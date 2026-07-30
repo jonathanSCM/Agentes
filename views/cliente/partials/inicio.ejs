@@ -106,7 +106,7 @@
                   <% if (n.conBotones) { %>
                     <div class="notif-actions">
                       <a class="btn btn-primary" href="/panel/paquetes">Comprar conversaciones</a>
-                      <a class="btn btn-ghost" href="https://wa.me/<%= site.whatsapp %>?text=<%= encodeURIComponent('Hola Proshop, quiero mejorar mi plan (' + empresaNombre + ')') %>" target="_blank" rel="noopener">Mejorar plan</a>
+                      <a class="btn btn-ghost" href="<%= site.whatsappUrl %>?text=<%= encodeURIComponent('Hola Proshop, quiero mejorar mi plan (' + empresaNombre + ')') %>" target="_blank" rel="noopener">Mejorar plan</a>
                     </div>
                   <% } %>
                   <% if (!n.leida) { %>

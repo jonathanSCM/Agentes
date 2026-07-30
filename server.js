@@ -42,6 +42,7 @@ const site = {
   tagline: 'Software a medida que impulsa tu negocio',
   // Numero de WhatsApp en formato internacional SIN el signo +, ej: 51999888777
   whatsapp: process.env.WHATSAPP_NUMBER || '51999888777',
+  whatsappUrl: process.env.WHATSAPP_URL || `https://wa.me/${process.env.WHATSAPP_NUMBER || '51999888777'}`,
   email: process.env.CONTACT_EMAIL || 'contacto@proshop.com',
   phone: process.env.CONTACT_PHONE || '+51 999 888 777',
   location: process.env.CONTACT_LOCATION || 'Lima, Peru',

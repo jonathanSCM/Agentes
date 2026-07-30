@@ -3,6 +3,13 @@
 require('dotenv').config();
 
 const { prisma } = require('../lib/db');
+const { registrarCliente } = require('../lib/services/auth');
+
+const SEED_CLIENTE_EMAIL = process.env.SEED_CLIENTE_EMAIL;
+const SEED_CLIENTE_PASSWORD = process.env.SEED_CLIENTE_PASSWORD;
+const SEED_CLIENTE_EMPRESA = process.env.SEED_CLIENTE_EMPRESA || 'Mi empresa';
+const SEED_CLIENTE_NOMBRE = process.env.SEED_CLIENTE_NOMBRE || 'Administrador';
+const SEED_CLIENTE_PLAN = process.env.SEED_CLIENTE_PLAN || 'GRATIS';
 
 // ---- Planes (precios en bolivianos) ----
 const PLANES = [
@@ -143,6 +150,7 @@ async function main() {
   console.log('Cargando paquetes de conversaciones...');
   // Los paquetes no tienen clave unica natural: se recargan desde cero.
   await prisma.paquete.deleteMany({});
+  await prisma.$executeRawUnsafe("SELECT setval(pg_get_serial_sequence('paquetes', 'id'), 1, false);");
   for (const p of PAQUETES) {
     await prisma.paquete.create({ data: p });
     console.log(`  - ${p.cantidad.toLocaleString('es')} conv. -> US$ ${p.precioUsd}`);
@@ -151,6 +159,32 @@ async function main() {
   const totalPlanes = await prisma.plan.count();
   const totalPaquetes = await prisma.paquete.count();
   console.log(`\nListo: ${totalPlanes} planes y ${totalPaquetes} paquetes en la base de datos.`);
+
+  if (SEED_CLIENTE_EMAIL && SEED_CLIENTE_PASSWORD) {
+    try {
+      const plan = await prisma.plan.findUnique({ where: { codigo: SEED_CLIENTE_PLAN } });
+      if (!plan) {
+        throw new Error(`No existe el plan con codigo ${SEED_CLIENTE_PLAN}.`);
+      }
+      const existingUser = await prisma.usuario.findUnique({ where: { email: SEED_CLIENTE_EMAIL.trim().toLowerCase() } });
+      if (existingUser) {
+        console.log(`La cuenta ${SEED_CLIENTE_EMAIL} ya existe, no se crea de nuevo.`);
+      } else {
+        console.log(`Creando cuenta inicial: ${SEED_CLIENTE_EMAIL}...`);
+        await registrarCliente({
+          empresa: SEED_CLIENTE_EMPRESA,
+          nombre: SEED_CLIENTE_NOMBRE,
+          email: SEED_CLIENTE_EMAIL,
+          password: SEED_CLIENTE_PASSWORD,
+          planId: plan.id,
+        });
+        console.log('Cuenta inicial creada correctamente.');
+      }
+    } catch (err) {
+      console.error('No se pudo crear la cuenta inicial:', err.message);
+      process.exit(1);
+    }
+  }
 }
 
 main()

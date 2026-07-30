@@ -1,0 +1,992 @@
+{
+  "id": 2,
+  "nombre": "Tienda Demo",
+  "slug": "tienda-demo",
+  "marca": null,
+  "createdAt": "2026-07-29T23:07:52.753Z",
+  "updatedAt": "2026-07-29T23:07:52.753Z",
+  "usuarios": [
+    {
+      "id": 1,
+      "empresaId": 2,
+      "email": "demo@tienda.com",
+      "passwordHash": "scrypt$77c344e390f1d3e93a60bcf5b7b5c0ea$0c4b5961e2ddedcca943bc169bf3808b159494cb6534f98a664bff5fd63199d150233f5e8c6dc7eb0fb3de02f0f115493f21be264c61d7c3741403c8eecb9214",
+      "nombre": "Admin Demo",
+      "rol": "OWNER",
+      "createdAt": "2026-07-29T23:07:52.859Z"
+    }
+  ],
+  "agentes": [
+    {
+      "id": 2,
+      "empresaId": 2,
+      "nombre": "Agente de Tienda Demo",
+      "numeroWhatsapp": null,
+      "estado": "ACTIVO",
+      "createdAt": "2026-07-29T23:07:52.753Z",
+      "updatedAt": "2026-07-29T23:07:52.934Z",
+      "config": {
+        "id": 2,
+        "agenteId": 2,
+        "mensajeBienvenida": "Hola! Bienvenido a Tienda Demo, ¿que estas buscando hoy?",
+        "tono": "cordial y entusiasta",
+        "instrucciones": null,
+        "derivarAHumano": true,
+        "updatedAt": "2026-07-29T23:07:52.942Z"
+      },
+      "conexion": null,
+      "conversaciones": [
+        {
+          "id": 2,
+          "agenteId": 2,
+          "telefonoCliente": "demo-65880",
+          "origen": "INCLUIDA",
+          "ultimoMensajeAt": "2026-07-29T23:09:05.376Z",
+          "createdAt": "2026-07-29T23:09:00.210Z",
+          "mensajes": [
+            {
+              "id": 7,
+              "conversacionId": 2,
+              "rol": "CLIENTE",
+              "contenido": "Hola, tienen zapatillas?",
+              "createdAt": "2026-07-29T23:09:00.210Z"
+            },
+            {
+              "id": 8,
+              "conversacionId": 2,
+              "rol": "AGENTE",
+              "contenido": "Aquí tienes la *Zapatilla deportiva urbana*, perfecta para el uso diario y entrenamiento ligero, gracias a su suela antideslizante. 🏃‍♂️\n\nSi te interesa, dime cuántas unidades necesitas para proceder con el pedido. ¡Estoy aquí para ayudarte a completar la compra! 👟✨",
+              "createdAt": "2026-07-29T23:09:05.398Z"
+            }
+          ]
+        },
+        {
+          "id": 3,
+          "agenteId": 2,
+          "telefonoCliente": "demo-253642",
+          "origen": "INCLUIDA",
+          "ultimoMensajeAt": "2026-07-29T23:12:34.924Z",
+          "createdAt": "2026-07-29T23:12:32.585Z",
+          "mensajes": [
+            {
+              "id": 9,
+              "conversacionId": 3,
+              "rol": "CLIENTE",
+              "contenido": "Hola",
+              "createdAt": "2026-07-29T23:12:32.585Z"
+            },
+            {
+              "id": 10,
+              "conversacionId": 3,
+              "rol": "AGENTE",
+              "contenido": "¡Hola! 😊 Soy tu asistente virtual de \"Tienda Demo\". Estoy aquí para ayudarte a encontrar justo lo que necesitas. ¿En qué categoría de productos estás interesado hoy? Aquí tienes algunas opciones para comenzar:\n\n1. Electrodomésticos\n2. Accesorios\n3. Calzado\n\n¡Espero tu respuesta para seguir adelante! 📦✨",
+              "createdAt": "2026-07-29T23:12:34.927Z"
+            }
+          ]
+        },
+        {
+          "id": 4,
+          "agenteId": 2,
+          "telefonoCliente": "demo-220614",
+          "origen": "INCLUIDA",
+          "ultimoMensajeAt": "2026-07-29T23:13:19.404Z",
+          "createdAt": "2026-07-29T23:13:17.828Z",
+          "mensajes": [
+            {
+              "id": 11,
+              "conversacionId": 4,
+              "rol": "CLIENTE",
+              "contenido": "Hola",
+              "createdAt": "2026-07-29T23:13:17.828Z"
+            },
+            {
+              "id": 12,
+              "conversacionId": 4,
+              "rol": "AGENTE",
+              "contenido": "¡Hola! 😊 Bienvenido a *Tienda Demo*. ¿En qué categoría de productos estás interesado hoy? Aquí tienes algunas opciones para comenzar:\n\n1. Electrodomésticos\n2. Accesorios\n3. Calzado\n\n¡Déjame saber cuál te interesa! 😄",
+              "createdAt": "2026-07-29T23:13:19.406Z"
+            }
+          ]
+        },
+        {
+          "id": 5,
+          "agenteId": 2,
+          "telefonoCliente": "demo-411112",
+          "origen": "INCLUIDA",
+          "ultimoMensajeAt": "2026-07-29T23:18:47.573Z",
+          "createdAt": "2026-07-29T23:18:07.917Z",
+          "mensajes": [
+            {
+              "id": 13,
+              "conversacionId": 5,
+              "rol": "CLIENTE",
+              "contenido": "Hola",
+              "createdAt": "2026-07-29T23:18:07.917Z"
+            },
+            {
+              "id": 14,
+              "conversacionId": 5,
+              "rol": "AGENTE",
+              "contenido": "¡Hola! ¿Cómo estás? ¿En qué puedo ayudarte hoy?",
+              "createdAt": "2026-07-29T23:18:10.593Z"
+            },
+            {
+              "id": 15,
+              "conversacionId": 5,
+              "rol": "CLIENTE",
+              "contenido": "Que productos tienes?",
+              "createdAt": "2026-07-29T23:18:20.657Z"
+            },
+            {
+              "id": 16,
+              "conversacionId": 5,
+              "rol": "AGENTE",
+              "contenido": "Tenemos una variedad de productos disponibles en las siguientes categorías:\n\n1. Electrodomésticos\n2. Accesorios\n3. Calzado\n\n¿Te interesa algún tipo de producto en particular? 😊",
+              "createdAt": "2026-07-29T23:18:22.104Z"
+            },
+            {
+              "id": 17,
+              "conversacionId": 5,
+              "rol": "CLIENTE",
+              "contenido": "2",
+              "createdAt": "2026-07-29T23:18:28.727Z"
+            },
+            {
+              "id": 18,
+              "conversacionId": 5,
+              "rol": "AGENTE",
+              "contenido": "Aquí tienes una zapatilla deportiva urbana que es perfecta para el uso diario y el entrenamiento ligero. Además, su suela antideslizante la hace súper cómoda. ¿Te gustaría llevarte un par? Si necesitas otra talla, solo dime. 😄🏃‍♂️",
+              "createdAt": "2026-07-29T23:18:30.707Z"
+            },
+            {
+              "id": 20,
+              "conversacionId": 5,
+              "rol": "CLIENTE",
+              "contenido": "Que tallas tienes?",
+              "createdAt": "2026-07-29T23:18:45.769Z"
+            },
+            {
+              "id": 22,
+              "conversacionId": 5,
+              "rol": "AGENTE",
+              "contenido": "¡Ah, perdón por la confusión! Deja te muestro las opciones que tenemos en calzado para que puedas ver si alguna se ajusta a lo que estás buscando. Aquí van: \n\n1. Zapatillas Deportivas Urbanas: ideales para el uso diario y entrenamiento ligero. Suela antideslizante.\n2. Botas de Montaña Resistentes: perfectas para aventuras al aire libre, resistente al agua.\n\nPara asegurarte de la talla, puedo revisar la disponibilidad. ¿Hay alguno de estos productos que te gustaría ver en detalle o necesitas saber algo más sobre ellos?",
+              "createdAt": "2026-07-29T23:18:47.575Z"
+            }
+          ]
+        },
+        {
+          "id": 6,
+          "agenteId": 2,
+          "telefonoCliente": "demo-891406",
+          "origen": "INCLUIDA",
+          "ultimoMensajeAt": "2026-07-29T23:19:11.131Z",
+          "createdAt": "2026-07-29T23:18:44.761Z",
+          "mensajes": [
+            {
+              "id": 19,
+              "conversacionId": 6,
+              "rol": "CLIENTE",
+              "contenido": "hola",
+              "createdAt": "2026-07-29T23:18:44.761Z"
+            },
+            {
+              "id": 21,
+              "conversacionId": 6,
+              "rol": "AGENTE",
+              "contenido": "¡Hola! ¿Cómo estás? ¿En qué puedo ayudarte hoy? 😊",
+              "createdAt": "2026-07-29T23:18:45.891Z"
+            },
+            {
+              "id": 23,
+              "conversacionId": 6,
+              "rol": "CLIENTE",
+              "contenido": "busco algo para hacer ejercicio, tengo poco presupuesto",
+              "createdAt": "2026-07-29T23:19:09.517Z"
+            },
+            {
+              "id": 24,
+              "conversacionId": 6,
+              "rol": "AGENTE",
+              "contenido": "¡Genial! Vamos a ver qué puedo ofrecerte dentro de nuestro inventario que te ayude a hacer ejercicio sin gastar mucho. \n\nPodemos ver opciones en las categorías disponibles:\n\n1. Electrodomésticos\n2. Accesorios\n3. Calzado\n\n¿Te interesa alguno de estos?",
+              "createdAt": "2026-07-29T23:19:11.134Z"
+            }
+          ]
+        },
+        {
+          "id": 7,
+          "agenteId": 2,
+          "telefonoCliente": "demo-323843",
+          "origen": "INCLUIDA",
+          "ultimoMensajeAt": "2026-07-29T23:34:50.092Z",
+          "createdAt": "2026-07-29T23:34:04.935Z",
+          "mensajes": [
+            {
+              "id": 25,
+              "conversacionId": 7,
+              "rol": "CLIENTE",
+              "contenido": "hola",
+              "createdAt": "2026-07-29T23:34:04.935Z"
+            },
+            {
+              "id": 26,
+              "conversacionId": 7,
+              "rol": "AGENTE",
+              "contenido": "¡Hola! ¿Cómo estás? ¿En qué te puedo ayudar hoy?",
+              "createdAt": "2026-07-29T23:34:08.182Z"
+            },
+            {
+              "id": 27,
+              "conversacionId": 7,
+              "rol": "CLIENTE",
+              "contenido": "que productos tienes?",
+              "createdAt": "2026-07-29T23:34:25.803Z"
+            },
+            {
+              "id": 28,
+              "conversacionId": 7,
+              "rol": "AGENTE",
+              "contenido": "Tenemos una variedad interesante. ¿Estás buscando algo en particular, como electrodomésticos, accesorios o calzado? ¡Contame un poco más así te puedo ayudar mejor!",
+              "createdAt": "2026-07-29T23:34:27.054Z"
+            },
+            {
+              "id": 29,
+              "conversacionId": 7,
+              "rol": "CLIENTE",
+              "contenido": "calzado",
+              "createdAt": "2026-07-29T23:34:47.971Z"
+            },
+            {
+              "id": 30,
+              "conversacionId": 7,
+              "rol": "AGENTE",
+              "contenido": "Te muestro dos opciones: hay unas sandalias de verano que son livianas y frescas, perfectas para esta época de calor. También tenemos zapatillas deportivas urbanas, ideales para el uso diario y algo de entrenamiento. ¿Te gustaría llevar alguna de estas?",
+              "createdAt": "2026-07-29T23:34:50.095Z"
+            }
+          ]
+        },
+        {
+          "id": 8,
+          "agenteId": 2,
+          "telefonoCliente": "demo-499630",
+          "origen": "INCLUIDA",
+          "ultimoMensajeAt": "2026-07-29T23:39:46.069Z",
+          "createdAt": "2026-07-29T23:39:43.106Z",
+          "mensajes": [
+            {
+              "id": 31,
+              "conversacionId": 8,
+              "rol": "CLIENTE",
+              "contenido": "quiero unas zapatillas",
+              "createdAt": "2026-07-29T23:39:43.106Z"
+            },
+            {
+              "id": 32,
+              "conversacionId": 8,
+              "rol": "AGENTE",
+              "contenido": "Aquí tienes las zapatillas deportivas urbanas, perfectas para el uso diario y con suela antideslizante. ¿Te gustaría llevarte un par? 😊",
+              "createdAt": "2026-07-29T23:39:46.088Z"
+            }
+          ]
+        },
+        {
+          "id": 9,
+          "agenteId": 2,
+          "telefonoCliente": "demo-375927",
+          "origen": "INCLUIDA",
+          "ultimoMensajeAt": "2026-07-29T23:42:04.255Z",
+          "createdAt": "2026-07-29T23:40:28.917Z",
+          "mensajes": [
+            {
+              "id": 33,
+              "conversacionId": 9,
+              "rol": "CLIENTE",
+              "contenido": "Hola, que productos tienes?",
+              "createdAt": "2026-07-29T23:40:28.917Z"
+            },
+            {
+              "id": 34,
+              "conversacionId": 9,
+              "rol": "AGENTE",
+              "contenido": "¡Hola! ¿Cómo estás? Tenemos varias cosas interesantes. ¿Qué andás buscando en particular? Puedo ayudarte con electrodomésticos, accesorios o calzados. ",
+              "createdAt": "2026-07-29T23:40:30.551Z"
+            },
+            {
+              "id": 35,
+              "conversacionId": 9,
+              "rol": "CLIENTE",
+              "contenido": "Que calzados tienes?",
+              "createdAt": "2026-07-29T23:40:43.397Z"
+            },
+            {
+              "id": 36,
+              "conversacionId": 9,
+              "rol": "AGENTE",
+              "contenido": "Tenemos unos calzados geniales para ofrecerte. Mira:\n\n1. *Zapatillas deportivas*: Perfectas para correr o para el día a día.\n2. *Botines de cuero*: Un clásico, super elegantes y cómodos.\n\n¿Cuál te gusta más o querés más detalles sobre alguno?",
+              "createdAt": "2026-07-29T23:40:45.993Z"
+            },
+            {
+              "id": 37,
+              "conversacionId": 9,
+              "rol": "CLIENTE",
+              "contenido": "Me gustan las zapatillas, que precio tienen?",
+              "createdAt": "2026-07-29T23:41:11.666Z"
+            },
+            {
+              "id": 38,
+              "conversacionId": 9,
+              "rol": "AGENTE",
+              "contenido": "Las zapatillas deportivas urbanas son una excelente opción, súper cómodas para el uso diario y con una suela antideslizante genial. Están a *$320*. ¿Te gustaría llevarlas? Podemos avanzar con el pedido si te interesa.",
+              "createdAt": "2026-07-29T23:41:13.769Z"
+            },
+            {
+              "id": 39,
+              "conversacionId": 9,
+              "rol": "CLIENTE",
+              "contenido": "Claro, las quiero, hacen envios a domicilio?",
+              "createdAt": "2026-07-29T23:41:33.527Z"
+            },
+            {
+              "id": 40,
+              "conversacionId": 9,
+              "rol": "AGENTE",
+              "contenido": "¡Perfecto! Sí, hacemos envíos a domicilio. Solo necesito que me pases tu nombre y la dirección de entrega para poder coordinar todo.",
+              "createdAt": "2026-07-29T23:41:35.066Z"
+            },
+            {
+              "id": 41,
+              "conversacionId": 9,
+              "rol": "CLIENTE",
+              "contenido": "Jonathan Campos Mansilla",
+              "createdAt": "2026-07-29T23:41:45.260Z"
+            },
+            {
+              "id": 42,
+              "conversacionId": 9,
+              "rol": "AGENTE",
+              "contenido": "¡Gracias, Jonathan! Ahora me faltaría la dirección exacta de entrega y ya podemos proceder con el pedido.",
+              "createdAt": "2026-07-29T23:41:46.543Z"
+            },
+            {
+              "id": 43,
+              "conversacionId": 9,
+              "rol": "CLIENTE",
+              "contenido": "Calle Los Penocos # 2085, Av banzer",
+              "createdAt": "2026-07-29T23:42:01.972Z"
+            },
+            {
+              "id": 44,
+              "conversacionId": 9,
+              "rol": "AGENTE",
+              "contenido": "¡Listo, Jonathan! He registrado tu pedido de las zapatillas deportivas. Un asesor se pondrá en contacto con vos para coordinar el pago y la entrega. Si tenés alguna consulta respecto al pago, puedo derivarte con un asesor ahora mismo. ¡Gracias por elegirnos!",
+              "createdAt": "2026-07-29T23:42:04.257Z"
+            }
+          ]
+        },
+        {
+          "id": 10,
+          "agenteId": 2,
+          "telefonoCliente": "demo-668749",
+          "origen": "INCLUIDA",
+          "ultimoMensajeAt": "2026-07-29T23:52:21.853Z",
+          "createdAt": "2026-07-29T23:52:19.149Z",
+          "mensajes": [
+            {
+              "id": 45,
+              "conversacionId": 10,
+              "rol": "CLIENTE",
+              "contenido": "quiero una mochila",
+              "createdAt": "2026-07-29T23:52:19.149Z"
+            },
+            {
+              "id": 46,
+              "conversacionId": 10,
+              "rol": "AGENTE",
+              "contenido": "¡Esta mochila es ideal para llevar tu laptop con seguridad y además es resistente al agua! ¿Te gustaría que hagamos el pedido?",
+              "createdAt": "2026-07-29T23:52:21.876Z"
+            }
+          ]
+        },
+        {
+          "id": 11,
+          "agenteId": 2,
+          "telefonoCliente": "demo-121084",
+          "origen": "INCLUIDA",
+          "ultimoMensajeAt": "2026-07-30T00:54:59.225Z",
+          "createdAt": "2026-07-30T00:54:03.118Z",
+          "mensajes": [
+            {
+              "id": 47,
+              "conversacionId": 11,
+              "rol": "CLIENTE",
+              "contenido": "Hola, tienes en stock esas zapatillas?",
+              "createdAt": "2026-07-30T00:54:03.118Z"
+            },
+            {
+              "id": 48,
+              "conversacionId": 11,
+              "rol": "AGENTE",
+              "contenido": "Aquí están las zapatillas deportivas urbanas, cómodas para el uso diario y con suela antideslizante. Si estás interesado, ¿cuántas te gustaría llevar?",
+              "createdAt": "2026-07-30T00:54:08.173Z"
+            },
+            {
+              "id": 49,
+              "conversacionId": 11,
+              "rol": "CLIENTE",
+              "contenido": "Quiero un par, hacen envios a domicilio?",
+              "createdAt": "2026-07-30T00:54:25.787Z"
+            },
+            {
+              "id": 50,
+              "conversacionId": 11,
+              "rol": "AGENTE",
+              "contenido": "¡Perfecto! Sí, hacemos envíos a domicilio. Para gestionar el pedido, necesito tu nombre y la dirección de entrega. ¿Podrías compartírmelos?",
+              "createdAt": "2026-07-30T00:54:27.185Z"
+            },
+            {
+              "id": 51,
+              "conversacionId": 11,
+              "rol": "CLIENTE",
+              "contenido": "Jonathan Samuel Campos Mansilla",
+              "createdAt": "2026-07-30T00:54:45.779Z"
+            },
+            {
+              "id": 52,
+              "conversacionId": 11,
+              "rol": "AGENTE",
+              "contenido": "¡Gracias, Jonathan! Ahora solo necesitaría la dirección de entrega para completar el pedido. ¿Me la puedes pasar?",
+              "createdAt": "2026-07-30T00:54:47.515Z"
+            },
+            {
+              "id": 53,
+              "conversacionId": 11,
+              "rol": "CLIENTE",
+              "contenido": "Los penocos # 2085",
+              "createdAt": "2026-07-30T00:54:54.666Z"
+            },
+            {
+              "id": 54,
+              "conversacionId": 11,
+              "rol": "AGENTE",
+              "contenido": "¡Perfecto, Jonathan! Tu pedido de las zapatillas deportivas urbanas está listo. Un asesor te contactará pronto para coordinar el pago y la entrega. Si tenés alguna pregunta sobre el pago, avisame y te pongo en contacto con alguien que te pueda ayudar. ¡Gracias por tu compra!",
+              "createdAt": "2026-07-30T00:54:59.227Z"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "productos": [
+    {
+      "id": 4,
+      "empresaId": 2,
+      "nombre": "Zapatilla deportiva urbana",
+      "categoria": "Calzado",
+      "descripcion": "Comoda para uso diario y entrenamiento ligero.",
+      "precio": "320",
+      "stock": 13,
+      "activo": true,
+      "fotos": [
+        "http://localhost:3000/uploads/demo-zapatilla-1.jpg",
+        "http://localhost:3000/uploads/demo-zapatilla-2.jpg"
+      ],
+      "caracteristicas": [
+        "Numeros 37 al 43",
+        "Suela antideslizante"
+      ],
+      "createdAt": "2026-07-29T23:07:52.892Z"
+    },
+    {
+      "id": 5,
+      "empresaId": 2,
+      "nombre": "Sandalia de verano",
+      "categoria": "Calzado",
+      "descripcion": "Liviana y fresca, ideal para epoca de calor.",
+      "precio": "120",
+      "stock": 20,
+      "activo": true,
+      "fotos": [],
+      "caracteristicas": [
+        "Numeros 35 al 42"
+      ],
+      "createdAt": "2026-07-29T23:07:52.899Z"
+    },
+    {
+      "id": 6,
+      "empresaId": 2,
+      "nombre": "Mochila resistente al agua",
+      "categoria": "Accesorios",
+      "descripcion": "Ideal para trabajo o estudio, con bolsillo acolchado.",
+      "precio": "150",
+      "stock": 10,
+      "activo": true,
+      "fotos": [
+        "http://localhost:3000/uploads/demo-mochila-1.jpg"
+      ],
+      "caracteristicas": [
+        "20 litros",
+        "Compartimento para laptop"
+      ],
+      "createdAt": "2026-07-29T23:07:52.905Z"
+    },
+    {
+      "id": 7,
+      "empresaId": 2,
+      "nombre": "Reloj deportivo",
+      "categoria": "Accesorios",
+      "descripcion": "Diseño resistente, correa de silicona.",
+      "precio": "200",
+      "stock": 8,
+      "activo": true,
+      "fotos": [],
+      "caracteristicas": [
+        "Resistente al agua",
+        "Cronometro"
+      ],
+      "createdAt": "2026-07-29T23:07:52.908Z"
+    },
+    {
+      "id": 8,
+      "empresaId": 2,
+      "nombre": "Licuadora 3 velocidades",
+      "categoria": "Electrodomesticos",
+      "descripcion": "Potente y facil de limpiar, ideal para uso diario.",
+      "precio": "350",
+      "stock": 6,
+      "activo": true,
+      "fotos": [
+        "http://localhost:3000/uploads/demo-licuadora-1.jpg"
+      ],
+      "caracteristicas": [
+        "Jarra 1.5 L",
+        "Vaso de vidrio"
+      ],
+      "createdAt": "2026-07-29T23:07:52.912Z"
+    },
+    {
+      "id": 9,
+      "empresaId": 2,
+      "nombre": "Plancha a vapor",
+      "categoria": "Electrodomesticos",
+      "descripcion": "Plancha con salida de vapor continuo.",
+      "precio": "180",
+      "stock": 12,
+      "activo": true,
+      "fotos": [
+        "http://localhost:3000/uploads/1785366732022-500849026.jpg"
+      ],
+      "caracteristicas": [
+        "Suela ceramica"
+      ],
+      "createdAt": "2026-07-29T23:07:52.919Z"
+    }
+  ],
+  "pedidos": [
+    {
+      "id": 2,
+      "empresaId": 2,
+      "clienteId": 9,
+      "total": "320",
+      "direccionEntrega": "Calle Los Penocos # 2085, Av banzer",
+      "entregaLat": null,
+      "entregaLng": null,
+      "notas": null,
+      "estado": "NUEVO",
+      "createdAt": "2026-07-29T23:42:03.215Z",
+      "cliente": {
+        "id": 9,
+        "empresaId": 2,
+        "nombre": "Jonathan Campos Mansilla",
+        "telefono": "demo-375927",
+        "createdAt": "2026-07-29T23:40:29.043Z",
+        "categoriaInteres": "Calzado",
+        "presupuesto": null,
+        "cantidad": null,
+        "direccionEntrega": "Calle Los Penocos # 2085, Av banzer",
+        "ubicacionLat": null,
+        "ubicacionLng": null,
+        "observaciones": null,
+        "nivelInteres": "FRIO",
+        "estadoLead": "PEDIDO_CREADO",
+        "contexto": {
+          "fotosEnviadas": [
+            8,
+            9,
+            4
+          ]
+        },
+        "updatedAt": "2026-07-29T23:42:03.237Z"
+      },
+      "items": [
+        {
+          "id": 2,
+          "pedidoId": 2,
+          "productoId": 4,
+          "nombre": "Zapatilla deportiva urbana",
+          "precio": "320",
+          "cantidad": 1
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "empresaId": 2,
+      "clienteId": 11,
+      "total": "320",
+      "direccionEntrega": "Los penocos # 2085",
+      "entregaLat": null,
+      "entregaLng": null,
+      "notas": null,
+      "estado": "NUEVO",
+      "createdAt": "2026-07-30T00:54:57.107Z",
+      "cliente": {
+        "id": 11,
+        "empresaId": 2,
+        "nombre": "Jonathan Samuel Campos Mansilla",
+        "telefono": "demo-121084",
+        "createdAt": "2026-07-30T00:54:03.199Z",
+        "categoriaInteres": "Calzado",
+        "presupuesto": null,
+        "cantidad": null,
+        "direccionEntrega": "Los penocos # 2085",
+        "ubicacionLat": null,
+        "ubicacionLng": null,
+        "observaciones": null,
+        "nivelInteres": "CALIENTE",
+        "estadoLead": "PEDIDO_CREADO",
+        "contexto": {
+          "fotosEnviadas": [
+            4
+          ]
+        },
+        "updatedAt": "2026-07-30T00:54:57.128Z"
+      },
+      "items": [
+        {
+          "id": 3,
+          "pedidoId": 3,
+          "productoId": 4,
+          "nombre": "Zapatilla deportiva urbana",
+          "precio": "320",
+          "cantidad": 1
+        }
+      ]
+    }
+  ],
+  "pagos": [
+    {
+      "id": 1,
+      "empresaId": 2,
+      "tipo": "PRIMER_PAGO",
+      "monto": "2890",
+      "moneda": "BOB",
+      "estado": "CONFIRMADO",
+      "referencia": "Registro desde el sitio",
+      "paqueteId": null,
+      "compraPaqueteId": null,
+      "fecha": "2026-07-29T23:07:52.869Z"
+    },
+    {
+      "id": 2,
+      "empresaId": 2,
+      "tipo": "PAQUETE",
+      "monto": "885",
+      "moneda": "USD",
+      "estado": "CONFIRMADO",
+      "referencia": "Paquete de 15000 conversaciones",
+      "paqueteId": 7,
+      "compraPaqueteId": null,
+      "fecha": "2026-07-30T00:55:32.762Z"
+    }
+  ],
+  "comprasPaquete": [
+    {
+      "id": 1,
+      "empresaId": 2,
+      "paqueteId": 7,
+      "cantidad": 15000,
+      "consumidas": 0,
+      "precioUsd": "885",
+      "fechaCompra": "2026-07-30T00:55:32.733Z",
+      "fechaRenovacion": "2026-08-29T00:55:32.726Z",
+      "estado": "ACTIVA",
+      "nota": "Comprado desde el panel del cliente"
+    }
+  ],
+  "notificaciones": [
+    {
+      "id": 2,
+      "empresaId": 2,
+      "titulo": "Tu pago fue confirmado",
+      "mensaje": "Confirmamos tu pago: tu plan ya está activo por 30 días más.",
+      "tipo": "PAGO_CONFIRMADO",
+      "conBotones": false,
+      "leida": true,
+      "createdAt": "2026-07-30T01:35:20.214Z"
+    }
+  ],
+  "suscripcion": {
+    "id": 2,
+    "empresaId": 2,
+    "planId": 3,
+    "estado": "ACTIVA",
+    "periodoInicio": "2026-07-30T01:35:20.188Z",
+    "periodoFin": "2026-08-29T01:35:20.188Z",
+    "refClientePago": null,
+    "refSuscripPago": null,
+    "createdAt": "2026-07-29T23:07:52.753Z",
+    "updatedAt": "2026-07-30T01:35:20.191Z"
+  },
+  "clientes": [
+    {
+      "id": 11,
+      "empresaId": 2,
+      "nombre": "Jonathan Samuel Campos Mansilla",
+      "telefono": "demo-121084",
+      "createdAt": "2026-07-30T00:54:03.199Z",
+      "categoriaInteres": "Calzado",
+      "presupuesto": null,
+      "cantidad": null,
+      "direccionEntrega": "Los penocos # 2085",
+      "ubicacionLat": null,
+      "ubicacionLng": null,
+      "observaciones": null,
+      "nivelInteres": "CALIENTE",
+      "estadoLead": "PEDIDO_CREADO",
+      "contexto": {
+        "fotosEnviadas": [
+          4
+        ]
+      },
+      "updatedAt": "2026-07-30T00:54:57.128Z"
+    },
+    {
+      "id": 4,
+      "empresaId": 2,
+      "nombre": null,
+      "telefono": "demo-220614",
+      "createdAt": "2026-07-29T23:13:17.871Z",
+      "categoriaInteres": null,
+      "presupuesto": null,
+      "cantidad": null,
+      "direccionEntrega": null,
+      "ubicacionLat": null,
+      "ubicacionLng": null,
+      "observaciones": null,
+      "nivelInteres": "FRIO",
+      "estadoLead": "NUEVO",
+      "contexto": {},
+      "updatedAt": "2026-07-29T23:13:17.871Z"
+    },
+    {
+      "id": 3,
+      "empresaId": 2,
+      "nombre": null,
+      "telefono": "demo-253642",
+      "createdAt": "2026-07-29T23:12:32.762Z",
+      "categoriaInteres": null,
+      "presupuesto": null,
+      "cantidad": null,
+      "direccionEntrega": null,
+      "ubicacionLat": null,
+      "ubicacionLng": null,
+      "observaciones": null,
+      "nivelInteres": "FRIO",
+      "estadoLead": "NUEVO",
+      "contexto": {},
+      "updatedAt": "2026-07-29T23:12:32.762Z"
+    },
+    {
+      "id": 7,
+      "empresaId": 2,
+      "nombre": null,
+      "telefono": "demo-323843",
+      "createdAt": "2026-07-29T23:34:05.012Z",
+      "categoriaInteres": "Calzado",
+      "presupuesto": null,
+      "cantidad": null,
+      "direccionEntrega": null,
+      "ubicacionLat": null,
+      "ubicacionLng": null,
+      "observaciones": null,
+      "nivelInteres": "FRIO",
+      "estadoLead": "NUEVO",
+      "contexto": {
+        "fotosEnviadas": [
+          5,
+          4
+        ]
+      },
+      "updatedAt": "2026-07-29T23:34:49.097Z"
+    },
+    {
+      "id": 9,
+      "empresaId": 2,
+      "nombre": "Jonathan Campos Mansilla",
+      "telefono": "demo-375927",
+      "createdAt": "2026-07-29T23:40:29.043Z",
+      "categoriaInteres": "Calzado",
+      "presupuesto": null,
+      "cantidad": null,
+      "direccionEntrega": "Calle Los Penocos # 2085, Av banzer",
+      "ubicacionLat": null,
+      "ubicacionLng": null,
+      "observaciones": null,
+      "nivelInteres": "FRIO",
+      "estadoLead": "PEDIDO_CREADO",
+      "contexto": {
+        "fotosEnviadas": [
+          8,
+          9,
+          4
+        ]
+      },
+      "updatedAt": "2026-07-29T23:42:03.237Z"
+    },
+    {
+      "id": 5,
+      "empresaId": 2,
+      "nombre": null,
+      "telefono": "demo-411112",
+      "createdAt": "2026-07-29T23:18:07.973Z",
+      "categoriaInteres": null,
+      "presupuesto": null,
+      "cantidad": null,
+      "direccionEntrega": null,
+      "ubicacionLat": null,
+      "ubicacionLng": null,
+      "observaciones": null,
+      "nivelInteres": "FRIO",
+      "estadoLead": "NUEVO",
+      "contexto": {
+        "fotosEnviadas": [
+          4
+        ]
+      },
+      "updatedAt": "2026-07-29T23:18:29.813Z"
+    },
+    {
+      "id": 8,
+      "empresaId": 2,
+      "nombre": null,
+      "telefono": "demo-499630",
+      "createdAt": "2026-07-29T23:39:43.174Z",
+      "categoriaInteres": "Calzado",
+      "presupuesto": null,
+      "cantidad": null,
+      "direccionEntrega": null,
+      "ubicacionLat": null,
+      "ubicacionLng": null,
+      "observaciones": null,
+      "nivelInteres": "FRIO",
+      "estadoLead": "NUEVO",
+      "contexto": {
+        "fotosEnviadas": [
+          4
+        ]
+      },
+      "updatedAt": "2026-07-29T23:39:44.844Z"
+    },
+    {
+      "id": 2,
+      "empresaId": 2,
+      "nombre": null,
+      "telefono": "demo-65880",
+      "createdAt": "2026-07-29T23:09:00.279Z",
+      "categoriaInteres": "Calzado",
+      "presupuesto": null,
+      "cantidad": null,
+      "direccionEntrega": null,
+      "ubicacionLat": null,
+      "ubicacionLng": null,
+      "observaciones": null,
+      "nivelInteres": "FRIO",
+      "estadoLead": "NUEVO",
+      "contexto": {
+        "fotosEnviadas": [
+          4
+        ]
+      },
+      "updatedAt": "2026-07-29T23:09:03.171Z"
+    },
+    {
+      "id": 10,
+      "empresaId": 2,
+      "nombre": null,
+      "telefono": "demo-668749",
+      "createdAt": "2026-07-29T23:52:19.320Z",
+      "categoriaInteres": "Accesorios",
+      "presupuesto": null,
+      "cantidad": null,
+      "direccionEntrega": null,
+      "ubicacionLat": null,
+      "ubicacionLng": null,
+      "observaciones": null,
+      "nivelInteres": "FRIO",
+      "estadoLead": "NUEVO",
+      "contexto": {
+        "fotosEnviadas": [
+          6
+        ]
+      },
+      "updatedAt": "2026-07-29T23:52:20.945Z"
+    },
+    {
+      "id": 6,
+      "empresaId": 2,
+      "nombre": null,
+      "telefono": "demo-891406",
+      "createdAt": "2026-07-29T23:18:44.896Z",
+      "categoriaInteres": null,
+      "presupuesto": null,
+      "cantidad": null,
+      "direccionEntrega": null,
+      "ubicacionLat": null,
+      "ubicacionLng": null,
+      "observaciones": null,
+      "nivelInteres": "FRIO",
+      "estadoLead": "NUEVO",
+      "contexto": {},
+      "updatedAt": "2026-07-29T23:18:44.896Z"
+    },
+    {
+      "id": 12,
+      "empresaId": 2,
+      "nombre": null,
+      "telefono": "test-debounce-1785373924181",
+      "createdAt": "2026-07-30T01:12:07.456Z",
+      "categoriaInteres": "Accesorios",
+      "presupuesto": null,
+      "cantidad": null,
+      "direccionEntrega": null,
+      "ubicacionLat": null,
+      "ubicacionLng": null,
+      "observaciones": null,
+      "nivelInteres": "FRIO",
+      "estadoLead": "NUEVO",
+      "contexto": {},
+      "updatedAt": "2026-07-30T01:12:07.476Z"
+    },
+    {
+      "id": 13,
+      "empresaId": 2,
+      "nombre": null,
+      "telefono": "test-debounce2-1785373970046",
+      "createdAt": "2026-07-30T01:12:53.261Z",
+      "categoriaInteres": "Accesorios",
+      "presupuesto": null,
+      "cantidad": null,
+      "direccionEntrega": null,
+      "ubicacionLat": null,
+      "ubicacionLng": null,
+      "observaciones": null,
+      "nivelInteres": "FRIO",
+      "estadoLead": "NUEVO",
+      "contexto": {
+        "fotosEnviadas": [
+          6
+        ]
+      },
+      "updatedAt": "2026-07-30T01:12:55.891Z"
+    }
+  ]
+}
