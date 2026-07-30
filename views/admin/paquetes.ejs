@@ -1,0 +1,38 @@
+<%- include('partials/inicio') %>
+
+<div class="page-head page-head-row">
+  <div>
+    <h2>Paquetes de conversaciones</h2>
+    <p>Se venden cuando una empresa agota las conversaciones incluidas en su plan.</p>
+  </div>
+  <a class="btn btn-primary" href="/admin/paquetes/nuevo">+ Nuevo paquete</a>
+</div>
+
+<% if (mensaje) { %><div class="alert-ok"><%= mensaje %></div><% } %>
+
+<div class="table-wrap">
+  <table class="leads-table">
+    <thead>
+      <tr><th>Conversaciones</th><th class="num">Precio (US$)</th><th class="num">Costo unitario</th><th>Estado</th><th>Acciones</th></tr>
+    </thead>
+    <tbody>
+      <% paquetes.forEach(function (p) { %>
+        <tr class="<%= !p.activo ? 'is-done' : '' %>">
+          <td><strong><%= p.cantidad.toLocaleString('es-BO') %></strong></td>
+          <td class="num">US$ <%= Number(p.precioUsd).toFixed(2) %></td>
+          <td class="num muted">US$ <%= Number(p.costoUnitarioUsd).toFixed(4) %></td>
+          <td><span class="badge <%= p.activo ? 'badge-new' : 'badge-off' %>"><%= p.activo ? 'Activo' : 'Inactivo' %></span></td>
+          <td class="actions-cell">
+            <a class="icon-btn" title="Editar" href="/admin/paquetes/<%= p.id %>/editar"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8"><path d="m16.5 3.5 4 4L7 21l-4.5 1L3.5 17.5 16.5 3.5Z"/></svg></a>
+            <form method="POST" action="/admin/paquetes/<%= p.id %>/activo" class="inline-form">
+              <button class="btn <%= p.activo ? 'btn-ghost' : 'btn-primary' %>" style="padding:.4rem .8rem;font-size:.85rem" type="submit"><%= p.activo ? 'Desactivar' : 'Activar' %></button>
+            </form>
+          </td>
+        </tr>
+      <% }); %>
+    </tbody>
+  </table>
+</div>
+<p class="muted" style="margin-top:1rem;font-size:.88rem">A mayor volumen, menor costo por conversación. Los paquetes inactivos dejan de ofrecerse en "Comprar paquete" del cliente, pero las compras ya hechas no se ven afectadas.</p>
+
+<%- include('partials/fin') %>

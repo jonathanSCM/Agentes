@@ -1,0 +1,68 @@
+<%- include('partials/inicio') %>
+
+<div class="page-head page-head-row">
+  <div>
+    <h2>Mis productos</h2>
+    <p>El catálogo que tu agente usa para responder y vender. Límite de tu plan: <strong><%= maxProductos.toLocaleString('es-BO') %></strong>.</p>
+  </div>
+  <% if (productos.length < maxProductos) { %>
+    <a class="btn btn-primary" href="/panel/productos/nuevo">+ Agregar producto</a>
+  <% } %>
+</div>
+
+<% if (mensaje) { %><div class="alert-ok"><%= mensaje %></div><% } %>
+<% if (productos.length >= maxProductos) { %>
+  <div class="alert-err">Alcanzaste el límite de productos de tu plan (<%= maxProductos %>). Mejora tu plan para agregar más.</div>
+<% } %>
+
+<div class="admin-stats">
+  <div class="stat-card"><span class="stat-num"><%= productos.length %></span><span class="stat-label">Productos</span></div>
+  <div class="stat-card stat-new"><span class="stat-num"><%= productos.filter(p=>p.activo).length %></span><span class="stat-label">Activos</span></div>
+  <div class="stat-card stat-done"><span class="stat-num"><%= productos.filter(p=>p.stock<=5).length %></span><span class="stat-label">Stock bajo (≤5)</span></div>
+</div>
+
+<% if (productos.length === 0) { %>
+  <div class="empty-state">
+    <h3>Aún no tienes productos</h3>
+    <p>Agrega tus productos para que el agente pueda ofrecerlos a tus clientes.</p>
+    <p style="margin-top:1rem"><a class="btn btn-primary" href="/panel/productos/nuevo">+ Agregar producto</a></p>
+  </div>
+<% } else { %>
+  <div class="table-wrap">
+    <table class="leads-table">
+      <thead>
+        <tr><th></th><th>Producto</th><th>Categoría</th><th class="num">Precio</th><th class="num">Stock</th><th>Estado</th><th>Acciones</th></tr>
+      </thead>
+      <tbody>
+        <% productos.forEach(function (p) { %>
+          <tr class="<%= p.activo ? '' : 'is-done' %>">
+            <td>
+              <% if (p.fotos && p.fotos.length) { %>
+                <img src="<%= p.fotos[0] %>" alt="" class="prod-thumb" />
+              <% } else { %>
+                <div class="prod-thumb prod-thumb-vacio">Sin foto</div>
+              <% } %>
+            </td>
+            <td>
+              <strong><%= p.nombre %></strong>
+              <% if (p.descripcion) { %><br /><span class="muted"><%= p.descripcion %></span><% } %>
+            </td>
+            <td><%= p.categoria || '-' %></td>
+            <td class="num">Bs <%= Number(p.precio).toFixed(2) %></td>
+            <td class="num <%= p.stock <= 5 ? 'saldo-ok' : '' %>"><%= p.stock %></td>
+            <td><span class="badge <%= p.activo ? 'badge-new' : 'badge-off' %>"><%= p.activo ? 'Activo' : 'Inactivo' %></span></td>
+            <td class="actions-cell">
+              <a class="icon-btn" title="Editar" href="/panel/productos/<%= p.id %>/editar"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8"><path d="m16.5 3.5 4 4L7 21l-4.5 1L3.5 17.5 16.5 3.5Z"/></svg></a>
+              <form method="POST" action="/panel/productos/<%= p.id %>/eliminar" class="inline-form"
+                    onsubmit="return confirm('¿Eliminar «<%= p.nombre %>»?');">
+                <button class="icon-btn del" type="submit" title="Eliminar"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 7h16M9 7V4h6v3m-9 0 1 13h10l1-13"/></svg></button>
+              </form>
+            </td>
+          </tr>
+        <% }); %>
+      </tbody>
+    </table>
+  </div>
+<% } %>
+
+<%- include('partials/fin') %>

@@ -1,0 +1,48 @@
+<%- include('partials/inicio') %>
+
+<div class="page-head">
+  <h2>Activos</h2>
+  <p>Clientes con suscripción vigente y su consumo en tiempo real.</p>
+</div>
+
+<div class="admin-stats">
+  <div class="stat-card stat-new"><span class="stat-num"><%= stats.activos %></span><span class="stat-label">Clientes activos</span></div>
+  <div class="stat-card"><span class="stat-num"><%= stats.convDisponibles.toLocaleString('es-BO') %></span><span class="stat-label">Conversaciones disponibles</span></div>
+  <div class="stat-card stat-done"><span class="stat-num"><%= stats.alLimite %></span><span class="stat-label">Al 80% o más del plan</span></div>
+</div>
+
+<% if (empresas.length === 0) { %>
+  <div class="empty-state">
+    <h3>No hay clientes activos</h3>
+    <p>Aparecerán aquí los que tengan una suscripción en estado ACTIVA o PRUEBA.</p>
+  </div>
+<% } else { %>
+  <div class="table-wrap">
+    <table class="leads-table">
+      <thead>
+        <tr>
+          <th>Cliente</th><th>Plan</th><th>Estado</th><th>Consumo del periodo</th>
+          <th class="num">Saldo extra</th><th class="num">Total disponible</th><th>Vence</th>
+        </tr>
+      </thead>
+      <tbody>
+        <% empresas.forEach(function (e) { %>
+          <tr>
+            <td><strong><%= e.nombre %></strong></td>
+            <td><%= e.suscripcion.plan.nombre %></td>
+            <td><span class="badge <%= e.suscripcion.estado === 'ACTIVA' ? 'badge-new' : 'badge-done' %>"><%= e.suscripcion.estado %></span></td>
+            <td style="min-width:170px">
+              <div class="bar"><span class="<%= e.consumo.porcentajeUsado >= 80 ? 'bar-alert' : '' %>" style="width:<%= e.consumo.porcentajeUsado %>%"></span></div>
+              <span class="muted"><%= e.consumo.incluidasUsadas %> / <%= e.consumo.incluidasTotal %> (<%= e.consumo.porcentajeUsado %>%)</span>
+            </td>
+            <td class="num"><%= e.consumo.extraDisponible.toLocaleString('es-BO') %></td>
+            <td class="num"><strong class="saldo-ok"><%= e.consumo.totalDisponible.toLocaleString('es-BO') %></strong></td>
+            <td class="nowrap muted"><%= new Date(e.suscripcion.periodoFin).toLocaleDateString('es-BO') %></td>
+          </tr>
+        <% }); %>
+      </tbody>
+    </table>
+  </div>
+<% } %>
+
+<%- include('partials/fin') %>

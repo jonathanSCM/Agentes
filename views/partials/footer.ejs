@@ -1,0 +1,42 @@
+<footer class="site-footer">
+  <div class="container footer-grid">
+    <div class="footer-brand">
+      <div class="brand">
+        <img src="/img/logo.png" alt="<%= site.name %>" class="brand-logo" />
+      </div>
+      <p class="footer-desc">Construimos software a medida: web apps, aplicaciones moviles y paneles administrativos que hacen crecer tu negocio.</p>
+    </div>
+
+    <div class="footer-col">
+      <h4>Servicios</h4>
+      <a href="#servicios">Aplicaciones web</a>
+      <a href="#servicios">Apps moviles</a>
+      <a href="#servicios">Paneles administrativos</a>
+      <a href="#servicios">Integraciones / APIs</a>
+    </div>
+
+    <div class="footer-col">
+      <h4>Empresa</h4>
+      <a href="#proceso">Nuestro proceso</a>
+      <a href="#portafolio">Portafolio</a>
+      <a href="#contacto">Contacto</a>
+      <a href="/admin">🔒 Panel de administración</a>
+    </div>
+
+    <div class="footer-col">
+      <h4>Contacto</h4>
+      <a href="mailto:<%= site.email %>"><%= site.email %></a>
+      <a href="https://wa.me/<%= site.whatsapp %>" target="_blank" rel="noopener"><%= site.phone %></a>
+      <span class="footer-muted"><%= site.location %></span>
+    </div>
+  </div>
+
+  <div class="container footer-bottom">
+    <span>&copy; <%= site.year %> <%= site.name %>. Todos los derechos reservados.</span>
+    <span class="footer-muted">Hecho con Node.js &middot; <a href="/admin" style="color:inherit">Panel</a></span>
+  </div>
+</footer>
+
+<a class="whatsapp-fab" href="https://wa.me/<%= site.whatsapp %>" target="_blank" rel="noopener" aria-label="Escribenos por WhatsApp">
+  <svg viewBox="0 0 32 32" width="30" height="30" fill="currentColor"><path d="M16 3C9.4 3 4 8.4 4 15c0 2.1.6 4.2 1.6 6L4 29l8.2-1.6c1.8.9 3.7 1.4 5.8 1.4 6.6 0 12-5.4 12-12S22.6 3 16 3zm0 21.8c-1.8 0-3.5-.5-5-1.4l-.4-.2-4.9 1 1-4.8-.3-.4A9.7 9.7 0 0 1 6.2 15c0-5.4 4.4-9.8 9.8-9.8s9.8 4.4 9.8 9.8-4.4 9.8-9.8 9.8zm5.4-7.3c-.3-.1-1.8-.9-2-1s-.5-.1-.7.1c-.2.3-.8 1-1 1.2-.2.2-.4.2-.7.1-1.8-.9-3-1.6-4.2-3.6-.3-.5.3-.5.9-1.6.1-.2 0-.4 0-.5s-.7-1.7-1-2.3c-.2-.6-.5-.5-.7-.5h-.6c-.2 0-.5.1-.8.4-.3.3-1 1-1 2.5s1.1 2.9 1.2 3.1c.2.2 2.1 3.3 5.2 4.6 2 .8 2.7.9 3.7.8.6-.1 1.8-.7 2-1.5.3-.7.3-1.4.2-1.5-.1-.2-.3-.2-.6-.4z"/></svg>
+</a>

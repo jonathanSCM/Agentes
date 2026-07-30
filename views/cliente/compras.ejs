@@ -1,0 +1,54 @@
+<%- include('partials/inicio') %>
+
+<div class="page-head">
+  <h2>Mis compras</h2>
+  <p>Paquetes que has adquirido, con su saldo y fecha de renovación.</p>
+</div>
+
+<% if (compras.some(function(c){ return c.estado === 'PENDIENTE'; })) { %>
+  <div class="alert-ok">Tienes una compra <strong>pendiente de confirmación</strong>: el saldo se activa apenas nuestro equipo confirme tu pago.</div>
+<% } %>
+
+<% if (compras.length === 0) { %>
+  <div class="empty-state">
+    <h3>Aún no has comprado paquetes</h3>
+    <p>Cuando compres uno, aparecerá aquí con su saldo restante.</p>
+    <p style="margin-top:1rem"><a class="btn btn-primary" href="/panel/paquetes">Comprar un paquete</a></p>
+  </div>
+<% } else { %>
+  <div class="table-wrap">
+    <table class="leads-table">
+      <thead>
+        <tr>
+          <th>Paquete</th><th class="num">Precio</th><th class="num">Usadas</th>
+          <th>Saldo restante</th><th>Compra</th><th>Renueva</th><th>Estado</th>
+        </tr>
+      </thead>
+      <tbody>
+        <% compras.forEach(function (c) { %>
+          <% var saldo = c.cantidad - c.consumidas;
+             var pct = c.cantidad > 0 ? Math.round((c.consumidas / c.cantidad) * 100) : 0; %>
+          <tr class="<%= c.estado !== 'ACTIVA' ? 'is-done' : '' %>">
+            <td><strong><%= c.cantidad.toLocaleString('es-BO') %></strong> conversaciones</td>
+            <td class="num">US$ <%= Number(c.precioUsd).toFixed(2) %></td>
+            <td class="num"><%= c.consumidas.toLocaleString('es-BO') %></td>
+            <td style="min-width:150px">
+              <div class="bar"><span style="width:<%= pct %>%"></span></div>
+              <strong class="<%= saldo === 0 ? 'muted' : 'saldo-ok' %>"><%= saldo.toLocaleString('es-BO') %></strong>
+              <span class="muted">restantes</span>
+            </td>
+            <td class="nowrap muted"><%= new Date(c.fechaCompra).toLocaleDateString('es-BO') %></td>
+            <td class="nowrap">
+              <%= new Date(c.fechaRenovacion).toLocaleDateString('es-BO') %>
+              <% var dias = Math.ceil((new Date(c.fechaRenovacion) - new Date()) / 86400000); %>
+              <br /><span class="muted"><%= dias > 0 ? 'en ' + dias + ' días' : 'vencido' %></span>
+            </td>
+            <td><span class="badge <%= c.estado === 'ACTIVA' ? 'badge-new' : (c.estado === 'AGOTADA' ? 'badge-done' : 'badge-off') %>"><%= c.estado %></span></td>
+          </tr>
+        <% }); %>
+      </tbody>
+    </table>
+  </div>
+<% } %>
+
+<%- include('partials/fin') %>

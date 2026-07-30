@@ -1,0 +1,43 @@
+{
+  "name": "proshop-web",
+  "version": "1.0.0",
+  "description": "Sitio web profesional de Proshop - software a medida (web apps, apps moviles y paneles).",
+  "main": "server.js",
+  "type": "commonjs",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js",
+    "seed": "node prisma/seed.js",
+    "prueba": "node scripts/prueba-consumo.js",
+    "simular": "node scripts/simular.js",
+    "db:studio": "prisma studio",
+    "db:migrate": "prisma migrate dev"
+  },
+  "keywords": [
+    "proshop",
+    "software",
+    "landing",
+    "express",
+    "nodejs"
+  ],
+  "author": "Proshop",
+  "license": "UNLICENSED",
+  "private": true,
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.115.0",
+    "@prisma/adapter-pg": "^7.9.0",
+    "@prisma/client": "^7.9.0",
+    "connect-pg-simple": "^10.0.0",
+    "dotenv": "^16.4.5",
+    "ejs": "^3.1.10",
+    "express": "^4.19.2",
+    "express-session": "^1.19.0",
+    "multer": "^2.2.0",
+    "openai": "^6.49.0",
+    "pg": "^8.22.0",
+    "sharp": "^0.35.3"
+  },
+  "devDependencies": {
+    "prisma": "^7.9.0"
+  }
+}

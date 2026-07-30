@@ -1,0 +1,42 @@
+<%- include('partials/inicio') %>
+
+<div class="page-head page-head-row">
+  <div>
+    <h2>Planes</h2>
+    <p>Catálogo comercial. Estos son los planes que se muestran en el sitio (los inactivos no aparecen ahí).</p>
+  </div>
+  <a class="btn btn-primary" href="/admin/planes/nuevo">+ Nuevo plan</a>
+</div>
+
+<% if (mensaje) { %><div class="alert-ok"><%= mensaje %></div><% } %>
+
+<div class="plan-grid">
+  <% planes.forEach(function (p) { %>
+    <div class="plan-card <%= p.recomendado ? 'is-reco' : '' %> <%= !p.activo ? 'is-done' : '' %>">
+      <h3>
+        <%= p.nombre %>
+        <% if (p.recomendado) { %><span class="badge badge-star">Recomendado</span><% } %>
+        <% if (!p.activo) { %><span class="badge badge-off">Inactivo</span><% } %>
+      </h3>
+      <div class="plan-price">Bs <%= Number(p.mensualidadBs).toLocaleString('es-BO') %><small>/mes</small></div>
+      <ul class="plan-meta">
+        <li>Código: <b><%= p.codigo %></b></li>
+        <li>Implementación: <b>Bs <%= Number(p.implementacionBs).toLocaleString('es-BO') %></b></li>
+        <li>Primer pago: <b>Bs <%= Number(p.primerPagoBs).toLocaleString('es-BO') %></b></li>
+        <li>Conversaciones: <b><%= p.convIncluidas.toLocaleString('es-BO') %>/mes</b></li>
+        <li>Productos: <b><%= p.maxProductos.toLocaleString('es-BO') %></b></li>
+        <li>Usuarios: <b><%= p.maxUsuarios %></b></li>
+        <li>Modelo IA: <b><%= p.modeloIa %></b></li>
+        <li>Marca blanca: <b><%= p.marcaBlanca ? 'Sí' : 'No' %></b></li>
+      </ul>
+      <div class="form-actions" style="margin-top:1rem">
+        <a class="btn btn-ghost" href="/admin/planes/<%= p.id %>/editar">Editar</a>
+        <form method="POST" action="/admin/planes/<%= p.id %>/activo" class="inline-form">
+          <button class="btn <%= p.activo ? 'btn-ghost' : 'btn-primary' %>" type="submit"><%= p.activo ? 'Desactivar' : 'Activar' %></button>
+        </form>
+      </div>
+    </div>
+  <% }); %>
+</div>
+
+<%- include('partials/fin') %>

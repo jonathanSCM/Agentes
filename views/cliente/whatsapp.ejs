@@ -1,0 +1,125 @@
+<%- include('partials/inicio') %>
+
+<div class="page-head">
+  <h2>WhatsApp</h2>
+  <p>Conecta tu número para que tu agente atienda a tus clientes por WhatsApp.</p>
+</div>
+
+<% if (mensaje) { %><div class="alert-ok"><%= mensaje %></div><% } %>
+<% if (error) { %><div class="alert-err"><%= error %></div><% } %>
+
+<%
+  var estado = conexion ? conexion.estado : 'NO_CONECTADO';
+  function haceCuanto(fecha) {
+    if (!fecha) return null;
+    var s = Math.floor((Date.now() - new Date(fecha).getTime()) / 1000);
+    if (s < 60) return 'hace segundos';
+    if (s < 3600) return 'hace ' + Math.floor(s/60) + ' min';
+    if (s < 86400) return 'hace ' + Math.floor(s/3600) + ' h';
+    return 'hace ' + Math.floor(s/86400) + ' días';
+  }
+%>
+
+<!-- ===== Banner de estado ===== -->
+<% if (estado === 'CONECTADO') { %>
+  <div class="wa-status wa-on">
+    <div class="wa-dot"></div>
+    <div>
+      <strong>WhatsApp conectado</strong>
+      <p>Número: <b><%= conexion.numeroVisible || conexion.phoneNumberId %></b></p>
+      <p class="muted">Último mensaje recibido: <%= haceCuanto(conexion.ultimoMensajeAt) || 'sin mensajes aún' %></p>
+    </div>
+  </div>
+
+  <div class="wa-actions">
+    <form method="POST" action="/panel/whatsapp/prueba" class="inline-form">
+      <button class="btn btn-primary" type="submit">Enviar mensaje de prueba</button>
+    </form>
+    <form method="POST" action="/panel/whatsapp/probar" class="inline-form">
+      <button class="btn btn-ghost" type="submit">Probar conexión</button>
+    </form>
+    <form method="POST" action="/panel/whatsapp/eliminar" class="inline-form"
+          onsubmit="return confirm('¿Desconectar tu número? El agente dejará de atender ahí.');">
+      <button class="btn btn-ghost" type="submit">Desconectar número</button>
+    </form>
+  </div>
+
+<% } else if (estado === 'EN_PROCESO') { %>
+  <div class="wa-status wa-proc">
+    <div class="wa-dot"></div>
+    <div>
+      <strong>WhatsApp no conectado</strong>
+      <p>Conexión en proceso. Esto puede tardar unas horas.</p>
+      <p class="muted">Nuestro equipo está conectando tu número<% if (conexion.numeroVisible) { %> <b><%= conexion.numeroVisible %></b><% } %>. Te avisaremos cuando esté listo.</p>
+    </div>
+  </div>
+
+  <form method="POST" action="/panel/whatsapp/eliminar" style="margin-top:1rem"
+        onsubmit="return confirm('¿Cancelar la solicitud de conexión?');">
+    <button class="btn btn-ghost" type="submit">Cancelar solicitud</button>
+  </form>
+
+<% } else { %>
+  <div class="wa-status wa-off">
+    <div class="wa-dot"></div>
+    <div>
+      <strong>WhatsApp no conectado</strong>
+      <p>Conecta tu número para comenzar a recibir mensajes.</p>
+    </div>
+  </div>
+
+  <form method="POST" action="/panel/whatsapp/solicitar" class="form-card" style="margin-top:1.2rem">
+    <h3 style="margin:0 0 .8rem;font-size:1.05rem">Solicitar conexión</h3>
+    <div class="field">
+      <label for="numeroVisible">Tu número de WhatsApp Business</label>
+      <input id="numeroVisible" name="numeroVisible" type="tel" maxlength="20" required
+             placeholder="+591 71234567" />
+      <p class="muted" style="font-size:.82rem;margin:.4rem 0 0">El número donde quieres que atienda tu agente.</p>
+    </div>
+    <div class="form-actions">
+      <button class="btn btn-primary" type="submit">Conectar mi WhatsApp</button>
+    </div>
+  </form>
+<% } %>
+
+<!-- ===== Configuración avanzada (manual, opcional) ===== -->
+<details class="aviso-box" style="margin-top:1.6rem">
+  <summary>Configuración avanzada (manual)</summary>
+  <div style="padding:.5rem 0 1rem">
+    <p class="muted" style="font-size:.88rem;margin:0 0 1rem">
+      Si prefieres conectarlo tú mismo con tus credenciales de Meta, complétalas aquí.
+      Datos del webhook para pegar en Meta:
+    </p>
+    <div class="field">
+      <label>Callback URL</label>
+      <input type="text" readonly value="<%= callbackUrl %>" onclick="this.select()" />
+    </div>
+    <div class="field">
+      <label>Verify Token</label>
+      <input type="text" readonly value="<%= verifyToken %>" onclick="this.select()" />
+    </div>
+
+    <form method="POST" action="/panel/whatsapp" style="margin-top:.8rem">
+      <div class="field">
+        <label for="phoneNumberId">Phone Number ID (de Meta)</label>
+        <input id="phoneNumberId" name="phoneNumberId" type="text" maxlength="60"
+               value="<%= conexion && conexion.phoneNumberId ? conexion.phoneNumberId : '' %>" placeholder="123456789012345" />
+      </div>
+      <div class="field">
+        <label for="wabaId">WhatsApp Business Account ID (opcional)</label>
+        <input id="wabaId" name="wabaId" type="text" maxlength="60"
+               value="<%= conexion && conexion.wabaId ? conexion.wabaId : '' %>" placeholder="987654321098765" />
+      </div>
+      <div class="field">
+        <label for="token">Token de acceso</label>
+        <input id="token" name="token" type="password" autocomplete="off"
+               placeholder="<%= conexion && conexion.tokenCifrado ? tokenEnmascarado : 'Pega el token de Meta' %>" />
+      </div>
+      <div class="form-actions">
+        <button class="btn btn-ghost" type="submit">Guardar credenciales</button>
+      </div>
+    </form>
+  </div>
+</details>
+
+<%- include('partials/fin') %>

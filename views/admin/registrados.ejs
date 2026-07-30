@@ -1,0 +1,76 @@
+<%- include('partials/inicio') %>
+
+<div class="page-head page-head-row">
+  <div>
+    <h2>Registrados</h2>
+    <p>Empresas cliente dadas de alta en la plataforma.</p>
+  </div>
+  <a class="btn btn-primary" href="/admin/registrados/nuevo">+ Agregar</a>
+</div>
+
+<p class="muted" style="font-size:.85rem;margin:-.6rem 0 1.2rem">
+  <strong>PRUEBA</strong>: probando sin pagar todavía · <strong>ACTIVA</strong>: al día · <strong>MOROSA</strong>: venció y no se confirmó el pago (agente apagado) · <strong>CANCELADA</strong>: dada de baja. Se confirman pagos desde <a href="/admin/pagos" style="color:var(--primary-2)">Pagos</a>.
+</p>
+
+<% if (mensaje) { %><div class="alert-ok"><%= mensaje %></div><% } %>
+
+<div class="admin-stats">
+  <div class="stat-card"><span class="stat-num"><%= stats.total %></span><span class="stat-label">Registrados</span></div>
+  <div class="stat-card stat-new"><span class="stat-num"><%= stats.activos %></span><span class="stat-label">Activos</span></div>
+  <div class="stat-card stat-done"><span class="stat-num"><%= stats.inactivos %></span><span class="stat-label">Inactivos</span></div>
+</div>
+
+<% if (empresas.length === 0) { %>
+  <div class="empty-state">
+    <h3>Aún no hay empresas registradas</h3>
+    <p>Usa el botón «Agregar» para dar de alta tu primer cliente.</p>
+  </div>
+<% } else { %>
+  <div class="table-wrap">
+    <table class="leads-table">
+      <thead>
+        <tr>
+          <th>Empresa</th><th>Plan</th><th>Estado</th>
+          <th>Consumo del periodo</th><th class="num">Saldo extra</th><th>Alta</th><th>Acciones</th>
+        </tr>
+      </thead>
+      <tbody>
+        <% empresas.forEach(function (e) { %>
+          <tr>
+            <td><strong><%= e.nombre %></strong><br /><span class="muted"><%= e.slug %></span></td>
+            <td><%= e.suscripcion ? e.suscripcion.plan.nombre : '—' %></td>
+            <td>
+              <% if (e.suscripcion) { %>
+                <span class="badge <%= e.suscripcion.estado === 'ACTIVA' ? 'badge-new' : (e.suscripcion.estado === 'PRUEBA' ? 'badge-done' : 'badge-off') %>"><%= e.suscripcion.estado %></span>
+              <% } else { %><span class="muted">Sin plan</span><% } %>
+            </td>
+            <td>
+              <% if (e.consumo) { %>
+                <div class="bar"><span style="width:<%= e.consumo.porcentajeUsado %>%"></span></div>
+                <span class="muted"><%= e.consumo.incluidasUsadas %> / <%= e.consumo.incluidasTotal %></span>
+              <% } else { %>—<% } %>
+            </td>
+            <td class="num"><%= e.consumo ? e.consumo.extraDisponible.toLocaleString('es-BO') : '—' %></td>
+            <td class="nowrap muted"><%= new Date(e.createdAt).toLocaleDateString('es-BO') %></td>
+            <td class="actions-cell">
+              <% if (e.suscripcion) { %>
+                <form method="POST" action="/admin/registrados/<%= e.id %>/simular" class="inline-form sim-form"
+                      title="Simular conversaciones entrantes para probar el consumo">
+                  <input type="number" name="cantidad" value="5" min="1" max="500" class="sim-input" />
+                  <button class="icon-btn sim" type="submit" title="Simular consumo">▶</button>
+                </form>
+              <% } %>
+              <a class="icon-btn" title="Editar" href="/admin/registrados/<%= e.id %>/editar"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8"><path d="m16.5 3.5 4 4L7 21l-4.5 1L3.5 17.5 16.5 3.5Z"/></svg></a>
+              <form method="POST" action="/admin/registrados/<%= e.id %>/eliminar" class="inline-form"
+                    onsubmit="return confirm('¿Eliminar «<%= e.nombre %>» y todos sus datos? Esta acción no se puede deshacer.');">
+                <button class="icon-btn del" type="submit" title="Eliminar"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 7h16M9 7V4h6v3m-9 0 1 13h10l1-13"/></svg></button>
+              </form>
+            </td>
+          </tr>
+        <% }); %>
+      </tbody>
+    </table>
+  </div>
+<% } %>
+
+<%- include('partials/fin') %>

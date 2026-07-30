@@ -1,0 +1,66 @@
+<%- include('partials/inicio') %>
+
+<div class="page-head">
+  <h2><%= producto ? 'Editar producto' : 'Agregar producto' %></h2>
+  <p>Estos datos son los que el agente usará para responder a tus clientes.</p>
+</div>
+
+<% if (error) { %><div class="alert-err"><%= error %></div><% } %>
+
+<form method="POST" action="<%= producto ? '/panel/productos/' + producto.id : '/panel/productos' %>" class="form-card" enctype="multipart/form-data">
+  <div class="field">
+    <label for="nombre">Nombre *</label>
+    <input id="nombre" name="nombre" type="text" required maxlength="120"
+           value="<%= producto ? producto.nombre : '' %>" placeholder="Ej: Zapatilla Runner Pro" />
+  </div>
+  <div class="field">
+    <label for="descripcion">Descripción</label>
+    <input id="descripcion" name="descripcion" type="text" maxlength="200"
+           value="<%= producto && producto.descripcion ? producto.descripcion : '' %>" placeholder="Color, talla, material..." />
+  </div>
+  <div class="field-row">
+    <div class="field">
+      <label for="precio">Precio (Bs) *</label>
+      <input id="precio" name="precio" type="number" min="0" step="0.01" required
+             value="<%= producto ? Number(producto.precio).toFixed(2) : '' %>" placeholder="0.00" />
+    </div>
+    <div class="field">
+      <label for="stock">Stock</label>
+      <input id="stock" name="stock" type="number" min="0"
+             value="<%= producto ? producto.stock : '0' %>" placeholder="0" />
+    </div>
+  </div>
+  <div class="field">
+    <label for="categoria">Categoría</label>
+    <input id="categoria" name="categoria" type="text" maxlength="120"
+           value="<%= producto && producto.categoria ? producto.categoria : '' %>" placeholder="Ej: Calzado" />
+  </div>
+  <div class="field">
+    <label for="caracteristicas">Características (separadas por coma)</label>
+    <input id="caracteristicas" name="caracteristicas" type="text" maxlength="300"
+           value="<%= producto && producto.caracteristicas ? producto.caracteristicas.join(', ') : '' %>" placeholder="Ej: Talla M, Color azul" />
+  </div>
+  <div class="field">
+    <label for="fotos">Fotos</label>
+    <input id="fotos" name="fotos" type="file" accept="image/*" multiple />
+    <% if (producto && producto.fotos && producto.fotos.length) { %>
+      <div class="fotos-existentes" style="display:flex;flex-wrap:wrap;gap:8px;margin-top:8px;">
+        <% producto.fotos.forEach(function (f) { %>
+          <img src="<%= f %>" style="width:80px;height:80px;object-fit:cover;border-radius:8px;" />
+        <% }); %>
+      </div>
+      <label style="margin-top:6px;"><input type="checkbox" name="quitarFotos" value="1" /> Quitar todas las fotos actuales al guardar</label>
+    <% } %>
+    <input type="hidden" name="fotosExistentes" value='<%- producto && producto.fotos ? JSON.stringify(producto.fotos) : "[]" %>' />
+  </div>
+  <div class="field">
+    <label><input type="checkbox" name="activo" value="1" <%= !producto || producto.activo ? 'checked' : '' %> /> Producto activo (visible para el agente)</label>
+  </div>
+
+  <div class="form-actions">
+    <a class="btn btn-ghost" href="/panel/productos">Cancelar</a>
+    <button class="btn btn-primary" type="submit"><%= producto ? 'Guardar cambios' : 'Agregar producto' %></button>
+  </div>
+</form>
+
+<%- include('partials/fin') %>

@@ -1,0 +1,82 @@
+<%- include('partials/inicio') %>
+
+<div class="page-head">
+  <h2>Configuración del agente</h2>
+  <p>Datos de tu agente de ventas y el número de WhatsApp que usará.</p>
+</div>
+
+<% if (mensaje) { %><div class="alert-ok"><%= mensaje %></div><% } %>
+<% if (error) { %><div class="alert-err"><%= error %></div><% } %>
+
+<form method="POST" action="/panel/configuracion" class="form-card">
+  <div class="field">
+    <label for="nombre">Nombre del agente</label>
+    <input id="nombre" name="nombre" type="text" maxlength="60"
+           value="<%= agente.nombre || '' %>" placeholder="Ej: Asistente de Tienda Doña Rosa" />
+  </div>
+
+  <div class="field">
+    <label for="numeroWhatsapp">Número de WhatsApp del agente</label>
+    <input id="numeroWhatsapp" name="numeroWhatsapp" type="tel" maxlength="20"
+           value="<%= agente.numeroWhatsapp || '' %>" placeholder="59171234567" />
+    <p class="muted" style="font-size:.82rem;margin:.4rem 0 0">
+      En formato internacional, sin el signo "+" ni espacios. Ej: Bolivia → <b>591</b> + número.
+    </p>
+  </div>
+
+  <div class="field">
+    <label for="mensajeBienvenida">Mensaje de bienvenida</label>
+    <input id="mensajeBienvenida" name="mensajeBienvenida" type="text" maxlength="200"
+           value="<%= config.mensajeBienvenida || '' %>" placeholder="¡Hola! ¿En qué puedo ayudarte hoy?" />
+  </div>
+
+  <div class="field-row">
+    <div class="field">
+      <label for="tono">Tono del agente</label>
+      <select id="tono" name="tono">
+        <% ['cordial y profesional','amigable y cercano','formal','divertido y casual'].forEach(function (t) { %>
+          <option value="<%= t %>" <%= config.tono === t ? 'selected' : '' %>><%= t %></option>
+        <% }); %>
+      </select>
+    </div>
+    <div class="field">
+      <label for="estado">Estado del agente</label>
+      <select id="estado" name="estado">
+        <% [['ACTIVO','Activo (atiende)'],['PAUSADO','Pausado'],['BORRADOR','Borrador']].forEach(function (e) { %>
+          <option value="<%= e[0] %>" <%= agente.estado === e[0] ? 'selected' : '' %>><%= e[1] %></option>
+        <% }); %>
+      </select>
+    </div>
+  </div>
+
+  <div class="field">
+    <label for="instrucciones">Instrucciones extra (opcional)</label>
+    <input id="instrucciones" name="instrucciones" type="text" maxlength="200"
+           value="<%= config.instrucciones || '' %>" placeholder="Ej: Ofrece el envío gratis en compras mayores a Bs 200" />
+  </div>
+
+  <div class="field">
+    <label><input type="checkbox" name="derivarAHumano" value="1" <%= config.derivarAHumano ? 'checked' : '' %> /> Permitir que derive a una persona cuando sea necesario</label>
+  </div>
+
+  <div class="form-actions">
+    <button class="btn btn-primary" type="submit">Guardar configuración</button>
+  </div>
+</form>
+
+<% if (!agente.numeroWhatsapp) { %>
+  <div class="alert-err" style="margin-top:1.4rem">
+    Aún no has puesto tu número de WhatsApp. Es necesario para conectar tu agente a WhatsApp real.
+  </div>
+<% } %>
+
+<div class="empty-state" style="margin-top:1.4rem;text-align:left;padding:1.6rem">
+  <h3 style="margin:0 0 .5rem">¿Cómo se conecta a WhatsApp real?</h3>
+  <p style="margin:0">
+    Guardar tu número aquí es el primer paso. La conexión con WhatsApp real requiere además una
+    <strong>cuenta de WhatsApp Business API (Meta)</strong> con verificación de empresa. Nuestro equipo de
+    Proshop te ayuda a completar ese enlace una vez que tu plan esté activo.
+  </p>
+</div>
+
+<%- include('partials/fin') %>

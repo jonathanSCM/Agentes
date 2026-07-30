@@ -1,0 +1,43 @@
+<%- include('partials/inicio') %>
+
+<div class="page-head">
+  <h2>Conversaciones</h2>
+  <p>Chats que tu agente ha atendido por WhatsApp.</p>
+</div>
+
+<div class="admin-stats">
+  <div class="stat-card"><span class="stat-num"><%= stats.total %></span><span class="stat-label">Conversaciones</span></div>
+  <div class="stat-card stat-new"><span class="stat-num"><%= stats.hoy %></span><span class="stat-label">Hoy</span></div>
+  <div class="stat-card stat-done"><span class="stat-num"><%= stats.mensajes %></span><span class="stat-label">Mensajes totales</span></div>
+</div>
+
+<% if (conversaciones.length === 0) { %>
+  <div class="empty-state">
+    <h3>Aún no hay conversaciones</h3>
+    <p>Cuando tus clientes escriban a tu agente (o pruebes el chat), aparecerán aquí.</p>
+    <p style="margin-top:1rem"><a class="btn btn-primary" href="/panel/agente">Probar el agente</a></p>
+  </div>
+<% } else { %>
+  <div class="table-wrap">
+    <table class="leads-table">
+      <thead>
+        <tr><th>Cliente</th><th class="num">Mensajes</th><th>Cobrada de</th><th>Último mensaje</th><th></th></tr>
+      </thead>
+      <tbody>
+        <% conversaciones.forEach(function (c) { %>
+          <tr class="row-link" onclick="window.location='/panel/conversaciones/<%= c.id %>'" style="cursor:pointer">
+            <td><strong><%= c.telefonoCliente %></strong></td>
+            <td class="num"><%= c._count.mensajes %></td>
+            <td><span class="badge <%= c.origen === 'INCLUIDA' ? 'badge-new' : 'badge-done' %>"><%= c.origen === 'INCLUIDA' ? 'Plan' : 'Paquete' %></span></td>
+            <td class="nowrap muted"><%= new Date(c.ultimoMensajeAt).toLocaleString('es-BO', { dateStyle:'short', timeStyle:'short' }) %></td>
+            <td class="actions-cell">
+              <a class="icon-btn" title="Ver conversación" href="/panel/conversaciones/<%= c.id %>" onclick="event.stopPropagation()"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg></a>
+            </td>
+          </tr>
+        <% }); %>
+      </tbody>
+    </table>
+  </div>
+<% } %>
+
+<%- include('partials/fin') %>

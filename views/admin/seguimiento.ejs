@@ -1,0 +1,73 @@
+<%- include('partials/inicio') %>
+
+<div class="page-head">
+  <h2>Seguimiento de mensajes</h2>
+  <p>Cuántas conversaciones le quedan a cada cliente (de su plan y de los paquetes comprados).</p>
+</div>
+
+<div class="admin-stats">
+  <div class="stat-card"><span class="stat-num"><%= stats.clientes %></span><span class="stat-label">Clientes con plan</span></div>
+  <div class="stat-card stat-new"><span class="stat-num"><%= stats.totalDisponible.toLocaleString('es-BO') %></span><span class="stat-label">Conversaciones disponibles (total)</span></div>
+  <div class="stat-card stat-done"><span class="stat-num"><%= stats.sinSaldo %></span><span class="stat-label">Sin saldo</span></div>
+</div>
+
+<% if (filas.length === 0) { %>
+  <div class="empty-state">
+    <h3>Aún no hay clientes con plan</h3>
+    <p>Cuando un cliente contrate un plan, verás aquí su consumo de conversaciones.</p>
+  </div>
+<% } else { %>
+  <div class="table-wrap">
+    <table class="leads-table">
+      <thead>
+        <tr>
+          <th>Cliente</th><th>Plan</th>
+          <th>Del plan (este periodo)</th>
+          <th class="num">Paquetes comprados</th>
+          <th class="num">Total restante</th>
+          <th>Renueva</th>
+        </tr>
+      </thead>
+      <tbody>
+        <% filas.forEach(function (f) { %>
+          <tr class="<%= f.consumo.totalDisponible === 0 ? 'is-done' : '' %>">
+            <td><strong><%= f.empresa.nombre %></strong></td>
+            <td><%= f.plan.nombre %></td>
+            <td style="min-width:180px">
+              <div class="bar"><span class="<%= f.consumo.porcentajeUsado >= 80 ? 'bar-alert' : '' %>" style="width:<%= f.consumo.porcentajeUsado %>%"></span></div>
+              <span class="muted">
+                Quedan <strong class="saldo-ok"><%= f.consumo.incluidasDisponibles.toLocaleString('es-BO') %></strong>
+                de <%= f.consumo.incluidasTotal.toLocaleString('es-BO') %>
+              </span>
+            </td>
+            <td class="num">
+              <% if (f.paquetes.length === 0) { %>
+                <span class="muted">—</span>
+              <% } else { %>
+                <strong class="saldo-ok"><%= f.consumo.extraDisponible.toLocaleString('es-BO') %></strong> restantes
+                <br /><span class="muted"><%= f.paquetes.length %> paquete<%= f.paquetes.length > 1 ? 's' : '' %></span>
+              <% } %>
+            </td>
+            <td class="num"><strong style="font-size:1.05rem"><%= f.consumo.totalDisponible.toLocaleString('es-BO') %></strong></td>
+            <td class="nowrap muted"><%= new Date(f.suscripcion.periodoFin).toLocaleDateString('es-BO') %></td>
+          </tr>
+          <% if (f.paquetes.length) { %>
+            <tr>
+              <td colspan="6" style="padding-top:0">
+                <div style="display:flex;flex-wrap:wrap;gap:.5rem;padding:.2rem 0 .6rem 1rem">
+                  <% f.paquetes.forEach(function (c) { %>
+                    <span class="badge <%= c.estado === 'ACTIVA' ? 'badge-new' : 'badge-off' %>">
+                      <%= c.cantidad.toLocaleString('es-BO') %> conv · quedan <%= (c.cantidad - c.consumidas).toLocaleString('es-BO') %> · renueva <%= new Date(c.fechaRenovacion).toLocaleDateString('es-BO') %>
+                    </span>
+                  <% }); %>
+                </div>
+              </td>
+            </tr>
+          <% } %>
+        <% }); %>
+      </tbody>
+    </table>
+  </div>
+<% } %>
+
+<%- include('partials/fin') %>

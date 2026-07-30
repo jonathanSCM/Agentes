@@ -1,0 +1,37 @@
+<%- include('partials/inicio') %>
+
+<div class="page-head">
+  <h2>Comprar paquete</h2>
+  <p>Añade conversaciones a tu cuenta. Se usan cuando agotas las incluidas en tu plan.</p>
+</div>
+
+<div class="gauge">
+  <div class="gauge-top">
+    <div>
+      <span class="gauge-num"><%= consumo.totalDisponible.toLocaleString('es-BO') %></span>
+      <span class="gauge-sub">conversaciones disponibles ahora</span>
+    </div>
+  </div>
+</div>
+
+<div class="buy-grid">
+  <% paquetes.forEach(function (p) { %>
+    <div class="buy-card">
+      <span class="buy-qty"><%= p.cantidad.toLocaleString('es-BO') %></span>
+      <span class="buy-lbl">conversaciones</span>
+      <div class="buy-price">US$ <%= Number(p.precioUsd).toFixed(2) %></div>
+      <span class="buy-unit">US$ <%= Number(p.costoUnitarioUsd).toFixed(4) %> por conversación</span>
+      <form method="POST" action="/panel/paquetes/<%= p.id %>/comprar"
+            onsubmit="return confirm('¿Confirmar la compra de <%= p.cantidad.toLocaleString('es-BO') %> conversaciones por US$ <%= Number(p.precioUsd).toFixed(2) %>?');">
+        <button class="btn btn-primary btn-block" type="submit">Comprar</button>
+      </form>
+    </div>
+  <% }); %>
+</div>
+
+<p class="muted" style="margin-top:1.4rem;font-size:.88rem">
+  A mayor volumen, menor costo por conversación. Los paquetes se activan al confirmarse el pago
+  y se consumen solo después de agotar las conversaciones incluidas en tu plan.
+</p>
+
+<%- include('partials/fin') %>

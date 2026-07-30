@@ -1,0 +1,52 @@
+<%- include('partials/inicio') %>
+
+<div class="page-head">
+  <h2>Usuarios y planes</h2>
+  <p>Cuentas registradas y el plan que adquirió cada una.</p>
+</div>
+
+<div class="admin-stats">
+  <div class="stat-card"><span class="stat-num"><%= stats.total %></span><span class="stat-label">Usuarios</span></div>
+  <div class="stat-card stat-new"><span class="stat-num"><%= stats.conPlan %></span><span class="stat-label">Con plan</span></div>
+  <div class="stat-card stat-done"><span class="stat-num"><%= stats.dePago %></span><span class="stat-label">En planes de pago</span></div>
+</div>
+
+<% if (usuarios.length === 0) { %>
+  <div class="empty-state">
+    <h3>Aún no hay usuarios registrados</h3>
+    <p>Cuando alguien cree una cuenta desde la web, aparecerá aquí con su plan.</p>
+  </div>
+<% } else { %>
+  <div class="table-wrap">
+    <table class="leads-table">
+      <thead>
+        <tr><th>Usuario</th><th>Empresa</th><th>Rol</th><th>Plan adquirido</th><th class="num">Mensualidad</th><th>Estado</th><th>Registro</th></tr>
+      </thead>
+      <tbody>
+        <% usuarios.forEach(function (u) { %>
+          <% var sub = u.empresa && u.empresa.suscripcion; var plan = sub && sub.plan; %>
+          <tr>
+            <td><strong><%= u.nombre %></strong><br /><a href="mailto:<%= u.email %>"><%= u.email %></a></td>
+            <td><%= u.empresa ? u.empresa.nombre : '—' %></td>
+            <td><span class="badge badge-off"><%= u.rol %></span></td>
+            <td>
+              <% if (plan) { %>
+                <%= plan.nombre %>
+                <% if (plan.recomendado) { %><span class="badge badge-star">★</span><% } %>
+              <% } else { %><span class="muted">Sin plan</span><% } %>
+            </td>
+            <td class="num"><%= plan ? 'Bs ' + Number(plan.mensualidadBs).toLocaleString('es-BO') : '—' %></td>
+            <td>
+              <% if (sub) { %>
+                <span class="badge <%= sub.estado === 'ACTIVA' ? 'badge-new' : (sub.estado === 'PRUEBA' ? 'badge-done' : 'badge-off') %>"><%= sub.estado %></span>
+              <% } else { %>—<% } %>
+            </td>
+            <td class="nowrap muted"><%= new Date(u.createdAt).toLocaleDateString('es-BO') %></td>
+          </tr>
+        <% }); %>
+      </tbody>
+    </table>
+  </div>
+<% } %>
+
+<%- include('partials/fin') %>

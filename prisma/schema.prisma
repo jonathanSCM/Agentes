@@ -1,0 +1,464 @@
+// Proshop - Plataforma de venta de Agentes de IA por WhatsApp
+// Esquema de base de datos (PostgreSQL via Prisma).
+//
+// Decisiones de diseno:
+//  - Multi-cliente (multi-tenant): cada negocio que contrata es una "Empresa".
+//  - El consumo se lleva como LIBRO CONTABLE (RegistroUso): cada consumo o compra
+//    queda registrado como un evento. Da historial auditable ante reclamos.
+//  - Una "conversacion" agrupa varios mensajes dentro de una ventana de tiempo,
+//    para cobrar por conversacion y no por mensaje (regla del PDF comercial).
+//  - Las conversaciones incluidas se reinician cada periodo; el saldo de paquetes
+//    adicionales NO caduca (se consume solo tras agotar las incluidas).
+
+// Generador clasico (CommonJS): compatible con el resto del proyecto,
+// que usa require() en lugar de import.
+generator client {
+  provider = "prisma-client-js"
+  output   = "../lib/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ============================ CATALOGO COMERCIAL ============================
+
+// Planes disponibles (Gratis, Standard, Pro, Premium BI)
+model Plan {
+  id               Int      @id @default(autoincrement())
+  codigo           String   @unique // GRATIS | STANDARD | PRO | PREMIUM
+  nombre           String
+  mensualidadBs    Decimal  @db.Decimal(10, 2)
+  implementacionBs Decimal  @db.Decimal(10, 2)
+  primerPagoBs     Decimal  @db.Decimal(10, 2) // implementacion + primera mensualidad
+  convIncluidas    Int // conversaciones incluidas por periodo
+  maxProductos     Int
+  maxUsuarios      Int
+  modeloIa         String   @default("claude-haiku-4-5") // modelo de IA segun el plan
+  marcaBlanca      Boolean  @default(false)
+  recomendado      Boolean  @default(false)
+  activo           Boolean  @default(true)
+  orden            Int      @default(0)
+  features         String[]
+  createdAt        DateTime @default(now())
+
+  suscripciones Suscripcion[]
+
+  @@map("planes")
+}
+
+// Paquetes de conversaciones adicionales (se compran al agotar el plan)
+model Paquete {
+  id               Int     @id @default(autoincrement())
+  cantidad         Int // 1000, 2500, 3500, 5000, 8000, 10000, 15000
+  precioUsd        Decimal @db.Decimal(10, 2)
+  costoUnitarioUsd Decimal @db.Decimal(10, 4)
+  activo           Boolean @default(true)
+
+  pagos   Pago[]
+  compras CompraPaquete[]
+
+  @@map("paquetes")
+}
+
+// Registro de cada paquete comprado por una empresa.
+// Guarda su propio saldo (cantidad - consumidas) y cuando debe renovarse.
+// El consumo del saldo extra se descuenta en orden de compra (el mas antiguo primero).
+model CompraPaquete {
+  id              Int          @id @default(autoincrement())
+  empresaId       Int
+  empresa         Empresa      @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  paqueteId       Int? // null si es una cantidad personalizada fuera del catalogo
+  paquete         Paquete?     @relation(fields: [paqueteId], references: [id])
+  cantidad        Int // conversaciones compradas
+  consumidas      Int          @default(0)
+  precioUsd       Decimal      @db.Decimal(10, 2)
+  fechaCompra     DateTime     @default(now())
+  fechaRenovacion DateTime // cuando debe renovar / vence
+  estado          EstadoCompra @default(ACTIVA)
+  nota            String?
+
+  pagos Pago[]
+
+  @@index([empresaId, estado])
+  @@map("compras_paquete")
+}
+
+enum EstadoCompra {
+  PENDIENTE  // comprada mientras se confirma el pago: TODAVIA NO da saldo usable
+  ACTIVA     // pago confirmado, con saldo disponible
+  AGOTADA    // se consumio todo
+  VENCIDA    // paso la fecha de renovacion
+  RECHAZADA  // el pago no se pudo confirmar, nunca dio saldo
+}
+
+// ============================ EMPRESAS Y USUARIOS ============================
+
+// Empresa cliente (tenant): cada negocio que contrata el agente
+model Empresa {
+  id        Int      @id @default(autoincrement())
+  nombre    String
+  slug      String   @unique
+  marca     String? // nombre para marca blanca (plan Premium)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  usuarios       Usuario[]
+  agentes        Agente[]
+  productos      Producto[]
+  clientes       ClienteFinal[]
+  pedidos        Pedido[]
+  pagos          Pago[]
+  comprasPaquete CompraPaquete[]
+  notificaciones Notificacion[]
+  suscripcion    Suscripcion?
+
+  @@map("empresas")
+}
+
+model Usuario {
+  id           Int      @id @default(autoincrement())
+  empresaId    Int?
+  empresa      Empresa? @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  email        String   @unique
+  passwordHash String
+  nombre       String
+  rol          Rol      @default(OWNER)
+  createdAt    DateTime @default(now())
+
+  @@index([empresaId])
+  @@map("usuarios")
+}
+
+enum Rol {
+  PROSHOP_ADMIN // administrador de Proshop (super admin)
+  OWNER         // dueno de la empresa cliente
+  ADMIN         // administrador de la empresa
+  STAFF         // colaborador
+}
+
+// ============================ SUSCRIPCION Y CONSUMO ============================
+
+model Suscripcion {
+  id             Int                @id @default(autoincrement())
+  empresaId      Int                @unique
+  empresa        Empresa            @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  planId         Int
+  plan           Plan               @relation(fields: [planId], references: [id])
+  estado         EstadoSuscripcion  @default(PRUEBA)
+  // Periodo de facturacion vigente: las conversaciones incluidas se reinician aqui.
+  periodoInicio  DateTime           @default(now())
+  periodoFin     DateTime
+  // Referencias de la pasarela de pago (se llenan al integrar Stripe / pasarela local)
+  refClientePago String?
+  refSuscripPago String?
+  createdAt      DateTime           @default(now())
+  updatedAt      DateTime           @updatedAt
+
+  registrosUso RegistroUso[]
+
+  @@index([planId])
+  @@index([estado])
+  @@map("suscripciones")
+}
+
+enum EstadoSuscripcion {
+  PRUEBA    // periodo de prueba
+  ACTIVA    // al dia
+  MOROSA    // periodo vencido sin pago confirmado: el agente deja de atender
+            // (ver ESTADOS_CON_SERVICIO en suscripciones.js) hasta reactivar
+  CANCELADA // sin acceso
+}
+
+// LIBRO CONTABLE del consumo. Cada fila es un evento, nunca se edita.
+// Saldo incluido = plan.convIncluidas - (CONSUMIDA con origen INCLUIDA en el periodo)
+// Saldo extra    = SUM(COMPRA_EXTRA) - COUNT(CONSUMIDA con origen EXTRA)  [historico]
+model RegistroUso {
+  id            Int          @id @default(autoincrement())
+  suscripcionId Int
+  suscripcion   Suscripcion  @relation(fields: [suscripcionId], references: [id], onDelete: Cascade)
+  tipo          TipoUso
+  origen        OrigenUso? // solo para CONSUMIDA: de donde se descontó
+  cantidad      Int // positivo siempre
+  nota          String?
+  createdAt     DateTime     @default(now())
+
+  @@index([suscripcionId, tipo])
+  @@index([suscripcionId, createdAt])
+  @@map("registros_uso")
+}
+
+enum TipoUso {
+  CONSUMIDA    // se consumio una conversacion
+  COMPRA_EXTRA // se compro un paquete adicional
+}
+
+enum OrigenUso {
+  INCLUIDA // descontada del cupo del plan
+  EXTRA    // descontada del saldo de paquetes comprados
+}
+
+// ============================ AGENTE (BOT) ============================
+
+model Agente {
+  id             Int          @id @default(autoincrement())
+  empresaId      Int
+  empresa        Empresa      @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  nombre         String
+  numeroWhatsapp String? // numero que el cliente usara para su agente (ej: 59171234567)
+  estado         EstadoAgente @default(BORRADOR)
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  config         AgenteConfig?
+  conexion       ConexionWhatsApp?
+  conversaciones Conversacion[]
+
+  @@index([empresaId])
+  @@map("agentes")
+}
+
+enum EstadoAgente {
+  BORRADOR
+  ACTIVO
+  PAUSADO
+}
+
+model AgenteConfig {
+  id                Int      @id @default(autoincrement())
+  agenteId          Int      @unique
+  agente            Agente   @relation(fields: [agenteId], references: [id], onDelete: Cascade)
+  mensajeBienvenida String   @default("Hola, en que puedo ayudarte?")
+  tono              String   @default("cordial y profesional")
+  instrucciones     String? // instrucciones adicionales para la IA
+  derivarAHumano    Boolean  @default(true)
+  updatedAt         DateTime @updatedAt
+
+  @@map("agente_config")
+}
+
+// Credenciales de WhatsApp. El token se guarda CIFRADO, nunca en texto plano.
+model ConexionWhatsApp {
+  id              Int       @id @default(autoincrement())
+  agenteId        Int       @unique
+  agente          Agente    @relation(fields: [agenteId], references: [id], onDelete: Cascade)
+  estado          String    @default("EN_PROCESO") // EN_PROCESO | CONECTADO
+  numeroVisible   String? // el numero que el cliente pidio conectar
+  phoneNumberId   String?   @unique // lo llena Proshop al conectar
+  wabaId          String? // WhatsApp Business Account ID (opcional)
+  tokenCifrado    String? // token de acceso, cifrado con APP_ENCRYPTION_KEY
+  ultimoMensajeAt DateTime? // ultimo mensaje recibido
+  verificado      Boolean   @default(false)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt @default(now())
+
+  @@map("conexiones_whatsapp")
+}
+
+// ============================ CONVERSACIONES ============================
+
+// Una conversacion agrupa los mensajes de un mismo cliente dentro de una
+// ventana de tiempo. Se cobra 1 conversacion, no 1 por mensaje.
+model Conversacion {
+  id              Int      @id @default(autoincrement())
+  agenteId        Int
+  agente          Agente   @relation(fields: [agenteId], references: [id], onDelete: Cascade)
+  telefonoCliente String
+  origen          OrigenUso @default(INCLUIDA) // de donde se cobro
+  ultimoMensajeAt DateTime  @default(now())
+  createdAt       DateTime  @default(now())
+
+  mensajes Mensaje[]
+
+  @@index([agenteId, telefonoCliente, ultimoMensajeAt])
+  @@map("conversaciones")
+}
+
+model Mensaje {
+  id             Int          @id @default(autoincrement())
+  conversacionId Int
+  conversacion   Conversacion @relation(fields: [conversacionId], references: [id], onDelete: Cascade)
+  rol            RolMensaje
+  contenido      String
+  createdAt      DateTime     @default(now())
+
+  @@index([conversacionId, createdAt])
+  @@map("mensajes")
+}
+
+enum RolMensaje {
+  CLIENTE
+  AGENTE
+  SISTEMA
+}
+
+// ============================ OPERACION / CATALOGO ============================
+
+model Producto {
+  id              Int      @id @default(autoincrement())
+  empresaId       Int
+  empresa         Empresa  @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  nombre          String
+  categoria       String?
+  descripcion     String?
+  precio          Decimal  @db.Decimal(10, 2)
+  stock           Int      @default(0)
+  activo          Boolean  @default(true)
+  fotos           String[] @default([])
+  caracteristicas String[] @default([])
+  createdAt       DateTime @default(now())
+
+  pedidoItems PedidoItem[]
+
+  @@index([empresaId])
+  @@map("productos")
+}
+
+model ClienteFinal {
+  id        Int      @id @default(autoincrement())
+  empresaId Int
+  empresa   Empresa  @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  nombre    String?
+  telefono  String
+  createdAt DateTime @default(now())
+
+  // Estado de la conversacion de ventas (equivalente al "lead" del bot):
+  // se actualiza por codigo (extraccion determinista) y via la tool
+  // actualizar_datos_lead del agente. Se reinicia solo si el cliente cambia
+  // de opinion, nunca automaticamente.
+  categoriaInteres String?
+  presupuesto      String?
+  cantidad         String?
+  direccionEntrega String?
+  // Coordenadas reales cuando el cliente comparte su ubicacion de WhatsApp
+  // (mucho mas confiable que una direccion escrita a mano para coordinar
+  // la entrega). direccionEntrega igual queda con un texto legible/link.
+  ubicacionLat     Float?
+  ubicacionLng     Float?
+  observaciones    String?
+  nivelInteres     NivelInteres @default(FRIO)
+  estadoLead       EstadoLead   @default(NUEVO)
+  // Datos efimeros del bot (ej. que productos ya se les envio foto, para
+  // no repetir el envio). Libre para que cualquier bot vertical lo use.
+  contexto         Json         @default("{}")
+  updatedAt        DateTime     @updatedAt
+
+  pedidos Pedido[]
+
+  @@unique([empresaId, telefono])
+  @@map("clientes_finales")
+}
+
+enum NivelInteres {
+  FRIO
+  TIBIO
+  CALIENTE
+}
+
+enum EstadoLead {
+  NUEVO
+  EN_CONVERSACION
+  CALIFICADO
+  PEDIDO_CREADO
+  DERIVADO_A_ASESOR
+  CERRADO
+  NO_INTERESADO
+}
+
+model Pedido {
+  id               Int           @id @default(autoincrement())
+  empresaId        Int
+  empresa          Empresa       @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  clienteId        Int?
+  cliente          ClienteFinal? @relation(fields: [clienteId], references: [id])
+  total            Decimal       @default(0) @db.Decimal(10, 2)
+  direccionEntrega String?
+  entregaLat       Float?
+  entregaLng       Float?
+  notas            String?
+  estado           EstadoPedido  @default(NUEVO)
+  createdAt        DateTime      @default(now())
+
+  items PedidoItem[]
+
+  @@index([empresaId, estado])
+  @@map("pedidos")
+}
+
+// Linea de un pedido. Guarda nombre y precio al momento de la compra
+// (denormalizado) para que el historial no cambie si el producto se edita
+// o se borra despues.
+model PedidoItem {
+  id         Int       @id @default(autoincrement())
+  pedidoId   Int
+  pedido     Pedido    @relation(fields: [pedidoId], references: [id], onDelete: Cascade)
+  productoId Int?
+  producto   Producto? @relation(fields: [productoId], references: [id], onDelete: SetNull)
+  nombre     String
+  precio     Decimal   @db.Decimal(10, 2)
+  cantidad   Int       @default(1)
+
+  @@index([pedidoId])
+  @@map("pedido_items")
+}
+
+enum EstadoPedido {
+  NUEVO
+  CONFIRMADO
+  ENTREGADO
+  CANCELADO
+}
+
+// ============================ PAGOS ============================
+
+model Pago {
+  id         Int        @id @default(autoincrement())
+  empresaId  Int
+  empresa    Empresa    @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  tipo       TipoPago
+  monto      Decimal    @db.Decimal(10, 2)
+  moneda     String     @default("BOB") // BOB (bolivianos) | USD
+  estado     EstadoPago @default(PENDIENTE)
+  referencia String? // id de la pasarela / comprobante
+  paqueteId  Int?
+  paquete    Paquete?       @relation(fields: [paqueteId], references: [id])
+  // Vinculo exacto con la compra que este pago paga (solo tipo PAQUETE): al
+  // confirmar/rechazar este pago, se activa/rechaza ESA compra puntual, sin
+  // adivinar cual por fecha o cantidad.
+  compraPaqueteId Int?
+  compraPaquete   CompraPaquete? @relation(fields: [compraPaqueteId], references: [id])
+  fecha      DateTime   @default(now())
+
+  @@index([empresaId, estado])
+  @@map("pagos")
+}
+
+enum TipoPago {
+  PRIMER_PAGO // implementacion + primera mensualidad
+  MENSUALIDAD
+  PAQUETE     // conversaciones adicionales
+}
+
+enum EstadoPago {
+  PENDIENTE
+  CONFIRMADO
+  FALLIDO
+}
+
+// ============================ NOTIFICACIONES ============================
+
+// Avisos que aparecen en la campanita del panel del cliente.
+model Notificacion {
+  id         Int      @id @default(autoincrement())
+  empresaId  Int
+  empresa    Empresa  @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  titulo     String
+  mensaje    String
+  tipo       String   @default("MANUAL") // MANUAL | PLAN_POR_ACABAR | SIN_SALDO
+  conBotones Boolean  @default(false) // muestra "Comprar paquete" y "Mejorar plan"
+  leida      Boolean  @default(false)
+  createdAt  DateTime @default(now())
+
+  @@index([empresaId, leida])
+  @@map("notificaciones")
+}

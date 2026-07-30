@@ -1,0 +1,102 @@
+<%- include('partials/inicio') %>
+
+<div class="page-head">
+  <h2>Hola, <%= empresaNombre %></h2>
+  <p>Resumen de hoy · <%= new Date().toLocaleDateString('es-BO', { weekday: 'long', day: 'numeric', month: 'long' }) %></p>
+</div>
+
+<% if (avisoSaldo) { %>
+  <div class="alert-err">
+    <%= avisoSaldo %> <a href="/panel/paquetes" style="color:var(--primary-2)">Comprar conversaciones</a>
+  </div>
+<% } %>
+
+<!-- KPIs del día -->
+<div class="admin-stats">
+  <div class="stat-card">
+    <span class="stat-num"><%= kpi.clientesHoy %></span>
+    <span class="stat-label">Clientes que escribieron hoy</span>
+  </div>
+  <div class="stat-card stat-new">
+    <span class="stat-num"><%= kpi.pedidosHoy %></span>
+    <span class="stat-label">Pedidos de hoy</span>
+  </div>
+  <div class="stat-card stat-done">
+    <span class="stat-num">Bs <%= kpi.ventasHoy.toLocaleString('es-BO') %></span>
+    <span class="stat-label">Vendido hoy</span>
+  </div>
+  <div class="stat-card">
+    <span class="stat-num"><%= kpi.resueltasIA %>%</span>
+    <span class="stat-label">Resuelto por la IA</span>
+  </div>
+</div>
+
+<div class="dash-grid">
+  <!-- Atención humana -->
+  <div class="dash-card">
+    <div class="dash-card-head">
+      <h3>Necesitan atención humana</h3>
+      <a href="/panel/conversaciones">Ver todas</a>
+    </div>
+    <% if (atencion.length === 0) { %>
+      <p class="dash-empty">Todo bajo control. La IA está respondiendo.</p>
+    <% } else { %>
+      <ul class="dash-list">
+        <% atencion.forEach(function (c) { %>
+          <li>
+            <span><%= c.telefonoCliente %></span>
+            <span class="muted"><%= new Date(c.ultimoMensajeAt).toLocaleString('es-BO', { hour:'2-digit', minute:'2-digit' }) %></span>
+          </li>
+        <% }); %>
+      </ul>
+    <% } %>
+  </div>
+
+  <!-- Stock bajo -->
+  <div class="dash-card">
+    <div class="dash-card-head">
+      <h3>Productos con poco stock</h3>
+      <a href="/panel/inventario">Ver inventario</a>
+    </div>
+    <% if (stockBajo.length === 0) { %>
+      <p class="dash-empty">Ningún producto en riesgo de agotarse.</p>
+    <% } else { %>
+      <ul class="dash-list">
+        <% stockBajo.forEach(function (p) { %>
+          <li>
+            <span><%= p.nombre %></span>
+            <span class="badge <%= p.stock === 0 ? 'badge-off' : 'badge-star' %>"><%= p.stock %> unid.</span>
+          </li>
+        <% }); %>
+      </ul>
+    <% } %>
+  </div>
+
+  <!-- Consumo rápido -->
+  <div class="dash-card">
+    <div class="dash-card-head">
+      <h3>Tu saldo</h3>
+      <a href="/panel/consumo">Ver detalle</a>
+    </div>
+    <div style="text-align:center;padding:.5rem 0">
+      <div class="gauge-num" style="font-size:2.2rem"><%= consumo.totalDisponible.toLocaleString('es-BO') %></div>
+      <span class="gauge-sub">conversaciones disponibles</span>
+      <div class="bar-lg" style="margin-top:.8rem">
+        <span class="<%= consumo.porcentajeUsado >= 100 ? 'bar-full' : (consumo.porcentajeUsado >= 80 ? 'bar-alert' : '') %>"
+              style="width:<%= consumo.porcentajeUsado %>%"></span>
+      </div>
+      <span class="muted" style="font-size:.82rem">Usaste <%= consumo.porcentajeUsado %>% de tu plan</span>
+    </div>
+  </div>
+
+  <!-- Ventas por anuncios (próximamente) -->
+  <div class="dash-card">
+    <div class="dash-card-head">
+      <h3>Ventas desde anuncios</h3>
+      <span class="badge badge-off">Próximamente</span>
+    </div>
+    <p class="dash-empty">Cuando conectes tus campañas de Meta, verás aquí cuántas ventas llegaron desde anuncios.</p>
+  </div>
+</div>
+
+<%- include('partials/fin') %>

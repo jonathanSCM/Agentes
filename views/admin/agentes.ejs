@@ -1,0 +1,41 @@
+<%- include('partials/inicio') %>
+
+<div class="page-head">
+  <h2>Agentes</h2>
+  <p>Agentes de IA configurados para cada empresa cliente.</p>
+</div>
+
+<% if (agentes.length === 0) { %>
+  <div class="empty-state">
+    <h3>Aún no hay agentes creados</h3>
+    <p>Cada empresa cliente tendrá su agente de ventas conectado a WhatsApp.</p>
+  </div>
+<% } else { %>
+  <div class="table-wrap">
+    <table class="leads-table">
+      <thead>
+        <tr><th>Agente</th><th>Empresa</th><th>Estado</th><th>WhatsApp</th><th class="num">Conversaciones</th></tr>
+      </thead>
+      <tbody>
+        <% agentes.forEach(function (a) { %>
+          <tr>
+            <td><strong><%= a.nombre %></strong></td>
+            <td><%= a.empresa.nombre %></td>
+            <td>
+              <span class="badge <%= a.estado === 'ACTIVO' ? 'badge-new' : 'badge-off' %>"><%= a.estado %></span>
+            </td>
+            <td>
+              <% if (a.conexion) { %>
+                <%= a.conexion.numeroVisible || a.conexion.phoneNumberId %>
+                <% if (a.conexion.verificado) { %><span class="badge badge-new">verificado</span><% } %>
+              <% } else { %><span class="muted">Sin conectar</span><% } %>
+            </td>
+            <td class="num"><%= a._count.conversaciones.toLocaleString('es-BO') %></td>
+          </tr>
+        <% }); %>
+      </tbody>
+    </table>
+  </div>
+<% } %>
+
+<%- include('partials/fin') %>

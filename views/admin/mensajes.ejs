@@ -1,0 +1,67 @@
+<%- include('partials/inicio') %>
+
+<div class="page-head">
+  <h2>Mensajes de contacto</h2>
+  <p>Solicitudes que llegan desde el formulario del sitio.</p>
+</div>
+
+<div class="admin-stats">
+  <div class="stat-card"><span class="stat-num"><%= stats.total %></span><span class="stat-label">Total</span></div>
+  <div class="stat-card stat-new"><span class="stat-num"><%= stats.nuevos %></span><span class="stat-label">Nuevos</span></div>
+  <div class="stat-card stat-done"><span class="stat-num"><%= stats.atendidos %></span><span class="stat-label">Atendidos</span></div>
+</div>
+
+<% if (leads.length === 0) { %>
+  <div class="empty-state">
+    <h3>Aún no hay mensajes</h3>
+    <p>Cuando alguien complete el formulario de contacto del sitio, aparecerá aquí.</p>
+  </div>
+<% } else { %>
+  <div class="table-wrap">
+    <table class="leads-table">
+      <thead>
+        <tr>
+          <th>Fecha</th><th>Nombre</th><th>Contacto</th><th>Servicio</th>
+          <th>Mensaje</th><th>Estado</th><th>Acciones</th>
+        </tr>
+      </thead>
+      <tbody>
+        <% leads.forEach(function (l) { %>
+          <tr class="<%= l.estado === 'atendido' ? 'is-done' : '' %>">
+            <td class="nowrap"><%= new Date(l.fecha).toLocaleString('es-BO', { dateStyle: 'short', timeStyle: 'short' }) %></td>
+            <td><strong><%= l.nombre %></strong></td>
+            <td>
+              <a href="mailto:<%= l.email %>"><%= l.email %></a>
+              <% if (l.telefono) { %><br /><span class="muted"><%= l.telefono %></span><% } %>
+            </td>
+            <td><%= l.servicio || '—' %></td>
+            <td class="msg-cell"><%= l.mensaje %></td>
+            <td>
+              <span class="badge <%= l.estado === 'atendido' ? 'badge-done' : 'badge-new' %>">
+                <%= l.estado === 'atendido' ? 'Atendido' : 'Nuevo' %>
+              </span>
+            </td>
+            <td class="actions-cell">
+              <% if (l.telefono) { %>
+                <a class="icon-btn wa" title="Responder por WhatsApp" target="_blank" rel="noopener"
+                   href="https://wa.me/<%= l.telefono.replace(/\D/g, '') %>">WA</a>
+              <% } %>
+              <a class="icon-btn mail" title="Responder por email" href="mailto:<%= l.email %>">@</a>
+              <form method="POST" action="/admin/leads/<%= l.id %>/estado" class="inline-form">
+                <input type="hidden" name="estado" value="<%= l.estado === 'atendido' ? 'nuevo' : 'atendido' %>" />
+                <button class="icon-btn check" type="submit"
+                  title="<%= l.estado === 'atendido' ? 'Marcar como nuevo' : 'Marcar como atendido' %>"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 12.5 9 17l11-11"/></svg></button>
+              </form>
+              <form method="POST" action="/admin/leads/<%= l.id %>/eliminar" class="inline-form"
+                    onsubmit="return confirm('¿Eliminar este mensaje de forma permanente?');">
+                <button class="icon-btn del" type="submit" title="Eliminar"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 7h16M9 7V4h6v3m-9 0 1 13h10l1-13"/></svg></button>
+              </form>
+            </td>
+          </tr>
+        <% }); %>
+      </tbody>
+    </table>
+  </div>
+<% } %>
+
+<%- include('partials/fin') %>

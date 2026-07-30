@@ -1,0 +1,36 @@
+<%- include('partials/inicio') %>
+
+<div class="page-head">
+  <h2><%= paquete ? 'Editar paquete' : 'Nuevo paquete' %></h2>
+  <p><%= paquete ? 'Modifica el paquete de conversaciones adicionales.' : 'Crea un nuevo paquete de conversaciones adicionales.' %></p>
+</div>
+
+<% if (error) { %><div class="alert-err"><%= error %></div><% } %>
+
+<form method="POST" action="<%= paquete && paquete.id ? '/admin/paquetes/' + paquete.id : '/admin/paquetes' %>" class="form-card">
+  <div class="field-row">
+    <div class="field">
+      <label for="cantidad">Cantidad de conversaciones *</label>
+      <input id="cantidad" name="cantidad" type="number" min="1" required
+             value="<%= paquete ? paquete.cantidad : '' %>" placeholder="Ej: 1000" />
+    </div>
+    <div class="field">
+      <label for="precioUsd">Precio al cliente (US$) *</label>
+      <input id="precioUsd" name="precioUsd" type="number" min="0.01" step="0.01" required
+             value="<%= paquete ? Number(paquete.precioUsd) : '' %>" />
+    </div>
+    <div class="field">
+      <label for="costoUnitarioUsd">Costo unitario (US$)</label>
+      <input id="costoUnitarioUsd" name="costoUnitarioUsd" type="number" min="0" step="0.0001"
+             value="<%= paquete ? Number(paquete.costoUnitarioUsd) : '' %>" placeholder="Ej: 0.0660" />
+      <p class="muted" style="font-size:.78rem;margin:.3rem 0 0">Referencia interna: cuánto te cuesta a vos cada conversación de este paquete.</p>
+    </div>
+  </div>
+
+  <div class="form-actions">
+    <a class="btn btn-ghost" href="/admin/paquetes">Cancelar</a>
+    <button class="btn btn-primary" type="submit"><%= paquete && paquete.id ? 'Guardar cambios' : 'Crear paquete' %></button>
+  </div>
+</form>
+
+<%- include('partials/fin') %>

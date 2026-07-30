@@ -1,0 +1,72 @@
+<%- include('partials/inicio') %>
+
+<div class="page-head">
+  <h2>Conexiones de WhatsApp</h2>
+  <p>Solicitudes de los clientes. Completa las credenciales de Meta y márcalas como conectadas.</p>
+</div>
+
+<% if (mensaje) { %><div class="alert-ok"><%= mensaje %></div><% } %>
+
+<div class="admin-stats">
+  <div class="stat-card"><span class="stat-num"><%= stats.total %></span><span class="stat-label">Conexiones</span></div>
+  <div class="stat-card stat-done"><span class="stat-num"><%= stats.enProceso %></span><span class="stat-label">En proceso</span></div>
+  <div class="stat-card stat-new"><span class="stat-num"><%= stats.conectadas %></span><span class="stat-label">Conectadas</span></div>
+</div>
+
+<% if (conexiones.length === 0) { %>
+  <div class="empty-state">
+    <h3>Aún no hay solicitudes de conexión</h3>
+    <p>Cuando un cliente solicite conectar su WhatsApp desde su panel, aparecerá aquí.</p>
+  </div>
+<% } else { %>
+  <% conexiones.forEach(function (c) { %>
+    <div class="form-card" style="margin-bottom:1.2rem">
+      <div class="dash-card-head" style="margin-bottom:1rem">
+        <h3 style="font-size:1.05rem">
+          <%= c.agente.empresa.nombre %>
+          <span class="badge <%= c.estado === 'CONECTADO' ? 'badge-new' : 'badge-done' %>">
+            <%= c.estado === 'CONECTADO' ? 'Conectado' : 'En proceso' %>
+          </span>
+        </h3>
+        <span class="muted"><%= c.numeroVisible || 'sin número' %></span>
+      </div>
+
+      <form method="POST" action="/admin/conexiones/<%= c.id %>">
+        <div class="field-row">
+          <div class="field">
+            <label>Número visible</label>
+            <input name="numeroVisible" type="text" value="<%= c.numeroVisible || '' %>" placeholder="+591 71234567" />
+          </div>
+          <div class="field">
+            <label>Phone Number ID (Meta)</label>
+            <input name="phoneNumberId" type="text" value="<%= c.phoneNumberId || '' %>" placeholder="123456789012345" />
+          </div>
+        </div>
+        <div class="field-row">
+          <div class="field">
+            <label>WABA ID (opcional)</label>
+            <input name="wabaId" type="text" value="<%= c.wabaId || '' %>" placeholder="987654321098765" />
+          </div>
+          <div class="field">
+            <label>Token de acceso <%= c.tokenCifrado ? '(déjalo vacío para no cambiarlo)' : '' %></label>
+            <input name="token" type="password" autocomplete="off"
+                   placeholder="<%= c.tokenCifrado ? '•••••• (guardado)' : 'Token de Meta' %>" />
+          </div>
+        </div>
+        <div class="field">
+          <label><input type="checkbox" name="conectado" value="1" <%= c.estado === 'CONECTADO' ? 'checked' : '' %> /> Marcar como <b>conectado</b> (su agente empezará a atender)</label>
+        </div>
+        <div class="form-actions" style="justify-content:space-between">
+          <button class="btn btn-primary" type="submit">Guardar</button>
+        </div>
+      </form>
+
+      <form method="POST" action="/admin/conexiones/<%= c.id %>/eliminar" style="margin-top:.6rem"
+            onsubmit="return confirm('¿Eliminar esta conexión?');">
+        <button class="btn btn-ghost" type="submit" style="font-size:.82rem">Eliminar conexión</button>
+      </form>
+    </div>
+  <% }); %>
+<% } %>
+
+<%- include('partials/fin') %>

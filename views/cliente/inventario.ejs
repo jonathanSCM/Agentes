@@ -1,0 +1,53 @@
+<%- include('partials/inicio') %>
+
+<div class="page-head page-head-row">
+  <div>
+    <h2>Inventario</h2>
+    <p>Control de stock de tus productos. Ajusta las cantidades disponibles.</p>
+  </div>
+  <a class="btn btn-ghost" href="/panel/productos">Gestionar productos</a>
+</div>
+
+<% if (mensaje) { %><div class="alert-ok"><%= mensaje %></div><% } %>
+
+<div class="admin-stats">
+  <div class="stat-card"><span class="stat-num"><%= stats.total %></span><span class="stat-label">Productos</span></div>
+  <div class="stat-card stat-done"><span class="stat-num"><%= stats.bajo %></span><span class="stat-label">Stock bajo (≤5)</span></div>
+  <div class="stat-card"><span class="stat-num"><%= stats.agotados %></span><span class="stat-label">Agotados</span></div>
+</div>
+
+<% if (productos.length === 0) { %>
+  <div class="empty-state">
+    <h3>No tienes productos aún</h3>
+    <p><a class="btn btn-primary" href="/panel/productos/nuevo">+ Agregar producto</a></p>
+  </div>
+<% } else { %>
+  <div class="table-wrap">
+    <table class="leads-table">
+      <thead>
+        <tr><th>Producto</th><th class="num">Precio</th><th>Stock actual</th><th>Ajustar</th></tr>
+      </thead>
+      <tbody>
+        <% productos.forEach(function (p) { %>
+          <tr class="<%= p.stock === 0 ? 'is-done' : '' %>">
+            <td><strong><%= p.nombre %></strong></td>
+            <td class="num">Bs <%= Number(p.precio).toFixed(2) %></td>
+            <td>
+              <span class="badge <%= p.stock === 0 ? 'badge-off' : (p.stock <= 5 ? 'badge-star' : 'badge-new') %>">
+                <%= p.stock %> unidades
+              </span>
+            </td>
+            <td>
+              <form method="POST" action="/panel/inventario/<%= p.id %>" class="sim-form">
+                <input type="number" name="stock" value="<%= p.stock %>" min="0" class="sim-input" style="width:70px" />
+                <button class="btn btn-ghost" type="submit" style="padding:.35rem .7rem;font-size:.82rem">Guardar</button>
+              </form>
+            </td>
+          </tr>
+        <% }); %>
+      </tbody>
+    </table>
+  </div>
+<% } %>
+
+<%- include('partials/fin') %>

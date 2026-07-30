@@ -1,0 +1,107 @@
+<%- include('partials/inicio') %>
+
+<div class="page-head page-head-row">
+  <div>
+    <h2>Registro de paquetes</h2>
+    <p>Paquetes de conversaciones comprados por cada cliente, con su saldo y renovación.</p>
+  </div>
+  <a class="btn btn-primary" href="/admin/compras/nueva">+ Registrar compra</a>
+</div>
+
+<% if (mensaje) { %><div class="alert-ok"><%= mensaje %></div><% } %>
+
+<!-- Enviar aviso (campanita) a un cliente -->
+<details class="aviso-box">
+  <summary>Enviar aviso a un cliente</summary>
+  <form method="POST" action="/admin/notificaciones" class="aviso-form">
+    <div class="field-row">
+      <div class="field">
+        <label for="av-empresa">Cliente</label>
+        <select id="av-empresa" name="empresaId" required>
+          <option value="">Selecciona...</option>
+          <% empresas.forEach(function (e) { %>
+            <option value="<%= e.id %>"><%= e.nombre %></option>
+          <% }); %>
+        </select>
+      </div>
+      <div class="field">
+        <label for="av-titulo">Título</label>
+        <input id="av-titulo" name="titulo" type="text" maxlength="120" placeholder="Ej: Recordatorio de renovación" />
+      </div>
+    </div>
+    <div class="field">
+      <label for="av-mensaje">Mensaje *</label>
+      <textarea id="av-mensaje" name="mensaje" rows="2" required maxlength="500"
+        placeholder="Ej: Tu plan vence pronto. Renueva para que tu agente siga atendiendo."></textarea>
+    </div>
+    <div class="field">
+      <label><input type="checkbox" name="conBotones" value="1" checked /> Incluir botones «Comprar conversaciones» y «Mejorar plan»</label>
+    </div>
+    <div class="form-actions">
+      <button class="btn btn-primary" type="submit">Enviar a la campanita del cliente</button>
+    </div>
+  </form>
+</details>
+
+<div class="admin-stats">
+  <div class="stat-card"><span class="stat-num"><%= stats.total %></span><span class="stat-label">Compras registradas</span></div>
+  <div class="stat-card stat-new"><span class="stat-num"><%= stats.saldoTotal.toLocaleString('es-BO') %></span><span class="stat-label">Saldo total disponible</span></div>
+  <div class="stat-card stat-done"><span class="stat-num"><%= stats.porVencer %></span><span class="stat-label">Renuevan en ≤ 7 días</span></div>
+</div>
+
+<% if (compras.length === 0) { %>
+  <div class="empty-state">
+    <h3>Aún no hay compras registradas</h3>
+    <p>Cuando un cliente compre un paquete adicional, regístralo aquí.</p>
+  </div>
+<% } else { %>
+  <div class="table-wrap">
+    <table class="leads-table">
+      <thead>
+        <tr>
+          <th>Cliente</th><th>Paquete</th><th class="num">Compradas</th><th class="num">Usadas</th>
+          <th>Saldo restante</th><th>Compra</th><th>Renueva</th><th>Estado</th><th>Acciones</th>
+        </tr>
+      </thead>
+      <tbody>
+        <% compras.forEach(function (c) { %>
+          <% var saldo = c.cantidad - c.consumidas;
+             var pct = c.cantidad > 0 ? Math.round((c.consumidas / c.cantidad) * 100) : 0; %>
+          <tr class="<%= c.estado !== 'ACTIVA' ? 'is-done' : '' %>">
+            <td><strong><%= c.empresa.nombre %></strong></td>
+            <td>
+              <%= c.paquete ? c.paquete.cantidad.toLocaleString('es-BO') + ' conv.' : 'Personalizado' %>
+              <br /><span class="muted">US$ <%= Number(c.precioUsd).toFixed(2) %></span>
+            </td>
+            <td class="num"><%= c.cantidad.toLocaleString('es-BO') %></td>
+            <td class="num"><%= c.consumidas.toLocaleString('es-BO') %></td>
+            <td style="min-width:150px">
+              <div class="bar"><span style="width:<%= pct %>%"></span></div>
+              <strong class="<%= saldo === 0 ? 'muted' : 'saldo-ok' %>"><%= saldo.toLocaleString('es-BO') %></strong>
+              <span class="muted">restantes</span>
+            </td>
+            <td class="nowrap muted"><%= new Date(c.fechaCompra).toLocaleDateString('es-BO') %></td>
+            <td class="nowrap">
+              <%= new Date(c.fechaRenovacion).toLocaleDateString('es-BO') %>
+              <% var dias = Math.ceil((new Date(c.fechaRenovacion) - new Date()) / 86400000); %>
+              <br />
+              <span class="muted"><%= dias > 0 ? 'en ' + dias + ' días' : 'vencido' %></span>
+            </td>
+            <td>
+              <span class="badge <%= c.estado === 'ACTIVA' ? 'badge-new' : (c.estado === 'AGOTADA' ? 'badge-done' : 'badge-off') %>"><%= c.estado %></span>
+            </td>
+            <td class="actions-cell">
+              <a class="icon-btn" title="Editar" href="/admin/compras/<%= c.id %>/editar"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8"><path d="m16.5 3.5 4 4L7 21l-4.5 1L3.5 17.5 16.5 3.5Z"/></svg></a>
+              <form method="POST" action="/admin/compras/<%= c.id %>/eliminar" class="inline-form"
+                    onsubmit="return confirm('¿Eliminar este registro de compra?');">
+                <button class="icon-btn del" type="submit" title="Eliminar"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 7h16M9 7V4h6v3m-9 0 1 13h10l1-13"/></svg></button>
+              </form>
+            </td>
+          </tr>
+        <% }); %>
+      </tbody>
+    </table>
+  </div>
+<% } %>
+
+<%- include('partials/fin') %>

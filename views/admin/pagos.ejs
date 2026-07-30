@@ -1,0 +1,52 @@
+<%- include('partials/inicio') %>
+
+<div class="page-head">
+  <h2>Pagos</h2>
+  <p>Mensualidades, implementaciones y compras de paquetes. Confirmar o rechazar aquí es lo que activa de verdad el plan o el saldo del cliente.</p>
+</div>
+
+<% if (mensaje) { %><div class="alert-ok"><%= mensaje %></div><% } %>
+
+<% if (pagos.length === 0) { %>
+  <div class="empty-state">
+    <h3>Aún no hay pagos registrados</h3>
+    <p>Al integrar la pasarela de pago, cada cobro quedará registrado aquí.</p>
+  </div>
+<% } else { %>
+  <div class="table-wrap">
+    <table class="leads-table">
+      <thead>
+        <tr><th>Fecha</th><th>Empresa</th><th>Tipo</th><th class="num">Monto</th><th>Estado</th><th>Referencia</th><th>Acciones</th></tr>
+      </thead>
+      <tbody>
+        <% pagos.forEach(function (p) { %>
+          <tr>
+            <td class="nowrap muted"><%= new Date(p.fecha).toLocaleDateString('es-BO') %></td>
+            <td><%= p.empresa.nombre %></td>
+            <td><%= p.tipo.replace('_', ' ') %></td>
+            <td class="num"><%= p.moneda %> <%= Number(p.monto).toFixed(2) %></td>
+            <td>
+              <span class="badge <%= p.estado === 'CONFIRMADO' ? 'badge-new' : (p.estado === 'FALLIDO' ? 'badge-off' : 'badge-done') %>"><%= p.estado %></span>
+            </td>
+            <td class="muted"><%= p.referencia || '—' %></td>
+            <td class="actions-cell">
+              <% if (p.estado === 'PENDIENTE') { %>
+                <form method="POST" action="/admin/pagos/<%= p.id %>/confirmar" class="inline-form">
+                  <button class="btn btn-primary" style="padding:.4rem .8rem;font-size:.85rem" type="submit">Confirmar</button>
+                </form>
+                <form method="POST" action="/admin/pagos/<%= p.id %>/rechazar" class="inline-form"
+                      onsubmit="return confirm('¿Rechazar este pago? Si es de un paquete, se revoca el saldo.');">
+                  <button class="btn btn-ghost" style="padding:.4rem .8rem;font-size:.85rem" type="submit">Rechazar</button>
+                </form>
+              <% } else { %>
+                <span class="muted">—</span>
+              <% } %>
+            </td>
+          </tr>
+        <% }); %>
+      </tbody>
+    </table>
+  </div>
+<% } %>
+
+<%- include('partials/fin') %>

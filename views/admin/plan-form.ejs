@@ -1,0 +1,92 @@
+<%- include('partials/inicio') %>
+
+<div class="page-head">
+  <h2><%= plan ? 'Editar plan' : 'Nuevo plan' %></h2>
+  <p><%= plan ? 'Modifica los datos comerciales de este plan.' : 'Crea un nuevo plan para el catálogo comercial.' %></p>
+</div>
+
+<% if (error) { %><div class="alert-err"><%= error %></div><% } %>
+
+<form method="POST" action="<%= plan && plan.id ? '/admin/planes/' + plan.id : '/admin/planes' %>" class="form-card">
+  <div class="field-row">
+    <div class="field">
+      <label for="codigo">Código *</label>
+      <input id="codigo" name="codigo" type="text" required maxlength="30" style="text-transform:uppercase"
+             value="<%= plan ? plan.codigo : '' %>" placeholder="Ej: STANDARD" <%= plan && plan.id ? 'readonly' : '' %> />
+    </div>
+    <div class="field">
+      <label for="nombre">Nombre *</label>
+      <input id="nombre" name="nombre" type="text" required maxlength="80"
+             value="<%= plan ? plan.nombre : '' %>" placeholder="Ej: Standard" />
+    </div>
+  </div>
+
+  <div class="field-row">
+    <div class="field">
+      <label for="mensualidadBs">Mensualidad (Bs)</label>
+      <input id="mensualidadBs" name="mensualidadBs" type="number" min="0" step="0.01"
+             value="<%= plan ? Number(plan.mensualidadBs) : 0 %>" />
+    </div>
+    <div class="field">
+      <label for="implementacionBs">Implementación (Bs)</label>
+      <input id="implementacionBs" name="implementacionBs" type="number" min="0" step="0.01"
+             value="<%= plan ? Number(plan.implementacionBs) : 0 %>" />
+    </div>
+    <div class="field">
+      <label for="primerPagoBs">Primer pago (Bs)</label>
+      <input id="primerPagoBs" name="primerPagoBs" type="number" min="0" step="0.01"
+             value="<%= plan ? Number(plan.primerPagoBs) : 0 %>" />
+      <p class="muted" style="font-size:.78rem;margin:.3rem 0 0">Normalmente implementación + primera mensualidad.</p>
+    </div>
+  </div>
+
+  <div class="field-row">
+    <div class="field">
+      <label for="convIncluidas">Conversaciones incluidas / mes</label>
+      <input id="convIncluidas" name="convIncluidas" type="number" min="0"
+             value="<%= plan ? plan.convIncluidas : 100 %>" />
+    </div>
+    <div class="field">
+      <label for="maxProductos">Máximo de productos</label>
+      <input id="maxProductos" name="maxProductos" type="number" min="0"
+             value="<%= plan ? plan.maxProductos : 10 %>" />
+    </div>
+    <div class="field">
+      <label for="maxUsuarios">Máximo de usuarios</label>
+      <input id="maxUsuarios" name="maxUsuarios" type="number" min="1"
+             value="<%= plan ? plan.maxUsuarios : 1 %>" />
+    </div>
+  </div>
+
+  <div class="field-row">
+    <div class="field">
+      <label for="modeloIa">Modelo de IA</label>
+      <input id="modeloIa" name="modeloIa" type="text" maxlength="60"
+             value="<%= plan ? plan.modeloIa : 'claude-haiku-4-5' %>" placeholder="Ej: gpt-4o-mini, claude-sonnet-5" />
+    </div>
+    <div class="field">
+      <label for="orden">Orden en la vitrina</label>
+      <input id="orden" name="orden" type="number" min="0"
+             value="<%= plan ? plan.orden : 0 %>" />
+    </div>
+  </div>
+
+  <div class="field">
+    <label for="features">Características (una por línea)</label>
+    <textarea id="features" name="features" rows="6" placeholder="Hasta 100 productos
+Agente de ventas con IA
+..."><%= plan && plan.features ? (Array.isArray(plan.features) ? plan.features.join('\n') : plan.features) : '' %></textarea>
+  </div>
+
+  <div class="field-row">
+    <label style="display:flex;align-items:center;gap:.5rem"><input type="checkbox" name="marcaBlanca" value="1" style="width:auto" <%= plan && plan.marcaBlanca ? 'checked' : '' %> /> Marca blanca</label>
+    <label style="display:flex;align-items:center;gap:.5rem"><input type="checkbox" name="recomendado" value="1" style="width:auto" <%= plan && plan.recomendado ? 'checked' : '' %> /> Marcar como recomendado</label>
+  </div>
+
+  <div class="form-actions">
+    <a class="btn btn-ghost" href="/admin/planes">Cancelar</a>
+    <button class="btn btn-primary" type="submit"><%= plan && plan.id ? 'Guardar cambios' : 'Crear plan' %></button>
+  </div>
+</form>
+
+<%- include('partials/fin') %>

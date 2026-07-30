@@ -1,0 +1,32 @@
+<%- include('partials/inicio') %>
+
+<div class="page-head">
+  <h2>Resumen</h2>
+  <p>Vista general de la plataforma de agentes de IA.</p>
+</div>
+
+<div class="admin-stats">
+  <div class="stat-card"><span class="stat-num"><%= stats.empresas %></span><span class="stat-label">Empresas cliente</span></div>
+  <div class="stat-card"><span class="stat-num"><%= stats.agentes %></span><span class="stat-label">Agentes creados</span></div>
+  <div class="stat-card stat-new"><span class="stat-num"><%= stats.conversaciones %></span><span class="stat-label">Conversaciones</span></div>
+  <div class="stat-card stat-done"><span class="stat-num"><%= stats.mensajesNuevos %></span><span class="stat-label">Mensajes nuevos</span></div>
+</div>
+
+<div class="page-head">
+  <h2 style="font-size:1.2rem">Catálogo comercial</h2>
+</div>
+<div class="admin-stats">
+  <div class="stat-card"><span class="stat-num"><%= stats.planes %></span><span class="stat-label">Planes activos</span></div>
+  <div class="stat-card"><span class="stat-num"><%= stats.paquetes %></span><span class="stat-label">Paquetes de conversaciones</span></div>
+  <div class="stat-card"><span class="stat-num"><%= stats.suscripciones %></span><span class="stat-label">Suscripciones</span></div>
+  <div class="stat-card"><span class="stat-num"><%= stats.pagos %></span><span class="stat-label">Pagos registrados</span></div>
+</div>
+
+<% if (stats.empresas === 0) { %>
+  <div class="empty-state">
+    <h3>Aún no hay empresas cliente</h3>
+    <p>Cuando un negocio contrate un plan, aparecerá aquí con su agente y su consumo.</p>
+  </div>
+<% } %>
+
+<%- include('partials/fin') %>

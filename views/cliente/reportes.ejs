@@ -1,0 +1,52 @@
+<%- include('partials/inicio') %>
+
+<div class="page-head">
+  <h2>Reportes</h2>
+  <p>Cómo va tu negocio con el agente de ventas.</p>
+</div>
+
+<div class="admin-stats">
+  <div class="stat-card"><span class="stat-num"><%= r.conversaciones %></span><span class="stat-label">Conversaciones (total)</span></div>
+  <div class="stat-card stat-new"><span class="stat-num"><%= r.conversaciones7 %></span><span class="stat-label">Últimos 7 días</span></div>
+  <div class="stat-card"><span class="stat-num"><%= r.clientes %></span><span class="stat-label">Clientes atendidos</span></div>
+  <div class="stat-card stat-done"><span class="stat-num"><%= r.pedidos %></span><span class="stat-label">Pedidos</span></div>
+</div>
+
+<div class="dash-grid">
+  <div class="dash-card">
+    <div class="dash-card-head"><h3>Conversaciones por día (últimos 7)</h3></div>
+    <% if (r.serie.every(function(d){return d.total===0})) { %>
+      <p class="dash-empty">Todavía no hay suficientes datos para el gráfico.</p>
+    <% } else { %>
+      <div class="mini-chart">
+        <% var maxv = Math.max.apply(null, r.serie.map(function(d){return d.total})) || 1; %>
+        <% r.serie.forEach(function (d) { %>
+          <div class="mini-bar-wrap">
+            <div class="mini-bar" style="height:<%= Math.round((d.total / maxv) * 100) %>%" title="<%= d.total %>"></div>
+            <span class="mini-lbl"><%= d.etiqueta %></span>
+          </div>
+        <% }); %>
+      </div>
+    <% } %>
+  </div>
+
+  <div class="dash-card">
+    <div class="dash-card-head"><h3>Productos más consultados</h3><span class="badge badge-off">Próximamente</span></div>
+    <p class="dash-empty">Cuando haya más actividad, verás aquí qué productos preguntan más tus clientes.</p>
+  </div>
+
+  <div class="dash-card">
+    <div class="dash-card-head"><h3>Resuelto por la IA</h3></div>
+    <div style="text-align:center;padding:1rem 0">
+      <div class="gauge-num" style="font-size:2.4rem"><%= r.resueltasIA %>%</div>
+      <span class="gauge-sub">de las conversaciones las atendió la IA sola</span>
+    </div>
+  </div>
+
+  <div class="dash-card">
+    <div class="dash-card-head"><h3>Rendimiento de anuncios</h3><span class="badge badge-off">Próximamente</span></div>
+    <p class="dash-empty">Conecta tus campañas de Meta para medir cuántas ventas llegan desde anuncios (ROAS).</p>
+  </div>
+</div>
+
+<%- include('partials/fin') %>

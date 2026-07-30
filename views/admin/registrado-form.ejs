@@ -1,0 +1,58 @@
+<%- include('partials/inicio') %>
+
+<div class="page-head">
+  <h2><%= empresa ? 'Editar empresa' : 'Agregar empresa' %></h2>
+  <p><%= empresa ? 'Modifica los datos del cliente y su plan.' : 'Da de alta un nuevo cliente y asígnale un plan.' %></p>
+</div>
+
+<% if (error) { %><div class="alert-err"><%= error %></div><% } %>
+
+<form method="POST" action="<%= empresa ? '/admin/registrados/' + empresa.id : '/admin/registrados' %>" class="form-card">
+  <div class="field">
+    <label for="nombre">Nombre de la empresa *</label>
+    <input id="nombre" name="nombre" type="text" required maxlength="120"
+           value="<%= empresa ? empresa.nombre : '' %>" placeholder="Ej: Zapatería El Paso" />
+  </div>
+
+  <div class="field-row">
+    <div class="field">
+      <label for="planId">Plan contratado *</label>
+      <select id="planId" name="planId" required>
+        <% planes.forEach(function (p) { %>
+          <option value="<%= p.id %>"
+            <%= empresa && empresa.suscripcion && empresa.suscripcion.planId === p.id ? 'selected' : '' %>>
+            <%= p.nombre %> — Bs <%= Number(p.mensualidadBs).toLocaleString('es-BO') %>/mes (<%= p.convIncluidas %> conv.)
+          </option>
+        <% }); %>
+      </select>
+    </div>
+    <div class="field">
+      <label for="estado">Estado</label>
+      <select id="estado" name="estado">
+        <% ['PRUEBA','ACTIVA','MOROSA','CANCELADA'].forEach(function (s) { %>
+          <option value="<%= s %>" <%= empresa && empresa.suscripcion && empresa.suscripcion.estado === s ? 'selected' : '' %>><%= s %></option>
+        <% }); %>
+      </select>
+    </div>
+  </div>
+
+  <div class="field-row">
+    <div class="field">
+      <label for="marca">Marca (opcional)</label>
+      <input id="marca" name="marca" type="text" maxlength="120"
+             value="<%= empresa && empresa.marca ? empresa.marca : '' %>" placeholder="Para marca blanca" />
+    </div>
+    <div class="field">
+      <label for="periodoFin">Vence el</label>
+      <input id="periodoFin" name="periodoFin" type="date"
+             value="<%= periodoFinValor %>" />
+    </div>
+  </div>
+
+  <div class="form-actions">
+    <a class="btn btn-ghost" href="/admin/registrados">Cancelar</a>
+    <button class="btn btn-primary" type="submit"><%= empresa ? 'Guardar cambios' : 'Crear empresa' %></button>
+  </div>
+</form>
+
+<%- include('partials/fin') %>

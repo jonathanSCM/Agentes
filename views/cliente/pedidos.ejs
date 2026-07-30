@@ -1,0 +1,46 @@
+<%- include('partials/inicio') %>
+
+<div class="page-head">
+  <h2>Pedidos</h2>
+  <p>Pedidos que registran tus clientes a través del agente.</p>
+</div>
+
+<div class="admin-stats">
+  <div class="stat-card"><span class="stat-num"><%= stats.total %></span><span class="stat-label">Pedidos</span></div>
+  <div class="stat-card stat-new"><span class="stat-num"><%= stats.nuevos %></span><span class="stat-label">Nuevos</span></div>
+  <div class="stat-card stat-done"><span class="stat-num">Bs <%= stats.total_bs.toLocaleString('es-BO') %></span><span class="stat-label">Total vendido</span></div>
+</div>
+
+<% if (pedidos.length === 0) { %>
+  <div class="empty-state">
+    <h3>Aún no hay pedidos</h3>
+    <p>Cuando el agente cierre una venta con un cliente, el pedido aparecerá aquí para que lo gestiones.</p>
+  </div>
+<% } else { %>
+  <div class="table-wrap">
+    <table class="leads-table">
+      <thead>
+        <tr><th>Fecha</th><th>Cliente</th><th>Productos</th><th>Entrega</th><th class="num">Total</th><th>Estado</th></tr>
+      </thead>
+      <tbody>
+        <% pedidos.forEach(function (p) { %>
+          <tr>
+            <td class="nowrap muted"><%= new Date(p.createdAt).toLocaleDateString('es-BO') %></td>
+            <td><%= p.cliente ? (p.cliente.nombre || p.cliente.telefono) : '—' %></td>
+            <td><%= p.items.map(function(i){ return i.cantidad + 'x ' + i.nombre; }).join(', ') %></td>
+            <td class="muted">
+              <%= p.direccionEntrega || '-' %>
+              <% if (p.entregaLat && p.entregaLng) { %>
+                <a href="https://www.google.com/maps?q=<%= p.entregaLat %>,<%= p.entregaLng %>" target="_blank" rel="noopener" style="color:var(--primary-2)">Ver mapa</a>
+              <% } %>
+            </td>
+            <td class="num">Bs <%= Number(p.total).toFixed(2) %></td>
+            <td><span class="badge <%= p.estado === 'ENTREGADO' ? 'badge-new' : (p.estado === 'CANCELADO' ? 'badge-off' : 'badge-done') %>"><%= p.estado %></span></td>
+          </tr>
+        <% }); %>
+      </tbody>
+    </table>
+  </div>
+<% } %>
+
+<%- include('partials/fin') %>

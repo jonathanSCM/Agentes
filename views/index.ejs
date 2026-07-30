@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <%- include('partials/head') %>
+</head>
+<body>
+  <%- include('partials/header') %>
+
+  <main>
+    <!-- ================= HERO ================= -->
+    <section class="hero">
+      <div class="hero-glow" aria-hidden="true"></div>
+      <div class="container hero-inner">
+        <div class="hero-copy reveal">
+          <span class="pill"><span class="dot"></span> Agente de ventas con Inteligencia Artificial</span>
+          <h1>Vende por WhatsApp <span class="grad">las 24 horas</span>, sin contratar más personal</h1>
+          <p class="lead">
+            El agente de IA de <strong><%= site.name %></strong> atiende a tus clientes por WhatsApp:
+            responde preguntas, muestra tus productos, recomienda opciones y
+            <strong>registra los pedidos</strong> automáticamente.
+          </p>
+          <div class="hero-cta">
+            <a class="btn btn-primary btn-lg" href="#planes">Ver planes</a>
+            <a class="btn btn-ghost btn-lg" href="https://wa.me/<%= site.whatsapp %>" target="_blank" rel="noopener">Solicitar demo</a>
+          </div>
+          <div class="hero-stats">
+            <div><strong>24/7</strong><span>atención sin descanso</span></div>
+            <div><strong>Segundos</strong><span>tiempo de respuesta</span></div>
+            <div><strong>Bs 0</strong><span>para empezar a probar</span></div>
+          </div>
+        </div>
+
+        <div class="hero-visual reveal">
+          <!-- Simulacion de chat de WhatsApp -->
+          <div class="chat-window">
+            <div class="chat-head">
+              <span class="chat-avatar">🤖</span>
+              <div>
+                <strong>Agente de ventas</strong>
+                <span class="chat-status">en línea</span>
+              </div>
+            </div>
+            <div class="chat-body">
+              <div class="msg in">Hola, ¿tienen zapatillas deportivas?</div>
+              <div class="msg out">¡Hola! 👋 Sí, tenemos varios modelos. ¿Buscas para correr o para uso diario?</div>
+              <div class="msg in">Para correr, talla 42</div>
+              <div class="msg out">Perfecto. Tengo estas disponibles:<br />• Runner Pro — Bs 450<br />• AirLite — Bs 380<br />¿Te muestro fotos?</div>
+              <div class="msg in">La AirLite, sí</div>
+              <div class="msg out typing"><span></span><span></span><span></span></div>
+            </div>
+          </div>
+          <div class="floaty floaty-1">Pedido registrado ✓</div>
+          <div class="floaty floaty-2">+24% ventas</div>
+        </div>
+      </div>
+
+      <div class="marquee" aria-hidden="true">
+        <div class="marquee-track">
+          <span>Atiende 24/7</span><span>Catálogo digital</span><span>Carrito conversacional</span>
+          <span>Registro de pedidos</span><span>Panel administrativo</span><span>Reportes de ventas</span>
+          <span>Atiende 24/7</span><span>Catálogo digital</span><span>Carrito conversacional</span>
+          <span>Registro de pedidos</span><span>Panel administrativo</span><span>Reportes de ventas</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================= COMO FUNCIONA ================= -->
+    <section id="como-funciona" class="section">
+      <div class="container">
+        <header class="section-head reveal">
+          <span class="eyebrow">Cómo funciona</span>
+          <h2>Tu vendedor digital en 4 pasos</h2>
+          <p>Nosotros lo implementamos por ti. Tú solo recibes los pedidos.</p>
+        </header>
+
+        <ol class="steps">
+          <li class="step reveal">
+            <span class="step-num">01</span>
+            <h3>Conectamos tu WhatsApp</h3>
+            <p>Enlazamos tu número de WhatsApp Business con el agente. Sin cambiar tu número.</p>
+          </li>
+          <li class="step reveal">
+            <span class="step-num">02</span>
+            <h3>Cargamos tu catálogo</h3>
+            <p>Subimos tus productos con precios, fotos y stock para que el agente los conozca.</p>
+          </li>
+          <li class="step reveal">
+            <span class="step-num">03</span>
+            <h3>El agente atiende y vende</h3>
+            <p>Responde consultas, recomienda productos, arma el carrito y registra el pedido.</p>
+          </li>
+          <li class="step reveal">
+            <span class="step-num">04</span>
+            <h3>Tú gestionas y creces</h3>
+            <p>Ves pedidos, clientes y reportes desde tu panel. Derivas a un humano cuando quieras.</p>
+          </li>
+        </ol>
+      </div>
+    </section>
+
+    <!-- ================= BENEFICIOS ================= -->
+    <section id="beneficios" class="section section-alt">
+      <div class="container">
+        <header class="section-head reveal">
+          <span class="eyebrow">Beneficios</span>
+          <h2>Todo lo que hace por tu negocio</h2>
+          <p>Mucho más que un chatbot: un vendedor que trabaja todo el día.</p>
+        </header>
+
+        <div class="cards">
+          <article class="card reveal">
+            <div class="card-icon">💬</div>
+            <h3>Atiende sin hacer esperar</h3>
+            <p>Responde al instante a cada cliente, a cualquier hora, incluso fines de semana.</p>
+          </article>
+          <article class="card reveal">
+            <div class="card-icon">🛒</div>
+            <h3>Carrito conversacional</h3>
+            <p>El cliente arma su pedido dentro del chat y queda registrado automáticamente.</p>
+          </article>
+          <article class="card reveal">
+            <div class="card-icon">📦</div>
+            <h3>Catálogo e inventario</h3>
+            <p>Muestra productos, precios y disponibilidad. Te avisa cuando baja el stock.</p>
+          </article>
+          <article class="card reveal">
+            <div class="card-icon">👥</div>
+            <h3>Gestión de clientes</h3>
+            <p>Guarda nombre, teléfono e historial de compras. Identifica a tus clientes frecuentes.</p>
+          </article>
+          <article class="card reveal">
+            <div class="card-icon">📊</div>
+            <h3>Reportes de ventas</h3>
+            <p>Productos más vendidos, ticket promedio y seguimiento de oportunidades.</p>
+          </article>
+          <article class="card reveal">
+            <div class="card-icon">🤝</div>
+            <h3>Derivación a humano</h3>
+            <p>Cuando el caso lo amerita, pasa la conversación a una persona de tu equipo.</p>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================= PLANES ================= -->
+    <section id="planes" class="section">
+      <div class="container">
+        <header class="section-head reveal">
+          <span class="eyebrow">Planes</span>
+          <h2>Elige el plan de tu negocio</h2>
+          <p>El consumo se mide en conversaciones. Una conversación puede tener varios mensajes.</p>
+        </header>
+
+        <div class="pricing">
+          <% planes.forEach(function (p) { %>
+            <article class="price-card reveal <%= p.recomendado ? 'is-reco' : '' %>">
+              <% if (p.recomendado) { %><span class="reco-tag">Recomendado</span><% } %>
+              <h3><%= p.nombre %></h3>
+              <div class="price">
+                <span class="price-cur">Bs</span>
+                <span class="price-num"><%= Number(p.mensualidadBs).toLocaleString('es-BO') %></span>
+                <span class="price-per">/mes</span>
+              </div>
+              <p class="price-impl">
+                <% if (Number(p.implementacionBs) > 0) { %>
+                  + Bs <%= Number(p.implementacionBs).toLocaleString('es-BO') %> de implementación
+                <% } else { %>
+                  Sin costo de implementación
+                <% } %>
+              </p>
+
+              <ul class="price-specs">
+                <li><b><%= p.convIncluidas.toLocaleString('es-BO') %></b> conversaciones/mes</li>
+                <li>Hasta <b><%= p.maxProductos.toLocaleString('es-BO') %></b> productos</li>
+                <li><b><%= p.maxUsuarios %></b> usuario<%= p.maxUsuarios > 1 ? 's' : '' %></li>
+              </ul>
+
+              <a class="btn <%= p.recomendado ? 'btn-primary' : 'btn-ghost' %> btn-block"
+                 href="/registro?plan=<%= p.id %>">
+                <%= Number(p.mensualidadBs) === 0 ? 'Probar gratis' : 'Contratar' %>
+              </a>
+
+              <ul class="price-features">
+                <% p.features.slice(0, 8).forEach(function (f) { %>
+                  <li><%= f %></li>
+                <% }); %>
+              </ul>
+              <% if (Number(p.primerPagoBs) > 0) { %>
+                <p class="price-first">Primer pago: <b>Bs <%= Number(p.primerPagoBs).toLocaleString('es-BO') %></b></p>
+              <% } %>
+            </article>
+          <% }); %>
+        </div>
+
+        <!-- Paquetes adicionales -->
+        <div class="packs reveal">
+          <h3>¿Necesitas más conversaciones?</h3>
+          <p class="muted-text">Al agotar las incluidas en tu plan, puedes comprar un paquete adicional. A mayor volumen, menor costo por conversación.</p>
+          <div class="pack-grid">
+            <% paquetes.forEach(function (q) { %>
+              <div class="pack">
+                <strong><%= q.cantidad.toLocaleString('es-BO') %></strong>
+                <span>conversaciones</span>
+                <em>US$ <%= Number(q.precioUsd).toFixed(2) %></em>
+              </div>
+            <% }); %>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================= CONTACTO ================= -->
+    <section id="contacto" class="section section-alt">
+      <div class="container contact-grid">
+        <div class="contact-copy reveal">
+          <span class="eyebrow">Contacto</span>
+          <h2>¿Listo para vender más?</h2>
+          <p>Escríbenos y te mostramos el agente funcionando con tus propios productos.</p>
+
+          <ul class="contact-list">
+            <li><span class="ci">✉️</span> <a href="mailto:<%= site.email %>"><%= site.email %></a></li>
+            <li><span class="ci">💬</span> <a href="https://wa.me/<%= site.whatsapp %>" target="_blank" rel="noopener"><%= site.phone %></a></li>
+            <li><span class="ci">📍</span> <%= site.location %></li>
+          </ul>
+        </div>
+
+        <form class="contact-form reveal" id="contactForm" novalidate>
+          <div class="field">
+            <label for="nombre">Nombre *</label>
+            <input id="nombre" name="nombre" type="text" required placeholder="Tu nombre" />
+          </div>
+          <div class="field-row">
+            <div class="field">
+              <label for="email">Email *</label>
+              <input id="email" name="email" type="email" required placeholder="tu@correo.com" />
+            </div>
+            <div class="field">
+              <label for="telefono">WhatsApp</label>
+              <input id="telefono" name="telefono" type="tel" placeholder="+591 ..." />
+            </div>
+          </div>
+          <div class="field">
+            <label for="servicio">Plan de interés</label>
+            <select id="servicio" name="servicio">
+              <option value="">Selecciona una opción</option>
+              <% planes.forEach(function (p) { %>
+                <option>Plan <%= p.nombre %></option>
+              <% }); %>
+              <option>Aún no lo sé</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="mensaje">Mensaje *</label>
+            <textarea id="mensaje" name="mensaje" rows="4" required placeholder="Cuéntanos sobre tu negocio y qué vendes..."></textarea>
+          </div>
+          <button type="submit" class="btn btn-primary btn-lg btn-block">Enviar mensaje</button>
+          <p class="form-note" id="formNote" role="status" aria-live="polite"></p>
+        </form>
+      </div>
+    </section>
+  </main>
+
+  <%- include('partials/footer') %>
+  <script src="/js/main.js"></script>
+</body>
+</html>

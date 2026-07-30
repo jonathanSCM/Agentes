@@ -1,0 +1,47 @@
+<%- include('partials/inicio') %>
+
+<div class="page-head">
+  <h2>Clientes</h2>
+  <p>Personas que han escrito a tu agente. Tu base de contactos.</p>
+</div>
+
+<div class="admin-stats">
+  <div class="stat-card"><span class="stat-num"><%= stats.total %></span><span class="stat-label">Clientes</span></div>
+  <div class="stat-card stat-new"><span class="stat-num"><%= stats.nuevosHoy %></span><span class="stat-label">Nuevos hoy</span></div>
+</div>
+
+<% if (clientes.length === 0) { %>
+  <div class="empty-state">
+    <h3>Aún no tienes clientes registrados</h3>
+    <p>Cuando alguien escriba a tu agente, quedará guardado aquí con su nombre y teléfono.</p>
+  </div>
+<% } else { %>
+  <div class="table-wrap">
+    <table class="leads-table">
+      <thead>
+        <tr><th>Nombre</th><th>Teléfono</th><th>Interés</th><th>Estado</th><th class="num">Pedidos</th><th>Desde</th></tr>
+      </thead>
+      <tbody>
+        <% clientes.forEach(function (c) { %>
+          <tr>
+            <td><strong><%= c.nombre || '(sin nombre)' %></strong></td>
+            <td>
+              <a href="https://wa.me/<%= c.telefono.replace(/\D/g,'') %>" target="_blank" rel="noopener"><%= c.telefono %></a>
+            </td>
+            <td class="muted">
+              <%= c.categoriaInteres || '-' %>
+              <% if (c.ubicacionLat && c.ubicacionLng) { %>
+                · <a href="https://www.google.com/maps?q=<%= c.ubicacionLat %>,<%= c.ubicacionLng %>" target="_blank" rel="noopener" style="color:var(--primary-2)">Ubicación</a>
+              <% } %>
+            </td>
+            <td><span class="badge badge-done"><%= c.estadoLead.replace(/_/g, ' ').toLowerCase() %></span></td>
+            <td class="num"><%= c._count.pedidos %></td>
+            <td class="nowrap muted"><%= new Date(c.createdAt).toLocaleDateString('es-BO') %></td>
+          </tr>
+        <% }); %>
+      </tbody>
+    </table>
+  </div>
+<% } %>
+
+<%- include('partials/fin') %>

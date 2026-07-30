@@ -1,0 +1,35 @@
+    </main>
+  </div>
+</div>
+
+<script>
+  (function () {
+    var btn = document.getElementById('sidebarToggle');
+    var side = document.getElementById('sidebar');
+    var over = document.getElementById('sidebarOverlay');
+    if (!btn || !side) return;
+    function abrir(v) {
+      side.classList.toggle('is-open', v);
+      over.hidden = !v;
+    }
+    btn.addEventListener('click', function () { abrir(!side.classList.contains('is-open')); });
+    over.addEventListener('click', function () { abrir(false); });
+  })();
+
+  // Campanita de notificaciones
+  (function () {
+    var bell = document.getElementById('notifBell');
+    var panel = document.getElementById('notifPanel');
+    var wrap = document.getElementById('notifWrap');
+    if (!bell || !panel) return;
+    bell.addEventListener('click', function (e) {
+      e.stopPropagation();
+      panel.hidden = !panel.hidden;
+    });
+    document.addEventListener('click', function (e) {
+      if (!wrap.contains(e.target)) panel.hidden = true;
+    });
+  })();
+</script>
+</body>
+</html>

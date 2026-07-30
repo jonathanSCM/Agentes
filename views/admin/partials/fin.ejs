@@ -1,0 +1,20 @@
+    </main>
+  </div>
+</div>
+
+<script>
+  (function () {
+    var btn = document.getElementById('sidebarToggle');
+    var side = document.getElementById('sidebar');
+    var over = document.getElementById('sidebarOverlay');
+    if (!btn || !side) return;
+    function abrir(v) {
+      side.classList.toggle('is-open', v);
+      over.hidden = !v;
+    }
+    btn.addEventListener('click', function () { abrir(!side.classList.contains('is-open')); });
+    over.addEventListener('click', function () { abrir(false); });
+  })();
+</script>
+</body>
+</html>

@@ -1,0 +1,477 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Un juego para ti 💛</title>
+<style>
+  /* ============================================================
+     PERSONALIZA AQUÍ LOS COLORES SI QUIERES
+     ============================================================ */
+  :root{
+    --fondo1:#2a1a2e;      /* fondo oscuro elegante */
+    --fondo2:#432c46;
+    --crema:#f7efe6;       /* texto claro */
+    --oro:#e8b95c;         /* dorado acento */
+    --oro-claro:#f4d58d;
+    --rosa:#e88fa4;        /* rosa suave */
+    --verde:#7bc4a4;       /* acierto */
+    --sombra:0 20px 50px rgba(0,0,0,.45);
+    --fuente-titulo:'Georgia','Times New Roman',serif;
+    --fuente-texto:'Segoe UI',system-ui,sans-serif;
+  }
+
+  *{box-sizing:border-box;margin:0;padding:0;}
+
+  html,body{height:100%;}
+  body{
+    font-family:var(--fuente-texto);
+    color:var(--crema);
+    background:linear-gradient(145deg,var(--fondo1),var(--fondo2));
+    min-height:100vh;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    overflow-x:hidden;
+    padding:20px;
+    position:relative;
+  }
+
+  /* Estrellitas/partículas de fondo */
+  .particulas{position:fixed;inset:0;pointer-events:none;z-index:0;overflow:hidden;}
+  .particula{
+    position:absolute;bottom:-30px;font-size:18px;opacity:.6;
+    animation:subir linear infinite;
+  }
+  @keyframes subir{
+    to{transform:translateY(-110vh) rotate(360deg);opacity:0;}
+  }
+
+  .app{
+    position:relative;z-index:1;
+    width:100%;max-width:640px;
+    background:rgba(255,255,255,.04);
+    border:1px solid rgba(255,255,255,.09);
+    border-radius:28px;
+    padding:34px 28px 40px;
+    box-shadow:var(--sombra);
+    backdrop-filter:blur(6px);
+    text-align:center;
+  }
+
+  /* Pantallas */
+  .pantalla{display:none;animation:aparecer .6s ease both;}
+  .pantalla.activa{display:block;}
+  @keyframes aparecer{from{opacity:0;transform:translateY(18px);}to{opacity:1;transform:translateY(0);}}
+
+  h1{font-family:var(--fuente-titulo);font-size:2.1rem;line-height:1.2;margin-bottom:14px;color:var(--oro-claro);}
+  h2{font-family:var(--fuente-titulo);font-size:1.5rem;margin-bottom:6px;color:var(--oro-claro);}
+  p.sub{opacity:.85;margin-bottom:22px;line-height:1.5;font-size:1.02rem;}
+  .nivel-tag{display:inline-block;font-size:.8rem;letter-spacing:2px;text-transform:uppercase;color:var(--rosa);margin-bottom:10px;}
+
+  /* Botones */
+  .btn{
+    cursor:pointer;border:none;
+    font-family:var(--fuente-texto);font-size:1.05rem;font-weight:600;
+    color:#3a2400;
+    background:linear-gradient(135deg,var(--oro),var(--oro-claro));
+    padding:14px 34px;border-radius:50px;
+    box-shadow:0 8px 22px rgba(232,185,92,.35);
+    transition:transform .15s ease,box-shadow .15s ease;
+    margin-top:8px;
+  }
+  .btn:hover{transform:translateY(-3px) scale(1.03);box-shadow:0 12px 28px rgba(232,185,92,.5);}
+  .btn:active{transform:translateY(0) scale(.98);}
+  .btn.sec{background:transparent;color:var(--crema);border:1px solid rgba(255,255,255,.3);box-shadow:none;}
+
+  .estado{min-height:24px;margin:14px 0;font-size:.98rem;color:var(--oro-claro);}
+
+  /* ---------- Nivel 1: Memoria ---------- */
+  .tablero-memoria{
+    display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin:18px auto;max-width:420px;
+  }
+  .carta{
+    aspect-ratio:3/4;perspective:800px;cursor:pointer;
+  }
+  .carta-inner{
+    position:relative;width:100%;height:100%;
+    transition:transform .5s;transform-style:preserve-3d;
+  }
+  .carta.volteada .carta-inner,.carta.hecha .carta-inner{transform:rotateY(180deg);}
+  .cara{
+    position:absolute;inset:0;backface-visibility:hidden;
+    display:flex;align-items:center;justify-content:center;
+    border-radius:14px;font-size:2rem;
+  }
+  .cara.frente{
+    background:linear-gradient(135deg,#5a3a5e,#7a4f7e);
+    border:2px solid rgba(255,255,255,.15);color:var(--oro-claro);
+  }
+  .cara.frente::after{content:"❦";font-size:1.8rem;opacity:.7;}
+  .cara.reverso{
+    background:linear-gradient(135deg,#fff9f0,#f4e6cf);
+    transform:rotateY(180deg);border:2px solid var(--oro);
+  }
+  .carta.hecha{animation:acierto .5s ease;}
+  .carta.hecha .cara.reverso{box-shadow:0 0 0 3px var(--verde) inset;}
+  @keyframes acierto{0%,100%{transform:scale(1);}50%{transform:scale(1.08);}}
+
+  /* ---------- Nivel 2: Rompecabezas deslizante ---------- */
+  .tablero-slide{
+    display:grid;grid-template-columns:repeat(3,1fr);gap:8px;
+    width:300px;height:300px;margin:18px auto;
+  }
+  .ficha{
+    display:flex;align-items:center;justify-content:center;
+    background:linear-gradient(135deg,var(--oro),var(--oro-claro));
+    color:#3a2400;font-size:1.8rem;font-weight:700;border-radius:12px;
+    cursor:pointer;transition:transform .12s ease;user-select:none;
+    box-shadow:0 4px 12px rgba(0,0,0,.25);
+  }
+  .ficha:hover{transform:scale(1.04);}
+  .ficha.vacia{background:transparent;box-shadow:none;cursor:default;}
+
+  /* ---------- Nivel 3: Acertijo ---------- */
+  .acertijo-caja{
+    background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.12);
+    border-radius:16px;padding:22px;margin:16px 0;font-family:var(--fuente-titulo);
+    font-size:1.15rem;line-height:1.6;font-style:italic;
+  }
+  .campo{
+    width:100%;max-width:320px;padding:13px 18px;border-radius:50px;
+    border:1px solid rgba(255,255,255,.25);background:rgba(0,0,0,.2);
+    color:var(--crema);font-size:1.05rem;text-align:center;margin:8px 0 4px;
+    outline:none;
+  }
+  .campo:focus{border-color:var(--oro);}
+  .pista{font-size:.85rem;opacity:.6;margin-top:6px;min-height:18px;}
+
+  /* ---------- Carta final ---------- */
+  .sobre-final{margin:10px auto 0;max-width:480px;text-align:left;}
+  .carta-amor{
+    background:linear-gradient(135deg,#fff9f0,#f6e9d2);
+    color:#4a2c1a;border-radius:18px;padding:30px 28px;
+    box-shadow:var(--sombra);font-family:var(--fuente-titulo);
+    line-height:1.7;font-size:1.08rem;
+    animation:desdoblar 1s ease both;
+  }
+  @keyframes desdoblar{from{opacity:0;transform:scale(.9) rotate(-2deg);}to{opacity:1;transform:scale(1) rotate(0);}}
+  .carta-amor h2{color:#b5842f;margin-bottom:14px;}
+  .firma{margin-top:20px;text-align:right;font-size:1.2rem;color:#b5842f;}
+
+  .barra-progreso{display:flex;gap:8px;justify-content:center;margin-bottom:22px;}
+  .paso{width:38px;height:6px;border-radius:6px;background:rgba(255,255,255,.15);transition:background .4s;}
+  .paso.on{background:var(--oro);}
+
+  .mini{font-size:.82rem;opacity:.5;margin-top:24px;}
+</style>
+</head>
+<body>
+
+<div class="particulas" id="particulas"></div>
+
+<div class="app">
+
+  <!-- Barra de progreso -->
+  <div class="barra-progreso" id="barra">
+    <div class="paso" data-paso="1"></div>
+    <div class="paso" data-paso="2"></div>
+    <div class="paso" data-paso="3"></div>
+    <div class="paso" data-paso="4"></div>
+  </div>
+
+  <!-- ============ INICIO ============ -->
+  <section class="pantalla activa" id="p-inicio">
+    <h1>Hola, mi amor 💛</h1>
+    <p class="sub">Preparé este pequeño juego solo para ti.<br>
+    Son tres retos… y al final hay un mensaje que quiero que leas.<br>
+    ¿Lista para jugar?</p>
+    <button class="btn" onclick="ir('p-memoria'); iniciarMemoria();">Empezar ✨</button>
+  </section>
+
+  <!-- ============ NIVEL 1: MEMORIA ============ -->
+  <section class="pantalla" id="p-memoria">
+    <span class="nivel-tag">Nivel 1 de 3</span>
+    <h2>Encuentra el par</h2>
+    <p class="sub">Voltea las cartas y encuentra las parejas iguales.</p>
+    <div class="estado" id="estado-memoria">Parejas: 0 / 8</div>
+    <div class="tablero-memoria" id="tablero-memoria"></div>
+    <button class="btn sec" onclick="iniciarMemoria()">Reiniciar</button>
+  </section>
+
+  <!-- ============ NIVEL 2: DESLIZANTE ============ -->
+  <section class="pantalla" id="p-slide">
+    <span class="nivel-tag">Nivel 2 de 3</span>
+    <h2>Ordena el rompecabezas</h2>
+    <p class="sub">Toca las fichas junto al espacio vacío para moverlas.<br>Ordénalas del 1 al 8.</p>
+    <div class="estado" id="estado-slide">Movimientos: 0</div>
+    <div class="tablero-slide" id="tablero-slide"></div>
+    <button class="btn sec" onclick="iniciarSlide()">Revolver de nuevo</button>
+  </section>
+
+  <!-- ============ NIVEL 3: ACERTIJO ============ -->
+  <section class="pantalla" id="p-acertijo">
+    <span class="nivel-tag">Nivel 3 de 3</span>
+    <h2>El último acertijo</h2>
+    <div class="acertijo-caja" id="texto-acertijo">
+      "Cuanto más quito, más grande me hago.<br>¿Qué soy?"
+    </div>
+    <input class="campo" id="resp-acertijo" placeholder="Escribe tu respuesta…" autocomplete="off" />
+    <div class="pista" id="pista-acertijo"></div>
+    <br>
+    <button class="btn" onclick="revisarAcertijo()">Comprobar</button>
+  </section>
+
+  <!-- ============ FINAL ============ -->
+  <section class="pantalla" id="p-final">
+    <div class="sobre-final">
+      <div class="carta-amor">
+        <h2>Para ti 💌</h2>
+        <!-- ============================================================
+             ✍️  ESCRIBE AQUÍ TU MENSAJE PERSONAL
+             Cambia este texto por lo que quieras decirle.
+             ============================================================ -->
+        <p>
+          Lo lograste, como logras todo lo que te propones. 🌙<br><br>
+          Me encanta cómo tu mente analiza cada detalle, cómo te pierdes
+          entre las páginas de un libro y cómo, sin darte cuenta, haces
+          que mis días tengan más sentido.<br><br>
+          Gracias por ser mi persona favorita para pensar, reír y soñar.
+          Este juego era pequeño, pero mi cariño por ti no lo es.
+        </p>
+        <div class="firma">— Con todo mi amor ❤️</div>
+      </div>
+    </div>
+    <br>
+    <button class="btn sec" onclick="location.reload()">Jugar otra vez</button>
+  </section>
+
+  <p class="mini">Hecho con cariño 💛</p>
+</div>
+
+<script>
+/* ==========================================================
+   NAVEGACIÓN ENTRE PANTALLAS
+   ========================================================== */
+function ir(id){
+  document.querySelectorAll('.pantalla').forEach(p=>p.classList.remove('activa'));
+  document.getElementById(id).classList.add('activa');
+  // progreso
+  const mapa={'p-memoria':1,'p-slide':2,'p-acertijo':3,'p-final':4};
+  const n=mapa[id]||0;
+  document.querySelectorAll('.paso').forEach(s=>{
+    s.classList.toggle('on', Number(s.dataset.paso)<=n);
+  });
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+
+/* ==========================================================
+   PARTÍCULAS DE FONDO (corazones y estrellitas)
+   ========================================================== */
+(function(){
+  const cont=document.getElementById('particulas');
+  const simbolos=['❤','✦','❦','✧','♡','⋆'];
+  for(let i=0;i<22;i++){
+    const s=document.createElement('div');
+    s.className='particula';
+    s.textContent=simbolos[Math.floor(Math.random()*simbolos.length)];
+    s.style.left=Math.random()*100+'%';
+    s.style.fontSize=(12+Math.random()*20)+'px';
+    s.style.animationDuration=(9+Math.random()*12)+'s';
+    s.style.animationDelay=(Math.random()*12)+'s';
+    s.style.color=Math.random()>.5?'#e88fa4':'#e8b95c';
+    cont.appendChild(s);
+  }
+})();
+
+/* ==========================================================
+   NIVEL 1 — MEMORIA (encuentra el par)
+   Tema: lectura y amor
+   ========================================================== */
+const ICONOS=['📖','☕','🌙','🌹','✒️','🔖','🕯️','💌'];
+let primeraCarta=null, bloqueado=false, paresHechos=0;
+
+function iniciarMemoria(){
+  const tablero=document.getElementById('tablero-memoria');
+  tablero.innerHTML='';
+  paresHechos=0; primeraCarta=null; bloqueado=false;
+  document.getElementById('estado-memoria').textContent='Parejas: 0 / 8';
+
+  let mazo=[...ICONOS,...ICONOS];
+  mazo.sort(()=>Math.random()-0.5);
+
+  mazo.forEach(icono=>{
+    const carta=document.createElement('div');
+    carta.className='carta';
+    carta.dataset.icono=icono;
+    carta.innerHTML=`
+      <div class="carta-inner">
+        <div class="cara frente"></div>
+        <div class="cara reverso">${icono}</div>
+      </div>`;
+    carta.addEventListener('click',()=>voltear(carta));
+    tablero.appendChild(carta);
+  });
+}
+
+function voltear(carta){
+  if(bloqueado) return;
+  if(carta.classList.contains('volteada')||carta.classList.contains('hecha')) return;
+
+  carta.classList.add('volteada');
+
+  if(!primeraCarta){ primeraCarta=carta; return; }
+
+  // segunda carta
+  if(carta.dataset.icono===primeraCarta.dataset.icono){
+    carta.classList.add('hecha');
+    primeraCarta.classList.add('hecha');
+    primeraCarta=null;
+    paresHechos++;
+    document.getElementById('estado-memoria').textContent=`Parejas: ${paresHechos} / 8`;
+    if(paresHechos===8){
+      setTimeout(()=>{ celebrar('¡Perfecto! 💛'); ir('p-slide'); iniciarSlide(); }, 700);
+    }
+  } else {
+    bloqueado=true;
+    setTimeout(()=>{
+      carta.classList.remove('volteada');
+      primeraCarta.classList.remove('volteada');
+      primeraCarta=null; bloqueado=false;
+    }, 800);
+  }
+}
+
+/* ==========================================================
+   NIVEL 2 — ROMPECABEZAS DESLIZANTE (3x3)
+   ========================================================== */
+let estadoSlide=[], movimientos=0;
+const VACIO=0;
+
+function iniciarSlide(){
+  movimientos=0;
+  document.getElementById('estado-slide').textContent='Movimientos: 0';
+  // Empieza resuelto: [1..8,0] y luego se revuelve con movimientos válidos
+  estadoSlide=[1,2,3,4,5,6,7,8,VACIO];
+  for(let i=0;i<150;i++){
+    const vecinos=indicesMovibles();
+    const elegido=vecinos[Math.floor(Math.random()*vecinos.length)];
+    moverFicha(elegido,true);
+  }
+  movimientos=0;
+  document.getElementById('estado-slide').textContent='Movimientos: 0';
+  dibujarSlide();
+}
+
+function indicesMovibles(){
+  const v=estadoSlide.indexOf(VACIO);
+  const fila=Math.floor(v/3), col=v%3;
+  const res=[];
+  if(fila>0) res.push(v-3);
+  if(fila<2) res.push(v+3);
+  if(col>0) res.push(v-1);
+  if(col<2) res.push(v+1);
+  return res;
+}
+
+function moverFicha(i,silencioso){
+  const v=estadoSlide.indexOf(VACIO);
+  if(!indicesMovibles().includes(i)) return;
+  [estadoSlide[i],estadoSlide[v]]=[estadoSlide[v],estadoSlide[i]];
+  if(!silencioso){
+    movimientos++;
+    document.getElementById('estado-slide').textContent='Movimientos: '+movimientos;
+    dibujarSlide();
+    if(estaResuelto()){
+      setTimeout(()=>{ celebrar('¡Lo resolviste! 🧩'); ir('p-acertijo'); document.getElementById('resp-acertijo').focus(); }, 500);
+    }
+  }
+}
+
+function estaResuelto(){
+  for(let i=0;i<8;i++){ if(estadoSlide[i]!==i+1) return false; }
+  return true;
+}
+
+function dibujarSlide(){
+  const t=document.getElementById('tablero-slide');
+  t.innerHTML='';
+  estadoSlide.forEach((val,i)=>{
+    const f=document.createElement('div');
+    f.className='ficha'+(val===VACIO?' vacia':'');
+    f.textContent=val===VACIO?'':val;
+    if(val!==VACIO) f.addEventListener('click',()=>moverFicha(i,false));
+    t.appendChild(f);
+  });
+}
+
+/* ==========================================================
+   NIVEL 3 — ACERTIJO
+   Respuesta: "un hoyo" / "un agujero" / "hoyo"
+   Puedes cambiar el acertijo y las respuestas abajo.
+   ========================================================== */
+const RESPUESTAS_VALIDAS=['hoyo','un hoyo','agujero','un agujero','el hoyo','pozo','un pozo'];
+let intentos=0;
+
+function normaliza(txt){
+  return txt.toLowerCase().trim()
+    .normalize('NFD').replace(/[̀-ͯ]/g,''); // quita acentos
+}
+
+function revisarAcertijo(){
+  const val=normaliza(document.getElementById('resp-acertijo').value);
+  const pista=document.getElementById('pista-acertijo');
+  if(!val){ pista.textContent='Escribe algo 🙂'; return; }
+
+  if(RESPUESTAS_VALIDAS.map(normaliza).includes(val)){
+    celebrar('¡Correcta! 🌟');
+    ir('p-final');
+    lluviaCorazones();
+  } else {
+    intentos++;
+    if(intentos===1) pista.textContent='Mmm… piensa en algo que crece cuanto más le quitas. 🤔';
+    else if(intentos===2) pista.textContent='Pista: se hace en la tierra cavando…';
+    else pista.textContent='Pista: empieza con "H" (o dilo como "agujero").';
+  }
+}
+// Permite responder con Enter
+document.getElementById('resp-acertijo').addEventListener('keydown',e=>{
+  if(e.key==='Enter') revisarAcertijo();
+});
+
+/* ==========================================================
+   EFECTOS DE CELEBRACIÓN
+   ========================================================== */
+function celebrar(msg){
+  const d=document.createElement('div');
+  d.textContent=msg;
+  d.style.cssText=`position:fixed;top:50%;left:50%;transform:translate(-50%,-50%) scale(.6);
+    z-index:99;font-family:var(--fuente-titulo);font-size:2rem;color:#fff;
+    background:linear-gradient(135deg,#e8b95c,#e88fa4);padding:18px 34px;border-radius:50px;
+    box-shadow:0 20px 50px rgba(0,0,0,.4);opacity:0;transition:all .4s ease;pointer-events:none;`;
+  document.body.appendChild(d);
+  requestAnimationFrame(()=>{ d.style.opacity='1'; d.style.transform='translate(-50%,-50%) scale(1)'; });
+  setTimeout(()=>{ d.style.opacity='0'; d.style.transform='translate(-50%,-60%) scale(1.1)'; },1000);
+  setTimeout(()=>d.remove(),1500);
+}
+
+function lluviaCorazones(){
+  for(let i=0;i<40;i++){
+    setTimeout(()=>{
+      const c=document.createElement('div');
+      c.textContent=['❤','💛','💗','✨','💖'][Math.floor(Math.random()*5)];
+      c.style.cssText=`position:fixed;top:-40px;left:${Math.random()*100}%;
+        font-size:${16+Math.random()*22}px;z-index:98;pointer-events:none;
+        transition:transform 3s linear,opacity 3s linear;opacity:1;`;
+      document.body.appendChild(c);
+      requestAnimationFrame(()=>{
+        c.style.transform=`translateY(110vh) rotate(${Math.random()*360}deg)`;
+        c.style.opacity='0';
+      });
+      setTimeout(()=>c.remove(),3200);
+    }, i*80);
+  }
+}
+</script>
+</body>
+</html>

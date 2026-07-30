@@ -1,0 +1,45 @@
+<%- include('partials/inicio') %>
+
+<div class="page-head">
+  <h2>Conversación con <%= cliente && cliente.nombre ? cliente.nombre : conversacion.telefonoCliente %></h2>
+  <p>
+    <%= conversacion.telefonoCliente %>
+    <a href="https://wa.me/<%= conversacion.telefonoCliente.replace(/\D/g,'') %>" target="_blank" rel="noopener" style="color:var(--primary-2);margin-left:.6rem">Hablar por WhatsApp</a>
+  </p>
+</div>
+
+<p style="margin:0 0 1rem"><a href="/panel/conversaciones" style="color:var(--primary-2)">← Volver a conversaciones</a></p>
+
+<% if (cliente) { %>
+<div class="admin-stats">
+  <div class="stat-card"><span class="stat-num" style="font-size:1.1rem"><%= cliente.categoriaInteres || '-' %></span><span class="stat-label">Interés</span></div>
+  <div class="stat-card"><span class="stat-num" style="font-size:1.1rem"><%= cliente.presupuesto || '-' %></span><span class="stat-label">Presupuesto</span></div>
+  <div class="stat-card"><span class="stat-num" style="font-size:1.1rem"><%= cliente.direccionEntrega || '-' %></span><span class="stat-label">Dirección de entrega</span></div>
+  <div class="stat-card"><span class="badge badge-done" style="font-size:.85rem"><%= cliente.estadoLead.replace(/_/g,' ').toLowerCase() %></span><span class="stat-label">Estado</span></div>
+</div>
+<% } %>
+
+<div class="chat-window" style="max-width:640px">
+  <div class="chat-head">
+    <span class="chat-avatar"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="4" y="7" width="16" height="12" rx="3"/><path d="M12 7V3M9 12h.01M15 12h.01"/></svg></span>
+    <div>
+      <strong><%= conversacion.agente.nombre %></strong>
+      <span class="chat-status"><%= conversacion.mensajes.length %> mensajes</span>
+    </div>
+  </div>
+  <div class="chat-body" style="max-height:60vh;overflow-y:auto">
+    <% if (conversacion.mensajes.length === 0) { %>
+      <p class="dash-empty">Todavía no hay mensajes en esta conversación.</p>
+    <% } %>
+    <% conversacion.mensajes.forEach(function (m) { %>
+      <div class="msg <%= m.rol === 'CLIENTE' ? 'in' : 'out' %>" style="white-space:pre-line;animation:none">
+        <%= m.contenido %>
+        <div class="muted" style="font-size:.7rem;margin-top:.3rem">
+          <%= new Date(m.createdAt).toLocaleString('es-BO', { dateStyle: 'short', timeStyle: 'short' }) %>
+        </div>
+      </div>
+    <% }); %>
+  </div>
+</div>
+
+<%- include('partials/fin') %>
