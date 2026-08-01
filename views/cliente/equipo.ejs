@@ -1,0 +1,87 @@
+<%- include('partials/inicio') %>
+
+<div class="page-head">
+  <h2>Mi equipo</h2>
+  <p>Invita a otras personas de tu negocio para que usen el panel y atiendan conversaciones.</p>
+</div>
+
+<% if (mensaje) { %><div class="alert-ok"><%= mensaje %></div><% } %>
+<% if (error) { %><div class="alert-err"><%= error %></div><% } %>
+<% if (linkInvitacion) { %>
+  <div class="alert-ok">
+    Compártele este link (por WhatsApp, por ejemplo) a la persona que invitaste — todavía no hay envío de correo automático:
+    <br /><input type="text" readonly value="<%= linkInvitacion %>" onclick="this.select()" style="margin-top:.5rem;width:100%;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);border-radius:8px;padding:.5rem .7rem;color:inherit;font-family:inherit" />
+  </div>
+<% } %>
+
+<form method="POST" action="/panel/equipo/invitar" class="form-card" style="max-width:520px">
+  <h3 style="margin:0 0 1rem;font-size:1.05rem">Invitar a alguien</h3>
+  <div class="field-row">
+    <div class="field">
+      <label for="email">Correo *</label>
+      <input id="email" name="email" type="email" required placeholder="colaborador@correo.com" />
+    </div>
+    <div class="field">
+      <label for="rol">Rol</label>
+      <select id="rol" name="rol">
+        <option value="STAFF">Staff (atiende conversaciones y pedidos)</option>
+        <option value="ADMIN">Admin (todo, menos equipo y facturación)</option>
+      </select>
+    </div>
+  </div>
+  <div class="form-actions">
+    <button class="btn btn-primary" type="submit">Enviar invitación</button>
+  </div>
+</form>
+
+<div class="page-head" style="margin-top:2rem"><h2 style="font-size:1.1rem">Miembros del equipo</h2></div>
+<div class="table-wrap">
+  <table class="leads-table">
+    <thead><tr><th>Nombre</th><th>Correo</th><th>Rol</th><th>Desde</th><th>Acciones</th></tr></thead>
+    <tbody>
+      <% usuarios.forEach(function (u) { %>
+        <tr>
+          <td><strong><%= u.nombre %></strong><% if (u.id === usuarioActualId) { %> <span class="muted">(vos)</span><% } %></td>
+          <td class="muted"><%= u.email %></td>
+          <td><span class="badge <%= u.rol === 'OWNER' ? 'badge-new' : 'badge-done' %>"><%= u.rol %></span></td>
+          <td class="nowrap muted"><%= new Date(u.createdAt).toLocaleDateString('es-BO') %></td>
+          <td class="actions-cell">
+            <% if (u.rol !== 'OWNER') { %>
+              <form method="POST" action="/panel/equipo/<%= u.id %>/eliminar" class="inline-form"
+                    onsubmit="return confirm('¿Quitar a «<%= u.nombre %>» del equipo?');">
+                <button class="btn btn-ghost" style="padding:.4rem .8rem;font-size:.85rem" type="submit">Quitar</button>
+              </form>
+            <% } else { %>
+              <span class="muted">Dueño</span>
+            <% } %>
+          </td>
+        </tr>
+      <% }); %>
+    </tbody>
+  </table>
+</div>
+
+<% if (invitaciones.length) { %>
+  <div class="page-head" style="margin-top:2rem"><h2 style="font-size:1.1rem">Invitaciones pendientes</h2></div>
+  <div class="table-wrap">
+    <table class="leads-table">
+      <thead><tr><th>Correo</th><th>Rol</th><th>Vence</th><th>Acciones</th></tr></thead>
+      <tbody>
+        <% invitaciones.forEach(function (i) { %>
+          <tr>
+            <td><%= i.email %></td>
+            <td><span class="badge badge-done"><%= i.rol %></span></td>
+            <td class="nowrap muted"><%= new Date(i.expiraEn).toLocaleDateString('es-BO') %></td>
+            <td class="actions-cell">
+              <form method="POST" action="/panel/equipo/invitaciones/<%= i.id %>/revocar" class="inline-form">
+                <button class="btn btn-ghost" style="padding:.4rem .8rem;font-size:.85rem" type="submit">Revocar</button>
+              </form>
+            </td>
+          </tr>
+        <% }); %>
+      </tbody>
+    </table>
+  </div>
+<% } %>
+
+<%- include('partials/fin') %>

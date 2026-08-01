@@ -21,6 +21,18 @@ datasource db {
   provider = "postgresql"
 }
 
+// Tabla de sesiones de express-session (connect-pg-simple la crea y maneja
+// sola). Se declara aca solo para que Prisma no la vea como "drift" y trate
+// de borrarla en cada migracion nueva; el codigo de la app nunca la toca
+// directamente via Prisma Client.
+model Session {
+  sid    String   @id
+  sess   Json
+  expire DateTime
+
+  @@map("session")
+}
+
 // ============================ CATALOGO COMERCIAL ============================
 
 // Planes disponibles (Gratis, Standard, Pro, Premium BI)
@@ -104,6 +116,7 @@ model Empresa {
   updatedAt DateTime @updatedAt
 
   usuarios       Usuario[]
+  invitaciones   Invitacion[]
   agentes        Agente[]
   productos      Producto[]
   clientes       ClienteFinal[]
@@ -126,8 +139,31 @@ model Usuario {
   rol          Rol      @default(OWNER)
   createdAt    DateTime @default(now())
 
+  conversacionesTomadas Conversacion[]
+  mensajes              Mensaje[]
+
   @@index([empresaId])
   @@map("usuarios")
+}
+
+// Invitacion pendiente a un miembro del equipo. No crea el Usuario hasta que
+// la persona invitada acepta y define su propia contraseña (asi no hay que
+// inventarle una contraseña ni chocar con el email unico de Usuario antes de
+// tiempo). No hay servicio de email configurado todavia: el dueño comparte
+// el link de la invitacion el mismo (WhatsApp, etc).
+model Invitacion {
+  id        Int      @id @default(autoincrement())
+  empresaId Int
+  empresa   Empresa  @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  email     String
+  rol       Rol      @default(STAFF)
+  token     String   @unique
+  aceptada  Boolean  @default(false)
+  expiraEn  DateTime
+  createdAt DateTime @default(now())
+
+  @@index([empresaId])
+  @@map("invitaciones")
 }
 
 enum Rol {
@@ -265,6 +301,11 @@ model Conversacion {
   agente          Agente   @relation(fields: [agenteId], references: [id], onDelete: Cascade)
   telefonoCliente String
   origen          OrigenUso @default(INCLUIDA) // de donde se cobro
+  // Mientras un humano tiene el control, el agente de IA NO responde este
+  // chat (se libera solo manualmente, ver /panel/conversaciones/:id/control).
+  modo            ModoConversacion @default(IA)
+  tomadaPorId     Int?
+  tomadaPor       Usuario?  @relation(fields: [tomadaPorId], references: [id], onDelete: SetNull)
   ultimoMensajeAt DateTime  @default(now())
   createdAt       DateTime  @default(now())
 
@@ -274,12 +315,25 @@ model Conversacion {
   @@map("conversaciones")
 }
 
+enum ModoConversacion {
+  IA
+  HUMANO
+}
+
 model Mensaje {
   id             Int          @id @default(autoincrement())
   conversacionId Int
   conversacion   Conversacion @relation(fields: [conversacionId], references: [id], onDelete: Cascade)
   rol            RolMensaje
   contenido      String
+  // Cuando un miembro del equipo escribe manualmente (modo HUMANO), para
+  // saber quien mando que en el historial.
+  usuarioId      Int?
+  usuario        Usuario?     @relation(fields: [usuarioId], references: [id], onDelete: SetNull)
+  // Adjunto opcional (foto o audio) mandado por el cliente o por un humano
+  // del equipo. mediaTipo: "imagen" | "audio".
+  mediaUrl       String?
+  mediaTipo      String?
   createdAt      DateTime     @default(now())
 
   @@index([conversacionId, createdAt])
@@ -309,9 +363,35 @@ model Producto {
   createdAt       DateTime @default(now())
 
   pedidoItems PedidoItem[]
+  variantes   Variante[]
 
   @@index([empresaId])
   @@map("productos")
+}
+
+// Una combinacion vendible de un producto (ej: talla 42 + color negro), con
+// SU PROPIO stock y, opcionalmente, su propio precio. Si un producto no
+// necesita variantes (la mayoria de los casos simples), simplemente no
+// tiene ninguna fila aca y se sigue usando Producto.precio/stock como hoy.
+model Variante {
+  id         Int      @id @default(autoincrement())
+  productoId Int
+  producto   Producto @relation(fields: [productoId], references: [id], onDelete: Cascade)
+  // Ej: {"Talla": "42", "Color": "Negro"}. Libre a proposito: cada negocio
+  // define sus propios atributos (talla, color, modelo, sabor, etc.).
+  atributos  Json
+  sku        String?
+  // null = usa el precio del producto padre. Se sobreescribe solo si esa
+  // combinacion puntual cuesta distinto.
+  precio     Decimal? @db.Decimal(10, 2)
+  stock      Int      @default(0)
+  activa     Boolean  @default(true)
+  createdAt  DateTime @default(now())
+
+  pedidoItems PedidoItem[]
+
+  @@index([productoId])
+  @@map("variantes")
 }
 
 model ClienteFinal {
@@ -394,6 +474,9 @@ model PedidoItem {
   pedido     Pedido    @relation(fields: [pedidoId], references: [id], onDelete: Cascade)
   productoId Int?
   producto   Producto? @relation(fields: [productoId], references: [id], onDelete: SetNull)
+  // Si el producto tenia variantes, cual combinacion exacta se vendio.
+  varianteId Int?
+  variante   Variante? @relation(fields: [varianteId], references: [id], onDelete: SetNull)
   nombre     String
   precio     Decimal   @db.Decimal(10, 2)
   cantidad   Int       @default(1)

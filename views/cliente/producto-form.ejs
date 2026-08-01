@@ -25,7 +25,7 @@
              value="<%= producto ? Number(producto.precio).toFixed(2) : '' %>" placeholder="0.00" />
     </div>
     <div class="field">
-      <label for="stock">Stock</label>
+      <label for="stock">Stock<% if (producto && producto.variantes && producto.variantes.length) { %> <span class="muted" style="font-weight:400">(sin usar: el stock se maneja por variante, más abajo)</span><% } %></label>
       <input id="stock" name="stock" type="number" min="0"
              value="<%= producto ? producto.stock : '0' %>" placeholder="0" />
     </div>
@@ -62,5 +62,64 @@
     <button class="btn btn-primary" type="submit"><%= producto ? 'Guardar cambios' : 'Agregar producto' %></button>
   </div>
 </form>
+
+<% if (producto && producto.id) { %>
+  <div class="page-head" style="margin-top:2rem">
+    <h2 style="font-size:1.1rem">Variantes (talla, color, etc.)</h2>
+    <p class="muted" style="font-size:.85rem">Si este producto se vende en distintas combinaciones (ej: talla + color), cargalas acá con su propio stock. Si no tiene variantes, ignora esta sección y usa el stock de arriba.</p>
+  </div>
+
+  <% if (errorVariante) { %><div class="alert-err"><%= errorVariante %></div><% } %>
+
+  <% if (producto.variantes.length) { %>
+    <div class="table-wrap">
+      <table class="leads-table">
+        <thead><tr><th>Combinación</th><th class="num">Precio propio</th><th class="num">Stock</th><th>Acciones</th></tr></thead>
+        <tbody>
+          <% producto.variantes.forEach(function (v) { %>
+            <%
+              var formId = 'editar-variante-' + v.id;
+              var inputStyle = 'background:transparent;border:1px solid rgba(255,255,255,.15);border-radius:8px;padding:.4rem .6rem;color:inherit;font:inherit';
+            %>
+            <tr>
+              <td><input form="<%= formId %>" type="text" name="atributos" value="<%= v.atributosTexto %>" style="width:100%;<%= inputStyle %>" /></td>
+              <td class="num"><input form="<%= formId %>" type="number" name="precio" min="0" step="0.01" value="<%= v.precio ? Number(v.precio).toFixed(2) : '' %>" placeholder="Precio del producto" style="width:110px;<%= inputStyle %>" /></td>
+              <td class="num"><input form="<%= formId %>" type="number" name="stock" min="0" value="<%= v.stock %>" style="width:80px;<%= inputStyle %>" /></td>
+              <td class="actions-cell">
+                <button form="<%= formId %>" class="btn btn-ghost" style="padding:.4rem .8rem;font-size:.85rem" type="submit">Guardar</button>
+                <form method="POST" action="/panel/productos/<%= producto.id %>/variantes/<%= v.id %>/eliminar" class="inline-form"
+                      onsubmit="return confirm('¿Eliminar esta variante?');">
+                  <button class="btn btn-ghost" style="padding:.4rem .8rem;font-size:.85rem" type="submit">Eliminar</button>
+                </form>
+              </td>
+            </tr>
+            <form id="<%= formId %>" method="POST" action="/panel/productos/<%= producto.id %>/variantes/<%= v.id %>"></form>
+          <% }); %>
+        </tbody>
+      </table>
+    </div>
+  <% } %>
+
+  <form method="POST" action="/panel/productos/<%= producto.id %>/variantes" class="form-card" style="max-width:600px;margin-top:1rem">
+    <h3 style="margin:0 0 1rem;font-size:.95rem">Agregar variante</h3>
+    <div class="field">
+      <label for="v-atributos">Combinación *</label>
+      <input id="v-atributos" name="atributos" type="text" required placeholder="Ej: Talla: 42, Color: Negro" />
+    </div>
+    <div class="field-row">
+      <div class="field">
+        <label for="v-precio">Precio propio (opcional)</label>
+        <input id="v-precio" name="precio" type="number" min="0" step="0.01" placeholder="Dejar vacío = precio del producto" />
+      </div>
+      <div class="field">
+        <label for="v-stock">Stock *</label>
+        <input id="v-stock" name="stock" type="number" min="0" required value="0" />
+      </div>
+    </div>
+    <div class="form-actions">
+      <button class="btn btn-primary" type="submit">+ Agregar variante</button>
+    </div>
+  </form>
+<% } %>
 
 <%- include('partials/fin') %>

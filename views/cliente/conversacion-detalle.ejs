@@ -1,14 +1,32 @@
 <%- include('partials/inicio') %>
 
-<div class="page-head">
-  <h2>Conversación con <%= cliente && cliente.nombre ? cliente.nombre : conversacion.telefonoCliente %></h2>
-  <p>
-    <%= conversacion.telefonoCliente %>
-    <a href="https://wa.me/<%= conversacion.telefonoCliente.replace(/\D/g,'') %>" target="_blank" rel="noopener" style="color:var(--primary-2);margin-left:.6rem">Hablar por WhatsApp</a>
-  </p>
+<div class="page-head page-head-row">
+  <div>
+    <h2>Conversación con <%= cliente && cliente.nombre ? cliente.nombre : conversacion.telefonoCliente %></h2>
+    <p>
+      <%= conversacion.telefonoCliente %>
+      <a href="https://wa.me/<%= conversacion.telefonoCliente.replace(/\D/g,'') %>" target="_blank" rel="noopener" style="color:var(--primary-2);margin-left:.6rem">Hablar por WhatsApp</a>
+    </p>
+  </div>
+  <div>
+    <% if (conversacion.modo === 'HUMANO') { %>
+      <span class="badge badge-done" style="margin-right:.6rem">Tomada por <%= conversacion.tomadaPor ? conversacion.tomadaPor.nombre : 'un humano' %></span>
+      <form method="POST" action="/panel/conversaciones/<%= conversacion.id %>/liberar" class="inline-form">
+        <button class="btn btn-ghost" type="submit">Devolver al agente IA</button>
+      </form>
+    <% } else { %>
+      <span class="badge badge-new" style="margin-right:.6rem">Atendida por IA</span>
+      <form method="POST" action="/panel/conversaciones/<%= conversacion.id %>/control" class="inline-form">
+        <button class="btn btn-primary" type="submit">Tomar control</button>
+      </form>
+    <% } %>
+  </div>
 </div>
 
 <p style="margin:0 0 1rem"><a href="/panel/conversaciones" style="color:var(--primary-2)">← Volver a conversaciones</a></p>
+
+<% if (mensaje) { %><div class="alert-ok"><%= mensaje %></div><% } %>
+<% if (error) { %><div class="alert-err"><%= error %></div><% } %>
 
 <% if (cliente) { %>
 <div class="admin-stats">
@@ -19,27 +37,102 @@
 </div>
 <% } %>
 
-<div class="chat-window" style="max-width:640px">
+<div class="chat-window" style="max-width:640px" data-conversacion-id="<%= conversacion.id %>">
   <div class="chat-head">
     <span class="chat-avatar"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="4" y="7" width="16" height="12" rx="3"/><path d="M12 7V3M9 12h.01M15 12h.01"/></svg></span>
     <div>
       <strong><%= conversacion.agente.nombre %></strong>
-      <span class="chat-status"><%= conversacion.mensajes.length %> mensajes</span>
+      <span class="chat-status" id="chatStatus"><%= conversacion.mensajes.length %> mensajes</span>
     </div>
   </div>
-  <div class="chat-body" style="max-height:60vh;overflow-y:auto">
+  <div class="chat-body" id="chatMensajes" style="max-height:60vh;overflow-y:auto">
     <% if (conversacion.mensajes.length === 0) { %>
-      <p class="dash-empty">Todavía no hay mensajes en esta conversación.</p>
+      <p class="dash-empty" id="chatVacio">Todavía no hay mensajes en esta conversación.</p>
     <% } %>
     <% conversacion.mensajes.forEach(function (m) { %>
-      <div class="msg <%= m.rol === 'CLIENTE' ? 'in' : 'out' %>" style="white-space:pre-line;animation:none">
-        <%= m.contenido %>
-        <div class="muted" style="font-size:.7rem;margin-top:.3rem">
-          <%= new Date(m.createdAt).toLocaleString('es-BO', { dateStyle: 'short', timeStyle: 'short' }) %>
+      <% if (m.mediaTipo === 'imagen' && m.mediaUrl) { %>
+        <div class="msg <%= m.rol === 'CLIENTE' ? 'in' : 'out' %> msg-foto" style="animation:none">
+          <img src="<%= m.mediaUrl %>" alt="" />
+          <% if (m.contenido) { %><div class="msg-foto-caption"><%= m.contenido %></div><% } %>
         </div>
+      <% } else if (m.mediaTipo === 'audio' && m.mediaUrl) { %>
+        <div class="msg <%= m.rol === 'CLIENTE' ? 'in' : 'out' %>" style="animation:none">
+          <audio controls src="<%= m.mediaUrl %>" style="max-width:100%"></audio>
+          <% if (m.contenido) { %><div style="margin-top:.4rem;font-size:.82rem"><%= m.contenido %></div><% } %>
+        </div>
+      <% } else { %>
+        <div class="msg <%= m.rol === 'CLIENTE' ? 'in' : 'out' %>" style="white-space:pre-line;animation:none">
+          <% if (m.usuario) { %><div style="font-size:.72rem;opacity:.75;margin-bottom:.2rem">✋ <%= m.usuario.nombre %></div><% } %>
+          <%= m.contenido %>
+        </div>
+      <% } %>
+      <div class="muted" style="font-size:.7rem;margin:-.4rem 0 .55rem;text-align:<%= m.rol === 'CLIENTE' ? 'left' : 'right' %>">
+        <%= new Date(m.createdAt).toLocaleString('es-BO', { dateStyle: 'short', timeStyle: 'short' }) %>
       </div>
     <% }); %>
   </div>
+
+  <% if (conversacion.modo === 'HUMANO') { %>
+    <form method="POST" action="/panel/conversaciones/<%= conversacion.id %>/mensaje" id="formMensajeHumano" style="display:flex; gap:.5rem; padding:.8rem; border-top:1px solid var(--border)">
+      <input type="text" name="texto" autocomplete="off" placeholder="Escribe tu respuesta..."
+             style="flex:1; padding:.6rem .8rem; border-radius:10px; border:1px solid var(--border); background:var(--bg-2); color:var(--text); font:inherit" />
+      <button class="btn btn-primary" type="submit">Enviar</button>
+    </form>
+  <% } else { %>
+    <p class="muted" style="padding:.8rem;text-align:center;font-size:.85rem;border-top:1px solid var(--border)">Tomá el control del chat para poder escribirle directo al cliente.</p>
+  <% } %>
 </div>
+
+<script src="/socket.io/socket.io.js"></script>
+<script>
+  (function () {
+    var CONV_ID = <%- conversacion.id %>;
+    var body = document.getElementById('chatMensajes');
+    var status = document.getElementById('chatStatus');
+    var total = <%- conversacion.mensajes.length %>;
+
+    function fmtFecha(iso) {
+      var d = new Date(iso);
+      return d.toLocaleString('es-BO', { dateStyle: 'short', timeStyle: 'short' });
+    }
+
+    function agregarBurbuja(m) {
+      document.getElementById('chatVacio')?.remove();
+      var wrap = document.createElement('div');
+      wrap.className = 'msg ' + (m.rol === 'CLIENTE' ? 'in' : 'out');
+      wrap.style.whiteSpace = 'pre-line';
+      wrap.style.animation = 'none';
+      if (m.usuarioNombre) {
+        var quien = document.createElement('div');
+        quien.style.cssText = 'font-size:.72rem;opacity:.75;margin-bottom:.2rem';
+        quien.textContent = '✋ ' + m.usuarioNombre;
+        wrap.appendChild(quien);
+      }
+      wrap.appendChild(document.createTextNode(m.contenido));
+      body.appendChild(wrap);
+
+      var hora = document.createElement('div');
+      hora.className = 'muted';
+      hora.style.cssText = 'font-size:.7rem;margin:-.4rem 0 .55rem;text-align:' + (m.rol === 'CLIENTE' ? 'left' : 'right');
+      hora.textContent = fmtFecha(m.createdAt);
+      body.appendChild(hora);
+
+      body.scrollTop = body.scrollHeight;
+      total++;
+      if (status) status.textContent = total + ' mensajes';
+    }
+
+    var socket = io();
+    socket.on('mensaje:nuevo', function (payload) {
+      if (payload.conversacionId === CONV_ID) agregarBurbuja(payload);
+    });
+    socket.on('conversacion:actualizada', function (payload) {
+      // Otra persona del equipo tomo/devolvio el control de este mismo chat
+      // mientras lo tenias abierto: recargamos para mostrar el estado real
+      // (evita que dos personas escriban a la vez sin saberlo).
+      if (payload.conversacionId === CONV_ID) location.reload();
+    });
+  })();
+</script>
 
 <%- include('partials/fin') %>

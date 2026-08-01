@@ -28,6 +28,7 @@ const { encolarRespuesta } = require('./lib/services/bufferMensajes');
 const wa = require('./lib/services/whatsapp');
 const { analizarImagenProducto, transcribirAudio } = require('./lib/services/agente');
 const { iniciarJobFacturacion } = require('./lib/jobs/facturacion');
+const { initSocket, emitMensaje, emitConversacion } = require('./lib/services/realtime');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -108,16 +109,17 @@ const sessionStore = new pgSession({
 const SESION_CORTA_MS = 1000 * 60 * 60 * 8; // 8 h
 const SESION_LARGA_MS = 1000 * 60 * 60 * 24 * 30; // 30 dias
 
-app.use(
-  session({
-    store: sessionStore,
-    secret: process.env.SESSION_SECRET || crypto.randomBytes(24).toString('hex'),
-    resave: false,
-    saveUninitialized: false,
-    rolling: true, // cada visita renueva el vencimiento mientras este activo
-    cookie: { httpOnly: true, sameSite: 'lax', maxAge: SESION_CORTA_MS },
-  })
-);
+// Guardada en su propia variable para poder compartirla con Socket.IO (el
+// inbox en tiempo real solo debe aceptar conexiones de gente ya logueada).
+const sessionMiddleware = session({
+  store: sessionStore,
+  secret: process.env.SESSION_SECRET || crypto.randomBytes(24).toString('hex'),
+  resave: false,
+  saveUninitialized: false,
+  rolling: true, // cada visita renueva el vencimiento mientras este activo
+  cookie: { httpOnly: true, sameSite: 'lax', maxAge: SESION_CORTA_MS },
+});
+app.use(sessionMiddleware);
 
 // Hace disponible "site" en todas las vistas
 app.use((req, res, next) => {
@@ -147,6 +149,31 @@ app.get('/', async (req, res, next) => {
       prisma.paquete.findMany({ where: { activo: true }, orderBy: { cantidad: 'asc' } }),
     ]);
     res.render('index', { title: `${site.name} - ${site.tagline}`, planes, paquetes });
+  } catch (err) { next(err); }
+});
+
+// Catalogo publico de una empresa (sin login): el agente manda este link
+// cuando el cliente pide "el catálogo" en general, en vez de un producto
+// puntual. Reutiliza el slug de la empresa (el mismo que ya usa cada tenant).
+app.get('/catalogo/:slug', async (req, res, next) => {
+  try {
+    const empresa = await prisma.empresa.findUnique({
+      where: { slug: req.params.slug },
+      include: { agentes: { take: 1 } },
+    });
+    if (!empresa) return res.status(404).render('404', { title: 'Página no encontrada' });
+
+    const productos = await prisma.producto.findMany({
+      where: { empresaId: empresa.id, activo: true },
+      orderBy: { nombre: 'asc' },
+    });
+    const agente = empresa.agentes[0];
+
+    res.render('catalogo', {
+      title: `Catálogo · ${empresa.marca || empresa.nombre}`,
+      empresa, productos,
+      numeroWhatsapp: agente ? agente.numeroWhatsapp : null,
+    });
   } catch (err) { next(err); }
 });
 
@@ -230,6 +257,7 @@ app.post('/registro', async (req, res, next) => {
     req.session.clienteId = usuario.id;
     req.session.empresaId = usuario.empresaId;
     req.session.clienteNombre = usuario.nombre;
+    req.session.clienteRol = usuario.rol;
     res.redirect('/panel?ok=' + encodeURIComponent('¡Bienvenido! Tu cuenta fue creada.'));
   } catch (err) {
     if (err.codigo === 'EMAIL_DUPLICADO' || err.codigo === 'PLAN_INVALIDO') {
@@ -260,6 +288,7 @@ app.post('/ingresar', async (req, res, next) => {
     req.session.clienteId = usuario.id;
     req.session.empresaId = usuario.empresaId;
     req.session.clienteNombre = usuario.nombre;
+    req.session.clienteRol = usuario.rol;
     if (recordar === '1') req.session.cookie.maxAge = SESION_LARGA_MS;
     res.redirect('/panel');
   } catch (err) { next(err); }
@@ -275,6 +304,16 @@ function requireCliente(req, res, next) {
   return res.redirect('/ingresar');
 }
 
+// Solo el dueño (OWNER) administra el equipo y la facturación. ADMIN/STAFF
+// pueden operar el dia a dia (conversaciones, pedidos, productos) pero no
+// invitar/quitar gente ni tocar planes y pagos.
+function requireRol(...rolesPermitidos) {
+  return (req, res, next) => {
+    if (req.session && rolesPermitidos.includes(req.session.clienteRol)) return next();
+    return res.status(403).render('403', { title: 'Sin permiso - Proshop' });
+  };
+}
+
 // Datos comunes de las vistas del panel del cliente
 const notif = require('./lib/services/notificaciones');
 
@@ -283,6 +322,7 @@ app.use('/panel', async (req, res, next) => {
   try {
     const empresa = await prisma.empresa.findUnique({ where: { id: req.session.empresaId } });
     res.locals.usuarioNombre = req.session.clienteNombre;
+    res.locals.usuarioRol = req.session.clienteRol;
     res.locals.empresaNombre = empresa ? empresa.nombre : '';
     // Notificaciones para la campanita
     const [notificaciones, notifCount] = await Promise.all([
@@ -402,13 +442,21 @@ app.get('/panel/conversaciones', requireCliente, async (req, res, next) => {
 
 // Detalle de una conversacion: el transcript completo, para que puedas leer
 // que le dijo el cliente y como respondio el agente.
+async function cargarConversacion(req) {
+  const agenteIds = await agenteIdsDe(req.session.empresaId);
+  return prisma.conversacion.findFirst({
+    where: { id: Number(req.params.id), agenteId: { in: agenteIds } },
+    include: {
+      mensajes: { orderBy: { createdAt: 'asc' }, include: { usuario: true } },
+      agente: { include: { conexion: true } },
+      tomadaPor: true,
+    },
+  });
+}
+
 app.get('/panel/conversaciones/:id', requireCliente, async (req, res, next) => {
   try {
-    const agenteIds = await agenteIdsDe(req.session.empresaId);
-    const conversacion = await prisma.conversacion.findFirst({
-      where: { id: Number(req.params.id), agenteId: { in: agenteIds } },
-      include: { mensajes: { orderBy: { createdAt: 'asc' } }, agente: true },
-    });
+    const conversacion = await cargarConversacion(req);
     if (!conversacion) return res.redirect('/panel/conversaciones');
 
     const cliente = await prisma.clienteFinal.findFirst({
@@ -417,8 +465,67 @@ app.get('/panel/conversaciones/:id', requireCliente, async (req, res, next) => {
 
     res.render('cliente/conversacion-detalle', {
       title: 'Conversación - Proshop', tituloPagina: 'Conversación', activo: 'conversaciones',
-      conversacion, cliente,
+      conversacion, cliente, mensaje: req.query.ok || null, error: req.query.err || null,
     });
+  } catch (err) { next(err); }
+});
+
+// Tomar el control: la IA deja de responder este chat puntual hasta que
+// alguien del equipo lo devuelva manualmente.
+app.post('/panel/conversaciones/:id/control', requireCliente, async (req, res, next) => {
+  try {
+    const conversacion = await cargarConversacion(req);
+    if (!conversacion) return res.redirect('/panel/conversaciones');
+    await prisma.conversacion.update({
+      where: { id: conversacion.id },
+      data: { modo: 'HUMANO', tomadaPorId: req.session.clienteId },
+    });
+    emitConversacion(req.session.empresaId, { conversacionId: conversacion.id, modo: 'HUMANO', tomadaPorNombre: req.session.clienteNombre });
+    res.redirect(`/panel/conversaciones/${conversacion.id}?ok=` + encodeURIComponent('Tomaste el control. La IA no responderá este chat hasta que lo devuelvas.'));
+  } catch (err) { next(err); }
+});
+
+app.post('/panel/conversaciones/:id/liberar', requireCliente, async (req, res, next) => {
+  try {
+    const conversacion = await cargarConversacion(req);
+    if (!conversacion) return res.redirect('/panel/conversaciones');
+    await prisma.conversacion.update({
+      where: { id: conversacion.id },
+      data: { modo: 'IA', tomadaPorId: null },
+    });
+    emitConversacion(req.session.empresaId, { conversacionId: conversacion.id, modo: 'IA', tomadaPorNombre: null });
+    res.redirect(`/panel/conversaciones/${conversacion.id}?ok=` + encodeURIComponent('Devuelto al agente de IA.'));
+  } catch (err) { next(err); }
+});
+
+// Mandar un mensaje real por WhatsApp como humano (solo si ya se tomo el
+// control de este chat).
+app.post('/panel/conversaciones/:id/mensaje', requireCliente, async (req, res, next) => {
+  try {
+    const conversacion = await cargarConversacion(req);
+    if (!conversacion) return res.redirect('/panel/conversaciones');
+    if (conversacion.modo !== 'HUMANO') {
+      return res.redirect(`/panel/conversaciones/${conversacion.id}?err=` + encodeURIComponent('Primero tenés que tomar el control de este chat.'));
+    }
+    const texto = String((req.body || {}).texto || '').trim();
+    if (!texto) return res.redirect(`/panel/conversaciones/${conversacion.id}`);
+
+    const conexion = conversacion.agente.conexion;
+    if (conexion && conexion.estado === 'CONECTADO') {
+      await wa.enviarTexto(conexion, conversacion.telefonoCliente, texto);
+    }
+    await prisma.$transaction([
+      prisma.mensaje.create({
+        data: { conversacionId: conversacion.id, rol: 'AGENTE', contenido: texto, usuarioId: req.session.clienteId },
+      }),
+      prisma.conversacion.update({ where: { id: conversacion.id }, data: { ultimoMensajeAt: new Date() } }),
+    ]);
+    emitMensaje(req.session.empresaId, {
+      conversacionId: conversacion.id, rol: 'AGENTE', contenido: texto, createdAt: new Date(),
+      usuarioNombre: req.session.clienteNombre,
+    });
+
+    res.redirect(`/panel/conversaciones/${conversacion.id}`);
   } catch (err) { next(err); }
 });
 
@@ -667,12 +774,76 @@ app.get('/panel/productos/:id/editar', requireCliente, async (req, res, next) =>
   try {
     const producto = await prisma.producto.findFirst({
       where: { id: Number(req.params.id), empresaId: req.session.empresaId },
+      include: { variantes: { orderBy: { id: 'asc' } } },
     });
     if (!producto) return res.redirect('/panel/productos');
+    producto.variantes = producto.variantes.map((v) => ({ ...v, atributosTexto: formatearAtributos(v.atributos) }));
     res.render('cliente/producto-form', {
       title: 'Editar producto - Proshop', tituloPagina: 'Editar producto', activo: 'productos',
-      producto, error: null,
+      producto, error: null, mensaje: req.query.ok || null, errorVariante: req.query.err || null,
     });
+  } catch (err) { next(err); }
+});
+
+// Texto libre "Talla: 42, Color: Negro" -> {"Talla":"42","Color":"Negro"}.
+// Deliberadamente simple (sin un editor de atributos estructurado): cada
+// negocio define sus propios atributos sin que el codigo tenga que conocerlos.
+function parsearAtributos(texto) {
+  const resultado = {};
+  for (const par of String(texto || '').split(',')) {
+    const [clave, ...resto] = par.split(':');
+    const valor = resto.join(':').trim();
+    if (clave && clave.trim() && valor) resultado[clave.trim()] = valor;
+  }
+  return resultado;
+}
+function formatearAtributos(atributos) {
+  return Object.entries(atributos || {}).map(([k, v]) => `${k}: ${v}`).join(', ');
+}
+
+app.post('/panel/productos/:id/variantes', requireCliente, async (req, res, next) => {
+  try {
+    const producto = await prisma.producto.findFirst({ where: { id: Number(req.params.id), empresaId: req.session.empresaId } });
+    if (!producto) return res.redirect('/panel/productos');
+
+    const atributos = parsearAtributos(req.body.atributos);
+    if (Object.keys(atributos).length === 0) {
+      return res.redirect(`/panel/productos/${producto.id}/editar?err=` + encodeURIComponent('Describe la variante, ej: Talla: 42, Color: Negro'));
+    }
+    await prisma.variante.create({
+      data: {
+        productoId: producto.id,
+        atributos,
+        precio: req.body.precio ? Number(req.body.precio) : null,
+        stock: parseInt(req.body.stock, 10) || 0,
+      },
+    });
+    res.redirect(`/panel/productos/${producto.id}/editar?ok=` + encodeURIComponent('Variante agregada.'));
+  } catch (err) { next(err); }
+});
+
+app.post('/panel/productos/:id/variantes/:varianteId', requireCliente, async (req, res, next) => {
+  try {
+    const producto = await prisma.producto.findFirst({ where: { id: Number(req.params.id), empresaId: req.session.empresaId } });
+    if (!producto) return res.redirect('/panel/productos');
+    await prisma.variante.updateMany({
+      where: { id: Number(req.params.varianteId), productoId: producto.id },
+      data: {
+        atributos: parsearAtributos(req.body.atributos),
+        precio: req.body.precio ? Number(req.body.precio) : null,
+        stock: parseInt(req.body.stock, 10) || 0,
+      },
+    });
+    res.redirect(`/panel/productos/${producto.id}/editar?ok=` + encodeURIComponent('Variante actualizada.'));
+  } catch (err) { next(err); }
+});
+
+app.post('/panel/productos/:id/variantes/:varianteId/eliminar', requireCliente, async (req, res, next) => {
+  try {
+    const producto = await prisma.producto.findFirst({ where: { id: Number(req.params.id), empresaId: req.session.empresaId } });
+    if (!producto) return res.redirect('/panel/productos');
+    await prisma.variante.deleteMany({ where: { id: Number(req.params.varianteId), productoId: producto.id } });
+    res.redirect(`/panel/productos/${producto.id}/editar?ok=` + encodeURIComponent('Variante eliminada.'));
   } catch (err) { next(err); }
 });
 
@@ -787,6 +958,95 @@ app.post('/panel/configuracion', requireCliente, async (req, res, next) => {
 
     res.redirect('/panel/configuracion?ok=' + encodeURIComponent('Configuración guardada.'));
   } catch (err) { next(err); }
+});
+
+// -------- Mi equipo (invitar colaboradores, solo el dueño) --------
+const { crearInvitacion, obtenerInvitacionPorToken, aceptarInvitacion } = require('./lib/services/auth');
+
+app.get('/panel/equipo', requireCliente, requireRol('OWNER'), async (req, res, next) => {
+  try {
+    const [usuarios, invitaciones] = await Promise.all([
+      prisma.usuario.findMany({ where: { empresaId: req.session.empresaId }, orderBy: { createdAt: 'asc' } }),
+      prisma.invitacion.findMany({ where: { empresaId: req.session.empresaId, aceptada: false }, orderBy: { createdAt: 'desc' } }),
+    ]);
+    res.render('cliente/equipo', {
+      title: 'Mi equipo - Proshop', tituloPagina: 'Mi equipo', activo: 'equipo',
+      usuarios, invitaciones, mensaje: req.query.ok || null, error: req.query.err || null,
+      linkInvitacion: req.query.link || null, usuarioActualId: req.session.clienteId,
+    });
+  } catch (err) { next(err); }
+});
+
+app.post('/panel/equipo/invitar', requireCliente, requireRol('OWNER'), async (req, res, next) => {
+  const { email, rol } = req.body || {};
+  try {
+    if (!email || !String(email).trim()) {
+      return res.redirect('/panel/equipo?err=' + encodeURIComponent('Ingresa un correo.'));
+    }
+    const invitacion = await crearInvitacion({ empresaId: req.session.empresaId, email, rol });
+    const link = `${req.protocol}://${req.get('host')}/invitacion/${invitacion.token}`;
+    res.redirect('/panel/equipo?ok=' + encodeURIComponent('Invitación creada. Compártele este link a la persona:') + '&link=' + encodeURIComponent(link));
+  } catch (err) {
+    if (err.codigo === 'EMAIL_DUPLICADO') {
+      return res.redirect('/panel/equipo?err=' + encodeURIComponent(err.message));
+    }
+    next(err);
+  }
+});
+
+app.post('/panel/equipo/invitaciones/:id/revocar', requireCliente, requireRol('OWNER'), async (req, res, next) => {
+  try {
+    await prisma.invitacion.deleteMany({ where: { id: Number(req.params.id), empresaId: req.session.empresaId } });
+    res.redirect('/panel/equipo?ok=' + encodeURIComponent('Invitación revocada.'));
+  } catch (err) { next(err); }
+});
+
+app.post('/panel/equipo/:id/eliminar', requireCliente, requireRol('OWNER'), async (req, res, next) => {
+  try {
+    const id = Number(req.params.id);
+    if (id === req.session.clienteId) {
+      return res.redirect('/panel/equipo?err=' + encodeURIComponent('No puedes quitarte a ti mismo del equipo.'));
+    }
+    await prisma.usuario.deleteMany({ where: { id, empresaId: req.session.empresaId, rol: { not: 'OWNER' } } });
+    res.redirect('/panel/equipo?ok=' + encodeURIComponent('Se quitó a la persona del equipo.'));
+  } catch (err) { next(err); }
+});
+
+// Aceptar invitacion (publico, sin sesion): la persona invitada define su
+// nombre y contraseña, y queda logueada directo.
+app.get('/invitacion/:token', async (req, res, next) => {
+  try {
+    const invitacion = await obtenerInvitacionPorToken(req.params.token);
+    if (!invitacion) {
+      return res.status(400).render('invitacion', { title: 'Invitación - Proshop', invitacion: null, error: 'Esta invitación ya no es válida (venció o ya fue usada).' });
+    }
+    res.render('invitacion', { title: 'Invitación - Proshop', invitacion, error: null });
+  } catch (err) { next(err); }
+});
+
+app.post('/invitacion/:token', async (req, res, next) => {
+  const { nombre, password } = req.body || {};
+  try {
+    const invitacion = await obtenerInvitacionPorToken(req.params.token);
+    if (!invitacion) {
+      return res.status(400).render('invitacion', { title: 'Invitación - Proshop', invitacion: null, error: 'Esta invitación ya no es válida (venció o ya fue usada).' });
+    }
+    if (!nombre || !password || String(password).length < 8) {
+      return res.status(400).render('invitacion', { title: 'Invitación - Proshop', invitacion, error: 'Completa tu nombre y una contraseña de al menos 8 caracteres.' });
+    }
+
+    const usuario = await aceptarInvitacion(req.params.token, { nombre, password });
+    req.session.clienteId = usuario.id;
+    req.session.empresaId = usuario.empresaId;
+    req.session.clienteNombre = usuario.nombre;
+    req.session.clienteRol = usuario.rol;
+    res.redirect('/panel?ok=' + encodeURIComponent('¡Bienvenido al equipo!'));
+  } catch (err) {
+    if (err.codigo === 'INVITACION_INVALIDA' || err.codigo === 'EMAIL_DUPLICADO') {
+      return res.status(400).render('invitacion', { title: 'Invitación - Proshop', invitacion: null, error: err.message });
+    }
+    next(err);
+  }
 });
 
 // -------- Conectar WhatsApp (datos de Meta que registra el cliente) --------
@@ -1080,10 +1340,24 @@ app.post('/webhooks/whatsapp', (req, res) => {
         return;
       }
 
+      // Empuja el mensaje del cliente al panel en vivo, sin esperar a que la
+      // IA responda (asi el equipo lo ve entrar al instante).
+      emitMensaje(conexion.agente.empresaId, {
+        conversacionId: entrada.conversacionId, rol: 'CLIENTE', contenido: texto, createdAt: new Date(),
+      });
+
+      // Un humano del equipo tiene tomado el control de este chat: la IA no
+      // contesta (el mensaje ya quedo guardado arriba, solo se salta la
+      // generacion de respuesta automatica).
+      if (entrada.modo === 'HUMANO') return;
+
       encolarRespuesta(`${conexion.agente.id}:${telefonoCliente}`, async () => {
         const salida = await generarYRegistrarRespuesta(conexion.agente.id, telefonoCliente, entrada.conversacionId, texto);
         if (salida.ok && salida.respuesta) {
           await wa.enviarTexto(conexion, telefonoCliente, salida.respuesta);
+          emitMensaje(conexion.agente.empresaId, {
+            conversacionId: entrada.conversacionId, rol: 'AGENTE', contenido: salida.respuesta, createdAt: new Date(),
+          });
         }
         notif.verificarAvisos(conexion.agente.empresaId).catch((e) => console.error('verificarAvisos:', e.message));
       });
@@ -1910,7 +2184,13 @@ app.use((req, res) => {
   res.status(404).render('404', { title: 'Pagina no encontrada' });
 });
 
-app.listen(PORT, '0.0.0.0', () => {
+// Servidor HTTP explicito (en vez de app.listen) para poder colgarle
+// Socket.IO encima y que comparta el mismo puerto.
+const http = require('http');
+const httpServer = http.createServer(app);
+initSocket(httpServer, sessionMiddleware);
+
+httpServer.listen(PORT, '0.0.0.0', () => {
   console.log(`\n  ${site.name} corriendo en http://0.0.0.0:${PORT}`);
   console.log(`  Panel admin: http://0.0.0.0:${PORT}/admin\n`);
   iniciarJobFacturacion();

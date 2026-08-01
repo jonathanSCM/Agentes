@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title><%= title %></title>
+<link rel="icon" type="image/png" href="/img/logo-icon.png" />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root{--fondo:#0f1117;--panel:#181b24;--tinta:#eef0f6;--tenue:#9aa1b5;--acento:#22c58b;--borde:#262b38;}
+  *{margin:0;padding:0;box-sizing:border-box;}
+  body{background:var(--fondo);color:var(--tinta);font-family:'Inter',system-ui,sans-serif;min-height:100vh;}
+  header{display:flex;align-items:center;gap:.7rem;padding:18px 20px;max-width:1100px;margin:0 auto;}
+  header img{width:32px;height:32px;border-radius:50%;}
+  header strong{font-size:1.1rem;}
+  main{max-width:1100px;margin:0 auto;padding:0 20px 40px;}
+  h1{font-size:1.5rem;margin-bottom:6px;}
+  .sub{color:var(--tenue);margin-bottom:24px;}
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:16px;}
+  .card{background:var(--panel);border:1px solid var(--borde);border-radius:14px;overflow:hidden;display:flex;flex-direction:column;}
+  .card img{width:100%;aspect-ratio:4/3;object-fit:cover;background:#0b0d13;}
+  .card .ph{width:100%;aspect-ratio:4/3;display:flex;align-items:center;justify-content:center;color:var(--tenue);font-size:.85rem;background:#0b0d13;}
+  .card-body{padding:12px 14px;display:flex;flex-direction:column;gap:6px;flex:1;}
+  .card-body h3{font-size:.98rem;font-weight:650;}
+  .cat{font-size:.78rem;color:var(--tenue);}
+  .precio{color:var(--acento);font-weight:700;font-size:1.05rem;margin-top:auto;}
+  .stock{font-size:.76rem;padding:2px 9px;border-radius:999px;background:rgba(255,255,255,.06);color:var(--tenue);display:inline-block;width:fit-content;}
+  .stock.bajo{background:rgba(255,180,60,.16);color:#ffc36b;}
+  .stock.agotado{background:rgba(255,90,90,.16);color:#ff9a9a;}
+  .vacio{min-height:50vh;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;color:var(--tenue);text-align:center;}
+  .cta{position:fixed;right:18px;bottom:18px;background:#25d366;color:#fff;width:56px;height:56px;border-radius:50%;display:grid;place-items:center;text-decoration:none;box-shadow:0 10px 25px -8px rgba(0,0,0,.6);}
+</style>
+</head>
+<body>
+  <header>
+    <img src="/img/logo-icon.png" alt="" />
+    <strong><%= empresa.marca || empresa.nombre %></strong>
+  </header>
+
+  <main>
+    <h1>Nuestro catálogo</h1>
+    <p class="sub"><%= productos.length %> producto<%= productos.length === 1 ? '' : 's' %> disponible<%= productos.length === 1 ? '' : 's' %></p>
+
+    <% if (productos.length === 0) { %>
+      <div class="vacio">
+        <h2>😕</h2>
+        <p>Todavía no hay productos cargados.</p>
+      </div>
+    <% } else { %>
+      <div class="grid">
+        <% productos.forEach(function (p) { %>
+          <div class="card">
+            <% if (p.fotos && p.fotos.length) { %>
+              <img src="<%= p.fotos[0] %>" alt="<%= p.nombre %>" loading="lazy" />
+            <% } else { %>
+              <div class="ph">Sin foto</div>
+            <% } %>
+            <div class="card-body">
+              <h3><%= p.nombre %></h3>
+              <% if (p.categoria) { %><span class="cat"><%= p.categoria %></span><% } %>
+              <span class="stock <%= p.stock === 0 ? 'agotado' : (p.stock <= 5 ? 'bajo' : '') %>">
+                <%= p.stock === 0 ? 'Agotado' : (p.stock <= 5 ? 'Últimas unidades' : 'Disponible') %>
+              </span>
+              <span class="precio">Bs <%= Number(p.precio).toFixed(2) %></span>
+            </div>
+          </div>
+        <% }); %>
+      </div>
+    <% } %>
+  </main>
+
+  <% if (numeroWhatsapp) { %>
+    <a class="cta" href="https://wa.me/<%= numeroWhatsapp %>" target="_blank" rel="noopener" aria-label="Escribir por WhatsApp">
+      <svg viewBox="0 0 32 32" width="28" height="28" fill="currentColor"><path d="M16 3C9.4 3 4 8.4 4 15c0 2.1.6 4.2 1.6 6L4 29l8.2-1.6c1.8.9 3.7 1.4 5.8 1.4 6.6 0 12-5.4 12-12S22.6 3 16 3zm0 21.8c-1.8 0-3.5-.5-5-1.4l-.4-.2-4.9 1 1-4.8-.3-.4A9.7 9.7 0 0 1 6.2 15c0-5.4 4.4-9.8 9.8-9.8s9.8 4.4 9.8 9.8-4.4 9.8-9.8 9.8zm5.4-7.3c-.3-.1-1.8-.9-2-1s-.5-.1-.7.1c-.2.3-.8 1-1 1.2-.2.2-.4.2-.7.1-1.8-.9-3-1.6-4.2-3.6-.3-.5.3-.5.9-1.6.1-.2 0-.4 0-.5s-.7-1.7-1-2.3c-.2-.6-.5-.5-.7-.5h-.6c-.2 0-.5.1-.8.4-.3.3-1 1-1 2.5s1.1 2.9 1.2 3.1c.2.2 2.1 3.3 5.2 4.6 2 .8 2.7.9 3.7.8.6-.1 1.8-.7 2-1.5.3-.7.3-1.4.2-1.5-.1-.2-.3-.2-.6-.4z"/></svg>
+    </a>
+  <% } %>
+</body>
+</html>

@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <%- include('partials/head') %>
+  <link rel="stylesheet" href="/css/admin.css" />
+</head>
+<body class="admin-login">
+  <main class="login-wrap">
+    <% if (!invitacion) { %>
+      <div class="login-card" style="text-align:center">
+        <img src="/img/logo-icon.png" alt="" class="brand-mark-icon" width="38" height="38" style="margin:0 auto 1rem" />
+        <h1 style="font-size:1.3rem;margin:0 0 .5rem">Invitación no válida</h1>
+        <p class="login-error"><%= error %></p>
+        <a class="login-back" href="/">← Volver al sitio</a>
+      </div>
+    <% } else { %>
+      <form class="login-card" method="POST" action="/invitacion/<%= invitacion.token %>">
+        <div class="login-brand">
+          <img src="/img/logo-icon.png" alt="" class="brand-mark-icon" width="38" height="38" />
+          <div>
+            <strong>Unirte al equipo</strong>
+            <span><%= invitacion.empresa.nombre %> te invitó como <b><%= invitacion.rol %></b></span>
+          </div>
+        </div>
+
+        <% if (error) { %><p class="login-error"><%= error %></p><% } %>
+
+        <div class="field">
+          <label>Correo</label>
+          <input type="text" value="<%= invitacion.email %>" disabled />
+        </div>
+        <div class="field">
+          <label for="nombre">Tu nombre *</label>
+          <input id="nombre" name="nombre" type="text" required maxlength="120" autofocus placeholder="Tu nombre completo" />
+        </div>
+        <div class="field">
+          <label for="password">Elegí una contraseña *</label>
+          <input id="password" name="password" type="password" required minlength="8" placeholder="Al menos 8 caracteres" />
+        </div>
+
+        <button type="submit" class="btn btn-primary btn-lg btn-block">Crear mi cuenta</button>
+      </form>
+    <% } %>
+  </main>
+</body>
+</html>
