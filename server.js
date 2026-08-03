@@ -2192,6 +2192,8 @@ initSocket(httpServer, sessionMiddleware);
 
 httpServer.listen(PORT, '0.0.0.0', () => {
   console.log(`\n  ${site.name} corriendo en http://0.0.0.0:${PORT}`);
-  console.log(`  Panel admin: http://0.0.0.0:${PORT}/admin\n`);
+  console.log(`  Panel admin: http://0.0.0.0:${PORT}/admin`);
+  console.log(`  [DIAGNOSTICO] OPENAI_API_KEY presente: ${Boolean(process.env.OPENAI_API_KEY)} (largo: ${(process.env.OPENAI_API_KEY || '').length})`);
+  console.log(`  [DIAGNOSTICO] ANTHROPIC_API_KEY presente: ${Boolean(process.env.ANTHROPIC_API_KEY)}\n`);
   iniciarJobFacturacion();
 });
