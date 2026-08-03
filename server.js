@@ -1354,7 +1354,10 @@ app.post('/webhooks/whatsapp', (req, res) => {
       encolarRespuesta(`${conexion.agente.id}:${telefonoCliente}`, async () => {
         const salida = await generarYRegistrarRespuesta(conexion.agente.id, telefonoCliente, entrada.conversacionId, texto);
         if (salida.ok && salida.respuesta) {
-          await wa.enviarTexto(conexion, telefonoCliente, salida.respuesta);
+          const envio = await wa.enviarTexto(conexion, telefonoCliente, salida.respuesta);
+          if (!envio.ok) {
+            console.error(`--- webhook: fallo el envio por WhatsApp a ${telefonoCliente} (agente ${conexion.agente.id}): ${envio.error}`);
+          }
           emitMensaje(conexion.agente.empresaId, {
             conversacionId: entrada.conversacionId, rol: 'AGENTE', contenido: salida.respuesta, createdAt: new Date(),
           });
