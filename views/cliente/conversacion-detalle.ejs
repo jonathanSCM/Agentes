@@ -99,16 +99,41 @@
     function agregarBurbuja(m) {
       document.getElementById('chatVacio')?.remove();
       var wrap = document.createElement('div');
-      wrap.className = 'msg ' + (m.rol === 'CLIENTE' ? 'in' : 'out');
-      wrap.style.whiteSpace = 'pre-line';
+      wrap.className = 'msg ' + (m.rol === 'CLIENTE' ? 'in' : 'out') + (m.mediaTipo === 'imagen' && m.mediaUrl ? ' msg-foto' : '');
       wrap.style.animation = 'none';
-      if (m.usuarioNombre) {
-        var quien = document.createElement('div');
-        quien.style.cssText = 'font-size:.72rem;opacity:.75;margin-bottom:.2rem';
-        quien.textContent = '✋ ' + m.usuarioNombre;
-        wrap.appendChild(quien);
+
+      if (m.mediaTipo === 'imagen' && m.mediaUrl) {
+        var img = document.createElement('img');
+        img.src = m.mediaUrl;
+        wrap.appendChild(img);
+        if (m.contenido) {
+          var caption = document.createElement('div');
+          caption.className = 'msg-foto-caption';
+          caption.textContent = m.contenido;
+          wrap.appendChild(caption);
+        }
+      } else if (m.mediaTipo === 'audio' && m.mediaUrl) {
+        var audio = document.createElement('audio');
+        audio.controls = true;
+        audio.src = m.mediaUrl;
+        audio.style.maxWidth = '100%';
+        wrap.appendChild(audio);
+        if (m.contenido) {
+          var notaAudio = document.createElement('div');
+          notaAudio.style.cssText = 'margin-top:.4rem;font-size:.82rem';
+          notaAudio.textContent = m.contenido;
+          wrap.appendChild(notaAudio);
+        }
+      } else {
+        wrap.style.whiteSpace = 'pre-line';
+        if (m.usuarioNombre) {
+          var quien = document.createElement('div');
+          quien.style.cssText = 'font-size:.72rem;opacity:.75;margin-bottom:.2rem';
+          quien.textContent = '✋ ' + m.usuarioNombre;
+          wrap.appendChild(quien);
+        }
+        wrap.appendChild(document.createTextNode(m.contenido));
       }
-      wrap.appendChild(document.createTextNode(m.contenido));
       body.appendChild(wrap);
 
       var hora = document.createElement('div');
