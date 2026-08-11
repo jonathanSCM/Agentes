@@ -196,15 +196,77 @@
         <div class="packs reveal">
           <h3>¿Necesitas más conversaciones?</h3>
           <p class="muted-text">Al agotar las incluidas en tu plan, puedes comprar un paquete adicional. A mayor volumen, menor costo por conversación.</p>
-          <div class="pack-grid">
-            <% paquetes.forEach(function (q) { %>
-              <div class="pack">
-                <strong><%= q.cantidad.toLocaleString('es-BO') %></strong>
-                <span>conversaciones</span>
-                <em>US$ <%= Number(q.precioUsd).toFixed(2) %></em>
+
+          <% if (paquetes.length) { %>
+            <%
+              var costoBase = Math.max.apply(null, paquetes.map(function (p) { return Number(p.costoUnitarioUsd); }));
+              var indiceInicial = Math.floor((paquetes.length - 1) / 2);
+            %>
+            <div class="slider-card" id="sliderPaqueteLanding">
+              <input type="range" id="rangoPaqueteLanding" class="slider-rango" min="0" max="<%= paquetes.length - 1 %>" step="1" value="<%= indiceInicial %>" />
+
+              <div class="slider-marcas">
+                <% paquetes.forEach(function (q) { %>
+                  <span><%= q.cantidad.toLocaleString('es-BO') %></span>
+                <% }); %>
               </div>
-            <% }); %>
-          </div>
+
+              <div class="slider-resultado">
+                <div>
+                  <div class="slider-cantidad">
+                    <span id="slCantidadLanding"></span>
+                    <span class="slider-cantidad-lbl">conversaciones</span>
+                  </div>
+                  <div class="slider-detalle">
+                    <span id="slUnitarioLanding"></span>
+                    <span class="badge-ahorro" id="slAhorroLanding" style="display:none"></span>
+                  </div>
+                </div>
+                <div class="slider-compra">
+                  <div class="slider-precio" id="slPrecioLanding"></div>
+                  <a class="btn btn-primary" href="#contacto">Empezar ahora</a>
+                </div>
+              </div>
+            </div>
+
+            <script>
+              (function () {
+                var paquetes = <%- JSON.stringify(paquetes.map(function (p) {
+                  return { cantidad: p.cantidad, precio: Number(p.precioUsd), unitario: Number(p.costoUnitarioUsd) };
+                })) %>;
+                var costoBase = <%- costoBase %>;
+
+                var rango = document.getElementById('rangoPaqueteLanding');
+                var elCantidad = document.getElementById('slCantidadLanding');
+                var elUnitario = document.getElementById('slUnitarioLanding');
+                var elAhorro = document.getElementById('slAhorroLanding');
+                var elPrecio = document.getElementById('slPrecioLanding');
+                var fmt = function (n) { return Number(n).toLocaleString('es-BO'); };
+
+                function pintar() {
+                  var idx = Number(rango.value);
+                  var p = paquetes[idx];
+                  elCantidad.textContent = fmt(p.cantidad);
+                  elUnitario.textContent = 'US$ ' + p.unitario.toFixed(4) + ' por conversación';
+                  elPrecio.textContent = 'US$ ' + p.precio.toFixed(2);
+
+                  var pct = paquetes.length > 1 ? (idx / (paquetes.length - 1)) * 100 : 0;
+                  rango.style.setProperty('--pct', pct + '%');
+
+                  var ahorro = costoBase > 0 ? Math.round((1 - p.unitario / costoBase) * 100) : 0;
+                  if (ahorro > 0) {
+                    elAhorro.style.display = '';
+                    elAhorro.textContent = 'Ahorras ' + ahorro + '% por conversación';
+                  } else {
+                    elAhorro.style.display = 'none';
+                  }
+                }
+
+                rango.addEventListener('input', pintar);
+                pintar();
+              })();
+            </script>
+          <% } %>
         </div>
       </div>
     </section>
