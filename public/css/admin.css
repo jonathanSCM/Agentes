@@ -268,6 +268,57 @@ body.admin, body.admin-login {
 .buy-unit { display: block; color: var(--muted); font-size: .74rem; margin-bottom: 1rem; }
 .buy-card form { margin: 0; }
 
+/* ---------- Slider para elegir paquete por cantidad ---------- */
+.slider-card {
+  background: var(--surface); backdrop-filter: blur(8px);
+  border: 1px solid var(--border); border-radius: var(--radius);
+  padding: 1.6rem 1.8rem;
+}
+.slider-titulo { margin: 0 0 1.2rem; font-size: 1rem; font-weight: 700; }
+
+.slider-rango {
+  -webkit-appearance: none; appearance: none;
+  width: 100%; height: 6px; border-radius: 3px;
+  background: linear-gradient(90deg, var(--primary-2) 0%, var(--primary-2) var(--pct, 50%), rgba(255,255,255,.12) var(--pct, 50%), rgba(255,255,255,.12) 100%);
+  outline: none; cursor: pointer; margin-bottom: .6rem;
+}
+.slider-rango::-webkit-slider-thumb {
+  -webkit-appearance: none; appearance: none;
+  width: 22px; height: 22px; border-radius: 50%;
+  background: var(--primary-2); border: 3px solid #06231a;
+  box-shadow: 0 0 0 4px rgba(47,227,166,.20); cursor: pointer;
+}
+.slider-rango::-moz-range-thumb {
+  width: 22px; height: 22px; border-radius: 50%; border: 3px solid #06231a;
+  background: var(--primary-2); box-shadow: 0 0 0 4px rgba(47,227,166,.20); cursor: pointer;
+}
+
+.slider-marcas { display: flex; justify-content: space-between; color: var(--muted); font-size: .78rem; margin-bottom: 1.2rem; }
+
+.slider-resultado {
+  display: flex; align-items: flex-end; justify-content: space-between; flex-wrap: wrap; gap: 1rem;
+  padding-top: 1.1rem; border-top: 1px solid var(--border);
+}
+.slider-cantidad { display: flex; align-items: baseline; gap: .5rem; }
+.slider-cantidad span:first-child { font-family: var(--display); font-size: 2.2rem; font-weight: 800; }
+.slider-cantidad-lbl { color: var(--muted); font-size: .85rem; }
+.slider-detalle { display: flex; align-items: center; gap: .6rem; margin-top: .3rem; flex-wrap: wrap; }
+.slider-detalle > span:first-child { color: var(--muted); font-size: .82rem; }
+.badge-ahorro {
+  background: rgba(139, 92, 246, .18); color: var(--primary);
+  border: 1px solid rgba(139, 92, 246, .35);
+  font-size: .72rem; font-weight: 700; padding: .2rem .55rem; border-radius: 999px;
+}
+.slider-compra { display: flex; flex-direction: column; align-items: flex-end; gap: .6rem; }
+.slider-precio { font-family: var(--display); font-size: 1.6rem; font-weight: 800; color: var(--primary-2); }
+.slider-compra form { margin: 0; }
+
+.slider-ver-todos {
+  display: block; margin: 1.2rem auto 0; background: none; border: none; cursor: pointer;
+  color: var(--muted); font-size: .85rem; font-weight: 600;
+}
+.slider-ver-todos:hover { color: var(--text); }
+
 /* ---------- Nombre de la empresa bajo la marca (panel cliente) ---------- */
 .sidebar-brand-stack { display: flex; flex-direction: column; line-height: 1.2; min-width: 0; }
 .sidebar-empresa {

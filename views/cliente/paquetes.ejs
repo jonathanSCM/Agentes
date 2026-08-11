@@ -14,20 +14,120 @@
   </div>
 </div>
 
-<div class="buy-grid">
-  <% paquetes.forEach(function (p) { %>
-    <div class="buy-card">
-      <span class="buy-qty"><%= p.cantidad.toLocaleString('es-BO') %></span>
-      <span class="buy-lbl">conversaciones</span>
-      <div class="buy-price">US$ <%= Number(p.precioUsd).toFixed(2) %></div>
-      <span class="buy-unit">US$ <%= Number(p.costoUnitarioUsd).toFixed(4) %> por conversación</span>
-      <form method="POST" action="/panel/paquetes/<%= p.id %>/comprar"
-            onsubmit="return confirm('¿Confirmar la compra de <%= p.cantidad.toLocaleString('es-BO') %> conversaciones por US$ <%= Number(p.precioUsd).toFixed(2) %>?');">
-        <button class="btn btn-primary btn-block" type="submit">Comprar</button>
-      </form>
+<% if (paquetes.length) { %>
+  <%
+    // El mayor costo por conversacion (normalmente el paquete mas chico, sin
+    // descuento por volumen) se usa como referencia base para calcular
+    // "cuanto ahorras" al elegir un paquete mas grande.
+    var costoBase = Math.max.apply(null, paquetes.map(function (p) { return Number(p.costoUnitarioUsd); }));
+    var indiceInicial = Math.floor((paquetes.length - 1) / 2);
+  %>
+  <div class="slider-card" id="sliderPaquete" data-inicial="<%= indiceInicial %>">
+    <h3 class="slider-titulo">¿Cuántas conversaciones extra necesitas al mes?</h3>
+
+    <input type="range" id="rangoPaquete" class="slider-rango" min="0" max="<%= paquetes.length - 1 %>" step="1" value="<%= indiceInicial %>" />
+
+    <div class="slider-marcas">
+      <% paquetes.forEach(function (p) { %>
+        <span><%= p.cantidad.toLocaleString('es-BO') %></span>
+      <% }); %>
     </div>
-  <% }); %>
-</div>
+
+    <div class="slider-resultado">
+      <div>
+        <div class="slider-cantidad">
+          <span id="slCantidad"></span>
+          <span class="slider-cantidad-lbl">conversaciones</span>
+        </div>
+        <div class="slider-detalle">
+          <span id="slUnitario"></span>
+          <span class="badge-ahorro" id="slAhorro" style="display:none"></span>
+        </div>
+      </div>
+      <div class="slider-compra">
+        <div class="slider-precio" id="slPrecio"></div>
+        <form method="POST" id="formComprarPaquete" action="">
+          <button class="btn btn-primary" type="submit" id="btnComprarPaquete">Comprar paquete</button>
+        </form>
+      </div>
+    </div>
+
+    <button type="button" class="slider-ver-todos" id="btnVerTodos">Ver todos los paquetes <span id="flechaVerTodos">▾</span></button>
+
+    <div class="buy-grid" id="gridPaquetes" style="display:none;margin-top:1rem">
+      <% paquetes.forEach(function (p) { %>
+        <div class="buy-card">
+          <span class="buy-qty"><%= p.cantidad.toLocaleString('es-BO') %></span>
+          <span class="buy-lbl">conversaciones</span>
+          <div class="buy-price">US$ <%= Number(p.precioUsd).toFixed(2) %></div>
+          <span class="buy-unit">US$ <%= Number(p.costoUnitarioUsd).toFixed(4) %> por conversación</span>
+          <form method="POST" action="/panel/paquetes/<%= p.id %>/comprar"
+                onsubmit="return confirm('¿Confirmar la compra de <%= p.cantidad.toLocaleString('es-BO') %> conversaciones por US$ <%= Number(p.precioUsd).toFixed(2) %>?');">
+            <button class="btn btn-ghost btn-block" type="submit">Comprar</button>
+          </form>
+        </div>
+      <% }); %>
+    </div>
+  </div>
+
+  <script>
+    (function () {
+      var paquetes = <%- JSON.stringify(paquetes.map(function (p) {
+        return { id: p.id, cantidad: p.cantidad, precio: Number(p.precioUsd), unitario: Number(p.costoUnitarioUsd) };
+      })) %>;
+      var costoBase = <%- costoBase %>;
+
+      var rango = document.getElementById('rangoPaquete');
+      var elCantidad = document.getElementById('slCantidad');
+      var elUnitario = document.getElementById('slUnitario');
+      var elAhorro = document.getElementById('slAhorro');
+      var elPrecio = document.getElementById('slPrecio');
+      var form = document.getElementById('formComprarPaquete');
+      var btnVerTodos = document.getElementById('btnVerTodos');
+      var flecha = document.getElementById('flechaVerTodos');
+      var grid = document.getElementById('gridPaquetes');
+      var fmt = function (n) { return Number(n).toLocaleString('es-BO'); };
+
+      function pintar() {
+        var idx = Number(rango.value);
+        var p = paquetes[idx];
+        elCantidad.textContent = fmt(p.cantidad);
+        elUnitario.textContent = 'US$ ' + p.unitario.toFixed(4) + ' por conversación';
+        elPrecio.textContent = 'US$ ' + p.precio.toFixed(2);
+        form.action = '/panel/paquetes/' + p.id + '/comprar';
+
+        var pct = paquetes.length > 1 ? (idx / (paquetes.length - 1)) * 100 : 0;
+        rango.style.setProperty('--pct', pct + '%');
+
+        var ahorro = costoBase > 0 ? Math.round((1 - p.unitario / costoBase) * 100) : 0;
+        if (ahorro > 0) {
+          elAhorro.style.display = '';
+          elAhorro.textContent = 'Ahorras ' + ahorro + '% por conversación';
+        } else {
+          elAhorro.style.display = 'none';
+        }
+      }
+
+      rango.addEventListener('input', pintar);
+      form.addEventListener('submit', function (e) {
+        var p = paquetes[Number(rango.value)];
+        if (!confirm('¿Confirmar la compra de ' + fmt(p.cantidad) + ' conversaciones por US$ ' + p.precio.toFixed(2) + '?')) {
+          e.preventDefault();
+        }
+      });
+
+      btnVerTodos.addEventListener('click', function () {
+        var visible = grid.style.display !== 'none';
+        grid.style.display = visible ? 'none' : 'grid';
+        flecha.textContent = visible ? '▾' : '▴';
+      });
+
+      pintar();
+    })();
+  </script>
+<% } else { %>
+  <p class="dash-empty">Todavía no hay paquetes configurados.</p>
+<% } %>
 
 <p class="muted" style="margin-top:1.4rem;font-size:.88rem">
   A mayor volumen, menor costo por conversación. Los paquetes se activan al confirmarse el pago
