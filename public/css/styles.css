@@ -198,6 +198,7 @@ h1, h2, h3, h4 { font-family: var(--display); line-height: 1.15; letter-spacing:
 .contact-grid { display: grid; grid-template-columns: 1fr 1.05fr; gap: 3rem; align-items: start; }
 .contact-copy h2 { font-size: clamp(1.8rem, 3.5vw, 2.6rem); margin: .5rem 0 .7rem; }
 .contact-copy > p { color: var(--muted); }
+.contact-promise { color: var(--text); font-weight: 600; margin-top: .6rem; }
 .contact-list { list-style: none; padding: 0; margin: 1.6rem 0 0; display: grid; gap: .9rem; }
 .contact-list li { display: flex; align-items: center; gap: .7rem; color: var(--muted); }
 .contact-list a:hover { color: var(--text); }

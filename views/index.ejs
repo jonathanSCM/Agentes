@@ -13,11 +13,11 @@
       <div class="container hero-inner">
         <div class="hero-copy reveal">
           <span class="pill"><span class="dot"></span> Agente de ventas con Inteligencia Artificial</span>
-          <h1>Vende por WhatsApp <span class="grad">las 24 horas</span>, sin contratar más personal</h1>
+          <h1>Convierte WhatsApp en <span class="grad">un vendedor que nunca deja de atender</span></h1>
           <p class="lead">
-            El agente de IA de <strong><%= site.name %></strong> atiende a tus clientes por WhatsApp:
-            responde preguntas, muestra tus productos, recomienda opciones y
-            <strong>registra los pedidos</strong> automáticamente.
+            Entrenamos un vendedor digital con la información de tu empresa para
+            responder, recomendar productos, vender y
+            <strong>registrar pedidos</strong> automáticamente.
           </p>
           <div class="hero-cta">
             <a class="btn btn-primary btn-lg" href="#planes">Ver planes</a>
@@ -68,31 +68,31 @@
     <section id="como-funciona" class="section">
       <div class="container">
         <header class="section-head reveal">
-          <span class="eyebrow">Cómo funciona</span>
-          <h2>Tu vendedor digital en 4 pasos</h2>
-          <p>Nosotros lo implementamos por ti. Tú solo recibes los pedidos.</p>
+          <span class="eyebrow">Así trabajamos</span>
+          <h2>Tu solución comercial en 4 pasos</h2>
+          <p>Entendemos tu negocio, lo implementamos y tú recibes los pedidos.</p>
         </header>
 
         <ol class="steps">
           <li class="step reveal">
             <span class="step-num">01</span>
-            <h3>Conectamos tu WhatsApp</h3>
-            <p>Enlazamos tu número de WhatsApp Business con el agente. Sin cambiar tu número.</p>
+            <h3>Conectamos tu canal de ventas</h3>
+            <p>Integramos tu WhatsApp Business con el agente, conservando tu número actual.</p>
           </li>
           <li class="step reveal">
             <span class="step-num">02</span>
-            <h3>Cargamos tu catálogo</h3>
-            <p>Subimos tus productos con precios, fotos y stock para que el agente los conozca.</p>
+            <h3>Entrenamos al agente</h3>
+            <p>Cargamos productos, precios, fotos y stock para que el agente conozca tu negocio.</p>
           </li>
           <li class="step reveal">
             <span class="step-num">03</span>
-            <h3>El agente atiende y vende</h3>
-            <p>Responde consultas, recomienda productos, arma el carrito y registra el pedido.</p>
+            <h3>El agente entiende y vende</h3>
+            <p>Responde consultas, recomienda opciones, arma pedidos y registra cada venta.</p>
           </li>
           <li class="step reveal">
             <span class="step-num">04</span>
-            <h3>Tú gestionas y creces</h3>
-            <p>Ves pedidos, clientes y reportes desde tu panel. Derivas a un humano cuando quieras.</p>
+            <h3>Tú decides y haces crecer</h3>
+            <p>Controlas pedidos, clientes y resultados. Derivas a tu equipo cuando sea necesario.</p>
           </li>
         </ol>
       </div>
@@ -147,8 +147,8 @@
       <div class="container">
         <header class="section-head reveal">
           <span class="eyebrow">Planes</span>
-          <h2>Elige el plan de tu negocio</h2>
-          <p>El consumo se mide en conversaciones. Una conversación puede tener varios mensajes.</p>
+          <h2>Elige la solución para tu negocio</h2>
+          <p>Empieza con el plan que mejor se adapta a tu empresa. Crece cuando lo necesites.</p>
         </header>
 
         <div class="pricing">
@@ -194,8 +194,8 @@
 
         <!-- Paquetes adicionales -->
         <div class="packs reveal">
-          <h3>¿Necesitas más conversaciones?</h3>
-          <p class="muted-text">Al agotar las incluidas en tu plan, puedes comprar un paquete adicional. A mayor volumen, menor costo por conversación.</p>
+          <h3>¿Tu empresa necesita mayor capacidad?</h3>
+          <p class="muted-text">Puedes ampliar tu capacidad en cualquier momento. Mientras mayor sea el paquete, menor será el costo por conversación.</p>
 
           <% if (paquetes.length) { %>
             <%
@@ -276,12 +276,13 @@
       <div class="container contact-grid">
         <div class="contact-copy reveal">
           <span class="eyebrow">Contacto</span>
-          <h2>¿Listo para vender más?</h2>
-          <p>Escríbenos y te mostramos el agente funcionando con tus propios productos.</p>
+          <h2>Conversemos sobre tu empresa</h2>
+          <p>Analizamos tu negocio y te mostramos cómo el agente puede adaptarse a tu empresa.</p>
+          <p class="contact-promise">Primero entendemos tu negocio. Después adaptamos el agente a tu operación.</p>
 
           <ul class="contact-list">
-            <li><span class="ci">✉️</span> <a href="mailto:<%= site.email %>"><%= site.email %></a></li>
             <li><span class="ci">💬</span> <a href="https://wa.me/<%= site.whatsapp %>" target="_blank" rel="noopener"><%= site.phone %></a></li>
+            <li><span class="ci">✉️</span> <a href="mailto:<%= site.email %>"><%= site.email %></a></li>
             <li><span class="ci">📍</span> <%= site.location %></li>
           </ul>
         </div>
@@ -302,7 +303,7 @@
             </div>
           </div>
           <div class="field">
-            <label for="servicio">Plan de interés</label>
+            <label for="servicio">¿Qué necesitas mejorar?</label>
             <select id="servicio" name="servicio">
               <option value="">Selecciona una opción</option>
               <% planes.forEach(function (p) { %>
@@ -313,9 +314,9 @@
           </div>
           <div class="field">
             <label for="mensaje">Mensaje *</label>
-            <textarea id="mensaje" name="mensaje" rows="4" required placeholder="Cuéntanos sobre tu negocio y qué vendes..."></textarea>
+            <textarea id="mensaje" name="mensaje" rows="4" required placeholder="Cuéntanos cómo atiendes hoy a tus clientes y qué te gustaría mejorar."></textarea>
           </div>
-          <button type="submit" class="btn btn-primary btn-lg btn-block">Enviar mensaje</button>
+          <button type="submit" class="btn btn-primary btn-lg btn-block">Obtén diagnóstico gratis</button>
           <p class="form-note" id="formNote" role="status" aria-live="polite"></p>
         </form>
       </div>
