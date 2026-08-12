@@ -498,6 +498,43 @@ app.post('/panel/conversaciones/:id/liberar', requireCliente, async (req, res, n
   } catch (err) { next(err); }
 });
 
+// Reiniciar la memoria del cliente (categoria, presupuesto, favorito,
+// productos ya mostrados, etc.), sin tocar el consumo/facturacion ni borrar
+// el historial de mensajes. Util para pruebas, o cuando un cliente quiere
+// arrancar de cero una busqueda distinta.
+app.post('/panel/conversaciones/:id/reiniciar', requireCliente, async (req, res, next) => {
+  try {
+    const conversacion = await cargarConversacion(req);
+    if (!conversacion) return res.redirect('/panel/conversaciones');
+
+    await prisma.clienteFinal.updateMany({
+      where: { empresaId: req.session.empresaId, telefono: conversacion.telefonoCliente },
+      data: {
+        categoriaInteres: null,
+        presupuesto: null,
+        cantidad: null,
+        marca: null,
+        talla: null,
+        color: null,
+        observaciones: null,
+        productoFavoritoId: null,
+        productosDescartados: [],
+        productosMostrados: [],
+        estadoConversacion: 'EXPLORANDO',
+        estadoLead: 'NUEVO',
+        nivelInteres: 'FRIO',
+        contexto: {},
+      },
+    });
+    await prisma.conversacion.update({
+      where: { id: conversacion.id },
+      data: { modo: 'IA', tomadaPorId: null },
+    });
+    emitConversacion(req.session.empresaId, { conversacionId: conversacion.id, modo: 'IA', tomadaPorNombre: null });
+    res.redirect(`/panel/conversaciones/${conversacion.id}?ok=` + encodeURIComponent('Se reinició la memoria del cliente: el agente lo tratará como una charla nueva desde el próximo mensaje.'));
+  } catch (err) { next(err); }
+});
+
 // Mandar un mensaje real por WhatsApp como humano (solo si ya se tomo el
 // control de este chat).
 app.post('/panel/conversaciones/:id/mensaje', requireCliente, async (req, res, next) => {

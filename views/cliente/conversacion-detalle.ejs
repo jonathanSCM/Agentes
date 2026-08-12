@@ -20,6 +20,10 @@
         <button class="btn btn-primary" type="submit">Tomar control</button>
       </form>
     <% } %>
+    <form method="POST" action="/panel/conversaciones/<%= conversacion.id %>/reiniciar" class="inline-form" style="margin-left:.4rem"
+          onsubmit="return confirm('¿Reiniciar la memoria de este cliente? El agente olvidará categoría, presupuesto, favorito y productos ya mostrados, y lo tratará como una charla nueva desde el próximo mensaje. El historial de mensajes NO se borra.');">
+      <button class="btn btn-ghost" type="submit" title="Borra lo que el agente recuerda de este cliente (categoría, presupuesto, productos ya mostrados, etc.), sin borrar el historial ni afectar tu consumo">↺ Reiniciar cliente</button>
+    </form>
   </div>
 </div>
 
