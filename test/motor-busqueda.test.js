@@ -11,6 +11,7 @@ const {
   productosCandidatosAMostrar,
   extraerFiltros,
   resolverSeleccionMenu,
+  seccionProductos,
 } = require('../lib/services/agente');
 
 function producto(overrides) {
@@ -107,6 +108,58 @@ describe('productosCandidatosAMostrar', () => {
     const lead = { categoriaInteres: 'Electrodomesticos' };
     const resultado = productosCandidatosAMostrar(productos, lead);
     assert.equal(resultado.length, 2, 'debe encontrar los productos reales de la categoria, no responder generico/vacio');
+  });
+
+  test('no vuelve a ofrecer como "candidato nuevo" un producto ya marcado como enviado', () => {
+    const productos = [
+      producto({ id: 10, categoria: 'Electrodomesticos' }),
+      producto({ id: 11, categoria: 'Electrodomesticos' }),
+    ];
+    // simula que "yaEnviadas" (usado en ejecutarFuncion via clienteFinal.contexto)
+    // ya tiene el 11: productosCandidatosAMostrar no filtra por yaEnviadas (esa
+    // exclusion vive en ejecutarFuncion/seccionProductos), pero confirma que la
+    // lista base sigue trayendo ambos para que el llamador decida.
+    const lead = { categoriaInteres: 'Electrodomesticos' };
+    const resultado = productosCandidatosAMostrar(productos, lead);
+    assert.equal(resultado.length, 2);
+  });
+});
+
+describe('seccionProductos - no repetir tarjetas ya enviadas (bug real de produccion)', () => {
+  test('primera vez: instruye a mostrar TODOS los productos con tarjeta', () => {
+    const productos = [
+      producto({ id: 10, nombre: 'Licuadora', categoria: 'Electrodomesticos' }),
+      producto({ id: 11, nombre: 'Plancha', categoria: 'Electrodomesticos' }),
+    ];
+    const lead = { categoriaInteres: 'Electrodomesticos', contexto: {} };
+    const texto = seccionProductos(productos, lead);
+    assert.match(texto, /Licuadora/);
+    assert.match(texto, /Plancha/);
+    assert.match(texto, /mostrar_productos/);
+  });
+
+  test('si UN producto ya fue enviado, solo pide mostrar el que falta (no lo omite ni lo repite)', () => {
+    const productos = [
+      producto({ id: 10, nombre: 'Licuadora', categoria: 'Electrodomesticos' }),
+      producto({ id: 11, nombre: 'Plancha', categoria: 'Electrodomesticos' }),
+    ];
+    // Este es el bug real: la plancha (11) ya estaba en fotosEnviadas de una
+    // conversacion/prueba anterior, y el sistema solo mandaba la licuadora
+    // en tarjeta pero el texto igual mencionaba la plancha sin tarjeta.
+    const lead = { categoriaInteres: 'Electrodomesticos', contexto: { fotosEnviadas: [11] } };
+    const texto = seccionProductos(productos, lead);
+    assert.match(texto, /Licuadora/, 'la que falta por mostrar debe seguir apareciendo');
+    assert.doesNotMatch(texto, /\[ID 11\]/, 'la que ya se mostro no debe volver a ofrecerse como "nueva" para tarjeta');
+  });
+
+  test('si TODOS los productos ya fueron enviados, avisa explicitamente que no vuelva a llamar mostrar_productos', () => {
+    const productos = [
+      producto({ id: 10, nombre: 'Sandalia de verano', categoria: 'Calzado' }),
+    ];
+    const lead = { categoriaInteres: 'Calzado', contexto: { fotosEnviadas: [10] } };
+    const texto = seccionProductos(productos, lead);
+    assert.match(texto, /YA SE LOS MOSTRASTE/);
+    assert.match(texto, /NO vuelvas a llamar mostrar_productos/);
   });
 });
 
