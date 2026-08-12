@@ -11,7 +11,8 @@
     "prueba": "node scripts/prueba-consumo.js",
     "simular": "node scripts/simular.js",
     "db:studio": "prisma studio",
-    "db:migrate": "prisma migrate dev"
+    "db:migrate": "prisma migrate dev",
+    "test": "node --test \"test/*.test.js\""
   },
   "keywords": [
     "proshop",

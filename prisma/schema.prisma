@@ -416,8 +416,24 @@ model ClienteFinal {
   ubicacionLat     Float?
   ubicacionLng     Float?
   observaciones    String?
+  // Preferencias puntuales de producto que el cliente fue mencionando.
+  marca            String?
+  talla            String?
+  color            String?
   nivelInteres     NivelInteres @default(FRIO)
   estadoLead       EstadoLead   @default(NUEVO)
+  // Estado de la conversacion de venta (donde esta el cliente en el proceso
+  // de decision). Lo actualiza la IA via actualizar_datos_lead; el codigo lo
+  // usa para cambiar el comportamiento del prompt (ej: si ya eligio un
+  // producto favorito, dejar de ofrecerle mas opciones y enfocarse en cerrar).
+  estadoConversacion EstadoConversacion @default(EXPLORANDO)
+  // IDs de productos ya mostrados (para no repetirlos) y descartados
+  // explicitamente por el cliente (para no volver a sugerirlos), y el
+  // producto que el cliente eligio como favorito (el motor deja de buscar
+  // alternativas y se enfoca en cerrar la venta de ese producto).
+  productosMostrados    Int[] @default([])
+  productosDescartados  Int[] @default([])
+  productoFavoritoId    Int?
   // Datos efimeros del bot (ej. que productos ya se les envio foto, para
   // no repetir el envio). Libre para que cualquier bot vertical lo use.
   contexto         Json         @default("{}")
@@ -443,6 +459,19 @@ enum EstadoLead {
   DERIVADO_A_ASESOR
   CERRADO
   NO_INTERESADO
+}
+
+// Estado de la conversacion de venta, mas granular que EstadoLead: refleja
+// en que punto del proceso de decision de compra esta el cliente, para que
+// el prompt cambie de comportamiento (ej: dejar de mostrar mas opciones
+// cuando ya esta LISTO_PARA_COMPRAR).
+enum EstadoConversacion {
+  EXPLORANDO
+  BUSCANDO_PRODUCTO
+  COMPARANDO
+  INTERESADO
+  INTENCION_DE_COMPRA
+  LISTO_PARA_COMPRAR
 }
 
 model Pedido {
