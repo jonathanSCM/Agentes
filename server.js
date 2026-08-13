@@ -798,20 +798,49 @@ app.get('/panel/productos', requireCliente, async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-app.get('/panel/productos/nuevo', requireCliente, (req, res) => {
-  res.render('cliente/producto-form', {
-    title: 'Agregar producto - Proshop', tituloPagina: 'Agregar producto', activo: 'productos',
-    producto: null, error: null,
+// Categorias ya usadas por la tienda, para sugerirlas en el formulario
+// (datalist) sin obligar a elegir de una lista cerrada.
+async function categoriasExistentes(empresaId) {
+  const filas = await prisma.producto.findMany({
+    where: { empresaId, categoria: { not: null } },
+    distinct: ['categoria'],
+    select: { categoria: true },
   });
+  return filas.map((f) => f.categoria).filter(Boolean);
+}
+
+app.get('/panel/productos/nuevo', requireCliente, async (req, res, next) => {
+  try {
+    res.render('cliente/producto-form', {
+      title: 'Agregar producto - Proshop', tituloPagina: 'Agregar producto', activo: 'productos',
+      producto: null, error: null, categoriasExistentes: await categoriasExistentes(req.session.empresaId),
+    });
+  } catch (err) { next(err); }
 });
 
+// Arma el objeto {clave: valor} a partir de las filas dinamicas del
+// formulario (atributoClave[] / atributoValor[], una fila por atributo:
+// Marca, Voltaje, Material, lo que cargue cada negocio segun su rubro).
+function atributosDesdeForm(body) {
+  const claves = [].concat(body.atributoClave || []);
+  const valores = [].concat(body.atributoValor || []);
+  const atributos = {};
+  claves.forEach((clave, i) => {
+    const k = String(clave || '').trim().slice(0, 60);
+    const v = String(valores[i] ?? '').trim().slice(0, 120);
+    if (k && v) atributos[k] = v;
+  });
+  return atributos;
+}
+
 // Convierte los campos de texto libre del formulario (categoria,
-// caracteristicas por coma) a los tipos que espera Prisma.
+// caracteristicas por coma, atributos por filas) a los tipos que espera Prisma.
 function datosCatalogoDesdeForm(body) {
   const caracteristicas = (body.caracteristicas || '').split(',').map((c) => c.trim()).filter(Boolean);
   return {
     categoria: body.categoria ? String(body.categoria).trim().slice(0, 120) : null,
     caracteristicas,
+    atributos: atributosDesdeForm(body),
   };
 }
 
@@ -862,6 +891,7 @@ app.get('/panel/productos/:id/editar', requireCliente, async (req, res, next) =>
     res.render('cliente/producto-form', {
       title: 'Editar producto - Proshop', tituloPagina: 'Editar producto', activo: 'productos',
       producto, error: null, mensaje: req.query.ok || null, errorVariante: req.query.err || null,
+      categoriasExistentes: await categoriasExistentes(req.session.empresaId),
     });
   } catch (err) { next(err); }
 });

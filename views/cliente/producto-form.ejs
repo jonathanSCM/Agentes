@@ -32,13 +32,56 @@
   </div>
   <div class="field">
     <label for="categoria">Categoría</label>
-    <input id="categoria" name="categoria" type="text" maxlength="120"
+    <input id="categoria" name="categoria" type="text" maxlength="120" list="categorias-sugeridas"
            value="<%= producto && producto.categoria ? producto.categoria : '' %>" placeholder="Ej: Calzado" />
+    <datalist id="categorias-sugeridas">
+      <% (typeof categoriasExistentes !== 'undefined' ? categoriasExistentes : []).forEach(function (c) { %>
+        <option value="<%= c %>"></option>
+      <% }); %>
+    </datalist>
   </div>
   <div class="field">
     <label for="caracteristicas">Características (separadas por coma)</label>
     <input id="caracteristicas" name="caracteristicas" type="text" maxlength="300"
            value="<%= producto && producto.caracteristicas ? producto.caracteristicas.join(', ') : '' %>" placeholder="Ej: Talla M, Color azul" />
+  </div>
+  <div class="field">
+    <label>Atributos del producto</label>
+    <p class="muted" style="font-size:.82rem;margin:0 0 .5rem">Marca, material, voltaje, capacidad... lo que le sirva a tu tipo de producto. Agrega los que quieras.</p>
+    <div id="atributos-lista">
+      <%
+        var atributosProducto = producto && producto.atributos ? producto.atributos : {};
+        var entradas = Object.entries(atributosProducto);
+        if (!entradas.length) entradas = [['', '']];
+      %>
+      <% entradas.forEach(function (par) { %>
+        <div class="atributo-row" style="display:flex;gap:8px;margin-bottom:6px;">
+          <input list="atributos-sugeridos" name="atributoClave[]" placeholder="Ej: Marca" maxlength="60" value="<%= par[0] %>" style="flex:1" />
+          <input name="atributoValor[]" placeholder="Ej: Nike" maxlength="120" value="<%= par[1] %>" style="flex:1" />
+          <button type="button" class="btn btn-ghost btn-quitar-atributo">Quitar</button>
+        </div>
+      <% }); %>
+    </div>
+    <datalist id="atributos-sugeridos">
+      <option value="Marca"></option>
+      <option value="Material"></option>
+      <option value="Color"></option>
+      <option value="Modelo"></option>
+      <option value="Voltaje"></option>
+      <option value="Capacidad"></option>
+      <option value="Peso"></option>
+      <option value="Sabor"></option>
+      <option value="Potencia"></option>
+      <option value="Garantía"></option>
+    </datalist>
+    <button type="button" id="btn-agregar-atributo" class="btn btn-ghost">+ Agregar atributo</button>
+    <template id="tpl-atributo-row">
+      <div class="atributo-row" style="display:flex;gap:8px;margin-bottom:6px;">
+        <input list="atributos-sugeridos" name="atributoClave[]" placeholder="Ej: Marca" maxlength="60" style="flex:1" />
+        <input name="atributoValor[]" placeholder="Ej: Nike" maxlength="120" style="flex:1" />
+        <button type="button" class="btn btn-ghost btn-quitar-atributo">Quitar</button>
+      </div>
+    </template>
   </div>
   <div class="field">
     <label for="fotos">Fotos</label>
@@ -121,5 +164,23 @@
     </div>
   </form>
 <% } %>
+
+<script>
+(function () {
+  var lista = document.getElementById('atributos-lista');
+  var tpl = document.getElementById('tpl-atributo-row');
+  var btnAgregar = document.getElementById('btn-agregar-atributo');
+  if (!lista || !tpl || !btnAgregar) return;
+  btnAgregar.addEventListener('click', function () {
+    lista.appendChild(tpl.content.cloneNode(true));
+  });
+  lista.addEventListener('click', function (ev) {
+    var btn = ev.target.closest('.btn-quitar-atributo');
+    if (!btn) return;
+    var fila = btn.closest('.atributo-row');
+    if (fila) fila.remove();
+  });
+})();
+</script>
 
 <%- include('partials/fin') %>

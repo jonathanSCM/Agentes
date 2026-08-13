@@ -360,6 +360,10 @@ model Producto {
   activo          Boolean  @default(true)
   fotos           String[] @default([])
   caracteristicas String[] @default([])
+  // Atributos libres clave:valor (ej. {"Marca":"Nike","Material":"Algodon"}
+  // o {"Marca":"LG","Voltaje":"220V","Capacidad":"15kg"}). Igual criterio que
+  // Variante.atributos: cada negocio define lo que le sirve a su rubro.
+  atributos       Json     @default("{}")
   createdAt       DateTime @default(now())
 
   pedidoItems PedidoItem[]

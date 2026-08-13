@@ -12,6 +12,7 @@ const {
   extraerFiltros,
   resolverSeleccionMenu,
   seccionProductos,
+  construirSystem,
 } = require('../lib/services/agente');
 
 function producto(overrides) {
@@ -23,6 +24,7 @@ function producto(overrides) {
     precio: 100,
     stock: 5,
     caracteristicas: [],
+    atributos: {},
     variantes: [],
     ...overrides,
   };
@@ -109,6 +111,27 @@ describe('buscarProductosFiltrados', () => {
     ];
     const lead = { categoriaInteres: 'Ropa' };
     assert.equal(buscarProductosFiltrados(productos, lead).length, 0);
+  });
+
+  test('atributos libres del producto (ej. Marca) suman score y matchean lo que pide el cliente', () => {
+    const productos = [
+      producto({ id: 1, categoria: 'Ropa', atributos: { Marca: 'Nike' } }),
+      producto({ id: 2, categoria: 'Ropa', atributos: { Marca: 'Adidas' } }),
+    ];
+    const lead = { categoriaInteres: 'Ropa', marca: 'Nike' };
+    const resultado = buscarProductosFiltrados(productos, lead);
+    // ambas quedan (marca no es filtro duro), pero la que matchea debe ir primero por score
+    assert.equal(resultado.length, 2);
+    assert.equal(resultado[0].id, 1, 'el producto con la marca pedida debe rankear primero');
+  });
+
+  test('atributos libres genericos (no solo marca/material, ej. Voltaje) tambien matchean via texto completo', () => {
+    const productos = [
+      producto({ id: 1, categoria: 'Electrodomesticos', atributos: { Voltaje: '220V', Capacidad: '15kg' } }),
+    ];
+    const lead = { categoriaInteres: 'Electrodomesticos', observaciones: '220V' };
+    const resultado = buscarProductosFiltrados(productos, lead);
+    assert.equal(resultado.length, 1, 'el producto debe encontrarse por categoria');
   });
 });
 
@@ -211,5 +234,25 @@ describe('resolverSeleccionMenu', () => {
 
   test('devuelve null si el texto no es un numero suelto', () => {
     assert.equal(resolverSeleccionMenu('quiero el segundo', 'algo'), null);
+  });
+});
+
+describe('construirSystem - "que vendes" no debe listar 1 sola categoria como menu', () => {
+  const empresa = { nombre: 'Tienda Demo', marca: 'Tienda Demo' };
+
+  test('con 1 sola categoria, NO arma una lista numerada de un solo item ni pregunta "cual te interesa"', () => {
+    const productos = [producto({ id: 1, categoria: 'Ropa' })];
+    const system = construirSystem(empresa, productos, {}, {}, false, false, 'Raul');
+    assert.doesNotMatch(system, /1\. Ropa/, 'no debe numerar la unica categoria como si fuera un menu');
+    assert.match(system, /UN SOLO rubro/i, 'debe reconocer explicitamente que es un solo rubro');
+  });
+
+  test('con 2+ categorias, SI arma la lista numerada de opciones para elegir', () => {
+    const productos = [
+      producto({ id: 1, categoria: 'Ropa' }),
+      producto({ id: 2, categoria: 'Calzado' }),
+    ];
+    const system = construirSystem(empresa, productos, {}, {}, false, false, 'Raul');
+    assert.match(system, /LISTA \(numerada o con guiones/, 'con varias categorias si tiene sentido pedir una lista');
   });
 });
