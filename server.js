@@ -382,8 +382,19 @@ app.get('/panel', requireCliente, async (req, res, next) => {
         where: { agenteId: { in: agenteIds }, mensajes: { none: { rol: 'AGENTE' } } },
         orderBy: { ultimoMensajeAt: 'desc' }, take: 5,
       }),
-      prisma.producto.findMany({ where: { empresaId, activo: true, stock: { lte: 5 } }, orderBy: { stock: 'asc' }, take: 5 }),
+      // El stock de un producto con variantes vive en las variantes, no en
+      // el producto (que queda en 0 a proposito) - no se puede filtrar por
+      // stock a nivel de base de datos sin contarlas.
+      prisma.producto.findMany({
+        where: { empresaId, activo: true },
+        include: { variantes: { where: { activa: true }, select: { stock: true } } },
+      }),
     ]);
+    const stockBajoConVariantes = stockBajo
+      .map((p) => ({ ...p, stockMostrado: p.variantes.length ? p.variantes.reduce((s, v) => s + v.stock, 0) : p.stock }))
+      .filter((p) => p.stockMostrado <= 5)
+      .sort((a, b) => a.stockMostrado - b.stockMostrado)
+      .slice(0, 5);
 
     const resueltasIA = convTotal > 0 ? Math.round((convConIA / convTotal) * 100) : 0;
     const avisoSaldo = resumen.consumo.totalDisponible === 0
@@ -400,7 +411,7 @@ app.get('/panel', requireCliente, async (req, res, next) => {
         ventasHoy: Number(ventasAgg._sum.total || 0),
         resueltasIA,
       },
-      atencion, stockBajo,
+      atencion, stockBajo: stockBajoConVariantes,
     });
   } catch (err) { next(err); }
 });
@@ -604,14 +615,28 @@ app.get('/panel/clientes', requireCliente, async (req, res, next) => {
 app.get('/panel/inventario', requireCliente, async (req, res, next) => {
   try {
     const empresaId = req.session.empresaId;
-    const productos = await prisma.producto.findMany({ where: { empresaId }, orderBy: { stock: 'asc' } });
+    const productosDb = await prisma.producto.findMany({
+      where: { empresaId },
+      include: { variantes: { where: { activa: true }, select: { stock: true } } },
+    });
+    // Si el producto tiene variantes, el stock real es la suma de sus
+    // variantes (el stock del producto en si queda en 0 a proposito) - ver
+    // la misma logica en /panel/productos.
+    const productos = productosDb
+      .map((p) => ({
+        ...p,
+        stockMostrado: p.variantes.length ? p.variantes.reduce((suma, v) => suma + v.stock, 0) : p.stock,
+        tieneVariantes: p.variantes.length > 0,
+      }))
+      .sort((a, b) => a.stockMostrado - b.stockMostrado);
+
     res.render('cliente/inventario', {
       title: 'Inventario - Proshop', tituloPagina: 'Inventario', activo: 'inventario',
       productos,
       stats: {
         total: productos.length,
-        bajo: productos.filter((p) => p.stock > 0 && p.stock <= 5).length,
-        agotados: productos.filter((p) => p.stock === 0).length,
+        bajo: productos.filter((p) => p.stockMostrado > 0 && p.stockMostrado <= 5).length,
+        agotados: productos.filter((p) => p.stockMostrado === 0).length,
       },
       mensaje: req.query.ok || null,
     });
@@ -620,11 +645,18 @@ app.get('/panel/inventario', requireCliente, async (req, res, next) => {
 
 app.post('/panel/inventario/:id', requireCliente, async (req, res, next) => {
   try {
-    const stock = Math.max(0, parseInt(req.body.stock, 10) || 0);
-    await prisma.producto.updateMany({
+    const producto = await prisma.producto.findFirst({
       where: { id: Number(req.params.id), empresaId: req.session.empresaId },
-      data: { stock },
+      include: { variantes: { where: { activa: true }, select: { id: true } } },
     });
+    if (!producto) return res.redirect('/panel/inventario');
+    if (producto.variantes.length) {
+      // El stock de un producto con variantes se edita por combinacion, no
+      // como un solo numero: se redirige a donde si se puede ajustar.
+      return res.redirect(`/panel/productos/${producto.id}/editar?err=` + encodeURIComponent('Este producto tiene variantes: ajusta el stock de cada combinación ahí abajo, no un número único.'));
+    }
+    const stock = Math.max(0, parseInt(req.body.stock, 10) || 0);
+    await prisma.producto.update({ where: { id: producto.id }, data: { stock } });
     res.redirect('/panel/inventario?ok=' + encodeURIComponent('Stock actualizado.'));
   } catch (err) { next(err); }
 });
@@ -743,10 +775,22 @@ async function planDeEmpresa(empresaId) {
 
 app.get('/panel/productos', requireCliente, async (req, res, next) => {
   try {
-    const [productos, plan] = await Promise.all([
-      prisma.producto.findMany({ where: { empresaId: req.session.empresaId }, orderBy: { createdAt: 'desc' } }),
+    const [productosDb, plan] = await Promise.all([
+      prisma.producto.findMany({
+        where: { empresaId: req.session.empresaId },
+        orderBy: { createdAt: 'desc' },
+        include: { variantes: { where: { activa: true }, select: { stock: true } } },
+      }),
       planDeEmpresa(req.session.empresaId),
     ]);
+    // Si el producto tiene variantes, el stock real es la suma de sus
+    // variantes (el stock del producto en si queda en 0 a proposito). Se
+    // calcula aca para que la lista no muestre "0" enganosamente.
+    const productos = productosDb.map((p) => ({
+      ...p,
+      stockMostrado: p.variantes.length ? p.variantes.reduce((suma, v) => suma + v.stock, 0) : p.stock,
+      tieneVariantes: p.variantes.length > 0,
+    }));
     res.render('cliente/productos', {
       title: 'Mis productos - Proshop', tituloPagina: 'Mis productos', activo: 'productos',
       productos, maxProductos: plan ? plan.maxProductos : 10, mensaje: req.query.ok || null,

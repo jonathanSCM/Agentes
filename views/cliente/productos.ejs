@@ -18,7 +18,7 @@
 <div class="admin-stats">
   <div class="stat-card"><span class="stat-num"><%= productos.length %></span><span class="stat-label">Productos</span></div>
   <div class="stat-card stat-new"><span class="stat-num"><%= productos.filter(p=>p.activo).length %></span><span class="stat-label">Activos</span></div>
-  <div class="stat-card stat-done"><span class="stat-num"><%= productos.filter(p=>p.stock<=5).length %></span><span class="stat-label">Stock bajo (≤5)</span></div>
+  <div class="stat-card stat-done"><span class="stat-num"><%= productos.filter(p=>p.stockMostrado<=5).length %></span><span class="stat-label">Stock bajo (≤5)</span></div>
 </div>
 
 <% if (productos.length === 0) { %>
@@ -49,7 +49,9 @@
             </td>
             <td><%= p.categoria || '-' %></td>
             <td class="num">Bs <%= Number(p.precio).toFixed(2) %></td>
-            <td class="num <%= p.stock <= 5 ? 'saldo-ok' : '' %>"><%= p.stock %></td>
+            <td class="num <%= p.stockMostrado <= 5 ? 'saldo-ok' : '' %>">
+              <%= p.stockMostrado %><% if (p.tieneVariantes) { %> <span class="muted" style="font-size:.75rem">(variantes)</span><% } %>
+            </td>
             <td><span class="badge <%= p.activo ? 'badge-new' : 'badge-off' %>"><%= p.activo ? 'Activo' : 'Inactivo' %></span></td>
             <td class="actions-cell">
               <a class="icon-btn" title="Editar" href="/panel/productos/<%= p.id %>/editar"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8"><path d="m16.5 3.5 4 4L7 21l-4.5 1L3.5 17.5 16.5 3.5Z"/></svg></a>

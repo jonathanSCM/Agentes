@@ -29,19 +29,23 @@
       </thead>
       <tbody>
         <% productos.forEach(function (p) { %>
-          <tr class="<%= p.stock === 0 ? 'is-done' : '' %>">
-            <td><strong><%= p.nombre %></strong></td>
+          <tr class="<%= p.stockMostrado === 0 ? 'is-done' : '' %>">
+            <td><strong><%= p.nombre %></strong><% if (p.tieneVariantes) { %> <span class="muted" style="font-size:.75rem">(por variante)</span><% } %></td>
             <td class="num">Bs <%= Number(p.precio).toFixed(2) %></td>
             <td>
-              <span class="badge <%= p.stock === 0 ? 'badge-off' : (p.stock <= 5 ? 'badge-star' : 'badge-new') %>">
-                <%= p.stock %> unidades
+              <span class="badge <%= p.stockMostrado === 0 ? 'badge-off' : (p.stockMostrado <= 5 ? 'badge-star' : 'badge-new') %>">
+                <%= p.stockMostrado %> unidades
               </span>
             </td>
             <td>
-              <form method="POST" action="/panel/inventario/<%= p.id %>" class="sim-form">
-                <input type="number" name="stock" value="<%= p.stock %>" min="0" class="sim-input" style="width:70px" />
-                <button class="btn btn-ghost" type="submit" style="padding:.35rem .7rem;font-size:.82rem">Guardar</button>
-              </form>
+              <% if (p.tieneVariantes) { %>
+                <a class="btn btn-ghost" href="/panel/productos/<%= p.id %>/editar" style="padding:.35rem .7rem;font-size:.82rem">Ajustar por variante</a>
+              <% } else { %>
+                <form method="POST" action="/panel/inventario/<%= p.id %>" class="sim-form">
+                  <input type="number" name="stock" value="<%= p.stock %>" min="0" class="sim-input" style="width:70px" />
+                  <button class="btn btn-ghost" type="submit" style="padding:.35rem .7rem;font-size:.82rem">Guardar</button>
+                </form>
+              <% } %>
             </td>
           </tr>
         <% }); %>
