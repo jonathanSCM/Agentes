@@ -84,6 +84,32 @@ describe('buscarProductosFiltrados', () => {
     assert.equal(buscarProductosFiltrados(productos, lead).length, 0);
     assert.equal(buscarProductosFiltrados(productos, lead, { ignorarTalla: true }).length, 1);
   });
+
+  test('un producto con stock 0 pero variantes con stock SI debe encontrarse (bug real: ropa con stock solo en variantes)', () => {
+    const productos = [
+      producto({
+        id: 1, categoria: 'Ropa', stock: 0,
+        variantes: [
+          { activa: true, atributos: { Talla: 'M', Color: 'Negro' }, stock: 4 },
+          { activa: true, atributos: { Talla: 'L', Color: 'Negro' }, stock: 0 },
+        ],
+      }),
+    ];
+    const lead = { categoriaInteres: 'Ropa' };
+    const resultado = buscarProductosFiltrados(productos, lead);
+    assert.equal(resultado.length, 1, 'el stock de las variantes debe contar como stock del producto, no solo producto.stock');
+  });
+
+  test('un producto con stock 0 en el producto Y en todas sus variantes no aparece', () => {
+    const productos = [
+      producto({
+        id: 1, categoria: 'Ropa', stock: 0,
+        variantes: [{ activa: true, atributos: { Talla: 'M' }, stock: 0 }],
+      }),
+    ];
+    const lead = { categoriaInteres: 'Ropa' };
+    assert.equal(buscarProductosFiltrados(productos, lead).length, 0);
+  });
 });
 
 describe('productosCandidatosAMostrar', () => {

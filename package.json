@@ -8,6 +8,7 @@
     "start": "node server.js",
     "dev": "node --watch server.js",
     "seed": "node prisma/seed.js",
+    "seed:ropa": "node scripts/seed-ropa-demo.js",
     "prueba": "node scripts/prueba-consumo.js",
     "simular": "node scripts/simular.js",
     "db:studio": "prisma studio",
