@@ -8,22 +8,26 @@
 <% if (error) { %><div class="alert-err"><%= error %></div><% } %>
 
 <form method="POST" action="<%= paquete && paquete.id ? '/admin/paquetes/' + paquete.id : '/admin/paquetes' %>" class="form-card">
+  <h3 class="form-section-title">Tamaño del paquete</h3>
+  <div class="field">
+    <label for="cantidad">Cantidad de conversaciones *</label>
+    <input id="cantidad" name="cantidad" type="number" min="1" required class="calc-costo"
+           value="<%= paquete ? paquete.cantidad : '' %>" placeholder="Ej: 1000" />
+  </div>
+
+  <h3 class="form-section-title">Precio internacional por default (US$)</h3>
+  <p class="muted" style="font-size:.85rem;margin:-.5rem 0 .8rem">Lo ve cualquier visitante sin un precio de país propio configurado más abajo (solo aplica editando un paquete ya creado).</p>
   <div class="field-row">
     <div class="field">
-      <label for="cantidad">Cantidad de conversaciones *</label>
-      <input id="cantidad" name="cantidad" type="number" min="1" required
-             value="<%= paquete ? paquete.cantidad : '' %>" placeholder="Ej: 1000" />
+      <label for="precioUsd">Precio al cliente *</label>
+      <div class="input-prefijo"><span>US$</span><input id="precioUsd" name="precioUsd" type="number" min="0.01" step="0.01" required class="calc-costo"
+             value="<%= paquete ? Number(paquete.precioUsd) : '' %>" /></div>
     </div>
     <div class="field">
-      <label for="precioUsd">Precio al cliente (US$) *</label>
-      <input id="precioUsd" name="precioUsd" type="number" min="0.01" step="0.01" required
-             value="<%= paquete ? Number(paquete.precioUsd) : '' %>" />
-    </div>
-    <div class="field">
-      <label for="costoUnitarioUsd">Costo unitario (US$)</label>
-      <input id="costoUnitarioUsd" name="costoUnitarioUsd" type="number" min="0" step="0.0001"
-             value="<%= paquete ? Number(paquete.costoUnitarioUsd) : '' %>" placeholder="Ej: 0.0660" />
-      <p class="muted" style="font-size:.78rem;margin:.3rem 0 0">Referencia interna: cuánto te cuesta a vos cada conversación de este paquete.</p>
+      <label for="costoUnitarioUsd">Costo unitario <span id="auto-tag-costo" class="badge-auto">calculado automático</span></label>
+      <div class="input-prefijo"><span>US$</span><input id="costoUnitarioUsd" name="costoUnitarioUsd" type="number" min="0" step="0.0001"
+             value="<%= paquete ? Number(paquete.costoUnitarioUsd) : '' %>" placeholder="Ej: 0.0660" /></div>
+      <p class="muted" style="font-size:.78rem;margin:.3rem 0 0">Referencia interna (Precio ÷ Cantidad): cuánto sale cada conversación de este paquete. No lo ve el cliente.</p>
     </div>
   </div>
 
@@ -33,13 +37,26 @@
   </div>
 </form>
 
-<% if (paquete && paquete.id) { %>
+<% if (!paquete || !paquete.id) { %>
+  <p class="muted" style="font-size:.85rem;margin-top:1rem">💡 Una vez que crees el paquete, vas a poder cargarle precios propios por país (ej. Perú en soles) desde esta misma pantalla.</p>
+<% } else { %>
   <div class="page-head" style="margin-top:2rem">
     <h2 style="font-size:1.1rem">Precios por país</h2>
-    <p class="muted" style="font-size:.85rem">Se detecta el país del visitante por IP. Si no hay un precio propio acá, se usa el precio en US$ de arriba.</p>
+    <p class="muted" style="font-size:.85rem">
+      Cómo se decide qué precio ve cada visitante (se detecta el país por su IP, automático):
+      <b>1)</b> si su país está en esta lista, ve ESE precio &nbsp;→&nbsp;
+      <b>2)</b> si no, ve el precio en US$ de arriba (el de siempre).
+    </p>
   </div>
 
   <% if (errorPrecioPais) { %><div class="alert-err"><%= errorPrecioPais %></div><% } %>
+
+  <datalist id="paises-sugeridos">
+    <option value="BO">Bolivia</option><option value="PE">Perú</option><option value="AR">Argentina</option>
+    <option value="CL">Chile</option><option value="CO">Colombia</option><option value="MX">México</option>
+    <option value="EC">Ecuador</option><option value="PY">Paraguay</option><option value="UY">Uruguay</option>
+    <option value="VE">Venezuela</option><option value="BR">Brasil</option><option value="US">Estados Unidos</option>
+  </datalist>
 
   <% if (paquete.preciosPais.length) { %>
     <div class="table-wrap">
@@ -47,18 +64,24 @@
         <thead><tr><th>País</th><th>Moneda</th><th class="num">Precio</th><th class="num">Costo unitario</th><th>Acciones</th></tr></thead>
         <tbody>
           <% paquete.preciosPais.forEach(function (pp) { %>
+            <%
+              var inputStylePP = 'background:transparent;border:1px solid rgba(255,255,255,.15);border-radius:8px;padding:.35rem .5rem;color:inherit;font:inherit;font-size:.85rem';
+              var formIdPP = 'editar-precio-pais-' + pp.id;
+            %>
             <tr>
-              <td><%= pp.pais %></td>
-              <td><%= pp.moneda %></td>
-              <td class="num"><%= Number(pp.precio).toFixed(2) %></td>
-              <td class="num"><%= Number(pp.costoUnitario).toFixed(4) %></td>
+              <td><input form="<%= formIdPP %>" name="pais" value="<%= pp.pais %>" maxlength="2" readonly title="El país no se puede editar: eliminá esta fila y agregá una nueva si te equivocaste." style="width:50px;text-transform:uppercase;opacity:.7;<%= inputStylePP %>" /></td>
+              <td><input form="<%= formIdPP %>" name="moneda" value="<%= pp.moneda %>" maxlength="3" style="width:60px;text-transform:uppercase;<%= inputStylePP %>" /></td>
+              <td class="num"><input form="<%= formIdPP %>" name="precio" type="number" min="0" step="0.01" value="<%= Number(pp.precio) %>" style="width:100px;<%= inputStylePP %>" /></td>
+              <td class="num"><input form="<%= formIdPP %>" name="costoUnitario" type="number" min="0" step="0.0001" value="<%= Number(pp.costoUnitario) %>" style="width:100px;<%= inputStylePP %>" /></td>
               <td class="actions-cell">
+                <button form="<%= formIdPP %>" class="btn btn-ghost" style="padding:.4rem .8rem;font-size:.85rem" type="submit">Guardar</button>
                 <form method="POST" action="/admin/paquetes/<%= paquete.id %>/precios-pais/<%= pp.id %>/eliminar" class="inline-form"
                       onsubmit="return confirm('¿Eliminar el precio de ' + '<%= pp.pais %>' + '?');">
                   <button class="btn btn-ghost" style="padding:.4rem .8rem;font-size:.85rem" type="submit">Eliminar</button>
                 </form>
               </td>
             </tr>
+            <form id="<%= formIdPP %>" method="POST" action="/admin/paquetes/<%= paquete.id %>/precios-pais"></form>
           <% }); %>
         </tbody>
       </table>
@@ -66,30 +89,26 @@
   <% } %>
 
   <form method="POST" action="/admin/paquetes/<%= paquete.id %>/precios-pais" class="form-card" style="max-width:600px;margin-top:1rem">
-    <h3 style="margin:0 0 1rem;font-size:.95rem">Agregar / actualizar precio de un país</h3>
+    <h3 style="margin:0 0 1rem;font-size:.95rem">+ Agregar precio de un nuevo país</h3>
     <div class="field-row">
       <div class="field">
-        <label for="pp-pais">País (código de 2 letras) *</label>
-        <input id="pp-pais" name="pais" type="text" required maxlength="2" style="text-transform:uppercase" list="paises-sugeridos" placeholder="Ej: PE" />
-        <datalist id="paises-sugeridos">
-          <option value="BO">Bolivia</option><option value="PE">Perú</option><option value="AR">Argentina</option>
-          <option value="CL">Chile</option><option value="CO">Colombia</option><option value="MX">México</option>
-          <option value="EC">Ecuador</option><option value="PY">Paraguay</option><option value="UY">Uruguay</option>
-          <option value="VE">Venezuela</option><option value="BR">Brasil</option><option value="US">Estados Unidos</option>
-        </datalist>
+        <label for="pp-pais">País *</label>
+        <input id="pp-pais" name="pais" type="text" required maxlength="2" style="text-transform:uppercase" list="paises-sugeridos" placeholder="Ej: PE (Perú)" autocomplete="off" />
+        <p class="muted" style="font-size:.76rem;margin:.3rem 0 0">Código de 2 letras. Empezá a escribir el nombre del país y elegí de la lista.</p>
       </div>
       <div class="field">
-        <label for="pp-moneda">Moneda (código de 3 letras) *</label>
-        <input id="pp-moneda" name="moneda" type="text" required maxlength="3" style="text-transform:uppercase" placeholder="Ej: PEN" />
+        <label for="pp-moneda">Moneda</label>
+        <input id="pp-moneda" name="moneda" type="text" required maxlength="3" style="text-transform:uppercase" placeholder="Se completa solo" />
+        <p class="muted" style="font-size:.76rem;margin:.3rem 0 0">Se autocompleta al elegir el país. Podés corregirla si hace falta.</p>
       </div>
     </div>
     <div class="field-row">
       <div class="field">
         <label for="pp-precio">Precio *</label>
-        <input id="pp-precio" name="precio" type="number" min="0" step="0.01" required />
+        <input id="pp-precio" name="precio" type="number" min="0" step="0.01" required data-cantidad="<%= paquete.cantidad %>" class="calc-costo-pp" />
       </div>
       <div class="field">
-        <label for="pp-costounitario">Costo unitario</label>
+        <label for="pp-costounitario">Costo unitario <span id="auto-tag-costo-pp" class="badge-auto">calculado automático</span></label>
         <input id="pp-costounitario" name="costoUnitario" type="number" min="0" step="0.0001" />
       </div>
     </div>
@@ -98,5 +117,80 @@
     </div>
   </form>
 <% } %>
+
+<style>
+  .form-section-title {
+    font-size: .82rem; text-transform: uppercase; letter-spacing: .04em;
+    color: var(--muted); margin: 1.6rem 0 .7rem; padding-top: 1rem; border-top: 1px solid var(--border);
+  }
+  .form-section-title:first-of-type { margin-top: 0; padding-top: 0; border-top: none; }
+  .input-prefijo { display: flex; align-items: stretch; }
+  .input-prefijo span {
+    display: flex; align-items: center; padding: 0 .6rem; border: 1px solid var(--border); border-right: none;
+    border-radius: 10px 0 0 10px; background: rgba(255,255,255,.04); color: var(--muted); font-size: .85rem; white-space: nowrap;
+  }
+  .input-prefijo input { border-radius: 0 10px 10px 0 !important; }
+  .badge-auto {
+    display: inline-block; font-size: .68rem; font-weight: 500; text-transform: none; letter-spacing: 0;
+    color: var(--primary-2); background: rgba(47,227,166,.12); border-radius: 999px; padding: .1rem .5rem; margin-left: .4rem; vertical-align: middle;
+  }
+</style>
+
+<script>
+(function () {
+  // Costo unitario = Precio / Cantidad. Se autocompleta y deja de hacerlo en
+  // cuanto el usuario toca el campo a mano.
+  function conectarCalculoUnitario(claseOrigen, idCantidadFijo, idCostoUnitario, idTagAuto) {
+    var campoPrecio = document.querySelector('.' + claseOrigen + '[name="precio"], .' + claseOrigen + '#precioUsd');
+    var campoCantidadFijo = idCantidadFijo ? document.getElementById(idCantidadFijo) : null;
+    var campoCosto = document.getElementById(idCostoUnitario);
+    var tagAuto = document.getElementById(idTagAuto);
+    if (!campoPrecio || !campoCosto) return;
+    // Si el costo unitario ya trae un valor mayor a 0 cargado (editando un
+    // paquete existente), no se toca solo al abrir la pagina - podria ser un
+    // valor puesto a mano a proposito, distinto de precio/cantidad exacto.
+    var automatico = !(Number(campoCosto.value) > 0);
+    if (!automatico && tagAuto) tagAuto.style.display = 'none';
+
+    function cantidadActual() {
+      if (campoCantidadFijo) return Number(campoCantidadFijo.value) || 0;
+      return Number(campoPrecio.getAttribute('data-cantidad')) || 0;
+    }
+
+    function recalcular() {
+      if (!automatico) return;
+      var cantidad = cantidadActual();
+      var precio = Number(campoPrecio.value) || 0;
+      campoCosto.value = cantidad > 0 && precio > 0 ? (precio / cantidad).toFixed(4) : '';
+    }
+
+    campoPrecio.addEventListener('input', recalcular);
+    if (campoCantidadFijo) campoCantidadFijo.addEventListener('input', recalcular);
+    campoCosto.addEventListener('input', function () {
+      automatico = false;
+      if (tagAuto) tagAuto.style.display = 'none';
+    });
+    recalcular();
+  }
+
+  conectarCalculoUnitario('calc-costo', 'cantidad', 'costoUnitarioUsd', 'auto-tag-costo');
+  conectarCalculoUnitario('calc-costo-pp', null, 'pp-costounitario', 'auto-tag-costo-pp');
+
+  var MONEDA_POR_PAIS = {
+    BO: 'BOB', PE: 'PEN', AR: 'ARS', CL: 'CLP', CO: 'COP', MX: 'MXN',
+    EC: 'USD', PY: 'PYG', UY: 'UYU', VE: 'VES', BR: 'BRL', US: 'USD',
+  };
+  var campoPais = document.getElementById('pp-pais');
+  var campoMoneda = document.getElementById('pp-moneda');
+  if (campoPais && campoMoneda) {
+    campoPais.addEventListener('input', function () {
+      var codigo = campoPais.value.trim().toUpperCase();
+      if (MONEDA_POR_PAIS[codigo] && !campoMoneda.value) {
+        campoMoneda.value = MONEDA_POR_PAIS[codigo];
+      }
+    });
+  }
+})();
+</script>
 
 <%- include('partials/fin') %>

@@ -25,6 +25,7 @@ const PLANES = [
     recomendado: false,
     modeloIa: 'gpt-4o-mini',
     orden: 1,
+    categoria: 'PERSONAL',
     features: [
       'Hasta 10 productos',
       'Respuestas basicas por WhatsApp',
@@ -47,6 +48,7 @@ const PLANES = [
     recomendado: false,
     modeloIa: 'gpt-4.1-mini',
     orden: 2,
+    categoria: 'PERSONAL',
     features: [
       'Hasta 100 productos',
       'Agente de ventas con IA por WhatsApp',
@@ -74,6 +76,7 @@ const PLANES = [
     recomendado: true,
     modeloIa: 'gpt-4o',
     orden: 3,
+    categoria: 'PERSONAL',
     features: [
       'Todo lo del plan Standard, mas:',
       'Hasta 500 productos',
@@ -105,6 +108,7 @@ const PLANES = [
     modeloIa: 'gpt-5.2-chat-latest',
     marcaBlanca: true,
     orden: 4,
+    categoria: 'EMPRESARIAL',
     features: [
       'Todo lo del plan Pro, mas:',
       'Hasta 2.000 productos',
@@ -123,6 +127,29 @@ const PLANES = [
       'Acciones recomendadas para mejorar las ventas',
     ],
   },
+];
+
+// ---- Catalogo de caracteristicas comparables (filas de la tabla publica de
+// comparacion, /planes/:categoria) y que planes (por codigo) la incluyen.
+// Derivado de los "features" de texto libre de arriba, pero en forma
+// estructurada para poder mostrar tildes/cruces por plan.
+const CARACTERISTICAS = [
+  { nombre: 'Agente de ventas con IA por WhatsApp', orden: 1, planes: ['STANDARD', 'PRO', 'PREMIUM'] },
+  { nombre: 'Catálogo digital de productos', orden: 2, planes: ['STANDARD', 'PRO', 'PREMIUM'] },
+  { nombre: 'Carrito conversacional', orden: 3, planes: ['STANDARD', 'PRO', 'PREMIUM'] },
+  { nombre: 'Registro automático de pedidos', orden: 4, planes: ['STANDARD', 'PRO', 'PREMIUM'] },
+  { nombre: 'Panel administrativo', orden: 5, planes: ['STANDARD', 'PRO', 'PREMIUM'] },
+  { nombre: 'Gestión de clientes', orden: 6, planes: ['STANDARD', 'PRO', 'PREMIUM'] },
+  { nombre: 'Control de stock', orden: 7, planes: ['STANDARD', 'PRO', 'PREMIUM'] },
+  { nombre: 'Combos, promociones y gestión avanzada de pedidos', orden: 8, planes: ['PRO', 'PREMIUM'] },
+  { nombre: 'CRM y seguimiento de oportunidades', orden: 9, planes: ['PRO', 'PREMIUM'] },
+  { nombre: 'Reportes de ventas', orden: 10, planes: ['PRO', 'PREMIUM'] },
+  { nombre: 'Soporte prioritario', orden: 11, planes: ['PRO', 'PREMIUM'] },
+  { nombre: 'Derivación a un asesor humano', orden: 12, planes: ['GRATIS', 'STANDARD', 'PRO', 'PREMIUM'] },
+  { nombre: 'Marca blanca (plataforma con tu marca)', orden: 13, planes: ['PREMIUM'] },
+  { nombre: 'Dashboard gerencial / Business Intelligence', orden: 14, planes: ['PREMIUM'] },
+  { nombre: 'Detección de clientes en riesgo de abandono', orden: 15, planes: ['PREMIUM'] },
+  { nombre: 'Resumen ejecutivo generado por IA', orden: 16, planes: ['PREMIUM'] },
 ];
 
 // ---- Paquetes de conversaciones adicionales (precios en dolares) ----
@@ -145,6 +172,25 @@ async function main() {
       create: plan,
     });
     console.log(`  - ${plan.nombre} (Bs ${plan.mensualidadBs}/mes, ${plan.convIncluidas} conv.)`);
+  }
+
+  console.log('Cargando catalogo de caracteristicas comparables...');
+  for (const c of CARACTERISTICAS) {
+    const caracteristica = await prisma.caracteristica.upsert({
+      where: { nombre: c.nombre },
+      update: { orden: c.orden },
+      create: { nombre: c.nombre, orden: c.orden },
+    });
+    for (const codigoPlan of c.planes) {
+      const plan = await prisma.plan.findUnique({ where: { codigo: codigoPlan } });
+      if (!plan) continue;
+      await prisma.planCaracteristica.upsert({
+        where: { planId_caracteristicaId: { planId: plan.id, caracteristicaId: caracteristica.id } },
+        update: { incluida: true },
+        create: { planId: plan.id, caracteristicaId: caracteristica.id, incluida: true },
+      });
+    }
+    console.log(`  - ${c.nombre} (${c.planes.join(', ')})`);
   }
 
   console.log('Cargando paquetes de conversaciones...');

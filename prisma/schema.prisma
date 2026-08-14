@@ -59,12 +59,47 @@ model Plan {
   activo           Boolean  @default(true)
   orden            Int      @default(0)
   features         String[]
+  // Grupo comercial para la pagina publica de comparacion (/planes/:categoria):
+  // los planes se comparan SOLO contra otros de su mismo grupo, nunca cruzado.
+  categoria        PlanCategoria @default(PERSONAL)
   createdAt        DateTime @default(now())
 
   suscripciones Suscripcion[]
   preciosPais   PlanPrecioPais[]
+  caracteristicas PlanCaracteristica[]
 
   @@map("planes")
+}
+
+enum PlanCategoria {
+  PERSONAL
+  EMPRESARIAL
+}
+
+// Catalogo compartido de caracteristicas comparables entre planes (ej.
+// "Marca blanca", "Reportes de ventas"). Cada fila de este catalogo es una
+// FILA de la tabla comparativa publica; PlanCaracteristica dice, para cada
+// plan, si esa fila aplica o no (el tilde/cruz de la tabla).
+model Caracteristica {
+  id     Int    @id @default(autoincrement())
+  nombre String @unique
+  orden  Int    @default(0)
+
+  planes PlanCaracteristica[]
+
+  @@map("caracteristicas")
+}
+
+model PlanCaracteristica {
+  id               Int            @id @default(autoincrement())
+  planId           Int
+  plan             Plan           @relation(fields: [planId], references: [id], onDelete: Cascade)
+  caracteristicaId Int
+  caracteristica   Caracteristica @relation(fields: [caracteristicaId], references: [id], onDelete: Cascade)
+  incluida         Boolean        @default(true)
+
+  @@unique([planId, caracteristicaId])
+  @@map("plan_caracteristicas")
 }
 
 // Precio propio de un plan para un pais especifico (ej. Peru con soles),

@@ -153,14 +153,33 @@ function requireAuth(req, res, next) {
 // ============================ SITIO PUBLICO ============================
 app.get('/', async (req, res, next) => {
   try {
-    const [planesDb, paquetesDb] = await Promise.all([
-      prisma.plan.findMany({ where: { activo: true }, orderBy: { orden: 'asc' }, include: { preciosPais: true } }),
+    const [planesDb, paquetesDb, catalogoCaracteristicas] = await Promise.all([
+      prisma.plan.findMany({ where: { activo: true }, orderBy: { orden: 'asc' }, include: { preciosPais: true, caracteristicas: true } }),
       prisma.paquete.findMany({ where: { activo: true }, orderBy: { cantidad: 'asc' }, include: { preciosPais: true } }),
+      prisma.caracteristica.findMany({ orderBy: { orden: 'asc' } }),
     ]);
     const pais = detectarPais(req.ip);
     const planes = planesDb.map((p) => ({ ...p, precio: precioPlanParaPais(p, pais, p.preciosPais) }));
     const paquetes = paquetesDb.map((p) => ({ ...p, precio: precioPaqueteParaPais(p, pais, p.preciosPais) }));
-    res.render('index', { title: `${site.name} - ${site.tagline}`, planes, paquetes, pais, simboloMoneda });
+
+    // Destacados de cada tarjeta de categoria en la landing: union de las
+    // caracteristicas que tiene AL MENOS UN plan de ese grupo, en el orden
+    // del catalogo, limitado a 8 para que la tarjeta no quede gigante.
+    function destacadasDe(categoria) {
+      const idsIncluidos = new Set();
+      for (const p of planesDb) {
+        if (p.categoria !== categoria) continue;
+        for (const pc of p.caracteristicas) if (pc.incluida) idsIncluidos.add(pc.caracteristicaId);
+      }
+      return catalogoCaracteristicas.filter((c) => idsIncluidos.has(c.id)).slice(0, 8).map((c) => c.nombre);
+    }
+    const destacadasPersonal = destacadasDe('PERSONAL');
+    const destacadasEmpresarial = destacadasDe('EMPRESARIAL');
+
+    res.render('index', {
+      title: `${site.name} - ${site.tagline}`, planes, paquetes, pais, simboloMoneda,
+      destacadasPersonal, destacadasEmpresarial,
+    });
   } catch (err) { next(err); }
 });
 
@@ -207,6 +226,36 @@ app.get('/catalogo/:slug', async (req, res, next) => {
       title: `Catálogo · ${empresa.marca || empresa.nombre}`,
       empresa, productos, categorias,
       numeroWhatsapp: agente ? agente.numeroWhatsapp : null,
+    });
+  } catch (err) { next(err); }
+});
+
+// Tabla comparativa publica de planes, agrupados por categoria (los planes
+// SOLO se comparan contra otros de su mismo grupo, nunca personal vs
+// empresarial mezclados - ver plan de "calculadora + comparador").
+app.get('/planes/:categoria', async (req, res, next) => {
+  try {
+    const categoria = String(req.params.categoria || '').toUpperCase();
+    if (categoria !== 'PERSONAL' && categoria !== 'EMPRESARIAL') {
+      return res.status(404).render('404', { title: 'Página no encontrada' });
+    }
+    const [planesDb, todasCaracteristicas] = await Promise.all([
+      prisma.plan.findMany({
+        where: { activo: true, categoria },
+        orderBy: { orden: 'asc' },
+        include: { preciosPais: true, caracteristicas: true },
+      }),
+      prisma.caracteristica.findMany({ orderBy: { orden: 'asc' } }),
+    ]);
+    const pais = detectarPais(req.ip);
+    const planes = planesDb.map((p) => ({
+      ...p,
+      precio: precioPlanParaPais(p, pais, p.preciosPais),
+      incluye: new Set(p.caracteristicas.filter((pc) => pc.incluida).map((pc) => pc.caracteristicaId)),
+    }));
+    res.render('planes', {
+      title: `Planes ${categoria === 'PERSONAL' ? 'personales' : 'empresariales'} - ${site.name}`,
+      categoria, planes, todasCaracteristicas, simboloMoneda,
     });
   } catch (err) { next(err); }
 });
@@ -2194,6 +2243,7 @@ function datosPlanDesdeForm(body) {
     recomendado: body.recomendado === '1',
     orden: parseInt(body.orden, 10) || 0,
     features: (body.features || '').split('\n').map((f) => f.trim()).filter(Boolean),
+    categoria: String(body.categoria || '').toUpperCase() === 'EMPRESARIAL' ? 'EMPRESARIAL' : 'PERSONAL',
   };
 }
 
@@ -2221,14 +2271,19 @@ app.post('/admin/planes', requireAuth, async (req, res, next) => {
 
 app.get('/admin/planes/:id/editar', requireAuth, async (req, res, next) => {
   try {
-    const plan = await prisma.plan.findUnique({
-      where: { id: Number(req.params.id) },
-      include: { preciosPais: { orderBy: { pais: 'asc' } } },
-    });
+    const [plan, todasCaracteristicas] = await Promise.all([
+      prisma.plan.findUnique({
+        where: { id: Number(req.params.id) },
+        include: { preciosPais: { orderBy: { pais: 'asc' } }, caracteristicas: true },
+      }),
+      prisma.caracteristica.findMany({ orderBy: { orden: 'asc' } }),
+    ]);
     if (!plan) return res.redirect('/admin/planes');
+    const idsIncluidas = new Set(plan.caracteristicas.filter((pc) => pc.incluida).map((pc) => pc.caracteristicaId));
     res.render('admin/plan-form', {
       title: 'Editar plan - Proshop', tituloPagina: 'Editar plan', activo: 'planes',
       plan, error: null, mensaje: req.query.ok || null, errorPrecioPais: req.query.err || null,
+      todasCaracteristicas, idsIncluidas,
     });
   } catch (err) { next(err); }
 });
@@ -2269,6 +2324,28 @@ app.post('/admin/planes/:id/precios-pais/:precioPaisId/eliminar', requireAuth, a
   } catch (err) { next(err); }
 });
 
+// Guarda de una sola vez que caracteristicas del catalogo tiene este plan
+// (checklist completo: lo que viene marcado en el body queda "incluida",
+// lo que no, se desmarca - nunca se borra la fila de PlanCaracteristica,
+// solo se prende/apaga, asi el admin puede reactivarla despues sin perder nada).
+app.post('/admin/planes/:id/caracteristicas', requireAuth, async (req, res, next) => {
+  try {
+    const planId = Number(req.params.id);
+    const todasCaracteristicas = await prisma.caracteristica.findMany({ select: { id: true } });
+    const marcadas = new Set([].concat(req.body.caracteristicaId || []).map(Number));
+    await prisma.$transaction(
+      todasCaracteristicas.map((c) =>
+        prisma.planCaracteristica.upsert({
+          where: { planId_caracteristicaId: { planId, caracteristicaId: c.id } },
+          create: { planId, caracteristicaId: c.id, incluida: marcadas.has(c.id) },
+          update: { incluida: marcadas.has(c.id) },
+        })
+      )
+    );
+    res.redirect(`/admin/planes/${planId}/editar?ok=` + encodeURIComponent('Características actualizadas.'));
+  } catch (err) { next(err); }
+});
+
 // Los planes no se borran (quedan referenciados por suscripciones existentes):
 // se activan/desactivan. Un plan inactivo desaparece de la vitrina publica
 // del sitio pero las empresas que ya lo tienen contratado no se ven afectadas.
@@ -2278,6 +2355,59 @@ app.post('/admin/planes/:id/activo', requireAuth, async (req, res, next) => {
     if (!plan) return res.redirect('/admin/planes');
     await prisma.plan.update({ where: { id: plan.id }, data: { activo: !plan.activo } });
     res.redirect('/admin/planes?ok=' + encodeURIComponent(plan.activo ? 'Plan desactivado.' : 'Plan activado.'));
+  } catch (err) { next(err); }
+});
+
+// --- Catalogo de caracteristicas comparables (filas de la tabla publica de
+// comparacion /planes/:categoria). Compartido entre todos los planes: cada
+// fila se prende/apaga por plan desde el checklist en /admin/planes/:id/editar. ---
+app.get('/admin/caracteristicas', requireAuth, async (req, res, next) => {
+  try {
+    const caracteristicas = await prisma.caracteristica.findMany({
+      orderBy: { orden: 'asc' },
+      include: { planes: { where: { incluida: true }, include: { plan: { select: { nombre: true } } } } },
+    });
+    res.render('admin/caracteristicas', {
+      title: 'Panel Proshop - Características', tituloPagina: 'Características', activo: 'caracteristicas',
+      caracteristicas, mensaje: req.query.ok || null, error: req.query.err || null,
+    });
+  } catch (err) { next(err); }
+});
+
+app.post('/admin/caracteristicas', requireAuth, async (req, res, next) => {
+  try {
+    const nombre = String(req.body.nombre || '').trim().slice(0, 150);
+    const orden = parseInt(req.body.orden, 10) || 0;
+    if (!nombre) {
+      return res.redirect('/admin/caracteristicas?err=' + encodeURIComponent('El nombre es obligatorio.'));
+    }
+    await prisma.caracteristica.create({ data: { nombre, orden } });
+    res.redirect('/admin/caracteristicas?ok=' + encodeURIComponent('Característica creada. Ahora marcala en cada plan que corresponda.'));
+  } catch (err) {
+    if (err.code === 'P2002') {
+      return res.redirect('/admin/caracteristicas?err=' + encodeURIComponent('Ya existe una característica con ese nombre.'));
+    }
+    next(err);
+  }
+});
+
+app.post('/admin/caracteristicas/:id', requireAuth, async (req, res, next) => {
+  try {
+    const nombre = String(req.body.nombre || '').trim().slice(0, 150);
+    const orden = parseInt(req.body.orden, 10) || 0;
+    if (!nombre) {
+      return res.redirect('/admin/caracteristicas?err=' + encodeURIComponent('El nombre es obligatorio.'));
+    }
+    await prisma.caracteristica.update({ where: { id: Number(req.params.id) }, data: { nombre, orden } });
+    res.redirect('/admin/caracteristicas?ok=' + encodeURIComponent('Característica actualizada.'));
+  } catch (err) { next(err); }
+});
+
+app.post('/admin/caracteristicas/:id/eliminar', requireAuth, async (req, res, next) => {
+  try {
+    // onDelete: Cascade en PlanCaracteristica se encarga de borrar sus filas.
+    await prisma.caracteristica.deleteMany({ where: { id: Number(req.params.id) } });
+    res.redirect('/admin/caracteristicas?ok=' + encodeURIComponent('Característica eliminada.'));
   } catch (err) { next(err); }
 });
 

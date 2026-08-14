@@ -151,45 +151,98 @@
           <p>Empieza con el plan que mejor se adapta a tu empresa. Crece cuando lo necesites.</p>
         </header>
 
-        <div class="pricing">
-          <% planes.forEach(function (p) { %>
-            <article class="price-card reveal <%= p.recomendado ? 'is-reco' : '' %>">
-              <% if (p.recomendado) { %><span class="reco-tag">Recomendado</span><% } %>
-              <h3><%= p.nombre %></h3>
-              <div class="price">
-                <span class="price-cur"><%= simboloMoneda(p.precio.moneda) %></span>
-                <span class="price-num"><%= p.precio.mensualidad.toLocaleString('es-BO') %></span>
-                <span class="price-per">/mes</span>
+        <div class="planes-categorias reveal">
+          <div class="categoria-card">
+            <span class="categoria-eyebrow">Plan personal</span>
+            <h3>Para emprendedores, vendedores y negocios chicos</h3>
+            <p>Empezá a vender por WhatsApp con un agente de IA, sin pagar de más por funciones que todavía no necesitás.</p>
+            <ul class="categoria-checklist">
+              <% destacadasPersonal.forEach(function (nombre) { %>
+                <li><%= nombre %></li>
+              <% }); %>
+            </ul>
+            <span class="categoria-label">Ideal para</span>
+            <div class="categoria-tags">
+              <span>Emprendedores</span><span>Tiendas chicas</span><span>Freelancers</span><span>Un solo local</span>
+            </div>
+            <a class="btn btn-primary btn-block categoria-btn" href="/planes/personal">Ver planes personales →</a>
+          </div>
+
+          <div class="categoria-card categoria-card-empresa">
+            <span class="categoria-badge">Para equipos</span>
+            <span class="categoria-eyebrow">Plan empresarial</span>
+            <h3>Para empresas y equipos comerciales</h3>
+            <p>Business Intelligence, marca blanca y catálogos grandes para negocios que ya venden en volumen.</p>
+            <ul class="categoria-checklist">
+              <% destacadasEmpresarial.forEach(function (nombre) { %>
+                <li><%= nombre %></li>
+              <% }); %>
+            </ul>
+            <span class="categoria-label">Ideal para</span>
+            <div class="categoria-tags">
+              <span>Cadenas de tiendas</span><span>Franquicias</span><span>Equipos comerciales</span><span>Empresas B2B</span>
+            </div>
+            <a class="btn btn-primary btn-block categoria-btn" href="/planes/empresarial">Ver planes empresariales →</a>
+          </div>
+        </div>
+
+        <!-- Calculadora: cuantas ventas necesita el agente para pagarse solo -->
+        <div class="calc-roi reveal">
+          <div class="calc-roi-copy">
+            <h3>Calcula cuántas ventas necesita el agente para pagarse solo</h3>
+            <p>Ingresa tus datos y descubre cuántas ventas adicionales necesitas al mes para cubrir el costo del plan.</p>
+          </div>
+          <div class="calc-roi-form">
+            <div class="calc-step">
+              <span class="calc-step-num">1</span>
+              <div class="calc-step-body">
+                <label for="calcTicket">¿Cuánto paga normalmente un cliente?</label>
+                <span class="calc-step-hint">Ticket promedio</span>
+                <div class="input-prefijo"><span id="calcSimboloTicket">Bs</span><input id="calcTicket" type="number" min="0" step="0.01" placeholder="Ej: 300" /></div>
               </div>
-              <p class="price-impl">
-                <% if (p.precio.implementacion > 0) { %>
-                  + <%= simboloMoneda(p.precio.moneda) %> <%= p.precio.implementacion.toLocaleString('es-BO') %> de implementación
-                <% } else { %>
-                  Sin costo de implementación
-                <% } %>
-              </p>
+            </div>
+            <div class="calc-step">
+              <span class="calc-step-num">2</span>
+              <div class="calc-step-body">
+                <label for="calcGanancia">¿Cuánto ganás realmente por cada venta?</label>
+                <span class="calc-step-hint">Ganancia o margen por venta, no el precio total</span>
+                <div class="input-prefijo"><span id="calcSimboloGanancia">Bs</span><input id="calcGanancia" type="number" min="0" step="0.01" placeholder="Ej: 90" /></div>
+              </div>
+            </div>
+            <div class="calc-step">
+              <span class="calc-step-num">3</span>
+              <div class="calc-step-body">
+                <label for="calcPlan">¿Cuánto cuesta el plan mensual?</label>
+                <span class="calc-step-hint">Elegí uno de tus planes, o escribí otro monto vos mismo</span>
+                <select id="calcPlan">
+                  <option value="" data-simbolo="Bs">Elegí un plan...</option>
+                  <% planes.forEach(function (p) { %>
+                    <option value="<%= p.precio.mensualidad %>" data-simbolo="<%= simboloMoneda(p.precio.moneda) %>"><%= p.nombre %> — <%= simboloMoneda(p.precio.moneda) %> <%= p.precio.mensualidad.toLocaleString('es-BO') %>/mes</option>
+                  <% }); %>
+                  <option value="manual">Otro monto...</option>
+                </select>
+                <div class="input-prefijo" id="calcCostoWrap" style="display:none;margin-top:.6rem">
+                  <span id="calcSimboloCosto">Bs</span><input id="calcCosto" type="number" min="0" step="0.01" placeholder="Ej: 490" />
+                </div>
+              </div>
+            </div>
 
-              <ul class="price-specs">
-                <li><b><%= p.convIncluidas.toLocaleString('es-BO') %></b> conversaciones/mes</li>
-                <li>Hasta <b><%= p.maxProductos.toLocaleString('es-BO') %></b> productos</li>
-                <li><b><%= p.maxUsuarios %></b> usuario<%= p.maxUsuarios > 1 ? 's' : '' %></li>
-              </ul>
+            <button type="button" id="btnCalcularRoi" class="btn btn-primary btn-lg btn-block">Calcular ahora</button>
+            <div id="calcRoiError" class="calc-roi-error" style="display:none"></div>
 
-              <a class="btn <%= p.recomendado ? 'btn-primary' : 'btn-ghost' %> btn-block"
-                 href="/registro?plan=<%= p.id %>">
-                <%= p.precio.mensualidad === 0 ? 'Probar gratis' : 'Contratar' %>
-              </a>
-
-              <ul class="price-features">
-                <% p.features.slice(0, 8).forEach(function (f) { %>
-                  <li><%= f %></li>
-                <% }); %>
-              </ul>
-              <% if (p.precio.primerPago > 0) { %>
-                <p class="price-first">Primer pago: <b><%= simboloMoneda(p.precio.moneda) %> <%= p.precio.primerPago.toLocaleString('es-BO') %></b></p>
-              <% } %>
-            </article>
-          <% }); %>
+            <div id="calcRoiResultado" class="calc-roi-resultado" style="display:none">
+              <span class="calc-roi-tag">Resultado</span>
+              <div class="calc-roi-numero">
+                <span id="calcRoiNumero">6</span>
+                <span id="calcRoiUnidad">ventas adicionales / mes</span>
+              </div>
+              <p id="calcRoiTitulo"></p>
+              <p>Pensá en todos los clientes que hoy se pierden porque nadie respondió a tiempo, el mensaje quedó olvidado o no se hizo seguimiento. ¿El agente puede ayudarte a recuperar esas ventas?</p>
+              <p>Si la respuesta es sí, el plan puede pagarse solo y empezar a generar más ganancias para tu negocio.</p>
+              <a class="btn btn-primary btn-block" href="#contacto">Quiero recuperar más ventas</a>
+              <p class="calc-roi-nota">Este resultado es aproximado y se calcula dividiendo el costo mensual del plan entre la ganancia obtenida por cada venta.</p>
+            </div>
+          </div>
         </div>
 
         <!-- Paquetes adicionales -->
@@ -270,6 +323,74 @@
         </div>
       </div>
     </section>
+
+    <script>
+      (function () {
+        var selectPlan = document.getElementById('calcPlan');
+        var costoWrap = document.getElementById('calcCostoWrap');
+        var campoCosto = document.getElementById('calcCosto');
+        var simboloCosto = document.getElementById('calcSimboloCosto');
+        var btnCalcular = document.getElementById('btnCalcularRoi');
+        var resultado = document.getElementById('calcRoiResultado');
+        var numeroResultado = document.getElementById('calcRoiNumero');
+        var unidadResultado = document.getElementById('calcRoiUnidad');
+        var tituloResultado = document.getElementById('calcRoiTitulo');
+        var elError = document.getElementById('calcRoiError');
+        if (!btnCalcular) return;
+
+        // Elegir un plan de la lista autocompleta el costo y esconde el
+        // campo manual (no hace falta tocarlo). "Otro monto..." lo muestra
+        // vacio para que lo escriban ellos. Asi queda UN solo dato de costo
+        // a la vista por vez, no dos campos que confunden.
+        var simboloTicket = document.getElementById('calcSimboloTicket');
+        var simboloGanancia = document.getElementById('calcSimboloGanancia');
+        selectPlan.addEventListener('change', function () {
+          var opcion = selectPlan.options[selectPlan.selectedIndex];
+          var simbolo = opcion.getAttribute('data-simbolo') || 'Bs';
+          simboloCosto.textContent = simbolo;
+          simboloTicket.textContent = simbolo;
+          simboloGanancia.textContent = simbolo;
+          if (selectPlan.value === 'manual') {
+            campoCosto.value = '';
+            costoWrap.style.display = 'flex';
+            campoCosto.focus();
+          } else if (selectPlan.value) {
+            campoCosto.value = Number(selectPlan.value).toFixed(2);
+            costoWrap.style.display = 'none';
+          } else {
+            costoWrap.style.display = 'none';
+          }
+        });
+
+        btnCalcular.addEventListener('click', function () {
+          var ganancia = Number(document.getElementById('calcGanancia').value);
+          var costoPlan = Number(campoCosto.value);
+          resultado.style.display = 'none';
+          elError.style.display = 'none';
+
+          if (!ganancia || ganancia <= 0) {
+            elError.textContent = 'Completá cuánto ganás por cada venta para poder calcular.';
+            elError.style.display = 'block';
+            return;
+          }
+          if (!costoPlan || costoPlan <= 0) {
+            elError.textContent = 'Elegí un plan o escribí el costo mensual para poder calcular.';
+            elError.style.display = 'block';
+            return;
+          }
+
+          var ventasNecesarias = Math.ceil(costoPlan / ganancia);
+          var ventasPorSemana = Math.max(1, Math.round(ventasNecesarias / 4.33));
+          var textoSemana = ventasPorSemana === 1 ? 'una venta por semana' : ventasPorSemana + ' ventas por semana';
+
+          numeroResultado.textContent = ventasNecesarias;
+          unidadResultado.textContent = ventasNecesarias === 1 ? 'venta adicional / mes' : 'ventas adicionales / mes';
+          tituloResultado.textContent = 'Con eso, el agente paga su mensualidad solo con ayudarte a recuperar ' + textoSemana + '.';
+          resultado.style.display = 'block';
+          resultado.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        });
+      })();
+    </script>
 
     <!-- ================= CONTACTO ================= -->
     <section id="contacto" class="section section-alt">

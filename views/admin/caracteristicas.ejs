@@ -1,0 +1,64 @@
+<%- include('partials/inicio') %>
+
+<div class="page-head">
+  <h2>Características comparables</h2>
+  <p>El catálogo compartido de filas que se muestran en la tabla comparativa pública (/planes/personal y /planes/empresarial). Marcá cuáles tiene cada plan desde <a href="/admin/planes" style="color:var(--primary-2)">Planes</a>, en la ficha de edición de cada uno.</p>
+</div>
+
+<% if (mensaje) { %><div class="alert-ok"><%= mensaje %></div><% } %>
+<% if (error) { %><div class="alert-err"><%= error %></div><% } %>
+
+<% if (caracteristicas.length) { %>
+  <div class="table-wrap">
+    <table class="leads-table">
+      <thead><tr><th>Orden</th><th>Nombre</th><th>Planes que la tienen</th><th>Acciones</th></tr></thead>
+      <tbody>
+        <% caracteristicas.forEach(function (c) { %>
+          <%
+            var formId = 'editar-caracteristica-' + c.id;
+            var inputStyle = 'background:transparent;border:1px solid rgba(255,255,255,.15);border-radius:8px;padding:.4rem .6rem;color:inherit;font:inherit';
+          %>
+          <tr>
+            <td><input form="<%= formId %>" name="orden" type="number" value="<%= c.orden %>" style="width:60px;<%= inputStyle %>" /></td>
+            <td><input form="<%= formId %>" name="nombre" type="text" value="<%= c.nombre %>" style="width:100%;min-width:280px;<%= inputStyle %>" /></td>
+            <td class="muted" style="font-size:.85rem">
+              <%= c.planes.length ? c.planes.map(function (pc) { return pc.plan.nombre; }).join(', ') : 'Ningún plan todavía' %>
+            </td>
+            <td class="actions-cell">
+              <button form="<%= formId %>" class="btn btn-ghost" style="padding:.4rem .8rem;font-size:.85rem" type="submit">Guardar</button>
+              <form method="POST" action="/admin/caracteristicas/<%= c.id %>/eliminar" class="inline-form"
+                    onsubmit="return confirm('¿Eliminar esta característica? Se saca de todos los planes.');">
+                <button class="btn btn-ghost" style="padding:.4rem .8rem;font-size:.85rem" type="submit">Eliminar</button>
+              </form>
+            </td>
+          </tr>
+          <form id="<%= formId %>" method="POST" action="/admin/caracteristicas/<%= c.id %>"></form>
+        <% }); %>
+      </tbody>
+    </table>
+  </div>
+<% } else { %>
+  <div class="empty-state">
+    <h3>Todavía no hay características cargadas</h3>
+    <p>Agregá la primera abajo. Después vas a poder marcarla en cada plan desde su ficha de edición.</p>
+  </div>
+<% } %>
+
+<form method="POST" action="/admin/caracteristicas" class="form-card" style="max-width:600px;margin-top:1.5rem">
+  <h3 style="margin:0 0 1rem;font-size:.95rem">+ Agregar característica nueva</h3>
+  <div class="field-row">
+    <div class="field">
+      <label for="nombre">Nombre *</label>
+      <input id="nombre" name="nombre" type="text" required maxlength="150" placeholder="Ej: Reportes de ventas" />
+    </div>
+    <div class="field" style="max-width:120px">
+      <label for="orden">Orden</label>
+      <input id="orden" name="orden" type="number" value="0" />
+    </div>
+  </div>
+  <div class="form-actions">
+    <button class="btn btn-primary" type="submit">Agregar</button>
+  </div>
+</form>
+
+<%- include('partials/fin') %>

@@ -7,58 +7,74 @@
 
 <% if (error) { %><div class="alert-err"><%= error %></div><% } %>
 
-<form method="POST" action="<%= plan && plan.id ? '/admin/planes/' + plan.id : '/admin/planes' %>" class="form-card">
+<form method="POST" action="<%= plan && plan.id ? '/admin/planes/' + plan.id : '/admin/planes' %>" class="form-card" id="form-plan">
+  <h3 class="form-section-title">Identificación</h3>
   <div class="field-row">
     <div class="field">
       <label for="codigo">Código *</label>
       <input id="codigo" name="codigo" type="text" required maxlength="30" style="text-transform:uppercase"
              value="<%= plan ? plan.codigo : '' %>" placeholder="Ej: STANDARD" <%= plan && plan.id ? 'readonly' : '' %> />
+      <p class="muted" style="font-size:.78rem;margin:.3rem 0 0">Identificador interno, no se muestra al cliente. No se puede cambiar después de creado.</p>
     </div>
     <div class="field">
       <label for="nombre">Nombre *</label>
       <input id="nombre" name="nombre" type="text" required maxlength="80"
              value="<%= plan ? plan.nombre : '' %>" placeholder="Ej: Standard" />
+      <p class="muted" style="font-size:.78rem;margin:.3rem 0 0">Este sí lo ve el cliente, en la web y al registrarse.</p>
+    </div>
+    <div class="field">
+      <label for="categoria">Categoría *</label>
+      <select id="categoria" name="categoria">
+        <option value="PERSONAL" <%= !plan || plan.categoria === 'PERSONAL' ? 'selected' : '' %>>Personal</option>
+        <option value="EMPRESARIAL" <%= plan && plan.categoria === 'EMPRESARIAL' ? 'selected' : '' %>>Empresarial</option>
+      </select>
+      <p class="muted" style="font-size:.78rem;margin:.3rem 0 0">Decide en qué página comparadora aparece (/planes/personal o /planes/empresarial) — se compara solo contra planes de su mismo grupo.</p>
     </div>
   </div>
 
+  <h3 class="form-section-title">Precio en Bolivia (Bs)</h3>
+  <p class="muted" style="font-size:.85rem;margin:-.5rem 0 .8rem">Este es el precio "de siempre": lo ve cualquier visitante que no tenga un precio de país propio configurado más abajo, y tampoco un precio en US$ cargado.</p>
   <div class="field-row">
     <div class="field">
-      <label for="mensualidadBs">Mensualidad (Bs)</label>
-      <input id="mensualidadBs" name="mensualidadBs" type="number" min="0" step="0.01"
-             value="<%= plan ? Number(plan.mensualidadBs) : 0 %>" />
+      <label for="mensualidadBs">Mensualidad</label>
+      <div class="input-prefijo"><span>Bs</span><input id="mensualidadBs" name="mensualidadBs" type="number" min="0" step="0.01" class="calc-bs"
+             value="<%= plan ? Number(plan.mensualidadBs) : 0 %>" /></div>
     </div>
     <div class="field">
-      <label for="implementacionBs">Implementación (Bs)</label>
-      <input id="implementacionBs" name="implementacionBs" type="number" min="0" step="0.01"
-             value="<%= plan ? Number(plan.implementacionBs) : 0 %>" />
+      <label for="implementacionBs">Implementación</label>
+      <div class="input-prefijo"><span>Bs</span><input id="implementacionBs" name="implementacionBs" type="number" min="0" step="0.01" class="calc-bs"
+             value="<%= plan ? Number(plan.implementacionBs) : 0 %>" /></div>
+      <p class="muted" style="font-size:.78rem;margin:.3rem 0 0">Cobro único al contratar. Si no cobras esto, dejalo en 0.</p>
     </div>
     <div class="field">
-      <label for="primerPagoBs">Primer pago (Bs)</label>
-      <input id="primerPagoBs" name="primerPagoBs" type="number" min="0" step="0.01"
-             value="<%= plan ? Number(plan.primerPagoBs) : 0 %>" />
-      <p class="muted" style="font-size:.78rem;margin:.3rem 0 0">Normalmente implementación + primera mensualidad.</p>
+      <label for="primerPagoBs">Primer pago <span id="auto-tag-bs" class="badge-auto">calculado automático</span></label>
+      <div class="input-prefijo"><span>Bs</span><input id="primerPagoBs" name="primerPagoBs" type="number" min="0" step="0.01"
+             value="<%= plan ? Number(plan.primerPagoBs) : 0 %>" /></div>
+      <p class="muted" style="font-size:.78rem;margin:.3rem 0 0">Se suma solo (Implementación + Mensualidad). Si lo editás a mano, deja de recalcularse.</p>
     </div>
   </div>
 
+  <h3 class="form-section-title">Precio internacional por default (US$)</h3>
+  <p class="muted" style="font-size:.85rem;margin:-.5rem 0 .8rem">Opcional. Si un visitante es de un país sin precio propio (ver más abajo, solo aplica editando un plan ya creado), ve este precio en vez del de Bolivia. Dejalo vacío si por ahora solo vendés en Bolivia.</p>
   <div class="field-row">
     <div class="field">
-      <label for="mensualidadUsd">Mensualidad (US$)</label>
-      <input id="mensualidadUsd" name="mensualidadUsd" type="number" min="0" step="0.01"
-             value="<%= plan && plan.mensualidadUsd != null ? Number(plan.mensualidadUsd) : '' %>" placeholder="Opcional" />
+      <label for="mensualidadUsd">Mensualidad</label>
+      <div class="input-prefijo"><span>US$</span><input id="mensualidadUsd" name="mensualidadUsd" type="number" min="0" step="0.01" class="calc-usd"
+             value="<%= plan && plan.mensualidadUsd != null ? Number(plan.mensualidadUsd) : '' %>" placeholder="Vacío = no aplica" /></div>
     </div>
     <div class="field">
-      <label for="implementacionUsd">Implementación (US$)</label>
-      <input id="implementacionUsd" name="implementacionUsd" type="number" min="0" step="0.01"
-             value="<%= plan && plan.implementacionUsd != null ? Number(plan.implementacionUsd) : '' %>" placeholder="Opcional" />
+      <label for="implementacionUsd">Implementación</label>
+      <div class="input-prefijo"><span>US$</span><input id="implementacionUsd" name="implementacionUsd" type="number" min="0" step="0.01" class="calc-usd"
+             value="<%= plan && plan.implementacionUsd != null ? Number(plan.implementacionUsd) : '' %>" placeholder="Vacío = no aplica" /></div>
     </div>
     <div class="field">
-      <label for="primerPagoUsd">Primer pago (US$)</label>
-      <input id="primerPagoUsd" name="primerPagoUsd" type="number" min="0" step="0.01"
-             value="<%= plan && plan.primerPagoUsd != null ? Number(plan.primerPagoUsd) : '' %>" placeholder="Opcional" />
-      <p class="muted" style="font-size:.78rem;margin:.3rem 0 0">Precio para visitantes de países sin precio propio configurado abajo. Si se deja vacío, esos países ven el precio en Bs.</p>
+      <label for="primerPagoUsd">Primer pago <span id="auto-tag-usd" class="badge-auto">calculado automático</span></label>
+      <div class="input-prefijo"><span>US$</span><input id="primerPagoUsd" name="primerPagoUsd" type="number" min="0" step="0.01"
+             value="<%= plan && plan.primerPagoUsd != null ? Number(plan.primerPagoUsd) : '' %>" placeholder="Vacío = no aplica" /></div>
     </div>
   </div>
 
+  <h3 class="form-section-title">Límites del plan</h3>
   <div class="field-row">
     <div class="field">
       <label for="convIncluidas">Conversaciones incluidas / mes</label>
@@ -77,6 +93,7 @@
     </div>
   </div>
 
+  <h3 class="form-section-title">Configuración avanzada</h3>
   <div class="field-row">
     <div class="field">
       <label for="modeloIa">Modelo de IA</label>
@@ -87,6 +104,7 @@
       <label for="orden">Orden en la vitrina</label>
       <input id="orden" name="orden" type="number" min="0"
              value="<%= plan ? plan.orden : 0 %>" />
+      <p class="muted" style="font-size:.78rem;margin:.3rem 0 0">De menor a mayor, así se ordenan las tarjetas en la web.</p>
     </div>
   </div>
 
@@ -108,13 +126,50 @@ Agente de ventas con IA
   </div>
 </form>
 
-<% if (plan && plan.id) { %>
+<% if (!plan || !plan.id) { %>
+  <p class="muted" style="font-size:.85rem;margin-top:1rem">💡 Una vez que crees el plan, vas a poder cargarle precios propios por país y marcar sus características desde esta misma pantalla.</p>
+<% } else { %>
+  <div class="page-head" style="margin-top:2rem">
+    <h2 style="font-size:1.1rem">Características de este plan</h2>
+    <p class="muted" style="font-size:.85rem">Se muestran como tilde/cruz en la tabla comparativa pública (/planes/<%= plan.categoria.toLowerCase() %>). Para agregar una fila nueva al catálogo, andá a <a href="/admin/caracteristicas" style="color:var(--primary-2)">Características</a>.</p>
+  </div>
+
+  <% if (todasCaracteristicas.length) { %>
+    <form method="POST" action="/admin/planes/<%= plan.id %>/caracteristicas" class="form-card" style="max-width:700px">
+      <div style="display:flex;flex-direction:column;gap:.6rem">
+        <% todasCaracteristicas.forEach(function (c) { %>
+          <label style="display:flex;align-items:center;gap:.6rem">
+            <input type="checkbox" name="caracteristicaId" value="<%= c.id %>" style="width:auto" <%= idsIncluidas.has(c.id) ? 'checked' : '' %> />
+            <%= c.nombre %>
+          </label>
+        <% }); %>
+      </div>
+      <div class="form-actions">
+        <button class="btn btn-primary" type="submit">Guardar características</button>
+      </div>
+    </form>
+  <% } else { %>
+    <p class="muted" style="font-size:.85rem">Todavía no hay características cargadas en el catálogo. Agregá la primera en <a href="/admin/caracteristicas" style="color:var(--primary-2)">Características</a>.</p>
+  <% } %>
+
   <div class="page-head" style="margin-top:2rem">
     <h2 style="font-size:1.1rem">Precios por país</h2>
-    <p class="muted" style="font-size:.85rem">Se detecta el país del visitante por IP. Si no hay un precio propio acá, se usa el default en US$ de arriba (o Bs si tampoco hay US$ cargado).</p>
+    <p class="muted" style="font-size:.85rem">
+      Cómo se decide qué precio ve cada visitante (se detecta el país por su IP, automático):
+      <b>1)</b> si su país está en esta lista, ve ESE precio &nbsp;→&nbsp;
+      <b>2)</b> si no, y cargaste un precio en US$ arriba, ve ese &nbsp;→&nbsp;
+      <b>3)</b> si tampoco, ve el precio en Bs de arriba (el de siempre).
+    </p>
   </div>
 
   <% if (errorPrecioPais) { %><div class="alert-err"><%= errorPrecioPais %></div><% } %>
+
+  <datalist id="paises-sugeridos">
+    <option value="BO">Bolivia</option><option value="PE">Perú</option><option value="AR">Argentina</option>
+    <option value="CL">Chile</option><option value="CO">Colombia</option><option value="MX">México</option>
+    <option value="EC">Ecuador</option><option value="PY">Paraguay</option><option value="UY">Uruguay</option>
+    <option value="VE">Venezuela</option><option value="BR">Brasil</option><option value="US">Estados Unidos</option>
+  </datalist>
 
   <% if (plan.preciosPais.length) { %>
     <div class="table-wrap">
@@ -122,54 +177,56 @@ Agente de ventas con IA
         <thead><tr><th>País</th><th>Moneda</th><th class="num">Mensualidad</th><th class="num">Implementación</th><th class="num">Primer pago</th><th>Acciones</th></tr></thead>
         <tbody>
           <% plan.preciosPais.forEach(function (pp) { %>
+            <%
+              var inputStylePP = 'background:transparent;border:1px solid rgba(255,255,255,.15);border-radius:8px;padding:.35rem .5rem;color:inherit;font:inherit;font-size:.85rem';
+              var formIdPP = 'editar-precio-pais-' + pp.id;
+            %>
             <tr>
-              <td><%= pp.pais %></td>
-              <td><%= pp.moneda %></td>
-              <td class="num"><%= Number(pp.mensualidad).toFixed(2) %></td>
-              <td class="num"><%= Number(pp.implementacion).toFixed(2) %></td>
-              <td class="num"><%= Number(pp.primerPago).toFixed(2) %></td>
+              <td><input form="<%= formIdPP %>" name="pais" value="<%= pp.pais %>" maxlength="2" readonly title="El país no se puede editar: eliminá esta fila y agregá una nueva si te equivocaste." style="width:50px;text-transform:uppercase;opacity:.7;<%= inputStylePP %>" /></td>
+              <td><input form="<%= formIdPP %>" name="moneda" value="<%= pp.moneda %>" maxlength="3" style="width:60px;text-transform:uppercase;<%= inputStylePP %>" /></td>
+              <td class="num"><input form="<%= formIdPP %>" name="mensualidad" type="number" min="0" step="0.01" value="<%= Number(pp.mensualidad) %>" style="width:100px;<%= inputStylePP %>" /></td>
+              <td class="num"><input form="<%= formIdPP %>" name="implementacion" type="number" min="0" step="0.01" value="<%= Number(pp.implementacion) %>" style="width:100px;<%= inputStylePP %>" /></td>
+              <td class="num"><input form="<%= formIdPP %>" name="primerPago" type="number" min="0" step="0.01" value="<%= Number(pp.primerPago) %>" style="width:100px;<%= inputStylePP %>" /></td>
               <td class="actions-cell">
+                <button form="<%= formIdPP %>" class="btn btn-ghost" style="padding:.4rem .8rem;font-size:.85rem" type="submit">Guardar</button>
                 <form method="POST" action="/admin/planes/<%= plan.id %>/precios-pais/<%= pp.id %>/eliminar" class="inline-form"
                       onsubmit="return confirm('¿Eliminar el precio de ' + '<%= pp.pais %>' + '?');">
                   <button class="btn btn-ghost" style="padding:.4rem .8rem;font-size:.85rem" type="submit">Eliminar</button>
                 </form>
               </td>
             </tr>
+            <form id="<%= formIdPP %>" method="POST" action="/admin/planes/<%= plan.id %>/precios-pais"></form>
           <% }); %>
         </tbody>
       </table>
     </div>
   <% } %>
 
-  <form method="POST" action="/admin/planes/<%= plan.id %>/precios-pais" class="form-card" style="max-width:700px;margin-top:1rem">
-    <h3 style="margin:0 0 1rem;font-size:.95rem">Agregar / actualizar precio de un país</h3>
+  <form method="POST" action="/admin/planes/<%= plan.id %>/precios-pais" class="form-card" style="max-width:700px;margin-top:1rem" id="form-nuevo-precio-pais">
+    <h3 style="margin:0 0 1rem;font-size:.95rem">+ Agregar precio de un nuevo país</h3>
     <div class="field-row">
       <div class="field">
-        <label for="pp-pais">País (código de 2 letras) *</label>
-        <input id="pp-pais" name="pais" type="text" required maxlength="2" style="text-transform:uppercase" list="paises-sugeridos" placeholder="Ej: PE" />
-        <datalist id="paises-sugeridos">
-          <option value="BO">Bolivia</option><option value="PE">Perú</option><option value="AR">Argentina</option>
-          <option value="CL">Chile</option><option value="CO">Colombia</option><option value="MX">México</option>
-          <option value="EC">Ecuador</option><option value="PY">Paraguay</option><option value="UY">Uruguay</option>
-          <option value="VE">Venezuela</option><option value="BR">Brasil</option><option value="US">Estados Unidos</option>
-        </datalist>
+        <label for="pp-pais">País *</label>
+        <input id="pp-pais" name="pais" type="text" required maxlength="2" style="text-transform:uppercase" list="paises-sugeridos" placeholder="Ej: PE (Perú)" autocomplete="off" />
+        <p class="muted" style="font-size:.76rem;margin:.3rem 0 0">Código de 2 letras. Empezá a escribir el nombre del país y elegí de la lista.</p>
       </div>
       <div class="field">
-        <label for="pp-moneda">Moneda (código de 3 letras) *</label>
-        <input id="pp-moneda" name="moneda" type="text" required maxlength="3" style="text-transform:uppercase" placeholder="Ej: PEN" />
+        <label for="pp-moneda">Moneda</label>
+        <input id="pp-moneda" name="moneda" type="text" required maxlength="3" style="text-transform:uppercase" placeholder="Se completa solo" />
+        <p class="muted" style="font-size:.76rem;margin:.3rem 0 0">Se autocompleta al elegir el país. Podés corregirla si hace falta.</p>
       </div>
     </div>
     <div class="field-row">
       <div class="field">
         <label for="pp-mensualidad">Mensualidad *</label>
-        <input id="pp-mensualidad" name="mensualidad" type="number" min="0" step="0.01" required />
+        <input id="pp-mensualidad" name="mensualidad" type="number" min="0" step="0.01" required class="calc-pp" />
       </div>
       <div class="field">
         <label for="pp-implementacion">Implementación *</label>
-        <input id="pp-implementacion" name="implementacion" type="number" min="0" step="0.01" required />
+        <input id="pp-implementacion" name="implementacion" type="number" min="0" step="0.01" required value="0" class="calc-pp" />
       </div>
       <div class="field">
-        <label for="pp-primerpago">Primer pago *</label>
+        <label for="pp-primerpago">Primer pago * <span id="auto-tag-pp" class="badge-auto">calculado automático</span></label>
         <input id="pp-primerpago" name="primerPago" type="number" min="0" step="0.01" required />
       </div>
     </div>
@@ -178,5 +235,78 @@ Agente de ventas con IA
     </div>
   </form>
 <% } %>
+
+<style>
+  .form-section-title {
+    font-size: .82rem; text-transform: uppercase; letter-spacing: .04em;
+    color: var(--muted); margin: 1.6rem 0 .7rem; padding-top: 1rem; border-top: 1px solid var(--border);
+  }
+  .form-section-title:first-of-type { margin-top: 0; padding-top: 0; border-top: none; }
+  .input-prefijo { display: flex; align-items: stretch; }
+  .input-prefijo span {
+    display: flex; align-items: center; padding: 0 .6rem; border: 1px solid var(--border); border-right: none;
+    border-radius: 10px 0 0 10px; background: rgba(255,255,255,.04); color: var(--muted); font-size: .85rem; white-space: nowrap;
+  }
+  .input-prefijo input { border-radius: 0 10px 10px 0 !important; }
+  .badge-auto {
+    display: inline-block; font-size: .68rem; font-weight: 500; text-transform: none; letter-spacing: 0;
+    color: var(--primary-2); background: rgba(47,227,166,.12); border-radius: 999px; padding: .1rem .5rem; margin-left: .4rem; vertical-align: middle;
+  }
+</style>
+
+<script>
+(function () {
+  // Autocompleta "Primer pago" = Implementacion + Mensualidad, en los 3
+  // pares de campos que existen en esta pantalla (Bs, US$, y el mini-form de
+  // precio por pais). Deja de autocompletar en cuanto el usuario toca el
+  // campo de Primer pago a mano (para no pisarle un valor que puso aposta).
+  function conectarCalculoAutomatico(claseOrigen, idPrimerPago, idTagAuto) {
+    var origenes = document.querySelectorAll('.' + claseOrigen);
+    var campoPrimerPago = document.getElementById(idPrimerPago);
+    var tagAuto = document.getElementById(idTagAuto);
+    if (!origenes.length || !campoPrimerPago) return;
+    // Si el campo ya trae un valor mayor a 0 cargado (editando un plan
+    // existente), NO se toca solo al abrir la pagina - podria ser un valor
+    // puesto a mano a proposito (ej. un descuento). "0" en un plan nuevo (o
+    // un plan Gratis) SI se considera "todavia sin cargar".
+    var automatico = !(Number(campoPrimerPago.value) > 0);
+    if (!automatico && tagAuto) tagAuto.style.display = 'none';
+
+    function recalcular() {
+      if (!automatico) return;
+      var total = 0;
+      origenes.forEach(function (input) { total += Number(input.value) || 0; });
+      campoPrimerPago.value = total.toFixed(2);
+    }
+
+    origenes.forEach(function (input) { input.addEventListener('input', recalcular); });
+    campoPrimerPago.addEventListener('input', function () {
+      automatico = false;
+      if (tagAuto) tagAuto.style.display = 'none';
+    });
+    recalcular();
+  }
+
+  conectarCalculoAutomatico('calc-bs', 'primerPagoBs', 'auto-tag-bs');
+  conectarCalculoAutomatico('calc-usd', 'primerPagoUsd', 'auto-tag-usd');
+  conectarCalculoAutomatico('calc-pp', 'pp-primerpago', 'auto-tag-pp');
+
+  // Autocompleta la moneda al elegir un pais conocido (nuevo precio de pais).
+  var MONEDA_POR_PAIS = {
+    BO: 'BOB', PE: 'PEN', AR: 'ARS', CL: 'CLP', CO: 'COP', MX: 'MXN',
+    EC: 'USD', PY: 'PYG', UY: 'UYU', VE: 'VES', BR: 'BRL', US: 'USD',
+  };
+  var campoPais = document.getElementById('pp-pais');
+  var campoMoneda = document.getElementById('pp-moneda');
+  if (campoPais && campoMoneda) {
+    campoPais.addEventListener('input', function () {
+      var codigo = campoPais.value.trim().toUpperCase();
+      if (MONEDA_POR_PAIS[codigo] && !campoMoneda.value) {
+        campoMoneda.value = MONEDA_POR_PAIS[codigo];
+      }
+    });
+  }
+})();
+</script>
 
 <%- include('partials/fin') %>
