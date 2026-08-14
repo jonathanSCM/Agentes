@@ -13,6 +13,7 @@ const {
   resolverSeleccionMenu,
   seccionProductos,
   construirSystem,
+  fichaProducto,
 } = require('../lib/services/agente');
 
 function producto(overrides) {
@@ -224,6 +225,33 @@ describe('extraerFiltros', () => {
     const cambios = extraerFiltros('Hola, buenas tardes', productos);
     assert.equal(cambios.categoriaInteres, undefined);
   });
+
+  test('detecta la talla de forma deterministica (bug real: la IA a veces no llama actualizar_datos_lead)', () => {
+    const productos = [
+      producto({
+        categoria: 'Casacas',
+        variantes: [
+          { activa: true, atributos: { Talla: 'S', Color: 'Negro' } },
+          { activa: true, atributos: { Talla: 'M', Color: 'Negro' } },
+          { activa: true, atributos: { Talla: 'L', Color: 'Negro' } },
+          { activa: true, atributos: { Talla: 'XL', Color: 'Negro' } },
+        ],
+      }),
+    ];
+    const cambios = extraerFiltros('Busco casacas de hombre en talla L y XL', productos);
+    assert.equal(cambios.talla, 'L, XL');
+  });
+
+  test('no confunde conectores de 1 letra ("y", "a") con una talla, aunque el catalogo tenga tallas cortas', () => {
+    const productos = [
+      producto({
+        categoria: 'Casacas',
+        variantes: [{ activa: true, atributos: { Talla: 'S', Color: 'Negro' } }],
+      }),
+    ];
+    const cambios = extraerFiltros('Voy a ver que tienen', productos);
+    assert.equal(cambios.talla, undefined);
+  });
 });
 
 describe('resolverSeleccionMenu', () => {
@@ -234,6 +262,62 @@ describe('resolverSeleccionMenu', () => {
 
   test('devuelve null si el texto no es un numero suelto', () => {
     assert.equal(resolverSeleccionMenu('quiero el segundo', 'algo'), null);
+  });
+});
+
+describe('fichaProducto - la tarjeta del cliente no debe saturarlo de datos internos', () => {
+  const productoConVariantes = producto({
+    id: 1,
+    nombre: 'Bomber ligera',
+    categoria: 'Casacas',
+    precio: 280,
+    atributos: { Marca: 'Nomada', Genero: 'Hombre', Estilo: 'Urbano', Ocasion: 'Noche, Diario', Temporada: 'Verano', Material: 'Nylon' },
+    variantes: [
+      { activa: true, atributos: { Talla: 'S', Color: 'Negro' }, stock: 3 },
+      { activa: true, atributos: { Talla: 'S', Color: 'Gris' }, stock: 2 },
+      { activa: true, atributos: { Talla: 'L', Color: 'Negro' }, stock: 4 },
+      { activa: true, atributos: { Talla: 'L', Color: 'Azul' }, stock: 1 },
+      { activa: true, atributos: { Talla: 'XL', Color: 'Negro' }, stock: 5 },
+    ],
+  });
+
+  test('no muestra categoria/genero/estilo/ocasion/temporada (ruido interno, no le sirve al cliente)', () => {
+    const ficha = fichaProducto(productoConVariantes, {});
+    assert.doesNotMatch(ficha, /Categoria/);
+    assert.doesNotMatch(ficha, /Genero/);
+    assert.doesNotMatch(ficha, /Estilo/);
+    assert.doesNotMatch(ficha, /Ocasion/);
+    assert.doesNotMatch(ficha, /Temporada/);
+  });
+
+  test('si muestra Marca y Material (datos utiles para decidir la compra)', () => {
+    const ficha = fichaProducto(productoConVariantes, {});
+    assert.match(ficha, /Marca.*Nomada/);
+    assert.match(ficha, /Material.*Nylon/);
+  });
+
+  test('agrupa las variantes por talla (una linea por talla, colores juntos) en vez de una linea por cada combinacion', () => {
+    const ficha = fichaProducto(productoConVariantes, {});
+    assert.match(ficha, /Talla S: Negro, Gris/);
+    assert.match(ficha, /Talla L: Negro, Azul/);
+    assert.match(ficha, /Talla XL: Negro/);
+    // 3 lineas de talla (S, L, XL), no 5 lineas de combinacion individual
+    const lineasTalla = (ficha.match(/· Talla /g) || []).length;
+    assert.equal(lineasTalla, 3);
+  });
+
+  test('si el cliente ya pidio una talla puntual, la ficha se filtra a esa talla nada mas', () => {
+    const ficha = fichaProducto(productoConVariantes, { talla: 'L' });
+    assert.match(ficha, /Talla L: Negro, Azul/);
+    assert.doesNotMatch(ficha, /Talla S/);
+    assert.doesNotMatch(ficha, /Talla XL/);
+  });
+
+  test('si pidio varias tallas ("L y XL"), muestra solo esas', () => {
+    const ficha = fichaProducto(productoConVariantes, { talla: 'L y XL' });
+    assert.match(ficha, /Talla L:/);
+    assert.match(ficha, /Talla XL:/);
+    assert.doesNotMatch(ficha, /Talla S/);
   });
 });
 

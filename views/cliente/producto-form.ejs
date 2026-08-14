@@ -25,10 +25,29 @@
              value="<%= producto ? Number(producto.precio).toFixed(2) : '' %>" placeholder="0.00" />
     </div>
     <div class="field">
-      <label for="stock">Stock<% if (producto && producto.variantes && producto.variantes.length) { %> <span class="muted" style="font-weight:400">(sin usar: el stock se maneja por variante, más abajo)</span><% } %></label>
+      <label for="stock">Stock</label>
+      <%
+        var yaTieneVariantes = Boolean(producto && producto.variantes && producto.variantes.length);
+      %>
       <input id="stock" name="stock" type="number" min="0"
-             value="<%= producto ? producto.stock : '0' %>" placeholder="0" />
+             value="<%= producto ? producto.stock : '0' %>" placeholder="0"
+             <%= yaTieneVariantes ? 'disabled' : '' %> />
     </div>
+  </div>
+  <div class="field">
+    <label>
+      <input type="checkbox" id="tiene-variantes" <%= yaTieneVariantes ? 'checked disabled' : '' %> />
+      Este producto tiene variantes (talla, color, etc.)
+    </label>
+    <p class="muted" style="font-size:.82rem;margin:.3rem 0 0">
+      <% if (yaTieneVariantes) { %>
+        El stock se maneja por variante (más abajo) — para volver a usar el stock general primero eliminá las variantes cargadas.
+      <% } else if (producto) { %>
+        Si marcás esto, el Stock de arriba se bloquea en 0: vas a cargar el stock real por variante más abajo.
+      <% } else { %>
+        Si marcás esto, el Stock de arriba queda en 0: vas a poder agregar las variantes con su propio stock después de guardar el producto.
+      <% } %>
+    </p>
   </div>
   <div class="field">
     <label for="categoria">Categoría</label>
@@ -114,20 +133,51 @@
 
   <% if (errorVariante) { %><div class="alert-err"><%= errorVariante %></div><% } %>
 
+  <%
+    var inputStyleVariante = 'background:transparent;border:1px solid rgba(255,255,255,.15);border-radius:8px;padding:.35rem .5rem;color:inherit;font:inherit;font-size:.82rem';
+  %>
+  <datalist id="atributos-variante-sugeridos">
+    <option value="Talla"></option>
+    <option value="Color"></option>
+    <option value="Modelo"></option>
+    <option value="Sabor"></option>
+    <option value="Presentación"></option>
+    <option value="Tamaño"></option>
+  </datalist>
+  <template id="tpl-atributo-variante-mini">
+    <div class="atributo-row-mini" style="display:flex;gap:4px;">
+      <input list="atributos-variante-sugeridos" name="atributoClave[]" placeholder="Talla" maxlength="60" style="width:76px;<%= inputStyleVariante %>" />
+      <input name="atributoValor[]" placeholder="42" maxlength="120" style="width:84px;<%= inputStyleVariante %>" />
+      <button type="button" class="btn-quitar-atributo-mini" style="background:none;border:none;color:var(--tenue,#9aa1b5);cursor:pointer;font-size:1rem;line-height:1;padding:0 .2rem">×</button>
+    </div>
+  </template>
+
   <% if (producto.variantes.length) { %>
     <div class="table-wrap">
       <table class="leads-table">
-        <thead><tr><th>Combinación</th><th class="num">Precio propio</th><th class="num">Stock</th><th>Acciones</th></tr></thead>
+        <thead><tr><th>Atributos</th><th class="num">Precio propio</th><th class="num">Stock</th><th>Acciones</th></tr></thead>
         <tbody>
           <% producto.variantes.forEach(function (v) { %>
             <%
               var formId = 'editar-variante-' + v.id;
-              var inputStyle = 'background:transparent;border:1px solid rgba(255,255,255,.15);border-radius:8px;padding:.4rem .6rem;color:inherit;font:inherit';
+              var entradasVariante = Object.entries(v.atributos || {});
+              if (!entradasVariante.length) entradasVariante = [['', '']];
             %>
             <tr>
-              <td><input form="<%= formId %>" type="text" name="atributos" value="<%= v.atributosTexto %>" style="width:100%;<%= inputStyle %>" /></td>
-              <td class="num"><input form="<%= formId %>" type="number" name="precio" min="0" step="0.01" value="<%= v.precio ? Number(v.precio).toFixed(2) : '' %>" placeholder="Precio del producto" style="width:110px;<%= inputStyle %>" /></td>
-              <td class="num"><input form="<%= formId %>" type="number" name="stock" min="0" value="<%= v.stock %>" style="width:80px;<%= inputStyle %>" /></td>
+              <td>
+                <div class="atributos-variante" data-form="<%= formId %>" style="display:flex;flex-direction:column;gap:4px;min-width:190px">
+                  <% entradasVariante.forEach(function (par) { %>
+                    <div class="atributo-row-mini" style="display:flex;gap:4px;">
+                      <input form="<%= formId %>" list="atributos-variante-sugeridos" name="atributoClave[]" value="<%= par[0] %>" placeholder="Talla" maxlength="60" style="width:76px;<%= inputStyleVariante %>" />
+                      <input form="<%= formId %>" name="atributoValor[]" value="<%= par[1] %>" placeholder="42" maxlength="120" style="width:84px;<%= inputStyleVariante %>" />
+                      <button type="button" class="btn-quitar-atributo-mini" style="background:none;border:none;color:var(--tenue,#9aa1b5);cursor:pointer;font-size:1rem;line-height:1;padding:0 .2rem">×</button>
+                    </div>
+                  <% }); %>
+                  <button type="button" class="btn btn-ghost btn-agregar-atributo-variante" style="padding:.2rem .5rem;font-size:.75rem;align-self:flex-start">+ atributo</button>
+                </div>
+              </td>
+              <td class="num"><input form="<%= formId %>" type="number" name="precio" min="0" step="0.01" value="<%= v.precio ? Number(v.precio).toFixed(2) : '' %>" placeholder="Precio del producto" style="width:110px;<%= inputStyleVariante %>" /></td>
+              <td class="num"><input form="<%= formId %>" type="number" name="stock" min="0" value="<%= v.stock %>" style="width:80px;<%= inputStyleVariante %>" /></td>
               <td class="actions-cell">
                 <button form="<%= formId %>" class="btn btn-ghost" style="padding:.4rem .8rem;font-size:.85rem" type="submit">Guardar</button>
                 <form method="POST" action="/panel/productos/<%= producto.id %>/variantes/<%= v.id %>/eliminar" class="inline-form"
@@ -146,8 +196,28 @@
   <form method="POST" action="/panel/productos/<%= producto.id %>/variantes" class="form-card" style="max-width:600px;margin-top:1rem">
     <h3 style="margin:0 0 1rem;font-size:.95rem">Agregar variante</h3>
     <div class="field">
-      <label for="v-atributos">Combinación *</label>
-      <input id="v-atributos" name="atributos" type="text" required placeholder="Ej: Talla: 42, Color: Negro" />
+      <label>Atributos de esta variante *</label>
+      <p class="muted" style="font-size:.8rem;margin:0 0 .5rem">Ej: Talla = 42, Color = Negro. Agregá los que necesites.</p>
+      <div id="atributos-nueva-variante-lista">
+        <div class="atributo-row" style="display:flex;gap:8px;margin-bottom:6px;">
+          <input list="atributos-variante-sugeridos" name="atributoClave[]" placeholder="Ej: Talla" maxlength="60" style="flex:1" />
+          <input name="atributoValor[]" placeholder="Ej: 42" maxlength="120" style="flex:1" />
+          <button type="button" class="btn btn-ghost btn-quitar-atributo">Quitar</button>
+        </div>
+        <div class="atributo-row" style="display:flex;gap:8px;margin-bottom:6px;">
+          <input list="atributos-variante-sugeridos" name="atributoClave[]" placeholder="Ej: Color" maxlength="60" style="flex:1" />
+          <input name="atributoValor[]" placeholder="Ej: Negro" maxlength="120" style="flex:1" />
+          <button type="button" class="btn btn-ghost btn-quitar-atributo">Quitar</button>
+        </div>
+      </div>
+      <button type="button" id="btn-agregar-atributo-nueva-variante" class="btn btn-ghost">+ Agregar atributo</button>
+      <template id="tpl-atributo-nueva-variante">
+        <div class="atributo-row" style="display:flex;gap:8px;margin-bottom:6px;">
+          <input list="atributos-variante-sugeridos" name="atributoClave[]" placeholder="Ej: Talla" maxlength="60" style="flex:1" />
+          <input name="atributoValor[]" placeholder="Ej: 42" maxlength="120" style="flex:1" />
+          <button type="button" class="btn btn-ghost btn-quitar-atributo">Quitar</button>
+        </div>
+      </template>
     </div>
     <div class="field-row">
       <div class="field">
@@ -167,19 +237,68 @@
 
 <script>
 (function () {
-  var lista = document.getElementById('atributos-lista');
-  var tpl = document.getElementById('tpl-atributo-row');
-  var btnAgregar = document.getElementById('btn-agregar-atributo');
-  if (!lista || !tpl || !btnAgregar) return;
-  btnAgregar.addEventListener('click', function () {
-    lista.appendChild(tpl.content.cloneNode(true));
+  // Atributos del producto (bloque de arriba)
+  var listaProducto = document.getElementById('atributos-lista');
+  var tplProducto = document.getElementById('tpl-atributo-row');
+  var btnAgregarProducto = document.getElementById('btn-agregar-atributo');
+  if (listaProducto && tplProducto && btnAgregarProducto) {
+    btnAgregarProducto.addEventListener('click', function () {
+      listaProducto.appendChild(tplProducto.content.cloneNode(true));
+    });
+  }
+
+  // Atributos de "Agregar variante" (form nuevo, abajo del todo)
+  var listaNuevaVariante = document.getElementById('atributos-nueva-variante-lista');
+  var tplNuevaVariante = document.getElementById('tpl-atributo-nueva-variante');
+  var btnAgregarNuevaVariante = document.getElementById('btn-agregar-atributo-nueva-variante');
+  if (listaNuevaVariante && tplNuevaVariante && btnAgregarNuevaVariante) {
+    btnAgregarNuevaVariante.addEventListener('click', function () {
+      listaNuevaVariante.appendChild(tplNuevaVariante.content.cloneNode(true));
+    });
+  }
+
+  // Quitar fila y agregar atributo a una variante YA existente: delegado en
+  // document porque hay una fila por cada variante (hasta 20+), no tiene
+  // sentido un listener por cada una.
+  document.addEventListener('click', function (ev) {
+    var btnQuitar = ev.target.closest('.btn-quitar-atributo');
+    if (btnQuitar) {
+      var fila = btnQuitar.closest('.atributo-row');
+      if (fila) fila.remove();
+      return;
+    }
+    var btnQuitarMini = ev.target.closest('.btn-quitar-atributo-mini');
+    if (btnQuitarMini) {
+      var filaMini = btnQuitarMini.closest('.atributo-row-mini');
+      if (filaMini) filaMini.remove();
+      return;
+    }
+    var btnAgregarVariante = ev.target.closest('.btn-agregar-atributo-variante');
+    if (btnAgregarVariante) {
+      var contenedor = btnAgregarVariante.closest('.atributos-variante');
+      var tplMini = document.getElementById('tpl-atributo-variante-mini');
+      if (contenedor && tplMini) {
+        var formId = contenedor.getAttribute('data-form');
+        var clon = tplMini.content.cloneNode(true);
+        if (formId) {
+          clon.querySelectorAll('input').forEach(function (inp) { inp.setAttribute('form', formId); });
+        }
+        contenedor.insertBefore(clon, btnAgregarVariante);
+      }
+    }
   });
-  lista.addEventListener('click', function (ev) {
-    var btn = ev.target.closest('.btn-quitar-atributo');
-    if (!btn) return;
-    var fila = btn.closest('.atributo-row');
-    if (fila) fila.remove();
-  });
+
+  // Checkbox "tiene variantes": bloquea el Stock general en 0 (el stock real
+  // va a vivir en las variantes de abajo). Si el producto ya tiene variantes
+  // cargadas, el checkbox viene deshabilitado (no aplica desactivarlo aca).
+  var chkVariantes = document.getElementById('tiene-variantes');
+  var stockInput = document.getElementById('stock');
+  if (chkVariantes && stockInput && !chkVariantes.disabled) {
+    chkVariantes.addEventListener('change', function () {
+      stockInput.disabled = chkVariantes.checked;
+      if (chkVariantes.checked) stockInput.value = '0';
+    });
+  }
 })();
 </script>
 

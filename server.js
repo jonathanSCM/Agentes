@@ -163,15 +163,37 @@ app.get('/catalogo/:slug', async (req, res, next) => {
     });
     if (!empresa) return res.status(404).render('404', { title: 'Página no encontrada' });
 
-    const productos = await prisma.producto.findMany({
+    const productosDb = await prisma.producto.findMany({
       where: { empresaId: empresa.id, activo: true },
-      orderBy: { nombre: 'asc' },
+      orderBy: [{ categoria: 'asc' }, { nombre: 'asc' }],
+      include: { variantes: { where: { activa: true }, select: { stock: true } } },
     });
+    // Si el producto tiene variantes, el stock real es la suma de sus
+    // variantes (Producto.stock queda en 0 a proposito en ese caso) - mismo
+    // criterio que /panel/productos, si no el catalogo publico muestra
+    // "Agotado" en productos que si tienen stock real.
+    const productos = productosDb.map((p) => ({
+      ...p,
+      stockMostrado: p.variantes.length ? p.variantes.reduce((suma, v) => suma + v.stock, 0) : p.stock,
+    }));
     const agente = empresa.agentes[0];
+
+    // Agrupa por categoria (orden alfabetico, "Otros" al final para
+    // productos sin categoria) para que el catalogo se pueda navegar por
+    // secciones en vez de una sola lista larga.
+    const grupos = new Map();
+    for (const p of productos) {
+      const cat = p.categoria || 'Otros';
+      if (!grupos.has(cat)) grupos.set(cat, []);
+      grupos.get(cat).push(p);
+    }
+    const categorias = [...grupos.entries()]
+      .sort(([a], [b]) => (a === 'Otros' ? 1 : b === 'Otros' ? -1 : a.localeCompare(b, 'es')))
+      .map(([nombre, items]) => ({ nombre, productos: items }));
 
     res.render('catalogo', {
       title: `Catálogo · ${empresa.marca || empresa.nombre}`,
-      empresa, productos,
+      empresa, productos, categorias,
       numeroWhatsapp: agente ? agente.numeroWhatsapp : null,
     });
   } catch (err) { next(err); }
@@ -887,7 +909,6 @@ app.get('/panel/productos/:id/editar', requireCliente, async (req, res, next) =>
       include: { variantes: { orderBy: { id: 'asc' } } },
     });
     if (!producto) return res.redirect('/panel/productos');
-    producto.variantes = producto.variantes.map((v) => ({ ...v, atributosTexto: formatearAtributos(v.atributos) }));
     res.render('cliente/producto-form', {
       title: 'Editar producto - Proshop', tituloPagina: 'Editar producto', activo: 'productos',
       producto, error: null, mensaje: req.query.ok || null, errorVariante: req.query.err || null,
@@ -896,30 +917,14 @@ app.get('/panel/productos/:id/editar', requireCliente, async (req, res, next) =>
   } catch (err) { next(err); }
 });
 
-// Texto libre "Talla: 42, Color: Negro" -> {"Talla":"42","Color":"Negro"}.
-// Deliberadamente simple (sin un editor de atributos estructurado): cada
-// negocio define sus propios atributos sin que el codigo tenga que conocerlos.
-function parsearAtributos(texto) {
-  const resultado = {};
-  for (const par of String(texto || '').split(',')) {
-    const [clave, ...resto] = par.split(':');
-    const valor = resto.join(':').trim();
-    if (clave && clave.trim() && valor) resultado[clave.trim()] = valor;
-  }
-  return resultado;
-}
-function formatearAtributos(atributos) {
-  return Object.entries(atributos || {}).map(([k, v]) => `${k}: ${v}`).join(', ');
-}
-
 app.post('/panel/productos/:id/variantes', requireCliente, async (req, res, next) => {
   try {
     const producto = await prisma.producto.findFirst({ where: { id: Number(req.params.id), empresaId: req.session.empresaId } });
     if (!producto) return res.redirect('/panel/productos');
 
-    const atributos = parsearAtributos(req.body.atributos);
+    const atributos = atributosDesdeForm(req.body || {});
     if (Object.keys(atributos).length === 0) {
-      return res.redirect(`/panel/productos/${producto.id}/editar?err=` + encodeURIComponent('Describe la variante, ej: Talla: 42, Color: Negro'));
+      return res.redirect(`/panel/productos/${producto.id}/editar?err=` + encodeURIComponent('Cargá al menos un atributo de la variante, ej: Talla = 42.'));
     }
     await prisma.variante.create({
       data: {
@@ -940,7 +945,7 @@ app.post('/panel/productos/:id/variantes/:varianteId', requireCliente, async (re
     await prisma.variante.updateMany({
       where: { id: Number(req.params.varianteId), productoId: producto.id },
       data: {
-        atributos: parsearAtributos(req.body.atributos),
+        atributos: atributosDesdeForm(req.body || {}),
         precio: req.body.precio ? Number(req.body.precio) : null,
         stock: parseInt(req.body.stock, 10) || 0,
       },
