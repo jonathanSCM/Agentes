@@ -1485,6 +1485,7 @@ app.post('/panel/agente/mensaje', requireCliente, async (req, res, next) => {
       agenteId: agente.id,
       telefonoCliente: String(telefono || 'demo').slice(0, 40),
       contenido: String(mensaje).slice(0, 1000),
+      baseUrl: `${req.protocol}://${req.get('host')}`,
     });
 
     // Revisa si hay que avisar (plan por acabar / sin saldo). No bloquea la respuesta.
@@ -1598,6 +1599,7 @@ app.post('/webhooks/whatsapp', (req, res) => {
       if (conexion.agente.estado !== 'ACTIVO') return;
 
       const telefonoCliente = mensaje.from;
+      const baseUrl = `${req.protocol}://${req.get('host')}`;
       await prisma.conexionWhatsApp.update({ where: { id: conexion.id }, data: { ultimoMensajeAt: new Date() } });
 
       const texto = await interpretarMensajeEntrante(mensaje, conexion, telefonoCliente);
@@ -1626,7 +1628,7 @@ app.post('/webhooks/whatsapp', (req, res) => {
       if (entrada.modo === 'HUMANO') return;
 
       encolarRespuesta(`${conexion.agente.id}:${telefonoCliente}`, async () => {
-        const salida = await generarYRegistrarRespuesta(conexion.agente.id, telefonoCliente, entrada.conversacionId, texto);
+        const salida = await generarYRegistrarRespuesta(conexion.agente.id, telefonoCliente, entrada.conversacionId, texto, baseUrl);
         if (salida.ok && salida.respuesta) {
           const envio = await wa.enviarTexto(conexion, telefonoCliente, salida.respuesta);
           if (!envio.ok) {
