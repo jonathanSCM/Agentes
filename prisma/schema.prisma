@@ -43,6 +43,13 @@ model Plan {
   mensualidadBs    Decimal  @db.Decimal(10, 2)
   implementacionBs Decimal  @db.Decimal(10, 2)
   primerPagoBs     Decimal  @db.Decimal(10, 2) // implementacion + primera mensualidad
+  // Default en dolares para paises sin precio propio configurado en
+  // PlanPrecioPais (ver ese modelo). Nullable a proposito: mientras no se
+  // carguen, el sistema sigue mostrando el precio en Bs a todo el mundo
+  // (comportamiento actual, sin cambios hasta que el negocio los active).
+  mensualidadUsd    Decimal? @db.Decimal(10, 2)
+  implementacionUsd Decimal? @db.Decimal(10, 2)
+  primerPagoUsd     Decimal? @db.Decimal(10, 2)
   convIncluidas    Int // conversaciones incluidas por periodo
   maxProductos     Int
   maxUsuarios      Int
@@ -55,8 +62,29 @@ model Plan {
   createdAt        DateTime @default(now())
 
   suscripciones Suscripcion[]
+  preciosPais   PlanPrecioPais[]
 
   @@map("planes")
+}
+
+// Precio propio de un plan para un pais especifico (ej. Peru con soles),
+// detectado por IP del visitante. Si un pais no tiene fila aca, se usa el
+// default en dolares del Plan (mensualidadUsd etc.) y si tampoco hay default
+// en dolares, se usa el precio base en bolivianos (ver lib/services/precios.js).
+model PlanPrecioPais {
+  id             Int      @id @default(autoincrement())
+  planId         Int
+  plan           Plan     @relation(fields: [planId], references: [id], onDelete: Cascade)
+  pais           String // codigo ISO 3166-1 alpha-2, ej "BO", "PE" (libre, cada negocio agrega el que necesite)
+  moneda         String // codigo ISO 4217, ej "BOB", "PEN"
+  mensualidad    Decimal  @db.Decimal(10, 2)
+  implementacion Decimal  @db.Decimal(10, 2)
+  primerPago     Decimal  @db.Decimal(10, 2)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@unique([planId, pais])
+  @@map("plan_precios_pais")
 }
 
 // Paquetes de conversaciones adicionales (se compran al agotar el plan)
@@ -67,10 +95,29 @@ model Paquete {
   costoUnitarioUsd Decimal @db.Decimal(10, 4)
   activo           Boolean @default(true)
 
-  pagos   Pago[]
-  compras CompraPaquete[]
+  pagos       Pago[]
+  compras     CompraPaquete[]
+  preciosPais PaquetePrecioPais[]
 
   @@map("paquetes")
+}
+
+// Precio propio de un paquete de conversaciones para un pais especifico. Si
+// un pais no tiene fila aca, se usa el default en dolares (precioUsd /
+// costoUnitarioUsd) — ese default ya existia, siempre fue en USD.
+model PaquetePrecioPais {
+  id            Int      @id @default(autoincrement())
+  paqueteId     Int
+  paquete       Paquete  @relation(fields: [paqueteId], references: [id], onDelete: Cascade)
+  pais          String
+  moneda        String
+  precio        Decimal  @db.Decimal(10, 2)
+  costoUnitario Decimal  @db.Decimal(10, 4)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@unique([paqueteId, pais])
+  @@map("paquete_precios_pais")
 }
 
 // Registro de cada paquete comprado por una empresa.

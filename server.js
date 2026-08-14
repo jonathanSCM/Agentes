@@ -29,6 +29,9 @@ const wa = require('./lib/services/whatsapp');
 const { analizarImagenProducto, transcribirAudio } = require('./lib/services/agente');
 const { iniciarJobFacturacion } = require('./lib/jobs/facturacion');
 const { initSocket, emitMensaje, emitConversacion } = require('./lib/services/realtime');
+const { detectarPais } = require('./lib/services/geo');
+const { precioPlanParaPais, precioPaqueteParaPais, simboloMoneda } = require('./lib/services/precios');
+const { transicionValida, requiereRestock, dentroDeVentana24h } = require('./lib/services/pedidos');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -83,6 +86,12 @@ async function convertirFotosAJpg(files) {
 }
 
 // ---- Middlewares ----
+// Confia en el primer hop del proxy (Coolify) para que req.ip sea la IP real
+// del visitante y no la IP interna del proxy - lo necesita la deteccion de
+// pais por IP (lib/services/geo.js). Asume que solo el proxy propio de
+// Coolify puede hablarle directo a esta app; si el setup de red cambiara,
+// revisar este valor.
+app.set('trust proxy', 1);
 app.set('view engine', 'ejs');
 app.set('views', path.join(__dirname, 'views'));
 app.use(express.static(path.join(__dirname, 'public')));
@@ -144,11 +153,14 @@ function requireAuth(req, res, next) {
 // ============================ SITIO PUBLICO ============================
 app.get('/', async (req, res, next) => {
   try {
-    const [planes, paquetes] = await Promise.all([
-      prisma.plan.findMany({ where: { activo: true }, orderBy: { orden: 'asc' } }),
-      prisma.paquete.findMany({ where: { activo: true }, orderBy: { cantidad: 'asc' } }),
+    const [planesDb, paquetesDb] = await Promise.all([
+      prisma.plan.findMany({ where: { activo: true }, orderBy: { orden: 'asc' }, include: { preciosPais: true } }),
+      prisma.paquete.findMany({ where: { activo: true }, orderBy: { cantidad: 'asc' }, include: { preciosPais: true } }),
     ]);
-    res.render('index', { title: `${site.name} - ${site.tagline}`, planes, paquetes });
+    const pais = detectarPais(req.ip);
+    const planes = planesDb.map((p) => ({ ...p, precio: precioPlanParaPais(p, pais, p.preciosPais) }));
+    const paquetes = paquetesDb.map((p) => ({ ...p, precio: precioPaqueteParaPais(p, pais, p.preciosPais) }));
+    res.render('index', { title: `${site.name} - ${site.tagline}`, planes, paquetes, pais, simboloMoneda });
   } catch (err) { next(err); }
 });
 
@@ -242,12 +254,18 @@ app.post('/api/contacto', (req, res) => {
 });
 
 // ==================== REGISTRO E INGRESO DE CLIENTES ====================
+async function planesConPrecio(pais) {
+  const planesDb = await prisma.plan.findMany({ where: { activo: true }, orderBy: { orden: 'asc' }, include: { preciosPais: true } });
+  return planesDb.map((p) => ({ ...p, precio: precioPlanParaPais(p, pais, p.preciosPais) }));
+}
+
 app.get('/registro', async (req, res, next) => {
   try {
     if (req.session && req.session.clienteId) return res.redirect('/panel');
-    const planes = await prisma.plan.findMany({ where: { activo: true }, orderBy: { orden: 'asc' } });
+    const pais = detectarPais(req.ip);
+    const planes = await planesConPrecio(pais);
     res.render('registro', {
-      title: 'Crear cuenta - Proshop', planes, error: null,
+      title: 'Crear cuenta - Proshop', planes, error: null, simboloMoneda,
       datos: { planId: req.query.plan || '' }, // plan preseleccionado desde la web
     });
   } catch (err) { next(err); }
@@ -255,11 +273,12 @@ app.get('/registro', async (req, res, next) => {
 
 app.post('/registro', async (req, res, next) => {
   const { empresa, nombre, email, password, planId } = req.body || {};
+  const pais = detectarPais(req.ip);
   try {
-    const planes = await prisma.plan.findMany({ where: { activo: true }, orderBy: { orden: 'asc' } });
+    const planes = await planesConPrecio(pais);
     const volverConError = (msg) =>
       res.status(400).render('registro', {
-        title: 'Crear cuenta - Proshop', planes, error: msg,
+        title: 'Crear cuenta - Proshop', planes, error: msg, simboloMoneda,
         datos: { empresa, nombre, email, planId },
       });
 
@@ -273,7 +292,7 @@ app.post('/registro', async (req, res, next) => {
       return volverConError('El correo no es válido.');
     }
 
-    const { usuario } = await registrarCliente({ empresa, nombre, email, password, planId });
+    const { usuario } = await registrarCliente({ empresa, nombre, email, password, planId, pais });
 
     // Inicia sesion automaticamente
     req.session.clienteId = usuario.id;
@@ -612,7 +631,85 @@ app.get('/panel/pedidos', requireCliente, async (req, res, next) => {
     res.render('cliente/pedidos', {
       title: 'Pedidos - Proshop', tituloPagina: 'Pedidos', activo: 'pedidos',
       pedidos, stats: { total, nuevos, total_bs: Number(agg._sum.total || 0) },
+      mensaje: req.query.ok || null, errorEstado: req.query.err || null,
     });
+  } catch (err) { next(err); }
+});
+
+// Avisa por WhatsApp que el pedido fue confirmado, SOLO si el cliente
+// escribio hace menos de 24hs (fuera de esa ventana, Meta no deja mandar
+// texto libre, solo plantillas aprobadas - eso no esta implementado aca).
+// Si algo falla (sin conexion, fuera de ventana, error de red) simplemente
+// no se notifica - el cambio de estado ya se guardo igual, esto es un extra.
+async function notificarConfirmacionPedido(empresaId, pedido) {
+  try {
+    if (!pedido.clienteId) return false;
+    const cliente = await prisma.clienteFinal.findUnique({ where: { id: pedido.clienteId } });
+    if (!cliente) return false;
+
+    const agente = await prisma.agente.findFirst({ where: { empresaId }, include: { conexion: true } });
+    if (!agente || !agente.conexion || agente.conexion.estado !== 'CONECTADO') return false;
+
+    const conversacion = await prisma.conversacion.findFirst({
+      where: { agenteId: agente.id, telefonoCliente: cliente.telefono },
+      orderBy: { ultimoMensajeAt: 'desc' },
+    });
+    if (!conversacion || !dentroDeVentana24h(conversacion.ultimoMensajeAt)) return false;
+
+    const texto = '¡Tu pedido fue confirmado! ✅ Ya lo estamos preparando y coordinando la entrega. Cualquier duda, escribinos por acá.';
+    await wa.enviarTexto(agente.conexion, cliente.telefono, texto);
+
+    const mensajeGuardado = await prisma.mensaje.create({
+      data: { conversacionId: conversacion.id, rol: 'SISTEMA', contenido: texto },
+    });
+    emitMensaje(empresaId, {
+      conversacionId: conversacion.id, rol: 'SISTEMA', contenido: texto, mediaUrl: null, mediaTipo: null, createdAt: mensajeGuardado.createdAt,
+    });
+    return true;
+  } catch (err) {
+    console.error('No se pudo notificar la confirmacion del pedido por WhatsApp:', err);
+    return false;
+  }
+}
+
+// Cambia el estado de un pedido (Confirmar / Marcar entregado / Cancelar).
+// Al cancelar se devuelve el stock que se habia descontado al crear el
+// pedido (ver crear_pedido en lib/services/agente.js) - confirmar/entregar
+// NO tocan el stock, ya se reservo al crearse.
+app.post('/panel/pedidos/:id/estado', requireCliente, async (req, res, next) => {
+  try {
+    const empresaId = req.session.empresaId;
+    const pedido = await prisma.pedido.findFirst({
+      where: { id: Number(req.params.id), empresaId },
+      include: { items: true },
+    });
+    if (!pedido) return res.redirect('/panel/pedidos');
+
+    const estadoNuevo = String(req.body.estado || '').toUpperCase();
+    if (!transicionValida(pedido.estado, estadoNuevo)) {
+      return res.redirect('/panel/pedidos?err=' + encodeURIComponent('Ese cambio de estado no es válido.'));
+    }
+
+    await prisma.$transaction(async (tx) => {
+      if (requiereRestock(pedido.estado, estadoNuevo)) {
+        for (const item of pedido.items) {
+          if (item.varianteId) {
+            await tx.variante.update({ where: { id: item.varianteId }, data: { stock: { increment: item.cantidad } } });
+          } else if (item.productoId) {
+            await tx.producto.update({ where: { id: item.productoId }, data: { stock: { increment: item.cantidad } } });
+          }
+        }
+      }
+      await tx.pedido.update({ where: { id: pedido.id }, data: { estado: estadoNuevo } });
+    });
+
+    let mensajeOk = 'Pedido actualizado.';
+    if (estadoNuevo === 'CONFIRMADO') {
+      const notificado = await notificarConfirmacionPedido(empresaId, pedido);
+      mensajeOk = notificado ? 'Pedido confirmado y cliente avisado por WhatsApp.' : 'Pedido confirmado (no se pudo avisar por WhatsApp: sin conexión o fuera de la ventana de 24hs).';
+    }
+
+    res.redirect('/panel/pedidos?ok=' + encodeURIComponent(mensajeOk));
   } catch (err) { next(err); }
 });
 
@@ -722,13 +819,15 @@ app.get('/panel/reportes', requireCliente, async (req, res, next) => {
 
 app.get('/panel/paquetes', requireCliente, async (req, res, next) => {
   try {
-    const [resumen, paquetes] = await Promise.all([
+    const [resumen, paquetesDb] = await Promise.all([
       obtenerResumenEmpresa(req.session.empresaId),
-      prisma.paquete.findMany({ where: { activo: true }, orderBy: { cantidad: 'asc' } }),
+      prisma.paquete.findMany({ where: { activo: true }, orderBy: { cantidad: 'asc' }, include: { preciosPais: true } }),
     ]);
+    const pais = detectarPais(req.ip);
+    const paquetes = paquetesDb.map((p) => ({ ...p, precio: precioPaqueteParaPais(p, pais, p.preciosPais) }));
     res.render('cliente/paquetes', {
       title: 'Comprar paquete - Proshop', tituloPagina: 'Comprar paquete', activo: 'paquetes',
-      paquetes, consumo: resumen.consumo,
+      paquetes, consumo: resumen.consumo, simboloMoneda,
     });
   } catch (err) { next(err); }
 });
@@ -736,10 +835,16 @@ app.get('/panel/paquetes', requireCliente, async (req, res, next) => {
 // Compra de un paquete: registra la compra + el pago, y acredita el saldo.
 app.post('/panel/paquetes/:id/comprar', requireCliente, async (req, res, next) => {
   try {
-    const paquete = await prisma.paquete.findUnique({ where: { id: Number(req.params.id) } });
+    const paquete = await prisma.paquete.findUnique({ where: { id: Number(req.params.id) }, include: { preciosPais: true } });
     if (!paquete || !paquete.activo) {
       return res.redirect('/panel/paquetes');
     }
+
+    // Mismo precio que se le mostro en pantalla (se detecta la IP de esta
+    // misma request, no se confia en nada que haya mandado el cliente): si
+    // no, se corre el riesgo de mostrar un precio y cobrar otro.
+    const pais = detectarPais(req.ip);
+    const precio = precioPaqueteParaPais(paquete, pais, paquete.preciosPais);
 
     const empresaId = req.session.empresaId;
     // PENDIENTE: todavia NO da saldo usable. Se activa recien cuando Proshop
@@ -749,18 +854,22 @@ app.post('/panel/paquetes/:id/comprar', requireCliente, async (req, res, next) =
       empresaId,
       paqueteId: paquete.id,
       cantidad: paquete.cantidad,
+      // precioUsd del registro de compra queda como referencia interna en
+      // USD (para reportes/comparaciones consistentes), independiente de en
+      // que moneda se le cobro realmente al cliente (ver Pago abajo).
       precioUsd: Number(paquete.precioUsd),
       nota: 'Comprado desde el panel del cliente',
       estado: 'PENDIENTE',
     });
 
-    // Queda registrado el pago (pendiente de confirmar por Proshop)
+    // Queda registrado el pago (pendiente de confirmar por Proshop), en la
+    // moneda/monto real que se le mostro y se le va a cobrar.
     await prisma.pago.create({
       data: {
         empresaId,
         tipo: 'PAQUETE',
-        monto: paquete.precioUsd,
-        moneda: 'USD',
+        monto: precio.precio,
+        moneda: precio.moneda,
         estado: 'PENDIENTE',
         referencia: `Paquete de ${paquete.cantidad} conversaciones`,
         paqueteId: paquete.id,
@@ -2064,12 +2173,19 @@ app.get('/admin/planes/nuevo', requireAuth, (req, res) => {
 });
 
 function datosPlanDesdeForm(body) {
+  // Los *Usd son opcionales (default para paises "extra" sin precio propio):
+  // si el campo viene vacio, se guarda null, NO 0 (0 se mostraria como
+  // "gratis" a cualquier pais sin configurar, que no es lo que se quiere).
+  const usdOpcional = (v) => (v === undefined || v === null || String(v).trim() === '' ? null : Number(v));
   return {
     codigo: String(body.codigo || '').trim().toUpperCase().slice(0, 30),
     nombre: String(body.nombre || '').trim().slice(0, 80),
     mensualidadBs: Number(body.mensualidadBs) || 0,
     implementacionBs: Number(body.implementacionBs) || 0,
     primerPagoBs: Number(body.primerPagoBs) || 0,
+    mensualidadUsd: usdOpcional(body.mensualidadUsd),
+    implementacionUsd: usdOpcional(body.implementacionUsd),
+    primerPagoUsd: usdOpcional(body.primerPagoUsd),
     convIncluidas: parseInt(body.convIncluidas, 10) || 0,
     maxProductos: parseInt(body.maxProductos, 10) || 0,
     maxUsuarios: parseInt(body.maxUsuarios, 10) || 1,
@@ -2105,11 +2221,14 @@ app.post('/admin/planes', requireAuth, async (req, res, next) => {
 
 app.get('/admin/planes/:id/editar', requireAuth, async (req, res, next) => {
   try {
-    const plan = await prisma.plan.findUnique({ where: { id: Number(req.params.id) } });
+    const plan = await prisma.plan.findUnique({
+      where: { id: Number(req.params.id) },
+      include: { preciosPais: { orderBy: { pais: 'asc' } } },
+    });
     if (!plan) return res.redirect('/admin/planes');
     res.render('admin/plan-form', {
       title: 'Editar plan - Proshop', tituloPagina: 'Editar plan', activo: 'planes',
-      plan, error: null,
+      plan, error: null, mensaje: req.query.ok || null, errorPrecioPais: req.query.err || null,
     });
   } catch (err) { next(err); }
 });
@@ -2118,6 +2237,35 @@ app.post('/admin/planes/:id', requireAuth, async (req, res, next) => {
   try {
     await prisma.plan.update({ where: { id: Number(req.params.id) }, data: datosPlanDesdeForm(req.body || {}) });
     res.redirect('/admin/planes?ok=' + encodeURIComponent('Plan actualizado.'));
+  } catch (err) { next(err); }
+});
+
+// Precio propio de un pais para este plan (crea si no existe, actualiza si
+// ya existe - mismo pais+plan es unico en el schema).
+app.post('/admin/planes/:id/precios-pais', requireAuth, async (req, res, next) => {
+  try {
+    const planId = Number(req.params.id);
+    const pais = String(req.body.pais || '').trim().toUpperCase().slice(0, 2);
+    const moneda = String(req.body.moneda || '').trim().toUpperCase().slice(0, 3);
+    const mensualidad = Number(req.body.mensualidad) || 0;
+    const implementacion = Number(req.body.implementacion) || 0;
+    const primerPago = Number(req.body.primerPago) || 0;
+    if (!pais || !moneda) {
+      return res.redirect(`/admin/planes/${planId}/editar?err=` + encodeURIComponent('País y moneda son obligatorios.'));
+    }
+    await prisma.planPrecioPais.upsert({
+      where: { planId_pais: { planId, pais } },
+      create: { planId, pais, moneda, mensualidad, implementacion, primerPago },
+      update: { moneda, mensualidad, implementacion, primerPago },
+    });
+    res.redirect(`/admin/planes/${planId}/editar?ok=` + encodeURIComponent(`Precio para ${pais} guardado.`));
+  } catch (err) { next(err); }
+});
+
+app.post('/admin/planes/:id/precios-pais/:precioPaisId/eliminar', requireAuth, async (req, res, next) => {
+  try {
+    await prisma.planPrecioPais.deleteMany({ where: { id: Number(req.params.precioPaisId), planId: Number(req.params.id) } });
+    res.redirect(`/admin/planes/${req.params.id}/editar?ok=` + encodeURIComponent('Precio eliminado.'));
   } catch (err) { next(err); }
 });
 
@@ -2178,11 +2326,14 @@ app.post('/admin/paquetes', requireAuth, async (req, res, next) => {
 
 app.get('/admin/paquetes/:id/editar', requireAuth, async (req, res, next) => {
   try {
-    const paquete = await prisma.paquete.findUnique({ where: { id: Number(req.params.id) } });
+    const paquete = await prisma.paquete.findUnique({
+      where: { id: Number(req.params.id) },
+      include: { preciosPais: { orderBy: { pais: 'asc' } } },
+    });
     if (!paquete) return res.redirect('/admin/paquetes');
     res.render('admin/paquete-form', {
       title: 'Editar paquete - Proshop', tituloPagina: 'Editar paquete', activo: 'paquetes',
-      paquete, error: null,
+      paquete, error: null, mensaje: req.query.ok || null, errorPrecioPais: req.query.err || null,
     });
   } catch (err) { next(err); }
 });
@@ -2191,6 +2342,33 @@ app.post('/admin/paquetes/:id', requireAuth, async (req, res, next) => {
   try {
     await prisma.paquete.update({ where: { id: Number(req.params.id) }, data: datosPaqueteDesdeForm(req.body || {}) });
     res.redirect('/admin/paquetes?ok=' + encodeURIComponent('Paquete actualizado.'));
+  } catch (err) { next(err); }
+});
+
+// Precio propio de un pais para este paquete (crea si no existe, actualiza si ya existe).
+app.post('/admin/paquetes/:id/precios-pais', requireAuth, async (req, res, next) => {
+  try {
+    const paqueteId = Number(req.params.id);
+    const pais = String(req.body.pais || '').trim().toUpperCase().slice(0, 2);
+    const moneda = String(req.body.moneda || '').trim().toUpperCase().slice(0, 3);
+    const precio = Number(req.body.precio) || 0;
+    const costoUnitario = Number(req.body.costoUnitario) || 0;
+    if (!pais || !moneda) {
+      return res.redirect(`/admin/paquetes/${paqueteId}/editar?err=` + encodeURIComponent('País y moneda son obligatorios.'));
+    }
+    await prisma.paquetePrecioPais.upsert({
+      where: { paqueteId_pais: { paqueteId, pais } },
+      create: { paqueteId, pais, moneda, precio, costoUnitario },
+      update: { moneda, precio, costoUnitario },
+    });
+    res.redirect(`/admin/paquetes/${paqueteId}/editar?ok=` + encodeURIComponent(`Precio para ${pais} guardado.`));
+  } catch (err) { next(err); }
+});
+
+app.post('/admin/paquetes/:id/precios-pais/:precioPaisId/eliminar', requireAuth, async (req, res, next) => {
+  try {
+    await prisma.paquetePrecioPais.deleteMany({ where: { id: Number(req.params.precioPaisId), paqueteId: Number(req.params.id) } });
+    res.redirect(`/admin/paquetes/${req.params.id}/editar?ok=` + encodeURIComponent('Precio eliminado.'));
   } catch (err) { next(err); }
 });
 

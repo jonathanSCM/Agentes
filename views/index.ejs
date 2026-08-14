@@ -157,13 +157,13 @@
               <% if (p.recomendado) { %><span class="reco-tag">Recomendado</span><% } %>
               <h3><%= p.nombre %></h3>
               <div class="price">
-                <span class="price-cur">Bs</span>
-                <span class="price-num"><%= Number(p.mensualidadBs).toLocaleString('es-BO') %></span>
+                <span class="price-cur"><%= simboloMoneda(p.precio.moneda) %></span>
+                <span class="price-num"><%= p.precio.mensualidad.toLocaleString('es-BO') %></span>
                 <span class="price-per">/mes</span>
               </div>
               <p class="price-impl">
-                <% if (Number(p.implementacionBs) > 0) { %>
-                  + Bs <%= Number(p.implementacionBs).toLocaleString('es-BO') %> de implementación
+                <% if (p.precio.implementacion > 0) { %>
+                  + <%= simboloMoneda(p.precio.moneda) %> <%= p.precio.implementacion.toLocaleString('es-BO') %> de implementación
                 <% } else { %>
                   Sin costo de implementación
                 <% } %>
@@ -177,7 +177,7 @@
 
               <a class="btn <%= p.recomendado ? 'btn-primary' : 'btn-ghost' %> btn-block"
                  href="/registro?plan=<%= p.id %>">
-                <%= Number(p.mensualidadBs) === 0 ? 'Probar gratis' : 'Contratar' %>
+                <%= p.precio.mensualidad === 0 ? 'Probar gratis' : 'Contratar' %>
               </a>
 
               <ul class="price-features">
@@ -185,8 +185,8 @@
                   <li><%= f %></li>
                 <% }); %>
               </ul>
-              <% if (Number(p.primerPagoBs) > 0) { %>
-                <p class="price-first">Primer pago: <b>Bs <%= Number(p.primerPagoBs).toLocaleString('es-BO') %></b></p>
+              <% if (p.precio.primerPago > 0) { %>
+                <p class="price-first">Primer pago: <b><%= simboloMoneda(p.precio.moneda) %> <%= p.precio.primerPago.toLocaleString('es-BO') %></b></p>
               <% } %>
             </article>
           <% }); %>
@@ -199,7 +199,7 @@
 
           <% if (paquetes.length) { %>
             <%
-              var costoBase = Math.max.apply(null, paquetes.map(function (p) { return Number(p.costoUnitarioUsd); }));
+              var costoBase = Math.max.apply(null, paquetes.map(function (p) { return p.precio.costoUnitario; }));
               var indiceInicial = Math.floor((paquetes.length - 1) / 2);
             %>
             <div class="slider-card" id="sliderPaqueteLanding">
@@ -232,7 +232,7 @@
             <script>
               (function () {
                 var paquetes = <%- JSON.stringify(paquetes.map(function (p) {
-                  return { cantidad: p.cantidad, precio: Number(p.precioUsd), unitario: Number(p.costoUnitarioUsd) };
+                  return { cantidad: p.cantidad, precio: p.precio.precio, unitario: p.precio.costoUnitario, simbolo: simboloMoneda(p.precio.moneda) };
                 })) %>;
                 var costoBase = <%- costoBase %>;
 
@@ -247,8 +247,8 @@
                   var idx = Number(rango.value);
                   var p = paquetes[idx];
                   elCantidad.textContent = fmt(p.cantidad);
-                  elUnitario.textContent = 'US$ ' + p.unitario.toFixed(4) + ' por conversación';
-                  elPrecio.textContent = 'US$ ' + p.precio.toFixed(2);
+                  elUnitario.textContent = p.simbolo + ' ' + p.unitario.toFixed(4) + ' por conversación';
+                  elPrecio.textContent = p.simbolo + ' ' + p.precio.toFixed(2);
 
                   var pct = paquetes.length > 1 ? (idx / (paquetes.length - 1)) * 100 : 0;
                   rango.style.setProperty('--pct', pct + '%');

@@ -33,4 +33,70 @@
   </div>
 </form>
 
+<% if (paquete && paquete.id) { %>
+  <div class="page-head" style="margin-top:2rem">
+    <h2 style="font-size:1.1rem">Precios por país</h2>
+    <p class="muted" style="font-size:.85rem">Se detecta el país del visitante por IP. Si no hay un precio propio acá, se usa el precio en US$ de arriba.</p>
+  </div>
+
+  <% if (errorPrecioPais) { %><div class="alert-err"><%= errorPrecioPais %></div><% } %>
+
+  <% if (paquete.preciosPais.length) { %>
+    <div class="table-wrap">
+      <table class="leads-table">
+        <thead><tr><th>País</th><th>Moneda</th><th class="num">Precio</th><th class="num">Costo unitario</th><th>Acciones</th></tr></thead>
+        <tbody>
+          <% paquete.preciosPais.forEach(function (pp) { %>
+            <tr>
+              <td><%= pp.pais %></td>
+              <td><%= pp.moneda %></td>
+              <td class="num"><%= Number(pp.precio).toFixed(2) %></td>
+              <td class="num"><%= Number(pp.costoUnitario).toFixed(4) %></td>
+              <td class="actions-cell">
+                <form method="POST" action="/admin/paquetes/<%= paquete.id %>/precios-pais/<%= pp.id %>/eliminar" class="inline-form"
+                      onsubmit="return confirm('¿Eliminar el precio de ' + '<%= pp.pais %>' + '?');">
+                  <button class="btn btn-ghost" style="padding:.4rem .8rem;font-size:.85rem" type="submit">Eliminar</button>
+                </form>
+              </td>
+            </tr>
+          <% }); %>
+        </tbody>
+      </table>
+    </div>
+  <% } %>
+
+  <form method="POST" action="/admin/paquetes/<%= paquete.id %>/precios-pais" class="form-card" style="max-width:600px;margin-top:1rem">
+    <h3 style="margin:0 0 1rem;font-size:.95rem">Agregar / actualizar precio de un país</h3>
+    <div class="field-row">
+      <div class="field">
+        <label for="pp-pais">País (código de 2 letras) *</label>
+        <input id="pp-pais" name="pais" type="text" required maxlength="2" style="text-transform:uppercase" list="paises-sugeridos" placeholder="Ej: PE" />
+        <datalist id="paises-sugeridos">
+          <option value="BO">Bolivia</option><option value="PE">Perú</option><option value="AR">Argentina</option>
+          <option value="CL">Chile</option><option value="CO">Colombia</option><option value="MX">México</option>
+          <option value="EC">Ecuador</option><option value="PY">Paraguay</option><option value="UY">Uruguay</option>
+          <option value="VE">Venezuela</option><option value="BR">Brasil</option><option value="US">Estados Unidos</option>
+        </datalist>
+      </div>
+      <div class="field">
+        <label for="pp-moneda">Moneda (código de 3 letras) *</label>
+        <input id="pp-moneda" name="moneda" type="text" required maxlength="3" style="text-transform:uppercase" placeholder="Ej: PEN" />
+      </div>
+    </div>
+    <div class="field-row">
+      <div class="field">
+        <label for="pp-precio">Precio *</label>
+        <input id="pp-precio" name="precio" type="number" min="0" step="0.01" required />
+      </div>
+      <div class="field">
+        <label for="pp-costounitario">Costo unitario</label>
+        <input id="pp-costounitario" name="costoUnitario" type="number" min="0" step="0.0001" />
+      </div>
+    </div>
+    <div class="form-actions">
+      <button class="btn btn-primary" type="submit">Guardar precio de país</button>
+    </div>
+  </form>
+<% } %>
+
 <%- include('partials/fin') %>

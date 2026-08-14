@@ -4,7 +4,7 @@
    ========================================================= */
 
 :root {
-  --bg: #6d28d9;                       /* morado marca (fallback) */
+  --bg: #190f28;                       /* morado oscuro marca (fallback), mismo tono que el panel */
   --bg-2: rgba(0, 0, 0, 0.14);         /* banda para secciones alternas */
   --surface: rgba(255, 255, 255, 0.09);/* tarjetas glass */
   --surface-2: rgba(255, 255, 255, 0.14);
@@ -29,7 +29,10 @@ html { scroll-behavior: smooth; scroll-padding-top: 84px; }
 body {
   margin: 0;
   font-family: var(--font);
-  background: linear-gradient(160deg, #9b2fd6 0%, #6d28d9 48%, #4c1d95 100%) fixed;
+  /* Mismo degradado oscuro que usa el panel (public/css/admin.css,
+     body.admin) - la landing publica antes tenia un morado mas vibrante,
+     ahora comparte el tono mas oscuro y opaco del panel. */
+  background: linear-gradient(160deg, #241634 0%, #190f28 55%, #110a1d 100%) fixed;
   background-color: var(--bg);
   color: var(--text);
   line-height: 1.6;

@@ -5,6 +5,9 @@
   <p>Pedidos que registran tus clientes a través del agente.</p>
 </div>
 
+<% if (mensaje) { %><div class="alert-ok"><%= mensaje %></div><% } %>
+<% if (errorEstado) { %><div class="alert-err"><%= errorEstado %></div><% } %>
+
 <div class="admin-stats">
   <div class="stat-card"><span class="stat-num"><%= stats.total %></span><span class="stat-label">Pedidos</span></div>
   <div class="stat-card stat-new"><span class="stat-num"><%= stats.nuevos %></span><span class="stat-label">Nuevos</span></div>
@@ -20,7 +23,7 @@
   <div class="table-wrap">
     <table class="leads-table">
       <thead>
-        <tr><th>Fecha</th><th>Cliente</th><th>Productos</th><th>Entrega</th><th class="num">Total</th><th>Estado</th></tr>
+        <tr><th>Fecha</th><th>Cliente</th><th>Productos</th><th>Entrega</th><th class="num">Total</th><th>Estado</th><th>Acciones</th></tr>
       </thead>
       <tbody>
         <% pedidos.forEach(function (p) { %>
@@ -36,6 +39,29 @@
             </td>
             <td class="num">Bs <%= Number(p.total).toFixed(2) %></td>
             <td><span class="badge <%= p.estado === 'ENTREGADO' ? 'badge-new' : (p.estado === 'CANCELADO' ? 'badge-off' : 'badge-done') %>"><%= p.estado %></span></td>
+            <td class="actions-cell">
+              <% if (p.estado === 'NUEVO') { %>
+                <form method="POST" action="/panel/pedidos/<%= p.id %>/estado" class="inline-form">
+                  <input type="hidden" name="estado" value="CONFIRMADO" />
+                  <button class="btn btn-ghost" style="padding:.35rem .7rem;font-size:.82rem" type="submit">Confirmar</button>
+                </form>
+                <form method="POST" action="/panel/pedidos/<%= p.id %>/estado" class="inline-form"
+                      onsubmit="return confirm('¿Cancelar este pedido? Se devolverá el stock descontado.');">
+                  <input type="hidden" name="estado" value="CANCELADO" />
+                  <button class="btn btn-ghost" style="padding:.35rem .7rem;font-size:.82rem" type="submit">Cancelar</button>
+                </form>
+              <% } else if (p.estado === 'CONFIRMADO') { %>
+                <form method="POST" action="/panel/pedidos/<%= p.id %>/estado" class="inline-form">
+                  <input type="hidden" name="estado" value="ENTREGADO" />
+                  <button class="btn btn-ghost" style="padding:.35rem .7rem;font-size:.82rem" type="submit">Marcar entregado</button>
+                </form>
+                <form method="POST" action="/panel/pedidos/<%= p.id %>/estado" class="inline-form"
+                      onsubmit="return confirm('¿Cancelar este pedido? Se devolverá el stock descontado.');">
+                  <input type="hidden" name="estado" value="CANCELADO" />
+                  <button class="btn btn-ghost" style="padding:.35rem .7rem;font-size:.82rem" type="submit">Cancelar</button>
+                </form>
+              <% } %>
+            </td>
           </tr>
         <% }); %>
       </tbody>

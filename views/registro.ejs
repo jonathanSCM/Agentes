@@ -41,7 +41,7 @@
         <select id="planId" name="planId" required>
           <% planes.forEach(function (p) { %>
             <option value="<%= p.id %>" <%= String(datos.planId) === String(p.id) ? 'selected' : '' %>>
-              <%= p.nombre %> — <%= Number(p.mensualidadBs) === 0 ? 'Gratis' : 'Bs ' + Number(p.mensualidadBs).toLocaleString('es-BO') + '/mes' %>
+              <%= p.nombre %> — <%= p.precio.mensualidad === 0 ? 'Gratis' : simboloMoneda(p.precio.moneda) + ' ' + p.precio.mensualidad.toLocaleString('es-BO') + '/mes' %>
               (<%= p.convIncluidas.toLocaleString('es-BO') %> conv.)
             </option>
           <% }); %>
