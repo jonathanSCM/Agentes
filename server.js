@@ -196,8 +196,8 @@ app.get('/catalogo/:slug', async (req, res, next) => {
 
     const productosDb = await prisma.producto.findMany({
       where: { empresaId: empresa.id, activo: true },
-      orderBy: [{ categoria: 'asc' }, { nombre: 'asc' }],
-      include: { variantes: { where: { activa: true }, select: { stock: true } } },
+      orderBy: [{ categoria: { nombre: 'asc' } }, { nombre: 'asc' }],
+      include: { variantes: { where: { activa: true }, select: { stock: true } }, categoria: true },
     });
     // Si el producto tiene variantes, el stock real es la suma de sus
     // variantes (Producto.stock queda en 0 a proposito en ese caso) - mismo
@@ -214,7 +214,7 @@ app.get('/catalogo/:slug', async (req, res, next) => {
     // secciones en vez de una sola lista larga.
     const grupos = new Map();
     for (const p of productos) {
-      const cat = p.categoria || 'Otros';
+      const cat = p.categoria?.nombre || 'Otros';
       if (!grupos.has(cat)) grupos.set(cat, []);
       grupos.get(cat).push(p);
     }
@@ -980,6 +980,103 @@ app.get('/panel/compras', requireCliente, async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
+// -------- Categorias (con atributos obligatorios/opcionales por categoria) --------
+app.get('/panel/categorias', requireCliente, async (req, res, next) => {
+  try {
+    const categorias = await prisma.categoria.findMany({
+      where: { empresaId: req.session.empresaId },
+      orderBy: { nombre: 'asc' },
+      include: { atributos: { orderBy: { orden: 'asc' } } },
+    });
+    res.render('cliente/categorias', {
+      title: 'Categorías - Proshop', tituloPagina: 'Categorías', activo: 'categorias',
+      categorias, mensaje: req.query.ok || null, error: req.query.err || null,
+    });
+  } catch (err) { next(err); }
+});
+
+app.post('/panel/categorias', requireCliente, async (req, res, next) => {
+  try {
+    const nombre = String(req.body.nombre || '').trim().slice(0, 120);
+    if (!nombre) return res.redirect('/panel/categorias?err=' + encodeURIComponent('El nombre es obligatorio.'));
+    await prisma.categoria.create({ data: { empresaId: req.session.empresaId, nombre } });
+    res.redirect('/panel/categorias?ok=' + encodeURIComponent('Categoría agregada.'));
+  } catch (err) {
+    if (err.code === 'P2002') return res.redirect('/panel/categorias?err=' + encodeURIComponent('Ya existe una categoría con ese nombre.'));
+    next(err);
+  }
+});
+
+app.post('/panel/categorias/:id', requireCliente, async (req, res, next) => {
+  try {
+    const nombre = String(req.body.nombre || '').trim().slice(0, 120);
+    if (!nombre) return res.redirect('/panel/categorias?err=' + encodeURIComponent('El nombre es obligatorio.'));
+    await prisma.categoria.updateMany({
+      where: { id: Number(req.params.id), empresaId: req.session.empresaId },
+      data: { nombre },
+    });
+    res.redirect('/panel/categorias?ok=' + encodeURIComponent('Categoría actualizada.'));
+  } catch (err) {
+    if (err.code === 'P2002') return res.redirect('/panel/categorias?err=' + encodeURIComponent('Ya existe una categoría con ese nombre.'));
+    next(err);
+  }
+});
+
+app.post('/panel/categorias/:id/eliminar', requireCliente, async (req, res, next) => {
+  try {
+    await prisma.categoria.deleteMany({ where: { id: Number(req.params.id), empresaId: req.session.empresaId } });
+    res.redirect('/panel/categorias?ok=' + encodeURIComponent('Categoría eliminada.'));
+  } catch (err) { next(err); }
+});
+
+app.post('/panel/categorias/:id/atributos', requireCliente, async (req, res, next) => {
+  try {
+    const categoria = await prisma.categoria.findFirst({ where: { id: Number(req.params.id), empresaId: req.session.empresaId } });
+    if (!categoria) return res.redirect('/panel/categorias');
+    const nombre = String(req.body.nombre || '').trim().slice(0, 60);
+    if (!nombre) return res.redirect('/panel/categorias?err=' + encodeURIComponent('El nombre del atributo es obligatorio.'));
+    await prisma.categoriaAtributo.create({
+      data: {
+        categoriaId: categoria.id,
+        nombre,
+        obligatorio: req.body.obligatorio === '1',
+        esDeVariante: req.body.esDeVariante === '1',
+        orden: parseInt(req.body.orden, 10) || 0,
+      },
+    });
+    res.redirect('/panel/categorias?ok=' + encodeURIComponent('Atributo agregado.'));
+  } catch (err) {
+    if (err.code === 'P2002') return res.redirect('/panel/categorias?err=' + encodeURIComponent('Esa categoría ya tiene un atributo con ese nombre.'));
+    next(err);
+  }
+});
+
+app.post('/panel/categorias/:id/atributos/:atributoId', requireCliente, async (req, res, next) => {
+  try {
+    const categoria = await prisma.categoria.findFirst({ where: { id: Number(req.params.id), empresaId: req.session.empresaId } });
+    if (!categoria) return res.redirect('/panel/categorias');
+    await prisma.categoriaAtributo.updateMany({
+      where: { id: Number(req.params.atributoId), categoriaId: categoria.id },
+      data: {
+        nombre: String(req.body.nombre || '').trim().slice(0, 60),
+        obligatorio: req.body.obligatorio === '1',
+        esDeVariante: req.body.esDeVariante === '1',
+        orden: parseInt(req.body.orden, 10) || 0,
+      },
+    });
+    res.redirect('/panel/categorias?ok=' + encodeURIComponent('Atributo actualizado.'));
+  } catch (err) { next(err); }
+});
+
+app.post('/panel/categorias/:id/atributos/:atributoId/eliminar', requireCliente, async (req, res, next) => {
+  try {
+    const categoria = await prisma.categoria.findFirst({ where: { id: Number(req.params.id), empresaId: req.session.empresaId } });
+    if (!categoria) return res.redirect('/panel/categorias');
+    await prisma.categoriaAtributo.deleteMany({ where: { id: Number(req.params.atributoId), categoriaId: categoria.id } });
+    res.redirect('/panel/categorias?ok=' + encodeURIComponent('Atributo eliminado.'));
+  } catch (err) { next(err); }
+});
+
 // -------- Catalogo de productos del cliente (CRUD) --------
 async function planDeEmpresa(empresaId) {
   const sub = await prisma.suscripcion.findUnique({
@@ -994,7 +1091,7 @@ app.get('/panel/productos', requireCliente, async (req, res, next) => {
       prisma.producto.findMany({
         where: { empresaId: req.session.empresaId },
         orderBy: { createdAt: 'desc' },
-        include: { variantes: { where: { activa: true }, select: { stock: true } } },
+        include: { variantes: { where: { activa: true }, select: { stock: true } }, categoria: true },
       }),
       planDeEmpresa(req.session.empresaId),
     ]);
@@ -1013,15 +1110,26 @@ app.get('/panel/productos', requireCliente, async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-// Categorias ya usadas por la tienda, para sugerirlas en el formulario
-// (datalist) sin obligar a elegir de una lista cerrada.
+// Categorias reales de la tienda (con sus atributos), para el <select> del
+// formulario de productos y para saber que atributos son obligatorios.
 async function categoriasExistentes(empresaId) {
-  const filas = await prisma.producto.findMany({
-    where: { empresaId, categoria: { not: null } },
-    distinct: ['categoria'],
-    select: { categoria: true },
+  return prisma.categoria.findMany({
+    where: { empresaId },
+    orderBy: { nombre: 'asc' },
+    include: { atributos: { orderBy: { orden: 'asc' } } },
   });
-  return filas.map((f) => f.categoria).filter(Boolean);
+}
+
+// Atributos de nivel producto (esDeVariante: false) que la categoria elegida
+// marca como obligatorios y no vinieron cargados en el formulario. Devuelve
+// los nombres que faltan (vacio = todo bien). Los de nivel variante NO se
+// validan aca (son guia, no bloqueo - ver plan de categorias).
+async function atributosObligatoriosFaltantes(categoriaId, atributosProducto) {
+  if (!categoriaId) return [];
+  const obligatorios = await prisma.categoriaAtributo.findMany({
+    where: { categoriaId: Number(categoriaId), obligatorio: true, esDeVariante: false },
+  });
+  return obligatorios.filter((a) => !atributosProducto[a.nombre]).map((a) => a.nombre);
 }
 
 app.get('/panel/productos/nuevo', requireCliente, async (req, res, next) => {
@@ -1053,7 +1161,7 @@ function atributosDesdeForm(body) {
 function datosCatalogoDesdeForm(body) {
   const caracteristicas = (body.caracteristicas || '').split(',').map((c) => c.trim()).filter(Boolean);
   return {
-    categoria: body.categoria ? String(body.categoria).trim().slice(0, 120) : null,
+    categoriaId: body.categoriaId ? Number(body.categoriaId) : null,
     caracteristicas,
     atributos: atributosDesdeForm(body),
   };
@@ -1061,6 +1169,25 @@ function datosCatalogoDesdeForm(body) {
 
 function urlPublicaDeArchivo(req, filename) {
   return `${req.protocol}://${req.get('host')}/uploads/${filename}`;
+}
+
+// Si algun valor de atributo trae una lista separada por comas (ej: Talla =
+// "38, 39, 40"), expande en una combinacion de atributos por cada valor de
+// esa lista, repitiendo el resto de atributos igual en todas - asi se puede
+// cargar un rango de tallas de un mismo color en un solo paso, todas
+// compartiendo las mismas fotos. Si ningun atributo trae coma, devuelve una
+// sola combinacion (comportamiento de siempre).
+function expandirAtributosPorListas(atributos) {
+  let combinaciones = [{}];
+  for (const [clave, valor] of Object.entries(atributos)) {
+    const valores = valor.includes(',') ? valor.split(',').map((v) => v.trim()).filter(Boolean) : [valor];
+    const nuevas = [];
+    for (const combo of combinaciones) {
+      for (const v of valores) nuevas.push({ ...combo, [clave]: v });
+    }
+    combinaciones = nuevas;
+  }
+  return combinaciones;
 }
 
 app.post('/panel/productos', requireCliente, upload.array('fotos', 8), async (req, res, next) => {
@@ -1075,6 +1202,16 @@ app.post('/panel/productos', requireCliente, upload.array('fotos', 8), async (re
       return res.status(400).render('cliente/producto-form', {
         title: 'Agregar producto - Proshop', tituloPagina: 'Agregar producto', activo: 'productos',
         producto: null, error: 'El nombre y el precio son obligatorios.',
+        categoriasExistentes: await categoriasExistentes(req.session.empresaId),
+      });
+    }
+    const datosCatalogo = datosCatalogoDesdeForm(req.body || {});
+    const faltantes = await atributosObligatoriosFaltantes(datosCatalogo.categoriaId, datosCatalogo.atributos);
+    if (faltantes.length) {
+      return res.status(400).render('cliente/producto-form', {
+        title: 'Agregar producto - Proshop', tituloPagina: 'Agregar producto', activo: 'productos',
+        producto: null, error: `Esta categoría requiere estos atributos: ${faltantes.join(', ')}.`,
+        categoriasExistentes: await categoriasExistentes(req.session.empresaId),
       });
     }
     const nombresArchivos = await convertirFotosAJpg(req.files);
@@ -1088,7 +1225,7 @@ app.post('/panel/productos', requireCliente, upload.array('fotos', 8), async (re
         stock: parseInt(stock, 10) || 0,
         activo: activo === '1',
         fotos,
-        ...datosCatalogoDesdeForm(req.body || {}),
+        ...datosCatalogo,
       },
     });
     res.redirect('/panel/productos?ok=' + encodeURIComponent('Producto agregado.'));
@@ -1110,7 +1247,7 @@ app.get('/panel/productos/:id/editar', requireCliente, async (req, res, next) =>
   } catch (err) { next(err); }
 });
 
-app.post('/panel/productos/:id/variantes', requireCliente, async (req, res, next) => {
+app.post('/panel/productos/:id/variantes', requireCliente, upload.array('fotos', 8), async (req, res, next) => {
   try {
     const producto = await prisma.producto.findFirst({ where: { id: Number(req.params.id), empresaId: req.session.empresaId } });
     if (!producto) return res.redirect('/panel/productos');
@@ -1119,31 +1256,76 @@ app.post('/panel/productos/:id/variantes', requireCliente, async (req, res, next
     if (Object.keys(atributos).length === 0) {
       return res.redirect(`/panel/productos/${producto.id}/editar?err=` + encodeURIComponent('Cargá al menos un atributo de la variante, ej: Talla = 42.'));
     }
-    await prisma.variante.create({
-      data: {
-        productoId: producto.id,
-        atributos,
-        precio: req.body.precio ? Number(req.body.precio) : null,
-        stock: parseInt(req.body.stock, 10) || 0,
-      },
+    const nombresArchivos = await convertirFotosAJpg(req.files);
+    const fotos = nombresArchivos.map((n) => urlPublicaDeArchivo(req, n));
+    const precio = req.body.precio ? Number(req.body.precio) : null;
+    const stock = parseInt(req.body.stock, 10) || 0;
+
+    // Si algun atributo vino con una lista separada por comas (ej: Talla =
+    // "38, 39, 40"), se crea una variante por cada valor, todas con el mismo
+    // precio/stock/fotos (rango de tallas de un mismo color, ver plan).
+    const combinaciones = expandirAtributosPorListas(atributos);
+    await prisma.variante.createMany({
+      data: combinaciones.map((atrib) => ({ productoId: producto.id, atributos: atrib, precio, stock, fotos })),
     });
-    res.redirect(`/panel/productos/${producto.id}/editar?ok=` + encodeURIComponent('Variante agregada.'));
+
+    const mensaje = combinaciones.length > 1 ? `${combinaciones.length} variantes agregadas.` : 'Variante agregada.';
+    res.redirect(`/panel/productos/${producto.id}/editar?ok=` + encodeURIComponent(mensaje));
   } catch (err) { next(err); }
 });
 
-app.post('/panel/productos/:id/variantes/:varianteId', requireCliente, async (req, res, next) => {
+app.post('/panel/productos/:id/variantes/:varianteId', requireCliente, upload.array('fotos', 8), async (req, res, next) => {
   try {
     const producto = await prisma.producto.findFirst({ where: { id: Number(req.params.id), empresaId: req.session.empresaId } });
     if (!producto) return res.redirect('/panel/productos');
+
+    const varianteActual = await prisma.variante.findFirst({ where: { id: Number(req.params.varianteId), productoId: producto.id } });
+    if (!varianteActual) return res.redirect(`/panel/productos/${producto.id}/editar`);
+
+    const nombresArchivos = await convertirFotosAJpg(req.files);
+    const fotosNuevas = nombresArchivos.map((n) => urlPublicaDeArchivo(req, n));
+    const fotosExistentes = req.body.quitarFotos === '1' ? [] : varianteActual.fotos;
+    const fotos = [...fotosExistentes, ...fotosNuevas];
+
     await prisma.variante.updateMany({
       where: { id: Number(req.params.varianteId), productoId: producto.id },
       data: {
         atributos: atributosDesdeForm(req.body || {}),
         precio: req.body.precio ? Number(req.body.precio) : null,
         stock: parseInt(req.body.stock, 10) || 0,
+        fotos,
       },
     });
     res.redirect(`/panel/productos/${producto.id}/editar?ok=` + encodeURIComponent('Variante actualizada.'));
+  } catch (err) { next(err); }
+});
+
+// Copia las fotos de una variante a todas las demas del mismo producto que
+// compartan el mismo atributo Color - asi no hay que subir la misma foto de
+// nuevo para cada talla si la variante no se creo con el flujo de "rango de
+// tallas" de arriba (ej: variantes viejas, cargadas una por una).
+app.post('/panel/productos/:id/variantes/:varianteId/copiar-fotos', requireCliente, async (req, res, next) => {
+  try {
+    const producto = await prisma.producto.findFirst({
+      where: { id: Number(req.params.id), empresaId: req.session.empresaId },
+      include: { variantes: true },
+    });
+    if (!producto) return res.redirect('/panel/productos');
+
+    const origen = producto.variantes.find((v) => v.id === Number(req.params.varianteId));
+    const color = origen?.atributos?.Color;
+    if (!origen || !color || !origen.fotos.length) {
+      return res.redirect(`/panel/productos/${producto.id}/editar?err=` + encodeURIComponent('Esa variante necesita tener Color y fotos cargadas para poder copiarlas.'));
+    }
+    const colorNormalizado = String(color).trim().toLowerCase();
+    const hermanas = producto.variantes.filter(
+      (v) => v.id !== origen.id && String(v.atributos?.Color || '').trim().toLowerCase() === colorNormalizado
+    );
+
+    await prisma.$transaction(hermanas.map((v) => prisma.variante.update({ where: { id: v.id }, data: { fotos: origen.fotos } })));
+
+    const mensaje = hermanas.length ? `Fotos copiadas a ${hermanas.length} variante(s) del color "${color}".` : `No hay otras variantes con color "${color}".`;
+    res.redirect(`/panel/productos/${producto.id}/editar?ok=` + encodeURIComponent(mensaje));
   } catch (err) { next(err); }
 });
 
@@ -1161,8 +1343,19 @@ app.post('/panel/productos/:id', requireCliente, upload.array('fotos', 8), async
   try {
     const producto = await prisma.producto.findFirst({
       where: { id: Number(req.params.id), empresaId: req.session.empresaId },
+      include: { variantes: { orderBy: { id: 'asc' } } },
     });
     if (!producto) return res.redirect('/panel/productos');
+
+    const datosCatalogo = datosCatalogoDesdeForm(req.body || {});
+    const faltantes = await atributosObligatoriosFaltantes(datosCatalogo.categoriaId, datosCatalogo.atributos);
+    if (faltantes.length) {
+      return res.status(400).render('cliente/producto-form', {
+        title: 'Editar producto - Proshop', tituloPagina: 'Editar producto', activo: 'productos',
+        producto: { ...producto, ...req.body }, error: `Esta categoría requiere estos atributos: ${faltantes.join(', ')}.`,
+        categoriasExistentes: await categoriasExistentes(req.session.empresaId),
+      });
+    }
 
     const nombresArchivos = await convertirFotosAJpg(req.files);
     const fotosNuevas = nombresArchivos.map((n) => urlPublicaDeArchivo(req, n));
@@ -1181,7 +1374,7 @@ app.post('/panel/productos/:id', requireCliente, upload.array('fotos', 8), async
         stock: parseInt(stock, 10) || 0,
         activo: activo === '1',
         fotos,
-        ...datosCatalogoDesdeForm(req.body || {}),
+        ...datosCatalogo,
       },
     });
     res.redirect('/panel/productos?ok=' + encodeURIComponent('Producto actualizado.'));
@@ -1230,8 +1423,8 @@ app.get('/panel/configuracion', requireCliente, async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-app.post('/panel/configuracion', requireCliente, async (req, res, next) => {
-  const { nombre, numeroWhatsapp, mensajeBienvenida, tono, estado, instrucciones, derivarAHumano } = req.body || {};
+app.post('/panel/configuracion', requireCliente, upload.single('qr'), async (req, res, next) => {
+  const { nombre, numeroWhatsapp, mensajeBienvenida, tono, estado, instrucciones, derivarAHumano, aceptaEfectivo, aceptaTarjeta, aceptaQr, quitarQr } = req.body || {};
   try {
     const agente = await obtenerAgente(req.session.empresaId);
 
@@ -1255,6 +1448,11 @@ app.post('/panel/configuracion', requireCliente, async (req, res, next) => {
       },
     });
 
+    const nombresArchivoQr = await convertirFotosAJpg(req.file ? [req.file] : []);
+    const qrCobroUrl = nombresArchivoQr.length
+      ? urlPublicaDeArchivo(req, nombresArchivoQr[0])
+      : (quitarQr === '1' ? null : agente.config?.qrCobroUrl);
+
     await prisma.agenteConfig.update({
       where: { agenteId: agente.id },
       data: {
@@ -1262,6 +1460,10 @@ app.post('/panel/configuracion', requireCliente, async (req, res, next) => {
         tono: tono ? String(tono).slice(0, 60) : undefined,
         instrucciones: instrucciones ? String(instrucciones).trim().slice(0, 200) : null,
         derivarAHumano: derivarAHumano === '1',
+        aceptaEfectivo: aceptaEfectivo === '1',
+        aceptaTarjeta: aceptaTarjeta === '1',
+        aceptaQr: aceptaQr === '1',
+        qrCobroUrl,
       },
     });
 

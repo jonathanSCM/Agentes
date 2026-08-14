@@ -201,6 +201,7 @@ model Empresa {
   invitaciones   Invitacion[]
   agentes        Agente[]
   productos      Producto[]
+  categorias     Categoria[]
   clientes       ClienteFinal[]
   pedidos        Pedido[]
   pagos          Pago[]
@@ -350,6 +351,14 @@ model AgenteConfig {
   tono              String   @default("cordial y profesional")
   instrucciones     String? // instrucciones adicionales para la IA
   derivarAHumano    Boolean  @default(true)
+  // Formas de pago que esta tienda realmente acepta - el bot NUNCA ofrece una
+  // que no este habilitada aca (ver construirSystem). El QR es una imagen
+  // estatica que el negocio ya usa hoy (no una pasarela de pago real): no hay
+  // confirmacion automatica de cobro, eso lo verifica un humano por fuera.
+  aceptaQr          Boolean  @default(false)
+  qrCobroUrl        String?
+  aceptaEfectivo    Boolean  @default(true)
+  aceptaTarjeta     Boolean  @default(false)
   updatedAt         DateTime @updatedAt
 
   @@map("agente_config")
@@ -440,11 +449,12 @@ enum RolMensaje {
 // ============================ OPERACION / CATALOGO ============================
 
 model Producto {
-  id              Int      @id @default(autoincrement())
+  id              Int        @id @default(autoincrement())
   empresaId       Int
-  empresa         Empresa  @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  empresa         Empresa    @relation(fields: [empresaId], references: [id], onDelete: Cascade)
   nombre          String
-  categoria       String?
+  categoriaId     Int?
+  categoria       Categoria? @relation(fields: [categoriaId], references: [id], onDelete: SetNull)
   descripcion     String?
   precio          Decimal  @db.Decimal(10, 2)
   stock           Int      @default(0)
@@ -461,7 +471,42 @@ model Producto {
   variantes   Variante[]
 
   @@index([empresaId])
+  @@index([categoriaId])
   @@map("productos")
+}
+
+// Categoria real de un negocio (ej: "Zapatillas deportivas"), con una lista
+// configurable de atributos donde cada uno se marca obligatorio u opcional.
+// El formulario de productos valida los obligatorios de nivel producto al
+// guardar, y el bot usa esto para saber que preguntarle al cliente antes de
+// recomendar (ver CategoriaAtributo mas abajo).
+model Categoria {
+  id        Int                 @id @default(autoincrement())
+  empresaId Int
+  empresa   Empresa             @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  nombre    String
+  atributos CategoriaAtributo[]
+  productos Producto[]
+  createdAt DateTime            @default(now())
+
+  @@unique([empresaId, nombre])
+  @@map("categorias")
+}
+
+model CategoriaAtributo {
+  id          Int       @id @default(autoincrement())
+  categoriaId Int
+  categoria   Categoria @relation(fields: [categoriaId], references: [id], onDelete: Cascade)
+  nombre      String // "Genero", "Talla", "Color", "Uso"...
+  obligatorio Boolean   @default(false)
+  // true = vive en Variante.atributos (ej: talla/color) - solo se usa como
+  // guia (datalist, que preguntar), no bloquea guardar el producto. false =
+  // vive en Producto.atributos - ese si se valida obligatorio al guardar.
+  esDeVariante Boolean  @default(false)
+  orden       Int       @default(0)
+
+  @@unique([categoriaId, nombre])
+  @@map("categoria_atributos")
 }
 
 // Una combinacion vendible de un producto (ej: talla 42 + color negro), con
@@ -482,6 +527,11 @@ model Variante {
   stock      Int      @default(0)
   activa     Boolean  @default(true)
   createdAt  DateTime @default(now())
+  // Fotos propias de esta variante (ej: la foto del color especifico). Si
+  // esta vacio, se usa Producto.fotos (comportamiento de siempre). Variantes
+  // que comparten color pero difieren en talla suelen compartir las mismas
+  // URLs aca (ver /panel/productos/:id/variantes, carga por rango de tallas).
+  fotos      String[] @default([])
 
   pedidoItems PedidoItem[]
 
@@ -502,6 +552,10 @@ model ClienteFinal {
   // actualizar_datos_lead del agente. Se reinicia solo si el cliente cambia
   // de opinion, nunca automaticamente.
   categoriaInteres String?
+  // Categoria real (de esta empresa) a la que se resolvio categoriaInteres,
+  // para saber sus atributos obligatorios (ver Categoria/CategoriaAtributo).
+  // categoriaInteres se mantiene como el texto literal que dijo el cliente.
+  categoriaId      Int?
   presupuesto      String?
   cantidad         String?
   direccionEntrega String?
@@ -515,6 +569,11 @@ model ClienteFinal {
   marca            String?
   talla            String?
   color            String?
+  // Como va a pagar, elegida entre las formas de pago que esa tienda tiene
+  // habilitadas (ver AgenteConfig.aceptaQr/aceptaEfectivo/aceptaTarjeta).
+  // crear_pedido no deja crear el pedido sin esto (mismo criterio que
+  // direccionEntrega).
+  formaPago        FormaPago?
   nivelInteres     NivelInteres @default(FRIO)
   estadoLead       EstadoLead   @default(NUEVO)
   // Estado de la conversacion de venta (donde esta el cliente en el proceso
@@ -532,12 +591,22 @@ model ClienteFinal {
   // Datos efimeros del bot (ej. que productos ya se les envio foto, para
   // no repetir el envio). Libre para que cualquier bot vertical lo use.
   contexto         Json         @default("{}")
+  // Valores de atributos definidos por la categoria (ver CategoriaAtributo)
+  // que no son ya un campo propio de este modelo (ej: {"Genero":"Hombre",
+  // "Uso":"Running"}). Talla/color/marca siguen usando sus campos de siempre.
+  atributosLead    Json         @default("{}")
   updatedAt        DateTime     @updatedAt
 
   pedidos Pedido[]
 
   @@unique([empresaId, telefono])
   @@map("clientes_finales")
+}
+
+enum FormaPago {
+  QR
+  EFECTIVO
+  TARJETA
 }
 
 enum NivelInteres {
@@ -585,6 +654,10 @@ model Pedido {
   entregaLat       Float?
   entregaLng       Float?
   notas            String?
+  // Copiado de ClienteFinal.formaPago al momento de crear el pedido. Solo
+  // registra que eligio el cliente - el cobro en si lo verifica un humano
+  // por fuera del bot (ver /panel/pedidos/:id/estado).
+  formaPago        FormaPago?
   estado           EstadoPedido  @default(NUEVO)
   createdAt        DateTime      @default(now())
 

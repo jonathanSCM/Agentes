@@ -8,7 +8,7 @@
 <% if (mensaje) { %><div class="alert-ok"><%= mensaje %></div><% } %>
 <% if (error) { %><div class="alert-err"><%= error %></div><% } %>
 
-<form method="POST" action="/panel/configuracion" class="form-card">
+<form method="POST" action="/panel/configuracion" class="form-card" enctype="multipart/form-data">
   <div class="field">
     <label for="nombre">Nombre del agente</label>
     <input id="nombre" name="nombre" type="text" maxlength="60"
@@ -59,6 +59,26 @@
     <label><input type="checkbox" name="derivarAHumano" value="1" <%= config.derivarAHumano ? 'checked' : '' %> /> Permitir que derive a una persona cuando sea necesario</label>
   </div>
 
+  <div class="field">
+    <label>Formas de pago que acepta esta tienda</label>
+    <p class="muted" style="font-size:.82rem;margin:0 0 .5rem">El agente SOLO le ofrece al cliente las formas de pago que marques acá.</p>
+    <label style="display:block;margin-bottom:.3rem"><input type="checkbox" name="aceptaEfectivo" value="1" <%= config.aceptaEfectivo !== false ? 'checked' : '' %> /> Efectivo</label>
+    <label style="display:block;margin-bottom:.3rem"><input type="checkbox" name="aceptaTarjeta" value="1" <%= config.aceptaTarjeta ? 'checked' : '' %> /> Tarjeta</label>
+    <label style="display:block;margin-bottom:.3rem"><input type="checkbox" id="aceptaQr" name="aceptaQr" value="1" <%= config.aceptaQr ? 'checked' : '' %> /> QR</label>
+  </div>
+
+  <div class="field" id="campo-qr" style="<%= config.aceptaQr ? '' : 'display:none' %>">
+    <label for="qr">Imagen del QR de cobro</label>
+    <p class="muted" style="font-size:.82rem;margin:0 0 .5rem">La misma imagen de QR que ya usás hoy para cobrar (banco, billetera, etc.). El bot la manda tal cual cuando el cliente elige pagar por QR.</p>
+    <% if (config.qrCobroUrl) { %>
+      <div style="margin-bottom:8px;">
+        <img src="<%= config.qrCobroUrl %>" style="width:120px;height:120px;object-fit:contain;border-radius:8px;background:#fff;padding:6px" />
+      </div>
+      <label style="margin-bottom:.5rem;display:block"><input type="checkbox" name="quitarQr" value="1" /> Quitar el QR actual</label>
+    <% } %>
+    <input id="qr" name="qr" type="file" accept="image/*" />
+  </div>
+
   <div class="form-actions">
     <button class="btn btn-primary" type="submit">Guardar configuración</button>
   </div>
@@ -78,5 +98,17 @@
     Proshop te ayuda a completar ese enlace una vez que tu plan esté activo.
   </p>
 </div>
+
+<script>
+(function () {
+  var chk = document.getElementById('aceptaQr');
+  var campo = document.getElementById('campo-qr');
+  if (chk && campo) {
+    chk.addEventListener('change', function () {
+      campo.style.display = chk.checked ? '' : 'none';
+    });
+  }
+})();
+</script>
 
 <%- include('partials/fin') %>

@@ -47,7 +47,7 @@
               <strong><%= p.nombre %></strong>
               <% if (p.descripcion) { %><br /><span class="muted"><%= p.descripcion %></span><% } %>
             </td>
-            <td><%= p.categoria || '-' %></td>
+            <td><%= p.categoria ? p.categoria.nombre : '-' %></td>
             <td class="num">Bs <%= Number(p.precio).toFixed(2) %></td>
             <td class="num <%= p.stockMostrado <= 5 ? 'saldo-ok' : '' %>">
               <%= p.stockMostrado %><% if (p.tieneVariantes) { %> <span class="muted" style="font-size:.75rem">(variantes)</span><% } %>

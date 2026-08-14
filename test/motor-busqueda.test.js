@@ -16,8 +16,19 @@ const {
   fichaProducto,
 } = require('../lib/services/agente');
 
+// Categoria ahora es una relacion ({id, nombre}), no texto libre. Los tests
+// de este archivo siguen pasando `categoria: 'Zapatillas'` como string por
+// comodidad - la factory la envuelve sola. Mismo nombre siempre da el mismo
+// id (hash simple), asi dos productos de "la misma categoria" en un test
+// quedan con el mismo categoria.id, como pasaria de verdad en la DB.
+function idDeCategoria(nombre) {
+  let h = 0;
+  for (const c of String(nombre)) h = (h * 31 + c.charCodeAt(0)) % 100000;
+  return h;
+}
+
 function producto(overrides) {
-  return {
+  const base = {
     id: 1,
     nombre: 'Producto generico',
     categoria: 'Calzado',
@@ -29,6 +40,10 @@ function producto(overrides) {
     variantes: [],
     ...overrides,
   };
+  if (typeof base.categoria === 'string') {
+    base.categoria = { id: idDeCategoria(base.categoria), nombre: base.categoria };
+  }
+  return base;
 }
 
 describe('buscarProductosFiltrados', () => {

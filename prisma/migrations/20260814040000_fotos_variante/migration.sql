@@ -1,0 +1,1 @@
+ALTER TABLE "variantes" ADD COLUMN "fotos" TEXT[] NOT NULL DEFAULT '{}';

@@ -49,16 +49,27 @@
       <% } %>
     </p>
   </div>
+  <%
+    var categorias = typeof categoriasExistentes !== 'undefined' ? categoriasExistentes : [];
+    var categoriaIdActual = producto && producto.categoriaId ? producto.categoriaId : (producto && producto.categoria ? Number(producto.categoria) : null);
+  %>
   <div class="field">
-    <label for="categoria">Categoría</label>
-    <input id="categoria" name="categoria" type="text" maxlength="120" list="categorias-sugeridas"
-           value="<%= producto && producto.categoria ? producto.categoria : '' %>" placeholder="Ej: Calzado" />
-    <datalist id="categorias-sugeridas">
-      <% (typeof categoriasExistentes !== 'undefined' ? categoriasExistentes : []).forEach(function (c) { %>
-        <option value="<%= c %>"></option>
+    <label for="categoriaId">Categoría</label>
+    <select id="categoriaId" name="categoriaId">
+      <option value="">Sin categoría</option>
+      <% categorias.forEach(function (c) { %>
+        <option value="<%= c.id %>" <%= categoriaIdActual === c.id ? 'selected' : '' %>><%= c.nombre %></option>
       <% }); %>
-    </datalist>
+    </select>
+    <p class="muted" style="font-size:.82rem;margin:.4rem 0 0" id="hint-atributos-categoria"></p>
+    <p class="muted" style="font-size:.8rem;margin:.3rem 0 0"><a href="/panel/categorias" style="color:var(--primary-2)">+ Crear categoría nueva</a> o editar sus atributos</p>
   </div>
+  <script>
+    window.__categoriasAtributos = <%- JSON.stringify(categorias.reduce(function (acc, c) {
+      acc[c.id] = c.atributos.filter(function (a) { return a.obligatorio && !a.esDeVariante; }).map(function (a) { return a.nombre; });
+      return acc;
+    }, {})) %>;
+  </script>
   <div class="field">
     <label for="caracteristicas">Características (separadas por coma)</label>
     <input id="caracteristicas" name="caracteristicas" type="text" maxlength="300"
@@ -155,13 +166,14 @@
   <% if (producto.variantes.length) { %>
     <div class="table-wrap">
       <table class="leads-table">
-        <thead><tr><th>Atributos</th><th class="num">Precio propio</th><th class="num">Stock</th><th>Acciones</th></tr></thead>
+        <thead><tr><th>Atributos</th><th>Fotos</th><th class="num">Precio propio</th><th class="num">Stock</th><th>Acciones</th></tr></thead>
         <tbody>
           <% producto.variantes.forEach(function (v) { %>
             <%
               var formId = 'editar-variante-' + v.id;
               var entradasVariante = Object.entries(v.atributos || {});
               if (!entradasVariante.length) entradasVariante = [['', '']];
+              var tieneColorYFotos = Boolean(v.atributos && v.atributos.Color) && v.fotos && v.fotos.length;
             %>
             <tr>
               <td>
@@ -176,6 +188,22 @@
                   <button type="button" class="btn btn-ghost btn-agregar-atributo-variante" style="padding:.2rem .5rem;font-size:.75rem;align-self:flex-start">+ atributo</button>
                 </div>
               </td>
+              <td style="min-width:140px">
+                <% if (v.fotos && v.fotos.length) { %>
+                  <div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:4px;">
+                    <% v.fotos.forEach(function (f) { %>
+                      <img src="<%= f %>" style="width:40px;height:40px;object-fit:cover;border-radius:6px;" />
+                    <% }); %>
+                  </div>
+                  <label style="display:block;font-size:.72rem;margin-bottom:4px;"><input form="<%= formId %>" type="checkbox" name="quitarFotos" value="1" /> Quitar</label>
+                <% } %>
+                <input form="<%= formId %>" type="file" name="fotos" accept="image/*" multiple style="width:130px;font-size:.72rem;" />
+                <% if (tieneColorYFotos) { %>
+                  <form method="POST" action="/panel/productos/<%= producto.id %>/variantes/<%= v.id %>/copiar-fotos" class="inline-form" style="margin-top:4px;">
+                    <button class="btn btn-ghost" style="padding:.2rem .5rem;font-size:.7rem" type="submit">Copiar a mismo color</button>
+                  </form>
+                <% } %>
+              </td>
               <td class="num"><input form="<%= formId %>" type="number" name="precio" min="0" step="0.01" value="<%= v.precio ? Number(v.precio).toFixed(2) : '' %>" placeholder="Precio del producto" style="width:110px;<%= inputStyleVariante %>" /></td>
               <td class="num"><input form="<%= formId %>" type="number" name="stock" min="0" value="<%= v.stock %>" style="width:80px;<%= inputStyleVariante %>" /></td>
               <td class="actions-cell">
@@ -186,18 +214,18 @@
                 </form>
               </td>
             </tr>
-            <form id="<%= formId %>" method="POST" action="/panel/productos/<%= producto.id %>/variantes/<%= v.id %>"></form>
+            <form id="<%= formId %>" method="POST" action="/panel/productos/<%= producto.id %>/variantes/<%= v.id %>" enctype="multipart/form-data"></form>
           <% }); %>
         </tbody>
       </table>
     </div>
   <% } %>
 
-  <form method="POST" action="/panel/productos/<%= producto.id %>/variantes" class="form-card" style="max-width:600px;margin-top:1rem">
+  <form method="POST" action="/panel/productos/<%= producto.id %>/variantes" class="form-card" style="max-width:600px;margin-top:1rem" enctype="multipart/form-data">
     <h3 style="margin:0 0 1rem;font-size:.95rem">Agregar variante</h3>
     <div class="field">
       <label>Atributos de esta variante *</label>
-      <p class="muted" style="font-size:.8rem;margin:0 0 .5rem">Ej: Talla = 42, Color = Negro. Agregá los que necesites.</p>
+      <p class="muted" style="font-size:.8rem;margin:0 0 .5rem">Ej: Talla = 42, Color = Negro. Agregá los que necesites. Si varias tallas comparten color y foto, escribilas separadas por coma en el valor (ej: Talla = "38, 39, 40"): se crea una variante por cada una, todas con la misma foto.</p>
       <div id="atributos-nueva-variante-lista">
         <div class="atributo-row" style="display:flex;gap:8px;margin-bottom:6px;">
           <input list="atributos-variante-sugeridos" name="atributoClave[]" placeholder="Ej: Talla" maxlength="60" style="flex:1" />
@@ -228,6 +256,11 @@
         <label for="v-stock">Stock *</label>
         <input id="v-stock" name="stock" type="number" min="0" required value="0" />
       </div>
+    </div>
+    <div class="field">
+      <label for="v-fotos">Fotos de esta variante (opcional)</label>
+      <p class="muted" style="font-size:.8rem;margin:0 0 .5rem">Si dejaste varias tallas separadas por coma arriba, estas fotos se aplican a todas las que se creen.</p>
+      <input id="v-fotos" name="fotos" type="file" accept="image/*" multiple />
     </div>
     <div class="form-actions">
       <button class="btn btn-primary" type="submit">+ Agregar variante</button>
@@ -298,6 +331,22 @@
       stockInput.disabled = chkVariantes.checked;
       if (chkVariantes.checked) stockInput.value = '0';
     });
+  }
+
+  // Muestra que atributos son obligatorios para la categoria elegida (los
+  // valida el servidor al guardar, esto es solo para avisar antes).
+  var selectCategoria = document.getElementById('categoriaId');
+  var hintAtributos = document.getElementById('hint-atributos-categoria');
+  function actualizarHintCategoria() {
+    if (!selectCategoria || !hintAtributos) return;
+    var obligatorios = (window.__categoriasAtributos || {})[selectCategoria.value] || [];
+    hintAtributos.textContent = obligatorios.length
+      ? 'Esta categoría requiere cargar estos atributos abajo: ' + obligatorios.join(', ') + '.'
+      : '';
+  }
+  if (selectCategoria) {
+    selectCategoria.addEventListener('change', actualizarHintCategoria);
+    actualizarHintCategoria();
   }
 })();
 </script>

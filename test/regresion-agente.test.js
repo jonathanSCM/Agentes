@@ -24,22 +24,22 @@ before(async () => {
     data: {
       nombre: 'Empresa de Test',
       slug: SLUG,
-      productos: {
-        create: [
-          { nombre: 'Zapatilla de test', categoria: 'Calzado', precio: 300, stock: 5 },
-        ],
-      },
       agentes: {
         create: [
           { nombre: 'Agente de test', estado: 'ACTIVO', config: { create: {} } },
         ],
       },
     },
-    include: { productos: true, agentes: true },
+    include: { agentes: true },
   });
   empresaId = empresa.id;
-  productoId = empresa.productos[0].id;
   agenteId = empresa.agentes[0].id;
+
+  const categoria = await prisma.categoria.create({ data: { empresaId, nombre: 'Calzado' } });
+  const producto = await prisma.producto.create({
+    data: { empresaId, nombre: 'Zapatilla de test', categoriaId: categoria.id, precio: 300, stock: 5 },
+  });
+  productoId = producto.id;
 });
 
 after(async () => {
