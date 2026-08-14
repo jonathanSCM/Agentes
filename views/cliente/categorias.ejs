@@ -2,103 +2,49 @@
 
 <div class="page-head">
   <h2>Categorías</h2>
-  <p>Cada categoría puede tener atributos marcados como <b>obligatorios</b>: el agente le va a preguntar por ellos al cliente antes de recomendar productos de esa categoría (ej: Género, Talla). Los que marques como "de variante" solo se usan como sugerencia al cargar tallas/colores, no bloquean nada.</p>
+  <p>Cada categoría puede tener atributos obligatorios (el agente se los pregunta al cliente antes de recomendar, ej: Género, Talla). Entrá a una categoría para configurar los suyos.</p>
 </div>
 
 <% if (mensaje) { %><div class="alert-ok"><%= mensaje %></div><% } %>
 <% if (error) { %><div class="alert-err"><%= error %></div><% } %>
-
-<%
-  var inputStyle = 'background:transparent;border:1px solid rgba(255,255,255,.15);border-radius:8px;padding:.35rem .5rem;color:inherit;font:inherit;font-size:.85rem';
-%>
 
 <% if (!categorias.length) { %>
   <div class="empty-state">
     <h3>Todavía no hay categorías cargadas</h3>
     <p>Agregá la primera abajo. Después la vas a poder elegir al crear o editar un producto.</p>
   </div>
+<% } else { %>
+  <div class="table-wrap">
+    <table class="leads-table">
+      <thead><tr><th>Categoría</th><th class="num">Productos</th><th class="num">Atributos configurados</th><th>Acciones</th></tr></thead>
+      <tbody>
+        <% categorias.forEach(function (cat) { %>
+          <tr>
+            <td><a href="/panel/categorias/<%= cat.id %>" style="color:inherit;font-weight:600"><%= cat.nombre %></a></td>
+            <td class="num"><%= cat._count.productos %></td>
+            <td class="num"><%= cat._count.atributos %></td>
+            <td class="actions-cell">
+              <a class="btn btn-ghost" style="padding:.4rem .8rem;font-size:.85rem" href="/panel/categorias/<%= cat.id %>">Configurar</a>
+              <form method="POST" action="/panel/categorias/<%= cat.id %>/eliminar" class="inline-form"
+                    onsubmit="return confirm('¿Eliminar esta categoría? Los productos que la usan quedan sin categoría.');">
+                <button class="btn btn-ghost" style="padding:.4rem .8rem;font-size:.85rem" type="submit">Eliminar</button>
+              </form>
+            </td>
+          </tr>
+        <% }); %>
+      </tbody>
+    </table>
+  </div>
 <% } %>
 
-<% categorias.forEach(function (cat) { %>
-  <div class="form-card" style="margin-bottom:1.2rem">
-    <div style="display:flex;justify-content:space-between;align-items:center;gap:1rem;margin-bottom:.8rem">
-      <%
-        var formCat = 'editar-categoria-' + cat.id;
-      %>
-      <input form="<%= formCat %>" name="nombre" type="text" value="<%= cat.nombre %>" style="font-size:1.05rem;font-weight:600;flex:1;<%= inputStyle %>" />
-      <div style="display:flex;gap:8px;flex-shrink:0">
-        <button form="<%= formCat %>" class="btn btn-ghost" type="submit">Guardar nombre</button>
-        <form method="POST" action="/panel/categorias/<%= cat.id %>/eliminar" class="inline-form"
-              onsubmit="return confirm('¿Eliminar esta categoría? Los productos que la usan quedan sin categoría.');">
-          <button class="btn btn-ghost" type="submit">Eliminar categoría</button>
-        </form>
-      </div>
-    </div>
-    <form id="<%= formCat %>" method="POST" action="/panel/categorias/<%= cat.id %>"></form>
-
-    <% if (cat.atributos.length) { %>
-      <div class="table-wrap">
-        <table class="leads-table">
-          <thead><tr><th>Orden</th><th>Atributo</th><th>Obligatorio</th><th>Es de variante (talla/color)</th><th>Acciones</th></tr></thead>
-          <tbody>
-            <% cat.atributos.forEach(function (a) { %>
-              <% var formAtr = 'editar-atributo-' + a.id; %>
-              <tr>
-                <td><input form="<%= formAtr %>" name="orden" type="number" value="<%= a.orden %>" style="width:60px;<%= inputStyle %>" /></td>
-                <td><input form="<%= formAtr %>" name="nombre" type="text" value="<%= a.nombre %>" style="width:100%;min-width:160px;<%= inputStyle %>" /></td>
-                <td><input form="<%= formAtr %>" name="obligatorio" type="checkbox" value="1" <%= a.obligatorio ? 'checked' : '' %> /></td>
-                <td><input form="<%= formAtr %>" name="esDeVariante" type="checkbox" value="1" <%= a.esDeVariante ? 'checked' : '' %> /></td>
-                <td class="actions-cell">
-                  <button form="<%= formAtr %>" class="btn btn-ghost" style="padding:.3rem .7rem;font-size:.8rem" type="submit">Guardar</button>
-                  <form method="POST" action="/panel/categorias/<%= cat.id %>/atributos/<%= a.id %>/eliminar" class="inline-form"
-                        onsubmit="return confirm('¿Quitar este atributo de la categoría?');">
-                    <button class="btn btn-ghost" style="padding:.3rem .7rem;font-size:.8rem" type="submit">Quitar</button>
-                  </form>
-                </td>
-              </tr>
-              <form id="<%= formAtr %>" method="POST" action="/panel/categorias/<%= cat.id %>/atributos/<%= a.id %>"></form>
-            <% }); %>
-          </tbody>
-        </table>
-      </div>
-    <% } else { %>
-      <p class="muted" style="font-size:.85rem;margin:.4rem 0">Sin atributos todavía.</p>
-    <% } %>
-
-    <form method="POST" action="/panel/categorias/<%= cat.id %>/atributos" class="field-row" style="margin-top:.8rem;align-items:flex-end">
-      <div class="field" style="max-width:220px">
-        <label>Nuevo atributo</label>
-        <input list="atributos-sugeridos" name="nombre" type="text" maxlength="60" required placeholder="Ej: Genero" />
-      </div>
-      <div class="field" style="max-width:90px">
-        <label>Orden</label>
-        <input name="orden" type="number" value="0" />
-      </div>
-      <label style="margin:0 0 .6rem"><input type="checkbox" name="obligatorio" value="1" /> Obligatorio</label>
-      <label style="margin:0 0 .6rem"><input type="checkbox" name="esDeVariante" value="1" /> Es de variante</label>
-      <button class="btn btn-ghost" type="submit">+ Agregar atributo</button>
-    </form>
-  </div>
-<% }); %>
-
-<datalist id="atributos-sugeridos">
-  <option value="Genero"></option>
-  <option value="Talla"></option>
-  <option value="Color"></option>
-  <option value="Marca"></option>
-  <option value="Material"></option>
-  <option value="Uso"></option>
-  <option value="Estilo"></option>
-</datalist>
-
-<form method="POST" action="/panel/categorias" class="form-card" style="max-width:500px;margin-top:1rem">
+<form method="POST" action="/panel/categorias" class="form-card" style="max-width:500px;margin-top:1.4rem">
   <h3 style="margin:0 0 1rem;font-size:.95rem">+ Agregar categoría nueva</h3>
   <div class="field">
     <label for="nombre">Nombre *</label>
     <input id="nombre" name="nombre" type="text" required maxlength="120" placeholder="Ej: Zapatillas deportivas" />
   </div>
   <div class="form-actions">
-    <button class="btn btn-primary" type="submit">Agregar</button>
+    <button class="btn btn-primary" type="submit">Agregar y configurar</button>
   </div>
 </form>
 

@@ -981,12 +981,15 @@ app.get('/panel/compras', requireCliente, async (req, res, next) => {
 });
 
 // -------- Categorias (con atributos obligatorios/opcionales por categoria) --------
+// Lista simple (solo nombre + cuantos atributos tiene) - el detalle de cada
+// una (sus atributos) vive en su propia pagina, para no saturar la lista con
+// las tablas de las 18+ categorias abiertas al mismo tiempo.
 app.get('/panel/categorias', requireCliente, async (req, res, next) => {
   try {
     const categorias = await prisma.categoria.findMany({
       where: { empresaId: req.session.empresaId },
       orderBy: { nombre: 'asc' },
-      include: { atributos: { orderBy: { orden: 'asc' } } },
+      include: { _count: { select: { atributos: true, productos: true } } },
     });
     res.render('cliente/categorias', {
       title: 'Categorías - Proshop', tituloPagina: 'Categorías', activo: 'categorias',
@@ -999,25 +1002,40 @@ app.post('/panel/categorias', requireCliente, async (req, res, next) => {
   try {
     const nombre = String(req.body.nombre || '').trim().slice(0, 120);
     if (!nombre) return res.redirect('/panel/categorias?err=' + encodeURIComponent('El nombre es obligatorio.'));
-    await prisma.categoria.create({ data: { empresaId: req.session.empresaId, nombre } });
-    res.redirect('/panel/categorias?ok=' + encodeURIComponent('Categoría agregada.'));
+    const categoria = await prisma.categoria.create({ data: { empresaId: req.session.empresaId, nombre } });
+    // Directo a su pagina de detalle: ahi es donde se cargan los atributos.
+    res.redirect(`/panel/categorias/${categoria.id}?ok=` + encodeURIComponent('Categoría agregada. Ahora cargá sus atributos.'));
   } catch (err) {
     if (err.code === 'P2002') return res.redirect('/panel/categorias?err=' + encodeURIComponent('Ya existe una categoría con ese nombre.'));
     next(err);
   }
 });
 
+app.get('/panel/categorias/:id', requireCliente, async (req, res, next) => {
+  try {
+    const categoria = await prisma.categoria.findFirst({
+      where: { id: Number(req.params.id), empresaId: req.session.empresaId },
+      include: { atributos: { orderBy: { orden: 'asc' } } },
+    });
+    if (!categoria) return res.redirect('/panel/categorias');
+    res.render('cliente/categoria-detalle', {
+      title: `${categoria.nombre} - Categorías - Proshop`, tituloPagina: 'Categorías', activo: 'categorias',
+      categoria, mensaje: req.query.ok || null, error: req.query.err || null,
+    });
+  } catch (err) { next(err); }
+});
+
 app.post('/panel/categorias/:id', requireCliente, async (req, res, next) => {
   try {
     const nombre = String(req.body.nombre || '').trim().slice(0, 120);
-    if (!nombre) return res.redirect('/panel/categorias?err=' + encodeURIComponent('El nombre es obligatorio.'));
+    if (!nombre) return res.redirect(`/panel/categorias/${req.params.id}?err=` + encodeURIComponent('El nombre es obligatorio.'));
     await prisma.categoria.updateMany({
       where: { id: Number(req.params.id), empresaId: req.session.empresaId },
       data: { nombre },
     });
-    res.redirect('/panel/categorias?ok=' + encodeURIComponent('Categoría actualizada.'));
+    res.redirect(`/panel/categorias/${req.params.id}?ok=` + encodeURIComponent('Categoría actualizada.'));
   } catch (err) {
-    if (err.code === 'P2002') return res.redirect('/panel/categorias?err=' + encodeURIComponent('Ya existe una categoría con ese nombre.'));
+    if (err.code === 'P2002') return res.redirect(`/panel/categorias/${req.params.id}?err=` + encodeURIComponent('Ya existe una categoría con ese nombre.'));
     next(err);
   }
 });
@@ -1034,7 +1052,7 @@ app.post('/panel/categorias/:id/atributos', requireCliente, async (req, res, nex
     const categoria = await prisma.categoria.findFirst({ where: { id: Number(req.params.id), empresaId: req.session.empresaId } });
     if (!categoria) return res.redirect('/panel/categorias');
     const nombre = String(req.body.nombre || '').trim().slice(0, 60);
-    if (!nombre) return res.redirect('/panel/categorias?err=' + encodeURIComponent('El nombre del atributo es obligatorio.'));
+    if (!nombre) return res.redirect(`/panel/categorias/${categoria.id}?err=` + encodeURIComponent('El nombre del atributo es obligatorio.'));
     await prisma.categoriaAtributo.create({
       data: {
         categoriaId: categoria.id,
@@ -1044,9 +1062,9 @@ app.post('/panel/categorias/:id/atributos', requireCliente, async (req, res, nex
         orden: parseInt(req.body.orden, 10) || 0,
       },
     });
-    res.redirect('/panel/categorias?ok=' + encodeURIComponent('Atributo agregado.'));
+    res.redirect(`/panel/categorias/${categoria.id}?ok=` + encodeURIComponent('Atributo agregado.'));
   } catch (err) {
-    if (err.code === 'P2002') return res.redirect('/panel/categorias?err=' + encodeURIComponent('Esa categoría ya tiene un atributo con ese nombre.'));
+    if (err.code === 'P2002') return res.redirect(`/panel/categorias/${req.params.id}?err=` + encodeURIComponent('Esa categoría ya tiene un atributo con ese nombre.'));
     next(err);
   }
 });
@@ -1064,7 +1082,7 @@ app.post('/panel/categorias/:id/atributos/:atributoId', requireCliente, async (r
         orden: parseInt(req.body.orden, 10) || 0,
       },
     });
-    res.redirect('/panel/categorias?ok=' + encodeURIComponent('Atributo actualizado.'));
+    res.redirect(`/panel/categorias/${categoria.id}?ok=` + encodeURIComponent('Atributo actualizado.'));
   } catch (err) { next(err); }
 });
 
@@ -1073,7 +1091,7 @@ app.post('/panel/categorias/:id/atributos/:atributoId/eliminar', requireCliente,
     const categoria = await prisma.categoria.findFirst({ where: { id: Number(req.params.id), empresaId: req.session.empresaId } });
     if (!categoria) return res.redirect('/panel/categorias');
     await prisma.categoriaAtributo.deleteMany({ where: { id: Number(req.params.atributoId), categoriaId: categoria.id } });
-    res.redirect('/panel/categorias?ok=' + encodeURIComponent('Atributo eliminado.'));
+    res.redirect(`/panel/categorias/${categoria.id}?ok=` + encodeURIComponent('Atributo eliminado.'));
   } catch (err) { next(err); }
 });
 

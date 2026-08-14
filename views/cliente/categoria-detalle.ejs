@@ -1,0 +1,82 @@
+<%- include('partials/inicio') %>
+
+<div class="page-head">
+  <h2><a href="/panel/categorias" style="color:var(--tenue);font-size:.85rem;font-weight:400">← Categorías</a><br /><%= categoria.nombre %></h2>
+  <p>Marcá qué atributos son obligatorios: el agente se los va a preguntar al cliente antes de recomendar productos de esta categoría. Los que marques como "de variante" (ej: Talla, Color) solo se usan como sugerencia al cargar variantes, no bloquean guardar el producto.</p>
+</div>
+
+<% if (mensaje) { %><div class="alert-ok"><%= mensaje %></div><% } %>
+<% if (error) { %><div class="alert-err"><%= error %></div><% } %>
+
+<%
+  var inputStyle = 'background:transparent;border:1px solid rgba(255,255,255,.15);border-radius:8px;padding:.35rem .5rem;color:inherit;font:inherit;font-size:.85rem';
+  var formCat = 'editar-categoria';
+%>
+<form method="POST" action="/panel/categorias/<%= categoria.id %>" id="<%= formCat %>" class="form-card" style="max-width:500px">
+  <div class="field">
+    <label for="nombre">Nombre</label>
+    <input id="nombre" name="nombre" type="text" value="<%= categoria.nombre %>" style="<%= inputStyle %>" />
+  </div>
+  <div class="form-actions">
+    <button class="btn btn-primary" type="submit">Guardar nombre</button>
+  </div>
+</form>
+
+<div class="page-head" style="margin-top:1.6rem">
+  <h3 style="font-size:1rem">Atributos</h3>
+</div>
+
+<% if (categoria.atributos.length) { %>
+  <div class="table-wrap">
+    <table class="leads-table">
+      <thead><tr><th>Orden</th><th>Atributo</th><th>Obligatorio</th><th>Es de variante (talla/color)</th><th>Acciones</th></tr></thead>
+      <tbody>
+        <% categoria.atributos.forEach(function (a) { %>
+          <% var formAtr = 'editar-atributo-' + a.id; %>
+          <tr>
+            <td><input form="<%= formAtr %>" name="orden" type="number" value="<%= a.orden %>" style="width:60px;<%= inputStyle %>" /></td>
+            <td><input form="<%= formAtr %>" name="nombre" type="text" value="<%= a.nombre %>" style="width:100%;min-width:160px;<%= inputStyle %>" /></td>
+            <td><input form="<%= formAtr %>" name="obligatorio" type="checkbox" value="1" <%= a.obligatorio ? 'checked' : '' %> /></td>
+            <td><input form="<%= formAtr %>" name="esDeVariante" type="checkbox" value="1" <%= a.esDeVariante ? 'checked' : '' %> /></td>
+            <td class="actions-cell">
+              <button form="<%= formAtr %>" class="btn btn-ghost" style="padding:.3rem .7rem;font-size:.8rem" type="submit">Guardar</button>
+              <form method="POST" action="/panel/categorias/<%= categoria.id %>/atributos/<%= a.id %>/eliminar" class="inline-form"
+                    onsubmit="return confirm('¿Quitar este atributo de la categoría?');">
+                <button class="btn btn-ghost" style="padding:.3rem .7rem;font-size:.8rem" type="submit">Quitar</button>
+              </form>
+            </td>
+          </tr>
+          <form id="<%= formAtr %>" method="POST" action="/panel/categorias/<%= categoria.id %>/atributos/<%= a.id %>"></form>
+        <% }); %>
+      </tbody>
+    </table>
+  </div>
+<% } else { %>
+  <p class="muted" style="font-size:.85rem;margin:.4rem 0">Sin atributos todavía.</p>
+<% } %>
+
+<datalist id="atributos-sugeridos">
+  <option value="Genero"></option>
+  <option value="Talla"></option>
+  <option value="Color"></option>
+  <option value="Marca"></option>
+  <option value="Material"></option>
+  <option value="Uso"></option>
+  <option value="Estilo"></option>
+</datalist>
+
+<form method="POST" action="/panel/categorias/<%= categoria.id %>/atributos" class="field-row" style="margin-top:1rem;align-items:flex-end">
+  <div class="field" style="max-width:220px">
+    <label>Nuevo atributo</label>
+    <input list="atributos-sugeridos" name="nombre" type="text" maxlength="60" required placeholder="Ej: Genero" />
+  </div>
+  <div class="field" style="max-width:90px">
+    <label>Orden</label>
+    <input name="orden" type="number" value="0" />
+  </div>
+  <label style="margin:0 0 .6rem"><input type="checkbox" name="obligatorio" value="1" /> Obligatorio</label>
+  <label style="margin:0 0 .6rem"><input type="checkbox" name="esDeVariante" value="1" /> Es de variante</label>
+  <button class="btn btn-ghost" type="submit">+ Agregar atributo</button>
+</form>
+
+<%- include('partials/fin') %>
