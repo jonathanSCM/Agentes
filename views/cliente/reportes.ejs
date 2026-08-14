@@ -44,8 +44,22 @@
   </div>
 
   <div class="dash-card">
-    <div class="dash-card-head"><h3>Rendimiento de anuncios</h3><span class="badge badge-off">Próximamente</span></div>
-    <p class="dash-empty">Conecta tus campañas de Meta para medir cuántas ventas llegan desde anuncios (ROAS).</p>
+    <div class="dash-card-head"><h3>Ventas desde anuncios</h3></div>
+    <% if (r.anuncios.length === 0) { %>
+      <p class="dash-empty">Todavía no detectamos ventas desde un anuncio de Meta. En cuanto un cliente escriba desde un anuncio "Click to WhatsApp", aparecerán acá automáticamente (sin conectar nada).</p>
+    <% } else { %>
+      <p class="muted" style="font-size:.82rem;margin:-.2rem 0 .6rem">
+        <%= r.ventasAnuncios.cantidad %> venta<%= r.ventasAnuncios.cantidad === 1 ? '' : 's' %> · Bs <%= r.ventasAnuncios.total.toFixed(2) %> · últimos 30 días
+      </p>
+      <ul class="dash-list">
+        <% r.anuncios.forEach(function (a) { %>
+          <li>
+            <span><%= a.titulo || ('Anuncio ' + a.anuncioId) %></span>
+            <span class="badge badge-star"><%= a.ventas %> venta<%= a.ventas === 1 ? '' : 's' %></span>
+          </li>
+        <% }); %>
+      </ul>
+    <% } %>
   </div>
 </div>
 

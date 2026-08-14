@@ -391,7 +391,16 @@ model Conversacion {
   ultimoMensajeAt DateTime  @default(now())
   createdAt       DateTime  @default(now())
 
+  // Atribucion a anuncios de Meta (Click to WhatsApp): WhatsApp manda estos
+  // datos solos, sin conectar nada, en el primer mensaje de una conversacion
+  // que arranco desde un anuncio (objeto "referral" del webhook). Quedan en
+  // null si el cliente escribio por su cuenta.
+  anuncioId        String?
+  anuncioTitulo    String?
+  anuncioImagenUrl String?
+
   mensajes Mensaje[]
+  pedidos  Pedido[]
 
   @@index([agenteId, telefonoCliente, ultimoMensajeAt])
   @@map("conversaciones")
@@ -566,6 +575,11 @@ model Pedido {
   empresa          Empresa       @relation(fields: [empresaId], references: [id], onDelete: Cascade)
   clienteId        Int?
   cliente          ClienteFinal? @relation(fields: [clienteId], references: [id])
+  // De que conversacion salio este pedido (para saber si vino de un anuncio
+  // de Meta, ver Conversacion.anuncioId). Null en pedidos viejos o creados
+  // sin conversacion asociada.
+  conversacionId   Int?
+  conversacion     Conversacion? @relation(fields: [conversacionId], references: [id], onDelete: SetNull)
   total            Decimal       @default(0) @db.Decimal(10, 2)
   direccionEntrega String?
   entregaLat       Float?

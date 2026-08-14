@@ -461,7 +461,9 @@ app.get('/panel', requireCliente, async (req, res, next) => {
     const agenteIds = await agenteIdsDe(empresaId);
     const hoy = inicioDeHoy();
 
-    const [clientesHoy, pedidosHoy, ventasAgg, convTotal, convConIA, atencion, stockBajo] = await Promise.all([
+    const hace30 = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+
+    const [clientesHoy, pedidosHoy, ventasAgg, convTotal, convConIA, atencion, stockBajo, ventasAnunciosAgg] = await Promise.all([
       prisma.conversacion.count({ where: { agenteId: { in: agenteIds }, createdAt: { gte: hoy } } }),
       prisma.pedido.count({ where: { empresaId, createdAt: { gte: hoy } } }),
       prisma.pedido.aggregate({ where: { empresaId, estado: { not: 'CANCELADO' }, createdAt: { gte: hoy } }, _sum: { total: true } }),
@@ -478,6 +480,13 @@ app.get('/panel', requireCliente, async (req, res, next) => {
       prisma.producto.findMany({
         where: { empresaId, activo: true },
         include: { variantes: { where: { activa: true }, select: { stock: true } } },
+      }),
+      // Pedidos cuya conversacion de origen tiene datos de un anuncio de
+      // Meta (ver Conversacion.anuncioId, capturado del webhook de WhatsApp).
+      prisma.pedido.aggregate({
+        where: { empresaId, estado: { not: 'CANCELADO' }, createdAt: { gte: hace30 }, conversacion: { anuncioId: { not: null } } },
+        _sum: { total: true },
+        _count: true,
       }),
     ]);
     const stockBajoConVariantes = stockBajo
@@ -501,6 +510,7 @@ app.get('/panel', requireCliente, async (req, res, next) => {
         ventasHoy: Number(ventasAgg._sum.total || 0),
         resueltasIA,
       },
+      ventasAnuncios: { cantidad: ventasAnunciosAgg._count, total: Number(ventasAnunciosAgg._sum.total || 0) },
       atencion, stockBajo: stockBajoConVariantes,
     });
   } catch (err) { next(err); }
@@ -837,13 +847,22 @@ app.get('/panel/reportes', requireCliente, async (req, res, next) => {
     const hace7 = new Date(Date.now() - 6 * 24 * 60 * 60 * 1000);
     hace7.setHours(0, 0, 0, 0);
 
-    const [conversaciones, conv7, convConIA, clientes, pedidos, convRecientes] = await Promise.all([
+    const hace30 = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+
+    const [conversaciones, conv7, convConIA, clientes, pedidos, convRecientes, pedidosDeAnuncios] = await Promise.all([
       prisma.conversacion.count({ where: { agenteId: { in: agenteIds } } }),
       prisma.conversacion.count({ where: { agenteId: { in: agenteIds }, createdAt: { gte: hace7 } } }),
       prisma.conversacion.count({ where: { agenteId: { in: agenteIds }, mensajes: { some: { rol: 'AGENTE' } } } }),
       prisma.clienteFinal.count({ where: { empresaId } }),
       prisma.pedido.count({ where: { empresaId } }),
       prisma.conversacion.findMany({ where: { agenteId: { in: agenteIds }, createdAt: { gte: hace7 } }, select: { createdAt: true } }),
+      // Ventas atribuidas a un anuncio de Meta (Click to WhatsApp), ver
+      // Conversacion.anuncioId. Se trae todo y se agrupa en JS: son pocos
+      // pedidos por empresa, no vale la pena un groupBy sobre una relacion.
+      prisma.pedido.findMany({
+        where: { empresaId, estado: { not: 'CANCELADO' }, createdAt: { gte: hace30 }, conversacion: { anuncioId: { not: null } } },
+        select: { total: true, conversacion: { select: { anuncioId: true, anuncioTitulo: true, anuncioImagenUrl: true } } },
+      }),
     ]);
 
     // Serie de los últimos 7 días
@@ -856,11 +875,27 @@ app.get('/panel/reportes', requireCliente, async (req, res, next) => {
       serie.push({ etiqueta: dias[d.getDay()], total });
     }
 
+    // Agrupa las ventas por anuncio de origen, ordenado de mas a menos ventas.
+    const anunciosMap = new Map();
+    for (const p of pedidosDeAnuncios) {
+      const c = p.conversacion;
+      const clave = c.anuncioId;
+      if (!anunciosMap.has(clave)) {
+        anunciosMap.set(clave, { anuncioId: clave, titulo: c.anuncioTitulo, imagenUrl: c.anuncioImagenUrl, ventas: 0, total: 0 });
+      }
+      const fila = anunciosMap.get(clave);
+      fila.ventas += 1;
+      fila.total += Number(p.total);
+    }
+    const anuncios = [...anunciosMap.values()].sort((a, b) => b.ventas - a.ventas);
+
     res.render('cliente/reportes', {
       title: 'Reportes - Proshop', tituloPagina: 'Reportes', activo: 'reportes',
       r: {
         conversaciones, conversaciones7: conv7, clientes, pedidos, serie,
         resueltasIA: conversaciones > 0 ? Math.round((convConIA / conversaciones) * 100) : 0,
+        anuncios,
+        ventasAnuncios: { cantidad: pedidosDeAnuncios.length, total: pedidosDeAnuncios.reduce((s, p) => s + Number(p.total), 0) },
       },
     });
   } catch (err) { next(err); }
@@ -1608,7 +1643,7 @@ app.post('/webhooks/whatsapp', (req, res) => {
       // Se cobra y se guarda el mensaje YA (nunca se demora la parte contable).
       // Solo se demora GENERAR la respuesta, por si el cliente manda mas
       // mensajes seguidos sobre la misma idea (ver bufferMensajes.js).
-      const entrada = await procesarMensajeEntrante({ agenteId: conexion.agente.id, telefonoCliente, contenido: texto });
+      const entrada = await procesarMensajeEntrante({ agenteId: conexion.agente.id, telefonoCliente, contenido: texto, referral: mensaje.referral });
 
       if (!entrada.ok) {
         console.log(`--- webhook: mensaje no atendido (${entrada.motivo}) para agente ${conexion.agente.id}`);

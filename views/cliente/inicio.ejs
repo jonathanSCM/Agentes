@@ -89,13 +89,21 @@
     </div>
   </div>
 
-  <!-- Ventas por anuncios (próximamente) -->
+  <!-- Ventas por anuncios: atribucion automatica via Click to WhatsApp de Meta -->
   <div class="dash-card">
     <div class="dash-card-head">
       <h3>Ventas desde anuncios</h3>
-      <span class="badge badge-off">Próximamente</span>
+      <a href="/panel/reportes">Ver detalle</a>
     </div>
-    <p class="dash-empty">Cuando conectes tus campañas de Meta, verás aquí cuántas ventas llegaron desde anuncios.</p>
+    <% if (ventasAnuncios.cantidad === 0) { %>
+      <p class="dash-empty">Todavía no detectamos ventas desde un anuncio. En cuanto un cliente te escriba desde un anuncio de Meta (Click to WhatsApp), aparecerán acá solas.</p>
+    <% } else { %>
+      <div style="text-align:center;padding:.5rem 0">
+        <div class="gauge-num" style="font-size:2.2rem"><%= ventasAnuncios.cantidad %></div>
+        <span class="gauge-sub">ventas desde un anuncio en los últimos 30 días</span>
+        <p class="muted" style="font-size:.82rem;margin-top:.4rem">Bs <%= ventasAnuncios.total.toFixed(2) %> en total</p>
+      </div>
+    <% } %>
   </div>
 </div>
 
