@@ -25,9 +25,12 @@
   </div>
 
   <div class="field">
-    <label for="mensajeBienvenida">Mensaje de bienvenida</label>
+    <label for="mensajeBienvenida">Mensaje de bienvenida (opcional)</label>
     <input id="mensajeBienvenida" name="mensajeBienvenida" type="text" maxlength="200"
-           value="<%= config.mensajeBienvenida || '' %>" placeholder="¡Hola! ¿En qué puedo ayudarte hoy?" />
+           value="<%= config.mensajeBienvenida || '' %>" placeholder="Ej: Bienvenido a Tienda Doña Rosa, tu tienda de ropa y calzado" />
+    <p class="muted" style="font-size:.82rem;margin:.4rem 0 0">
+      Si lo dejás vacío, el agente se presenta solo (su nombre, tu tienda y qué vendés) en vez de un saludo genérico — normalmente da mejor resultado dejarlo así.
+    </p>
   </div>
 
   <div class="field-row">

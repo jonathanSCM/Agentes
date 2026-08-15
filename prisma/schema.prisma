@@ -347,7 +347,11 @@ model AgenteConfig {
   id                Int      @id @default(autoincrement())
   agenteId          Int      @unique
   agente            Agente   @relation(fields: [agenteId], references: [id], onDelete: Cascade)
-  mensajeBienvenida String   @default("Hola, en que puedo ayudarte?")
+  // null = la tienda no personalizo su saludo, el bot arma su propia
+  // presentacion (nombre, tienda, que vende) en vez de repetir un saludo
+  // generico. NUNCA poner un default generico aca: se termina usando como si
+  // el negocio lo hubiese elegido a proposito (ver construirSystem, bug real).
+  mensajeBienvenida String?
   tono              String   @default("cordial y profesional")
   instrucciones     String? // instrucciones adicionales para la IA
   derivarAHumano    Boolean  @default(true)
