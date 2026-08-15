@@ -43,17 +43,22 @@ El motivo de no hacerlo automático está en `docs/03-decisiones-recientes.md`: 
 - **Mostrar 3 + paginación reemplazó la decisión anterior de "mostrar todas".** Está explicado en `docs/03-decisiones-recientes.md` punto 8. No "corregirlo" de vuelta sin hablarlo: el riesgo que motivaba mostrar todas (esconder inventario) hoy está cubierto por `total_matches`.
 - **Los atributos del lead filtran solo si el producto los tiene cargados.** Un producto sin `Genero` cargado igual le aparece a un cliente que pidió ropa de hombre. Es deliberado (no hay dato que lo contradiga y excluirlo escondería inventario mal etiquetado), pero significa que **la calidad del filtrado por género depende de que el catálogo esté bien etiquetado**. La auto-detección de atributos por categoría ayuda, pero no inventa datos que no existen.
 
-## 🔴 Pendiente de infraestructura (no es del documento)
+## 🔴 Infraestructura
 
-Detectado al analizar el proyecto, no está en los 50 puntos pero es más grave que varios de ellos:
+Detectado al analizar el proyecto, no está en los 50 puntos del documento pero era más grave que varios de ellos.
 
-- **La migración `20260815010000_documento_agente_ventas` está escrita pero NO aplicada** (el entorno no tenía credenciales de base). Hay que aplicarla antes del próximo deploy.
-- **El seed borra datos en cada deploy.** `Dockerfile` corre `npm run seed` siempre, y `prisma/seed.js` hace `prisma.paquete.deleteMany({})`: eso borra en cascada los `PaquetePrecioPais` configurados desde el panel y deja en `null` el `paqueteId` de compras y pagos históricos. Además el upsert de planes revierte cualquier edición hecha en `/admin/planes`.
-- **El webhook de WhatsApp no valida la firma de Meta** (`X-Hub-Signature-256`): cualquiera que conozca un `phoneNumberId` puede inyectar mensajes falsos, consumir conversaciones pagas y disparar envíos.
-- **Las fotos subidas se pierden en cada redeploy**: `multer` escribe en `public/uploads` dentro del contenedor y el `Dockerfile` no declara volumen.
-- **Credenciales por defecto**: `admin`/`proshop123` y una `APP_ENCRYPTION_KEY` de desarrollo si faltan las variables de entorno.
-- **`temp_db_export.js` y `temp_demo_export.js`** siguen versionados con una contraseña de base en texto plano.
-- **Todo asume un solo proceso**: los timers de debounce, el mutex de conversaciones y el job de facturación viven en memoria.
+### ✅ Resuelto
+
+- **El seed ya no borra datos en cada deploy.** `prisma/seed.js` hacía `paquete.deleteMany({})` + reset de la secuencia, y como el `CMD` del Dockerfile corre `npm run seed` en cada arranque, cada despliegue borraba en cascada los `PaquetePrecioPais` configurados desde `/admin` y dejaba en `NULL` el `paqueteId` de compras y pagos históricos. Ahora siembra por `cantidad` (clave natural) y solo crea lo que falta. El upsert de planes pasó a `update: {}`: la fuente de verdad de un plan que ya existe es el panel, no el seed. Verificado contra la base real: un precio por país y una edición de plan sobreviven a dos corridas seguidas.
+- **Las fotos ya no se pierden al redesplegar** (a medias): el `Dockerfile` declara `VOLUME ["/app/public/uploads"]`. **Falta el paso manual en Coolify**: Storages → Add → Volume Mount apuntando a `/app/public/uploads`. Sin ese mapeo, la declaración sola no alcanza.
+- **No se puede arrancar en producción con credenciales por defecto.** Si falta `ADMIN_PASSWORD` (o está en `proshop123`), `APP_ENCRYPTION_KEY` o `SESSION_SECRET`, el proceso sale con un error claro en vez de levantar el panel abierto. `lib/crypto.js` además tira error si falta la clave de cifrado: con la de desarrollo, los tokens de WhatsApp de todos los clientes serían descifrables.
+- **`npm ci` en vez de `npm install`** en el Dockerfile: dos deploys del mismo commit instalan las mismas versiones.
+- **Credenciales fuera del repo**: `temp_db_export.js` y `temp_demo_export.js` salieron del control de versiones y `scripts/export-demo-data.js` lee `DATABASE_URL` del `.env`.
+
+### 🔴 Todavía sin resolver
+
+- **El webhook de WhatsApp no valida la firma de Meta** (`X-Hub-Signature-256`). Cualquiera que conozca un `phoneNumberId` puede inyectar mensajes falsos: consume conversaciones pagas y dispara envíos a números arbitrarios. La solución son ~20 líneas (HMAC-SHA256 del body crudo con el App Secret), pero **necesita el App Secret de la app de Meta**, que hay que sacar del panel de Meta y cargar como `WHATSAPP_APP_SECRET`.
+- **Todo asume un solo proceso.** Los timers de debounce (`bufferMensajes.js`), el mutex por cliente (`conversaciones.js`) y el job de facturación viven en memoria. Con dos réplicas habría cobros y notificaciones duplicados. Hoy no es un problema real con una sola instancia; la solución de fondo (Redis o locks en Postgres) es trabajo grande. **Decisión: no escalar a más de una réplica hasta que haga falta.**
 
 ## Cómo usar este archivo
 

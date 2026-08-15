@@ -54,6 +54,24 @@ const site = {
 };
 
 // ---- Credenciales del panel admin (cambiar en .env) ----
+// En produccion NO se permite arrancar con los valores de ejemplo: un panel de
+// administracion con admin/proshop123 esta abierto para cualquiera que conozca
+// el proyecto, y una APP_ENCRYPTION_KEY por defecto hace descifrables los
+// tokens de WhatsApp guardados. Antes esto caia al valor inseguro en silencio;
+// ahora el arranque falla con un mensaje claro (mejor no desplegar que
+// desplegar abierto).
+if (process.env.NODE_ENV === 'production') {
+  const faltantes = [];
+  if (!process.env.ADMIN_PASSWORD || process.env.ADMIN_PASSWORD === 'proshop123') faltantes.push('ADMIN_PASSWORD');
+  if (!process.env.APP_ENCRYPTION_KEY) faltantes.push('APP_ENCRYPTION_KEY');
+  if (!process.env.SESSION_SECRET) faltantes.push('SESSION_SECRET');
+  if (faltantes.length) {
+    console.error(`\n  ERROR DE CONFIGURACION: falta definir ${faltantes.join(', ')} en el entorno.`);
+    console.error('  Son obligatorias en produccion. Cargalas en las variables de entorno del servidor y volve a desplegar.\n');
+    process.exit(1);
+  }
+}
+
 const ADMIN_USER = process.env.ADMIN_USER || 'admin';
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'proshop123';
 

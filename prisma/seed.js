@@ -166,12 +166,18 @@ const PAQUETES = [
 async function main() {
   console.log('Cargando planes...');
   for (const plan of PLANES) {
+    // update VACIO a proposito: este seed corre en CADA deploy (ver el CMD del
+    // Dockerfile). Si actualizara los campos, cada despliegue pisaria los
+    // precios y las conversaciones incluidas que Proshop haya editado desde
+    // /admin/planes. El seed siembra lo que falta; la fuente de verdad de un
+    // plan que ya existe es el panel.
+    const existia = await prisma.plan.findUnique({ where: { codigo: plan.codigo } });
     await prisma.plan.upsert({
       where: { codigo: plan.codigo },
-      update: plan,
+      update: {},
       create: plan,
     });
-    console.log(`  - ${plan.nombre} (Bs ${plan.mensualidadBs}/mes, ${plan.convIncluidas} conv.)`);
+    console.log(`  - ${plan.nombre}${existia ? ' (ya existia, no se toco)' : ' (creado)'}`);
   }
 
   console.log('Cargando catalogo de caracteristicas comparables...');
@@ -194,12 +200,23 @@ async function main() {
   }
 
   console.log('Cargando paquetes de conversaciones...');
-  // Los paquetes no tienen clave unica natural: se recargan desde cero.
-  await prisma.paquete.deleteMany({});
-  await prisma.$executeRawUnsafe("SELECT setval(pg_get_serial_sequence('paquetes', 'id'), 1, false);");
+  // NUNCA borrar y recrear los paquetes. Antes esto hacia deleteMany({}) + un
+  // reset de la secuencia de ids, y como el seed corre en cada deploy eso
+  // significaba, cada vez:
+  //   - borrar en cascada los PaquetePrecioPais configurados desde /admin
+  //     (la FK es ON DELETE CASCADE), y
+  //   - dejar en NULL el paqueteId de todas las compras y pagos historicos
+  //     (esas FKs son ON DELETE SET NULL), perdiendo que paquete se vendio.
+  // Se siembra por cantidad, que es la clave natural del catalogo, y solo se
+  // crea lo que falta: un paquete que ya existe queda intacto.
   for (const p of PAQUETES) {
+    const existente = await prisma.paquete.findFirst({ where: { cantidad: p.cantidad } });
+    if (existente) {
+      console.log(`  - ${p.cantidad.toLocaleString('es')} conv. (ya existia, no se toco)`);
+      continue;
+    }
     await prisma.paquete.create({ data: p });
-    console.log(`  - ${p.cantidad.toLocaleString('es')} conv. -> US$ ${p.precioUsd}`);
+    console.log(`  - ${p.cantidad.toLocaleString('es')} conv. -> US$ ${p.precioUsd} (creado)`);
   }
 
   const totalPlanes = await prisma.plan.count();
