@@ -7,6 +7,32 @@ const fs = require('fs');
 // trabajo (ej. un launcher externo), dotenv no debe depender del cwd.
 require('dotenv').config({ path: path.join(__dirname, '.env') });
 
+// Esta validacion va ANTES de cualquier require de la app a proposito: si va
+// despues, el primer modulo que necesite una variable (lib/crypto.js) revienta
+// con su propio error y solo se entera de UNA variable por deploy fallido.
+// Aca se listan todas juntas y el operador arregla todo de una vez.
+//
+// En produccion no se permite arrancar con los valores de ejemplo: un panel
+// con admin/proshop123 esta abierto para cualquiera que conozca el proyecto, y
+// una APP_ENCRYPTION_KEY por defecto hace descifrables los tokens de WhatsApp.
+if (process.env.NODE_ENV === 'production') {
+  const faltantes = [];
+  if (!process.env.ADMIN_PASSWORD || process.env.ADMIN_PASSWORD === 'proshop123') faltantes.push('ADMIN_PASSWORD');
+  if (!process.env.APP_ENCRYPTION_KEY) faltantes.push('APP_ENCRYPTION_KEY');
+  if (!process.env.SESSION_SECRET) faltantes.push('SESSION_SECRET');
+  if (faltantes.length) {
+    console.error('\n  ERROR DE CONFIGURACION: faltan variables de entorno obligatorias en produccion.');
+    for (const v of faltantes) console.error(`    - ${v}`);
+    console.error('\n  Cargalas TODAS en el servidor y volve a desplegar.');
+    console.error('  OJO con APP_ENCRYPTION_KEY: tiene que ser la MISMA con la que se cifraron');
+    console.error('  los tokens de WhatsApp que ya estan guardados. Si esta app venia corriendo');
+    console.error('  sin esa variable, el valor que estaba en uso era el de desarrollo:');
+    console.error('  "clave-de-desarrollo-cambia-esto-en-produccion" (ver lib/crypto.js).');
+    console.error('  Poner una clave nueva sin re-cifrar los tokens desconecta a los agentes.\n');
+    process.exit(1);
+  }
+}
+
 const crypto = require('crypto');
 const express = require('express');
 const session = require('express-session');
@@ -54,24 +80,8 @@ const site = {
 };
 
 // ---- Credenciales del panel admin (cambiar en .env) ----
-// En produccion NO se permite arrancar con los valores de ejemplo: un panel de
-// administracion con admin/proshop123 esta abierto para cualquiera que conozca
-// el proyecto, y una APP_ENCRYPTION_KEY por defecto hace descifrables los
-// tokens de WhatsApp guardados. Antes esto caia al valor inseguro en silencio;
-// ahora el arranque falla con un mensaje claro (mejor no desplegar que
-// desplegar abierto).
-if (process.env.NODE_ENV === 'production') {
-  const faltantes = [];
-  if (!process.env.ADMIN_PASSWORD || process.env.ADMIN_PASSWORD === 'proshop123') faltantes.push('ADMIN_PASSWORD');
-  if (!process.env.APP_ENCRYPTION_KEY) faltantes.push('APP_ENCRYPTION_KEY');
-  if (!process.env.SESSION_SECRET) faltantes.push('SESSION_SECRET');
-  if (faltantes.length) {
-    console.error(`\n  ERROR DE CONFIGURACION: falta definir ${faltantes.join(', ')} en el entorno.`);
-    console.error('  Son obligatorias en produccion. Cargalas en las variables de entorno del servidor y volve a desplegar.\n');
-    process.exit(1);
-  }
-}
-
+// La validacion de que estas variables existan en produccion vive arriba de
+// todo, antes de los require (ver el comentario ahi).
 const ADMIN_USER = process.env.ADMIN_USER || 'admin';
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'proshop123';
 
