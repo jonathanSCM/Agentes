@@ -4,8 +4,14 @@ WORKDIR /app
 
 # npm ci respeta package-lock.json: dos deploys del mismo commit instalan
 # exactamente las mismas versiones (npm install podia traer versiones nuevas).
+#
+# NO usar --omit=dev: el CLI de Prisma vive en devDependencies y hace falta en
+# tiempo de EJECUCION, no solo al construir (el CMD de abajo corre
+# "npx prisma migrate deploy" en cada arranque). Sin el instalado, npx intenta
+# descargarlo de internet en cada boot: lento y, si la descarga falla, el
+# contenedor nunca llega a escuchar y el proxy devuelve 502 Bad Gateway.
 COPY package*.json ./
-RUN npm ci --omit=dev || npm install --omit=dev
+RUN npm ci || npm install
 
 COPY . .
 
