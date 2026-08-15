@@ -63,6 +63,36 @@
   </div>
 
   <div class="field">
+    <label for="moneda">Moneda de tu catálogo</label>
+    <p class="muted" style="font-size:.82rem;margin:0 0 .5rem">Todos los precios que tenés cargados están en esta moneda. El agente la usa para escribir cualquier precio y nunca la convierte a otra.</p>
+    <select id="moneda" name="moneda">
+      <% monedas.forEach(function (m) { %>
+        <option value="<%= m %>" <%= (empresa && empresa.moneda) === m ? 'selected' : '' %>><%= m %></option>
+      <% }); %>
+    </select>
+  </div>
+
+  <div class="field">
+    <label for="direccionTienda">Dirección de tu local (para retiro en tienda)</label>
+    <p class="muted" style="font-size:.82rem;margin:0 0 .5rem">Si la dejás vacía, el agente solo ofrece entrega a domicilio: nunca inventa una dirección. Si la cargás, se la manda tal cual al cliente que elija pasar a retirar.</p>
+    <input id="direccionTienda" name="direccionTienda" type="text" maxlength="200"
+           value="<%= config.direccionTienda || '' %>" placeholder="Ej: Av. Ballivián 1234, entre 2do y 3er anillo" />
+  </div>
+
+  <div class="field-row">
+    <div class="field">
+      <label for="tiendaLat">Latitud (opcional)</label>
+      <input id="tiendaLat" name="tiendaLat" type="number" step="any"
+             value="<%= config.tiendaLat != null ? config.tiendaLat : '' %>" placeholder="-17.783" />
+    </div>
+    <div class="field">
+      <label for="tiendaLng">Longitud (opcional)</label>
+      <input id="tiendaLng" name="tiendaLng" type="number" step="any"
+             value="<%= config.tiendaLng != null ? config.tiendaLng : '' %>" placeholder="-63.182" />
+    </div>
+  </div>
+
+  <div class="field">
     <label>Formas de pago que acepta esta tienda</label>
     <p class="muted" style="font-size:.82rem;margin:0 0 .5rem">El agente SOLO le ofrece al cliente las formas de pago que marques acá.</p>
     <label style="display:block;margin-bottom:.3rem"><input type="checkbox" name="aceptaEfectivo" value="1" <%= config.aceptaEfectivo !== false ? 'checked' : '' %> /> Efectivo</label>

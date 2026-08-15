@@ -14,6 +14,8 @@ const {
   seccionProductos,
   construirSystem,
   fichaProducto,
+  limpiezaPorCambioDeCategoria,
+  datosDeActualizacionDeLead,
 } = require('../lib/services/agente');
 
 // Categoria ahora es una relacion ({id, nombre}), no texto libre. Los tests
@@ -353,5 +355,100 @@ describe('construirSystem - "que vendes" no debe listar 1 sola categoria como me
     ];
     const system = construirSystem(empresa, productos, {}, {}, false, false, 'Raul');
     assert.match(system, /LISTA \(numerada o con guiones/, 'con varias categorias si tiene sentido pedir una lista');
+  });
+});
+
+describe('el cliente cambia de opinion de categoria (punto 46 del documento)', () => {
+  const zapatillas = { id: 1, nombre: 'Zapatillas', atributos: [{ nombre: 'Genero', nivel: 'OBLIGATORIO' }] };
+  const camisas = { id: 2, nombre: 'Camisas', atributos: [{ nombre: 'Genero', nivel: 'OBLIGATORIO' }, { nombre: 'Cuello', nivel: 'RECOMENDADO' }] };
+  const productos = [
+    { id: 10, nombre: 'Runner', categoria: zapatillas, variantes: [] },
+    { id: 20, nombre: 'Camisa lisa', categoria: camisas, variantes: [] },
+  ];
+
+  test('suelta el producto favorito de la categoria vieja (no sigue empujando esa venta)', () => {
+    const cliente = { productoFavoritoId: 10, varianteFavoritaId: 99, productosDescartados: [11], atributosLead: { Genero: 'Hombre' }, contexto: {} };
+    const limpieza = limpiezaPorCambioDeCategoria(cliente, productos, camisas.id);
+    assert.equal(limpieza.productoFavoritoId, null);
+    assert.equal(limpieza.varianteFavoritaId, null);
+    assert.deepEqual(limpieza.productosDescartados, [], 'lo descartado era de la otra categoria');
+  });
+
+  test('CONSERVA lo que sigue siendo valido (el genero existe tambien en la categoria nueva)', () => {
+    const cliente = { atributosLead: { Genero: 'Hombre' }, contexto: {} };
+    const limpieza = limpiezaPorCambioDeCategoria(cliente, productos, camisas.id);
+    assert.deepEqual(limpieza.atributosLead, { Genero: 'Hombre' });
+  });
+
+  test('descarta los atributos que solo tenian sentido en la categoria vieja', () => {
+    const cliente = { atributosLead: { Genero: 'Hombre', Pisada: 'Neutra' }, contexto: {} };
+    const limpieza = limpiezaPorCambioDeCategoria(cliente, productos, camisas.id);
+    assert.deepEqual(limpieza.atributosLead, { Genero: 'Hombre' }, 'Pisada no existe en Camisas');
+  });
+
+  test('resetea la confirmacion de pedido pendiente (era de otro producto)', () => {
+    const cliente = { atributosLead: {}, contexto: { resumenConfirmado: '10:0:1', fotosEnviadas: [10] } };
+    const limpieza = limpiezaPorCambioDeCategoria(cliente, productos, camisas.id);
+    assert.equal(limpieza.contexto.resumenConfirmado, null);
+    assert.deepEqual(limpieza.contexto.fotosEnviadas, [10], 'lo que ya vio sigue siendo cierto, no se borra');
+  });
+});
+
+describe('datosDeActualizacionDeLead - la memoria del cliente', () => {
+  const zapatillas = { id: 1, nombre: 'Zapatillas', atributos: [{ nombre: 'Genero', nivel: 'OBLIGATORIO' }, { nombre: 'Pisada', nivel: 'OPCIONAL' }] };
+  const camisas = { id: 2, nombre: 'Camisas', atributos: [{ nombre: 'Genero', nivel: 'OBLIGATORIO' }, { nombre: 'Cuello', nivel: 'RECOMENDADO' }] };
+  const productos = [
+    { id: 10, nombre: 'Runner', categoria: zapatillas, variantes: [] },
+    { id: 20, nombre: 'Camisa lisa', categoria: camisas, variantes: [] },
+  ];
+
+  test('el presupuesto en texto se guarda TAMBIEN como rango numerico', () => {
+    const datos = datosDeActualizacionDeLead({ presupuesto: 'hasta Bs 500' }, {}, productos);
+    assert.equal(datos.presupuesto, 'hasta Bs 500');
+    assert.equal(datos.presupuestoMax, 500);
+  });
+
+  test('entiende un rango ("entre 300 y 500")', () => {
+    const datos = datosDeActualizacionDeLead({ presupuesto: 'entre 300 y 500' }, {}, productos);
+    assert.equal(datos.presupuestoMin, 300);
+    assert.equal(datos.presupuestoMax, 500);
+  });
+
+  test('cambiar de categoria Y dar un atributo nuevo en el MISMO mensaje no resucita los atributos viejos', () => {
+    // Bug real: el bloque de atributosCategoria acumulaba sobre el valor viejo
+    // del cliente y deshacia la limpieza por cambio de categoria.
+    const cliente = { categoriaId: zapatillas.id, atributosLead: { Genero: 'Hombre', Pisada: 'Neutra' }, contexto: {} };
+    const datos = datosDeActualizacionDeLead(
+      { categoriaInteres: 'Camisas', atributosCategoria: { Cuello: 'Mao' } },
+      cliente, productos,
+    );
+    assert.deepEqual(datos.atributosLead, { Genero: 'Hombre', Cuello: 'Mao' });
+    assert.ok(!('Pisada' in datos.atributosLead), 'Pisada no existe en Camisas: no puede sobrevivir al cambio');
+  });
+
+  test('lo mismo con los descartados: cambiar de categoria los limpia aunque vengan nuevos', () => {
+    const cliente = { categoriaId: zapatillas.id, productosDescartados: [10, 11], atributosLead: {}, contexto: {} };
+    const datos = datosDeActualizacionDeLead(
+      { categoriaInteres: 'Camisas', productosDescartadosIds: [20] },
+      cliente, productos,
+    );
+    assert.deepEqual(datos.productosDescartados, [20], 'los descartados de zapatillas no aplican a camisas');
+  });
+
+  test('sin cambio de categoria, los descartados SI se acumulan como siempre', () => {
+    const cliente = { categoriaId: zapatillas.id, productosDescartados: [10], atributosLead: {}, contexto: {} };
+    const datos = datosDeActualizacionDeLead({ productosDescartadosIds: [11] }, cliente, productos);
+    assert.deepEqual(datos.productosDescartados, [10, 11]);
+  });
+
+  test('sin cambio de categoria, los atributos SI se acumulan como siempre', () => {
+    const cliente = { categoriaId: zapatillas.id, atributosLead: { Genero: 'Hombre' }, contexto: {} };
+    const datos = datosDeActualizacionDeLead({ atributosCategoria: { Pisada: 'Neutra' } }, cliente, productos);
+    assert.deepEqual(datos.atributosLead, { Genero: 'Hombre', Pisada: 'Neutra' });
+  });
+
+  test('el tipo de entrega se normaliza al enum de la base', () => {
+    assert.equal(datosDeActualizacionDeLead({ tipoEntrega: 'recojo' }, {}, productos).tipoEntrega, 'RECOJO');
+    assert.equal(datosDeActualizacionDeLead({ tipoEntrega: 'domicilio' }, {}, productos).tipoEntrega, 'DOMICILIO');
   });
 });

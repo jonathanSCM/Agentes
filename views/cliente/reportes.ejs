@@ -49,7 +49,7 @@
       <p class="dash-empty">Todavía no detectamos ventas desde un anuncio de Meta. En cuanto un cliente escriba desde un anuncio "Click to WhatsApp", aparecerán acá automáticamente (sin conectar nada).</p>
     <% } else { %>
       <p class="muted" style="font-size:.82rem;margin:-.2rem 0 .6rem">
-        <%= r.ventasAnuncios.cantidad %> venta<%= r.ventasAnuncios.cantidad === 1 ? '' : 's' %> · Bs <%= r.ventasAnuncios.total.toFixed(2) %> · últimos 30 días
+        <%= r.ventasAnuncios.cantidad %> venta<%= r.ventasAnuncios.cantidad === 1 ? '' : 's' %> · <%= simboloCatalogo %> <%= r.ventasAnuncios.total.toFixed(2) %> · últimos 30 días
       </p>
       <ul class="dash-list">
         <% r.anuncios.forEach(function (a) { %>

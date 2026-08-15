@@ -194,6 +194,11 @@ model Empresa {
   nombre    String
   slug      String   @unique
   marca     String? // nombre para marca blanca (plan Premium)
+  // Moneda REAL en la que estan cargados los precios del catalogo de este
+  // negocio. Existe porque la IA no puede decidir la moneda por su cuenta:
+  // antes la ficha mostraba "370.00" pelado y el modelo elegia si escribir
+  // "Bs" o "$" segun le pareciera (ver docs/02, regla de moneda del backend).
+  moneda    String   @default("BOB")
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -363,6 +368,12 @@ model AgenteConfig {
   qrCobroUrl        String?
   aceptaEfectivo    Boolean  @default(true)
   aceptaTarjeta     Boolean  @default(false)
+  // Ubicacion REAL del local, para los pedidos con retiro en tienda. El bot
+  // nunca inventa una direccion: si esto esta vacio, dice que no la tiene
+  // cargada en vez de improvisar una (ver crear_pedido).
+  direccionTienda   String?
+  tiendaLat         Float?
+  tiendaLng         Float?
   updatedAt         DateTime @updatedAt
 
   @@map("agente_config")
@@ -457,6 +468,9 @@ model Producto {
   empresaId       Int
   empresa         Empresa    @relation(fields: [empresaId], references: [id], onDelete: Cascade)
   nombre          String
+  // Codigo interno del negocio para este producto. Las variantes tienen el
+  // suyo propio (Variante.sku); este es el del producto padre.
+  sku             String?
   categoriaId     Int?
   categoria       Categoria? @relation(fields: [categoriaId], references: [id], onDelete: SetNull)
   descripcion     String?
@@ -502,7 +516,11 @@ model CategoriaAtributo {
   categoriaId Int
   categoria   Categoria @relation(fields: [categoriaId], references: [id], onDelete: Cascade)
   nombre      String // "Genero", "Talla", "Color", "Uso"...
-  obligatorio Boolean   @default(false)
+  // Tres niveles, no un booleano: OBLIGATORIO bloquea de verdad (el bot no
+  // muestra productos hasta saberlo), RECOMENDADO se pregunta pero no
+  // bloquea, OPCIONAL ni se pregunta. Reemplazo del viejo campo
+  // "obligatorio" (boolean), que no distinguia el caso del medio.
+  nivel        NivelAtributo @default(OPCIONAL)
   // true = vive en Variante.atributos (ej: talla/color) - solo se usa como
   // guia (datalist, que preguntar), no bloquea guardar el producto. false =
   // vive en Producto.atributos - ese si se valida obligatorio al guardar.
@@ -511,6 +529,12 @@ model CategoriaAtributo {
 
   @@unique([categoriaId, nombre])
   @@map("categoria_atributos")
+}
+
+enum NivelAtributo {
+  OBLIGATORIO // el bot NO muestra productos hasta conocerlo
+  RECOMENDADO // el bot lo pregunta si puede, pero no bloquea la busqueda
+  OPCIONAL    // solo sirve para filtrar si el cliente lo menciona solo
 }
 
 // Una combinacion vendible de un producto (ej: talla 42 + color negro), con
@@ -560,9 +584,19 @@ model ClienteFinal {
   // para saber sus atributos obligatorios (ver Categoria/CategoriaAtributo).
   // categoriaInteres se mantiene como el texto literal que dijo el cliente.
   categoriaId      Int?
+  // Texto literal que dijo el cliente ("hasta 500 bs", "unos 300").
   presupuesto      String?
+  // El mismo presupuesto ya interpretado a numero por el backend. El texto
+  // solo sirve para repetirselo al cliente; el filtrado real usa estos dos,
+  // asi la busqueda no depende de reparsear un string en cada consulta.
+  presupuestoMin   Decimal? @db.Decimal(10, 2)
+  presupuestoMax   Decimal? @db.Decimal(10, 2)
   cantidad         String?
   direccionEntrega String?
+  // Domicilio o retiro en tienda. Sin esto no se puede crear el pedido: son
+  // dos flujos distintos (uno necesita direccion del cliente, el otro manda
+  // la ubicacion real del local).
+  tipoEntrega      TipoEntrega?
   // Coordenadas reales cuando el cliente comparte su ubicacion de WhatsApp
   // (mucho mas confiable que una direccion escrita a mano para coordinar
   // la entrega). direccionEntrega igual queda con un texto legible/link.
@@ -592,6 +626,9 @@ model ClienteFinal {
   productosMostrados    Int[] @default([])
   productosDescartados  Int[] @default([])
   productoFavoritoId    Int?
+  // La combinacion exacta (talla+color) que eligio, no solo el producto: el
+  // pedido siempre termina apuntando a una variante real.
+  varianteFavoritaId    Int?
   // Datos efimeros del bot (ej. que productos ya se les envio foto, para
   // no repetir el envio). Libre para que cualquier bot vertical lo use.
   contexto         Json         @default("{}")
@@ -611,6 +648,11 @@ enum FormaPago {
   QR
   EFECTIVO
   TARJETA
+}
+
+enum TipoEntrega {
+  DOMICILIO
+  RECOJO
 }
 
 enum NivelInteres {
@@ -640,6 +682,10 @@ enum EstadoConversacion {
   INTERESADO
   INTENCION_DE_COMPRA
   LISTO_PARA_COMPRAR
+  // Etapas del cierre: ya decidio que compra y falta completar el pedido.
+  DATOS_DE_PEDIDO
+  ENTREGA
+  PEDIDO_COMPLETADO
 }
 
 model Pedido {
@@ -654,6 +700,10 @@ model Pedido {
   conversacionId   Int?
   conversacion     Conversacion? @relation(fields: [conversacionId], references: [id], onDelete: SetNull)
   total            Decimal       @default(0) @db.Decimal(10, 2)
+  // Copiada de ClienteFinal al crear el pedido, igual que formaPago. En un
+  // pedido con RECOJO la direccion queda vacia a proposito (retira el
+  // cliente en el local).
+  tipoEntrega      TipoEntrega?
   direccionEntrega String?
   entregaLat       Float?
   entregaLng       Float?

@@ -22,7 +22,7 @@
     <span class="stat-label">Pedidos de hoy</span>
   </div>
   <div class="stat-card stat-done">
-    <span class="stat-num">Bs <%= kpi.ventasHoy.toLocaleString('es-BO') %></span>
+    <span class="stat-num"><%= simboloCatalogo %> <%= kpi.ventasHoy.toLocaleString('es-BO') %></span>
     <span class="stat-label">Vendido hoy</span>
   </div>
   <div class="stat-card">
@@ -101,7 +101,7 @@
       <div style="text-align:center;padding:.5rem 0">
         <div class="gauge-num" style="font-size:2.2rem"><%= ventasAnuncios.cantidad %></div>
         <span class="gauge-sub">ventas desde un anuncio en los últimos 30 días</span>
-        <p class="muted" style="font-size:.82rem;margin-top:.4rem">Bs <%= ventasAnuncios.total.toFixed(2) %> en total</p>
+        <p class="muted" style="font-size:.82rem;margin-top:.4rem"><%= simboloCatalogo %> <%= ventasAnuncios.total.toFixed(2) %> en total</p>
       </div>
     <% } %>
   </div>

@@ -78,3 +78,73 @@ De paso, se corrigió otro problema notado en la misma captura: `fichaProducto` 
 ## Patrón general que se repitió en toda la sesión
 
 Casi todos estos cambios siguieron el mismo ciclo: **reporte real de uso del dueño → diagnóstico en código real (no suposición) → decisión de alcance explícita cuando había ambigüedad → implementación → verificación con simulación real (`llamarInyectado` inyectando una IA falsa determinista) antes de dar por resuelto.** Varias veces la causa raíz real no era donde el síntoma aparecía (ej: el bug de la foto equivocada no era un problema de "elegir la foto", era un problema de "no haber usado tarjetas antes").
+
+---
+
+## 8. Aplicación completa del documento "Instrucciones definitivas para el desarrollo del Agente de Ventas" (50 puntos)
+
+Se auditaron los 50 puntos del documento contra el código real y se implementó todo lo que faltaba. Lo omitido a pedido explícito del dueño: **todo lo de pago/dinero** (puntos 35 y 36, y la parte de factura/NIT/razón social del 34) — el 35 y 36 ya estaban resueltos igual.
+
+### Decisión de producto revertida a propósito: volver a 2-3 opciones + paginación
+
+La decisión #1 de esta bitácora (mostrar TODAS las opciones, `MAX = 20`) **se reemplazó** por lo que pide el documento: mostrar 3 por vez con paginación real. El motivo por el que se había elegido "mostrar todas" era el miedo del punto 16 ("el catálogo tiene 13 y el bot muestra 3 y dice que son todas"), y ese miedo se resuelve mejor con `total_matches`: ahora el backend cuenta **todos** los resultados reales y le dice al modelo cuántos hay y cuántos quedan sin mostrar, así que el bot nunca puede afirmar "esas son todas" sin saberlo. No se esconde inventario: se muestra de a poco y el bot ofrece el resto.
+
+### Motor de búsqueda separado (`lib/services/catalogo.js`)
+
+`agente.js` era "cómo se le habla al modelo" y "qué existe en el inventario" mezclados. La segunda mitad se movió a `lib/services/catalogo.js` (filtros, cascada de alternativas, paginación, selección de fotos). `agente.js` reexporta lo que los tests ya usaban, así que nada se rompió.
+
+### Qué cambió, punto por punto
+
+- **Primero entender, después mostrar (puntos 2, 8, 13, 42, 44).** `filtrosCompletos` ya no se conforma con saber la categoría: si esa categoría tiene atributos de nivel `OBLIGATORIO` que todavía no se saben, `seccionProductos` **no le pasa ningún producto al modelo** y `mostrar_productos` lo rechaza en código. Antes era solo una línea de texto en el prompt, y el modelo mostraba productos igual apenas escuchaba "zapatillas".
+- **Tres niveles de atributo (punto 44).** `CategoriaAtributo.obligatorio` (boolean) → `CategoriaAtributo.nivel` (`OBLIGATORIO` / `RECOMENDADO` / `OPCIONAL`). Obligatorio bloquea de verdad; recomendado se pregunta si la charla da pie; opcional solo filtra si el cliente lo menciona. El panel pasó de checkbox a selector.
+- **Género como filtro real (punto 3).** Los atributos del lead (`atributosLead`) ahora **filtran la búsqueda**, no solo suman puntaje. Antes, con `Genero = Hombre` guardado, la búsqueda seguía devolviendo productos de mujer. Criterio: si el producto tiene el atributo cargado, tiene que coincidir; si no lo tiene, no se lo excluye (no hay dato que lo contradiga y descartarlo escondería inventario mal etiquetado). El género nunca se afloja, ni como último recurso.
+- **Orden de alternativas del documento (punto 11).** `buscarConFallback` afloja de a un filtro por vez y en este orden: exacto → color → marca → presupuesto → talla. Nunca afloja categoría ni atributos del lead. Devuelve **cuál** filtro aflojó.
+- **Preguntar antes de ampliar la búsqueda (punto 12).** Si el resultado apareció aflojando un filtro, no se muestra nada: el bot tiene que decir qué no encontró y preguntar si quiere ver las parecidas. Reforzado en código, y con control de turno para que el modelo no pueda preguntar y autorresponderse en la misma vuelta.
+- **`total_matches` y paginación (puntos 15, 16, 17).** `RESULTADOS_POR_PAGINA = 3`. El bloque de resultados le dice al modelo el total real, cuántos ya vio el cliente y cuántos quedan. Tool nueva `ver_mas_productos`: la página siguiente **la elige el backend**, no el modelo, así no repite ni se saltea resultados.
+- **Fotos de otro color (puntos 22, 23).** `fotoParaMostrar` ya no devuelve una URL pelada: devuelve `{url, colorDeLaFoto, esDelColorPedido, coloresConFoto, coloresSinFoto}`. Si el cliente pidió gris y solo hay foto blanca, se manda la blanca **marcada como referencial** y el bot recibe la orden explícita de aclararlo. También sabe qué colores tienen foto y cuáles no.
+- **TOOL_SUCCESS / TOOL_FAILED de verdad (puntos 26, 41).** `mostrar_productos` y `enviar_fotos_producto` miran el resultado real de `wa.enviarImagenes`/`enviarTexto`. Si el envío falla, el resultado de la tool arranca con `TOOL_FAILED` y le prohíbe al modelo decir que mandó algo. Antes solo el QR de pago verificaba esto.
+- **Moneda del backend (punto 29).** `Empresa.moneda` (configurable en `/panel/configuracion`). La ficha pasó de `Precio: 370.00` pelado a `Precio: Bs 370.00`. El modelo tiene prohibido convertir o cambiar el símbolo. También se aplicó al catálogo público y a las vistas de ventas del panel (los precios de los planes de Proshop siguen como estaban: son otra cosa).
+- **Resumen de confirmación obligatorio (punto 39).** Tool nueva `confirmar_pedido`: arma el resumen real (producto, variante, cantidad, precios de la base, entrega) para que el bot se lo lea. `crear_pedido` **rechaza** si el cliente no confirmó ese pedido exacto (se compara una firma de los ítems), así que ningún pedido se crea sin confirmación real.
+- **Tipo de entrega y retiro en tienda (puntos 34, 37, 38).** Enum `TipoEntrega` (`DOMICILIO` / `RECOJO`) en `ClienteFinal` y `Pedido`. `AgenteConfig.direccionTienda/tiendaLat/tiendaLng`: si el negocio no cargó su dirección, el bot **no ofrece retiro** en vez de inventar una. Al crear un pedido con retiro, manda la ubicación real y solo afirma haberla mandado si el envío fue exitoso.
+- **Cambio de opinión (punto 46).** `limpiezaPorCambioDeCategoria`: al cambiar de rubro se sueltan favorito, variante favorita, descartados, confirmación pendiente y los atributos que no existen en la categoría nueva; se conserva lo que sigue valiendo (género, talla, presupuesto, nombre, dirección). Aplica tanto por la tool como por la detección determinista.
+- **Memoria estructurada (punto 6).** `presupuestoMin`/`presupuestoMax` numéricos (el texto libre queda solo para repetírselo al cliente) y `varianteFavoritaId`.
+- **Estados de compra (punto 7).** Se agregaron `DATOS_DE_PEDIDO`, `ENTREGA` y `PEDIDO_COMPLETADO` (el estado `PAGO` se omitió por ser de dinero).
+- **SKU de producto (punto 19)** y **no inventar datos ni justificaciones de precio (puntos 28, 30)**, reforzado explícitamente en el prompt.
+- **Logs (punto 48).** `logEtapa` ahora incluye `total_matches`, `results_returned`, `missing_attributes`, `purchase_stage`, `tool_result` y `selected_variant`.
+- **Los 12 tests del punto 47.** `test/documento-12-casos.test.js`, uno por caso y en el mismo orden que el documento (45 asserts). Para poder testear los casos 5-8 sin WhatsApp ni base de datos, se extrajeron dos funciones puras: `avisosDeFoto` y `resultadoDeEnvio`.
+
+**Migración**: `prisma/migrations/20260815010000_documento_agente_ventas` (idempotente, incluye la conversión de `obligatorio` → `nivel`).
+
+⚠️ **La migración quedó escrita pero NO aplicada**: el entorno donde se hizo este trabajo no tenía credenciales de la base. Antes del próximo deploy hay que aplicarla y correr `npx prisma migrate resolve --applied 20260815010000_documento_agente_ventas` + `npx prisma generate`, como indica `CLAUDE.md`.
+
+### Corrección encontrada al verificar contra el dump real de producción
+
+Al revisar el backup local (`proshop_local_20260815_1130.sql`, 150 productos / 18 categorías / 2.290 variantes) apareció un problema que no se veía en los tests: **las 18 categorías tienen 8 atributos marcados `obligatorio`** (Corte, Estilo, Género, Material, Ocasión, Talla, Temporada, Tipo). Vienen de la migración de auto-detección (`20260814080000`), que marcaba obligatorio a todo atributo presente en TODOS los productos de la categoría.
+
+Eso era inofensivo mientras `obligatorio` fuera solo una sugerencia en el prompt. Con el gate nuevo pasa a **bloquear**: el bot habría exigido las 8 respuestas antes de mostrar un solo producto — justo el interrogatorio que prohíbe el punto 4 del mismo documento.
+
+**Decisión**: el backfill mapea `obligatorio = true` → **`RECOMENDADO`**, no a `OBLIGATORIO`. Es la traducción fiel de lo que ese flag hacía (pedir sin bloquear). `OBLIGATORIO` es comportamiento nuevo y activarlo sobre datos existentes sería un cambio silencioso y dañino. Cada negocio promueve a obligatorio los 1-2 que de verdad importan (típicamente Género y Talla) desde `/panel/categorias/:id`.
+
+Además se agregó `MAX_ATRIBUTOS_SUGERIDOS = 3`: aunque una categoría tenga 8 recomendados, al modelo se le sugieren 3 por vez, para que el prompt no se vuelva un checklist.
+
+**Lección repetida**: los tests deterministas pasaban al 100% y el problema igual estaba. Solo apareció mirando datos reales.
+
+## 9. El bot preguntaba demasiado: más directo, menos interrogatorio
+
+**Problema reportado por el dueño** (capturas reales de WhatsApp, conversación "vestido para mi novia"): tres fallas encadenadas en una sola conversación.
+
+1. El bot pidió **marca, ocasión y talla juntas**, en una lista con viñetas — un formulario, justo lo que prohíbe el punto 4 del documento.
+2. El cliente respondió marca y talla, y el bot **volvió a preguntar** ocasión y estilo en vez de mostrar productos.
+3. Cerró con *"Voy a buscar algunas opciones... Dame un momento 🚀"* y **no mostró nada**: el turno termina en ese mensaje, así que el cliente quedó esperando algo que nunca llegó.
+
+**Causa raíz**: el prompt tenía una regla que fomentaba usar listas ("USA LISTAS CUANDO AYUDEN"), sin excluir las preguntas; y los atributos `RECOMENDADO` se le ofrecían al modelo *antes* de mostrar, invitándolo a seguir preguntando para "afinar".
+
+**Decisión (prompt + backstops en código, el patrón de siempre)**:
+
+- Regla dura de **una sola pregunta por mensaje**, y listas permitidas solo para opciones entre las que el cliente elige, nunca para preguntas.
+- Los atributos `RECOMENDADO` pasan a ser explícitamente **para después de mostrar**: "no los preguntes antes, solo sirven si el cliente vio las opciones y ninguna le convenció".
+- Cuando faltan datos obligatorios, el sistema le dice **cuál preguntar** (solo el primero), no la lista entera.
+- `pareceInterrogatorio()` — si el mensaje trae 2+ signos de pregunta, se rechaza en código y se le exige reescribirlo con una sola.
+- `pareceAnuncioDeBusqueda()` — si promete buscar ("dame un momento", "ya te muestro", "voy a revisar"), se rechaza y se le exige mostrar de verdad o hacer la pregunta que falta.
+
+Ambos backstops corren en el mismo punto del loop que el de "listado en texto plano", y están cubiertos por tests con los mensajes textuales de las capturas.

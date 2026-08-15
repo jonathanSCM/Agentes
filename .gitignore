@@ -6,3 +6,8 @@ npm-debug.log*
 .DS_Store
 
 /lib/generated/prisma
+
+# Scripts temporales de exploracion de la base (CLAUDE.md: se borran despues
+# de usarlos). Nunca se versionan: suelen llevar la cadena de conexion con
+# contraseña escrita a mano.
+temp_*.js

@@ -110,7 +110,7 @@
                     <span class="stock <%= p.stockMostrado === 0 ? 'agotado' : (p.stockMostrado <= 5 ? 'bajo' : '') %>">
                       <%= p.stockMostrado === 0 ? 'Agotado' : (p.stockMostrado <= 5 ? 'Últimas unidades' : 'Disponible') %>
                     </span>
-                    <span class="precio">Bs <%= Number(p.precio).toFixed(2) %></span>
+                    <span class="precio"><%= simboloCatalogo %> <%= Number(p.precio).toFixed(2) %></span>
                   </div>
                 </div>
               <% }); %>

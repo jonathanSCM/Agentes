@@ -1,41 +1,60 @@
 # Pendientes y gaps conocidos
 
-Basado en una revisión formal contra el documento "Instrucciones definitivas para el desarrollo del Agente de Ventas" del dueño del negocio, actualizada con todo lo resuelto en `docs/03-decisiones-recientes.md`. El objetivo de este archivo es que otra sesión de IA sepa, sin adivinar, qué ya está bien y qué falta.
+Basado en una revisión formal contra el documento "Instrucciones definitivas para el desarrollo del Agente de Ventas" del dueño del negocio (50 puntos), actualizada con todo lo resuelto en `docs/03-decisiones-recientes.md`. El objetivo de este archivo es que otra sesión de IA sepa, sin adivinar, qué ya está bien y qué falta.
 
 ## ✅ Resuelto
 
-- Bot se presenta de verdad en el primer mensaje (no un saludo genérico) — punto 1 + bug del default corregido.
-- No interrogatorio (preguntas de a una, conversacional) — prompt.
-- Memoria persistente estructurada del lead (categoría, presupuesto, marca, talla, color, dirección, forma de pago, atributos de categoría) — `ClienteFinal`.
-- Estados de intención comercial (`EstadoConversacion`) con los mismos nombres que pedía el documento.
-- El presupuesto nunca reemplaza la categoría; nunca cambia de categoría por su cuenta.
-- Consulta el backend antes de decir "no tenemos".
-- **Género como filtro real** — ya NO es un caso especial hardcodeado: es un atributo configurable más, vía el sistema de Categorías (ver decisión #5).
-- **Atributos obligatorios/opcionales por categoría** — motor de reglas real (`Categoria`/`CategoriaAtributo`), con auto-detección desde los datos existentes.
-- Producto ≠ variante, con fotos propias por variante/color; el bot manda la foto del color correcto.
-- No inventa información; precio y moneda vienen siempre del backend.
-- Se enfoca en el producto favorito una vez elegido; lleva la conversación hacia el cierre.
-- Revalida stock/precio/variante justo antes de crear el pedido.
-- Logs estructurados por etapa (`logEtapa`), similar a lo que pedía el documento.
-- **Formas de pago configurables por tienda + QR estático** (decisión de alcance explícita: no pasarela de pago real, un humano cierra el cobro).
-- **Nunca oculta inventario real por prolijidad** — se sacó el tope de 3 productos.
-- **Nunca manda la foto de un producto no relacionado** — validación de ID contra la conversación real.
-- **No describe productos con precio como texto plano** — detectado y corregido en código si el modelo lo intenta.
-- Tallas con los mismos colores ya no se repiten línea por línea.
+Los 50 puntos del documento están aplicados, salvo lo omitido a propósito (ver más abajo). Resumen de los que se cerraron en la última pasada:
 
-## 🟡 Decisión tomada distinta a la recomendación literal del documento
+- **Primero entender, después mostrar** (2, 8, 13, 42) — gate real en código: sin los atributos `OBLIGATORIO` de la categoría, el modelo no recibe ningún producto y `mostrar_productos` lo rechaza.
+- **Género como filtro principal** (3) — `atributosLead` filtra la búsqueda de verdad y nunca se afloja.
+- **Atributos con 3 niveles** (44) — `OBLIGATORIO` / `RECOMENDADO` / `OPCIONAL`.
+- **Orden de alternativas + preguntar antes de ampliar** (11, 12) — color → marca → presupuesto → talla, avisando cuál se aflojó y pidiendo permiso antes de mostrar.
+- **`total_matches` + paginación de 3** (15, 16, 17) — tool `ver_mas_productos`, con la página siguiente elegida por el backend.
+- **Fotos: color exacto, referencial o inexistente** (21-25) — `fotoParaMostrar` devuelve si la foto es del color pedido, y qué colores tienen o no tienen foto.
+- **TOOL_SUCCESS / TOOL_FAILED en todos los envíos** (26, 41) — el bot no puede afirmar que mandó algo que no se envió.
+- **Moneda del backend** (29) — `Empresa.moneda`, precios siempre con símbolo real.
+- **No inventar datos ni justificaciones de precio** (27, 28, 30).
+- **Resumen de confirmación antes de crear el pedido** (39) — `confirmar_pedido`, con firma de ítems verificada en `crear_pedido`.
+- **Tipo de entrega + retiro en tienda con ubicación real** (34, 37, 38).
+- **Cambio de opinión sin reiniciar la conversación** (46).
+- **Memoria estructurada con presupuesto numérico y variante elegida** (6), **estados de cierre** (7), **SKU** (19).
+- **Logs con `total_matches`, `results_returned`, `missing_attributes`, `tool_result`** (48).
+- **Los 12 tests de regresión** (47) — `test/documento-12-casos.test.js`.
+- Y lo que ya estaba de antes: presentación real del bot (1), no interrogatorio (4), memoria persistente (5), presupuesto que no reemplaza categoría (9), no cambiar de categoría solo (10), no saturar con datos innecesarios (14), consultar antes de decir "no tenemos" (18), producto ≠ variante con `variant_id` en el pedido (20), foco en el favorito (32), llevar hasta el cierre (33), revalidar antes de crear (40), preguntas adaptadas a la categoría (43), no repreguntar (45), orden de responsabilidades (49).
 
-- El documento pedía mostrar 3 + "¿querés ver más?" con paginación (`offset`/`limit`). Se decidió explícitamente (con el dueño) **mostrar todas las opciones reales que apliquen** en vez de eso. Es una decisión de producto, no un olvido — documentado acá para que no se "corrija" de vuelta sin querer.
+## ⚪ Omitido a pedido explícito del dueño
 
-## 🔴 Todavía sin resolver
+Todo lo de **pago y dinero**:
 
-- **Avisar cuando una foto es de otro color o no hay foto del color exacto pedido.** Hoy `fotoParaMostrar` cae silenciosamente a la foto genérica del producto si el color pedido no tiene foto propia — no le aclara al cliente que esa foto podría no ser exactamente ese color (punto 22-23 del documento original).
-- **Confirmación de envío (TOOL_SUCCESS) para fotos de producto en general.** Ya se aplica ese principio para el QR de pago (nunca dice "te mandé el QR" sin confirmar el envío real), pero `mostrar_productos`/`enviar_fotos_producto` todavía no verifican el resultado real de `wa.enviarImagenes` antes de que el texto de respuesta asuma que salió bien.
-- **Recojo en tienda + ubicación fija del negocio.** No existe `tipo_entrega` (domicilio vs. recojo) ni una ubicación configurada por tienda para ese caso.
-- **Facturación (NIT, razón social).** No hay ningún campo de facturación en `Pedido`.
-- **Orden de fallback específico al buscar alternativas** (misma categoría+talla+marca+color → mismo con otro color → otra marca similar → fuera de presupuesto) y **preguntar explícitamente antes de ampliar la búsqueda** ("no encontré X, tengo estos similares, ¿los muestro?"). Hoy el relajado de filtros existe pero no sigue ese orden exacto ni pregunta antes de mostrar alternativas relajadas.
-- **Suite de tests específica de 12 casos** que pedía el documento — hay 60 tests reales cubriendo buena parte de esto, pero no están armados como esos 12 casos puntuales uno por uno.
+- **Punto 35 (formas de pago)** y **36 (pago por QR)** — quedaron implementados de antes igual: formas de pago configurables por tienda y QR estático con confirmación real de envío.
+- **La parte de facturación del punto 34** (factura sí/no, NIT, razón social) — no existe ningún campo de facturación en `Pedido` y no se agregó.
+
+Si algún día se retoma: el lugar natural es `Pedido` (campos de facturación) y `AgenteConfig` (si la tienda factura o no).
+
+## ⚠️ Acción pendiente del dueño después de aplicar la migración
+
+Los atributos que hoy están marcados obligatorio pasan a **RECOMENDADO** (el bot los pregunta pero no bloquea). Para que funcione el punto 1 del documento ("no mostrar antes de preguntar género/talla"), hay que entrar a `/panel/categorias/:id` y **promover a Obligatorio los 1-2 atributos que de verdad importan** en cada categoría — normalmente Género y Talla. Mientras nadie lo haga, el bot se comporta como antes en ese punto: muestra apenas sabe la categoría.
+
+El motivo de no hacerlo automático está en `docs/03-decisiones-recientes.md`: las 18 categorías tienen 8 atributos marcados, y activarlos todos como bloqueantes convertiría la conversación en un interrogatorio.
+
+## 🟡 Cosas a tener en cuenta, no son gaps
+
+- **Mostrar 3 + paginación reemplazó la decisión anterior de "mostrar todas".** Está explicado en `docs/03-decisiones-recientes.md` punto 8. No "corregirlo" de vuelta sin hablarlo: el riesgo que motivaba mostrar todas (esconder inventario) hoy está cubierto por `total_matches`.
+- **Los atributos del lead filtran solo si el producto los tiene cargados.** Un producto sin `Genero` cargado igual le aparece a un cliente que pidió ropa de hombre. Es deliberado (no hay dato que lo contradiga y excluirlo escondería inventario mal etiquetado), pero significa que **la calidad del filtrado por género depende de que el catálogo esté bien etiquetado**. La auto-detección de atributos por categoría ayuda, pero no inventa datos que no existen.
+
+## 🔴 Pendiente de infraestructura (no es del documento)
+
+Detectado al analizar el proyecto, no está en los 50 puntos pero es más grave que varios de ellos:
+
+- **La migración `20260815010000_documento_agente_ventas` está escrita pero NO aplicada** (el entorno no tenía credenciales de base). Hay que aplicarla antes del próximo deploy.
+- **El seed borra datos en cada deploy.** `Dockerfile` corre `npm run seed` siempre, y `prisma/seed.js` hace `prisma.paquete.deleteMany({})`: eso borra en cascada los `PaquetePrecioPais` configurados desde el panel y deja en `null` el `paqueteId` de compras y pagos históricos. Además el upsert de planes revierte cualquier edición hecha en `/admin/planes`.
+- **El webhook de WhatsApp no valida la firma de Meta** (`X-Hub-Signature-256`): cualquiera que conozca un `phoneNumberId` puede inyectar mensajes falsos, consumir conversaciones pagas y disparar envíos.
+- **Las fotos subidas se pierden en cada redeploy**: `multer` escribe en `public/uploads` dentro del contenedor y el `Dockerfile` no declara volumen.
+- **Credenciales por defecto**: `admin`/`proshop123` y una `APP_ENCRYPTION_KEY` de desarrollo si faltan las variables de entorno.
+- **`temp_db_export.js` y `temp_demo_export.js`** siguen versionados con una contraseña de base en texto plano.
+- **Todo asume un solo proceso**: los timers de debounce, el mutex de conversaciones y el job de facturación viven en memoria.
 
 ## Cómo usar este archivo
 
-Si el próximo pedido es "segui con lo del documento del jefe" o similar, este archivo dice exactamente por dónde seguir sin tener que releer el PDF completo ni redescubrir qué ya se hizo.
+Si el próximo pedido es "seguí con lo del documento del jefe", ya no queda nada del documento salvo lo omitido por ser de pago. Lo que sigue en prioridad es la lista de infraestructura de arriba.

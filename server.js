@@ -225,6 +225,7 @@ app.get('/catalogo/:slug', async (req, res, next) => {
     res.render('catalogo', {
       title: `Catálogo · ${empresa.marca || empresa.nombre}`,
       empresa, productos, categorias,
+      simboloCatalogo: simboloMoneda(empresa.moneda),
       numeroWhatsapp: agente ? agente.numeroWhatsapp : null,
     });
   } catch (err) { next(err); }
@@ -414,6 +415,10 @@ app.use('/panel', async (req, res, next) => {
     res.locals.usuarioNombre = req.session.clienteNombre;
     res.locals.usuarioRol = req.session.clienteRol;
     res.locals.empresaNombre = empresa ? empresa.nombre : '';
+    // Moneda real del catalogo: todas las vistas del panel escriben los
+    // precios con esta, nunca con un "Bs" hardcodeado.
+    res.locals.moneda = empresa ? empresa.moneda : 'BOB';
+    res.locals.simboloCatalogo = simboloMoneda(empresa ? empresa.moneda : 'BOB');
     // Notificaciones para la campanita
     const [notificaciones, notifCount] = await Promise.all([
       notif.listar(req.session.empresaId),
@@ -1047,6 +1052,14 @@ app.post('/panel/categorias/:id/eliminar', requireCliente, async (req, res, next
   } catch (err) { next(err); }
 });
 
+// Tres niveles reales, no un checkbox: OBLIGATORIO bloquea que el bot muestre
+// productos hasta saberlo, RECOMENDADO lo pregunta si la charla da pie, y
+// OPCIONAL solo filtra si el cliente lo menciona por su cuenta.
+const NIVELES_ATRIBUTO = ['OBLIGATORIO', 'RECOMENDADO', 'OPCIONAL'];
+function nivelAtributoDesdeForm(valor) {
+  return NIVELES_ATRIBUTO.includes(valor) ? valor : 'OPCIONAL';
+}
+
 app.post('/panel/categorias/:id/atributos', requireCliente, async (req, res, next) => {
   try {
     const categoria = await prisma.categoria.findFirst({ where: { id: Number(req.params.id), empresaId: req.session.empresaId } });
@@ -1057,7 +1070,7 @@ app.post('/panel/categorias/:id/atributos', requireCliente, async (req, res, nex
       data: {
         categoriaId: categoria.id,
         nombre,
-        obligatorio: req.body.obligatorio === '1',
+        nivel: nivelAtributoDesdeForm(req.body.nivel),
         esDeVariante: req.body.esDeVariante === '1',
         orden: parseInt(req.body.orden, 10) || 0,
       },
@@ -1077,7 +1090,7 @@ app.post('/panel/categorias/:id/atributos/:atributoId', requireCliente, async (r
       where: { id: Number(req.params.atributoId), categoriaId: categoria.id },
       data: {
         nombre: String(req.body.nombre || '').trim().slice(0, 60),
-        obligatorio: req.body.obligatorio === '1',
+        nivel: nivelAtributoDesdeForm(req.body.nivel),
         esDeVariante: req.body.esDeVariante === '1',
         orden: parseInt(req.body.orden, 10) || 0,
       },
@@ -1145,7 +1158,7 @@ async function categoriasExistentes(empresaId) {
 async function atributosObligatoriosFaltantes(categoriaId, atributosProducto) {
   if (!categoriaId) return [];
   const obligatorios = await prisma.categoriaAtributo.findMany({
-    where: { categoriaId: Number(categoriaId), obligatorio: true, esDeVariante: false },
+    where: { categoriaId: Number(categoriaId), nivel: 'OBLIGATORIO', esDeVariante: false },
   });
   return obligatorios.filter((a) => !atributosProducto[a.nombre]).map((a) => a.nombre);
 }
@@ -1180,6 +1193,7 @@ function datosCatalogoDesdeForm(body) {
   const caracteristicas = (body.caracteristicas || '').split(',').map((c) => c.trim()).filter(Boolean);
   return {
     categoriaId: body.categoriaId ? Number(body.categoriaId) : null,
+    sku: body.sku ? String(body.sku).trim().slice(0, 60) : null,
     caracteristicas,
     atributos: atributosDesdeForm(body),
   };
@@ -1434,15 +1448,21 @@ async function obtenerAgente(empresaId) {
 app.get('/panel/configuracion', requireCliente, async (req, res, next) => {
   try {
     const agente = await obtenerAgente(req.session.empresaId);
+    const empresa = await prisma.empresa.findUnique({ where: { id: req.session.empresaId } });
     res.render('cliente/configuracion', {
       title: 'Configuración del agente - Proshop', tituloPagina: 'Configuración', activo: 'configuracion',
-      agente, config: agente.config || {}, mensaje: req.query.ok || null, error: null,
+      agente, config: agente.config || {}, empresa, monedas: MONEDAS_CATALOGO,
+      mensaje: req.query.ok || null, error: null,
     });
   } catch (err) { next(err); }
 });
 
+// Monedas en las que un negocio puede tener cargado su catalogo. El bot
+// escribe los precios con la que este elegida aca y nunca convierte a otra.
+const MONEDAS_CATALOGO = ['BOB', 'USD', 'PEN'];
+
 app.post('/panel/configuracion', requireCliente, upload.single('qr'), async (req, res, next) => {
-  const { nombre, numeroWhatsapp, mensajeBienvenida, tono, estado, instrucciones, derivarAHumano, aceptaEfectivo, aceptaTarjeta, aceptaQr, quitarQr } = req.body || {};
+  const { nombre, numeroWhatsapp, mensajeBienvenida, tono, estado, instrucciones, derivarAHumano, aceptaEfectivo, aceptaTarjeta, aceptaQr, quitarQr, moneda, direccionTienda, tiendaLat, tiendaLng } = req.body || {};
   try {
     const agente = await obtenerAgente(req.session.empresaId);
 
@@ -1452,6 +1472,8 @@ app.post('/panel/configuracion', requireCliente, upload.single('qr'), async (req
       return res.status(400).render('cliente/configuracion', {
         title: 'Configuración del agente - Proshop', tituloPagina: 'Configuración', activo: 'configuracion',
         agente, config: agente.config || {},
+        empresa: await prisma.empresa.findUnique({ where: { id: req.session.empresaId } }),
+        monedas: MONEDAS_CATALOGO,
         error: 'El número de WhatsApp parece incompleto. Usa el formato internacional (ej: 59171234567).',
         mensaje: null,
       });
@@ -1482,8 +1504,19 @@ app.post('/panel/configuracion', requireCliente, upload.single('qr'), async (req
         aceptaTarjeta: aceptaTarjeta === '1',
         aceptaQr: aceptaQr === '1',
         qrCobroUrl,
+        // Ubicacion real del local: si esta vacia, el bot directamente no
+        // ofrece retiro en tienda (nunca inventa una direccion).
+        direccionTienda: direccionTienda ? String(direccionTienda).trim().slice(0, 200) : null,
+        tiendaLat: tiendaLat ? Number(tiendaLat) : null,
+        tiendaLng: tiendaLng ? Number(tiendaLng) : null,
       },
     });
+
+    // La moneda del catalogo vive en la empresa: es la que el bot usa para
+    // escribir CUALQUIER precio (nunca la elige el modelo).
+    if (MONEDAS_CATALOGO.includes(moneda)) {
+      await prisma.empresa.update({ where: { id: req.session.empresaId }, data: { moneda } });
+    }
 
     res.redirect('/panel/configuracion?ok=' + encodeURIComponent('Configuración guardada.'));
   } catch (err) { next(err); }

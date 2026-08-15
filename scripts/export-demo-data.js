@@ -1,8 +1,14 @@
 const fs = require('fs');
+require('dotenv').config();
 const { PrismaClient } = require('../lib/generated/prisma');
 const { PrismaPg } = require('@prisma/adapter-pg');
 
-const connectionString = 'postgresql://postgres:987654321@localhost:5432/proshop?schema=public';
+// La conexion sale del .env, NUNCA hardcodeada: este archivo se versiona y una
+// contraseña escrita aca termina publicada en el repositorio.
+const connectionString = process.env.DATABASE_URL;
+if (!connectionString) {
+  throw new Error('Falta DATABASE_URL en el .env (copia .env.example a .env y completalo).');
+}
 const client = new PrismaClient({ adapter: new PrismaPg({ connectionString }) });
 
 (async () => {

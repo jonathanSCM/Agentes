@@ -14,13 +14,18 @@
            value="<%= producto ? producto.nombre : '' %>" placeholder="Ej: Zapatilla Runner Pro" />
   </div>
   <div class="field">
+    <label for="sku">SKU / código interno</label>
+    <input id="sku" name="sku" type="text" maxlength="60"
+           value="<%= producto && producto.sku ? producto.sku : '' %>" placeholder="Ej: ZAP-RUN-001" />
+  </div>
+  <div class="field">
     <label for="descripcion">Descripción</label>
     <input id="descripcion" name="descripcion" type="text" maxlength="200"
            value="<%= producto && producto.descripcion ? producto.descripcion : '' %>" placeholder="Color, talla, material..." />
   </div>
   <div class="field-row">
     <div class="field">
-      <label for="precio">Precio (Bs) *</label>
+      <label for="precio">Precio (<%= moneda %>) *</label>
       <input id="precio" name="precio" type="number" min="0" step="0.01" required
              value="<%= producto ? Number(producto.precio).toFixed(2) : '' %>" placeholder="0.00" />
     </div>
@@ -66,7 +71,7 @@
   </div>
   <script>
     window.__categoriasAtributos = <%- JSON.stringify(categorias.reduce(function (acc, c) {
-      acc[c.id] = c.atributos.filter(function (a) { return a.obligatorio && !a.esDeVariante; }).map(function (a) { return a.nombre; });
+      acc[c.id] = c.atributos.filter(function (a) { return a.nivel === 'OBLIGATORIO' && !a.esDeVariante; }).map(function (a) { return a.nombre; });
       return acc;
     }, {})) %>;
   </script>

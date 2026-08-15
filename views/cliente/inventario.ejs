@@ -31,7 +31,7 @@
         <% productos.forEach(function (p) { %>
           <tr class="<%= p.stockMostrado === 0 ? 'is-done' : '' %>">
             <td><strong><%= p.nombre %></strong><% if (p.tieneVariantes) { %> <span class="muted" style="font-size:.75rem">(por variante)</span><% } %></td>
-            <td class="num">Bs <%= Number(p.precio).toFixed(2) %></td>
+            <td class="num"><%= simboloCatalogo %> <%= Number(p.precio).toFixed(2) %></td>
             <td>
               <span class="badge <%= p.stockMostrado === 0 ? 'badge-off' : (p.stockMostrado <= 5 ? 'badge-star' : 'badge-new') %>">
                 <%= p.stockMostrado %> unidades

@@ -2,7 +2,13 @@
 
 <div class="page-head">
   <h2><a href="/panel/categorias" style="color:var(--tenue);font-size:.85rem;font-weight:400">← Categorías</a><br /><%= categoria.nombre %></h2>
-  <p>Marcá qué atributos son obligatorios: el agente se los va a preguntar al cliente antes de recomendar productos de esta categoría. Los que marques como "de variante" (ej: Talla, Color) solo se usan como sugerencia al cargar variantes, no bloquean guardar el producto.</p>
+  <p>Definí cuánto le importa cada atributo al agente antes de recomendar productos de esta categoría:</p>
+  <ul style="margin:.4rem 0 .6rem 1.1rem;padding:0;font-size:.9rem">
+    <li><strong>Obligatorio</strong>: el agente NO le muestra ningún producto al cliente hasta saberlo (ej: Género en una tienda de ropa).</li>
+    <li><strong>Recomendado</strong>: lo pregunta si la conversación da pie, pero no bloquea la búsqueda.</li>
+    <li><strong>Opcional</strong>: solo se usa para filtrar si el cliente lo menciona por su cuenta.</li>
+  </ul>
+  <p>Los que marques como "de variante" (ej: Talla, Color) no bloquean guardar el producto en este panel, pero sí cuentan para lo que el agente pregunta.</p>
 </div>
 
 <% if (mensaje) { %><div class="alert-ok"><%= mensaje %></div><% } %>
@@ -29,14 +35,20 @@
 <% if (categoria.atributos.length) { %>
   <div class="table-wrap">
     <table class="leads-table">
-      <thead><tr><th>Orden</th><th>Atributo</th><th>Obligatorio</th><th>Es de variante (talla/color)</th><th>Acciones</th></tr></thead>
+      <thead><tr><th>Orden</th><th>Atributo</th><th>Nivel</th><th>Es de variante (talla/color)</th><th>Acciones</th></tr></thead>
       <tbody>
         <% categoria.atributos.forEach(function (a) { %>
           <% var formAtr = 'editar-atributo-' + a.id; %>
           <tr>
             <td><input form="<%= formAtr %>" name="orden" type="number" value="<%= a.orden %>" style="width:60px;<%= inputStyle %>" /></td>
             <td><input form="<%= formAtr %>" name="nombre" type="text" value="<%= a.nombre %>" style="width:100%;min-width:160px;<%= inputStyle %>" /></td>
-            <td><input form="<%= formAtr %>" name="obligatorio" type="checkbox" value="1" <%= a.obligatorio ? 'checked' : '' %> /></td>
+            <td>
+              <select form="<%= formAtr %>" name="nivel" style="<%= inputStyle %>">
+                <% ['OBLIGATORIO','RECOMENDADO','OPCIONAL'].forEach(function (n) { %>
+                  <option value="<%= n %>" <%= a.nivel === n ? 'selected' : '' %>><%= n.charAt(0) + n.slice(1).toLowerCase() %></option>
+                <% }); %>
+              </select>
+            </td>
             <td><input form="<%= formAtr %>" name="esDeVariante" type="checkbox" value="1" <%= a.esDeVariante ? 'checked' : '' %> /></td>
             <td class="actions-cell">
               <button form="<%= formAtr %>" class="btn btn-ghost" style="padding:.3rem .7rem;font-size:.8rem" type="submit">Guardar</button>
@@ -74,7 +86,14 @@
     <label>Orden</label>
     <input name="orden" type="number" value="0" />
   </div>
-  <label style="margin:0 0 .6rem"><input type="checkbox" name="obligatorio" value="1" /> Obligatorio</label>
+  <div class="field" style="max-width:150px">
+    <label>Nivel</label>
+    <select name="nivel">
+      <option value="OPCIONAL">Opcional</option>
+      <option value="RECOMENDADO">Recomendado</option>
+      <option value="OBLIGATORIO">Obligatorio</option>
+    </select>
+  </div>
   <label style="margin:0 0 .6rem"><input type="checkbox" name="esDeVariante" value="1" /> Es de variante</label>
   <button class="btn btn-ghost" type="submit">+ Agregar atributo</button>
 </form>
