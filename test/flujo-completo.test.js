@@ -31,9 +31,11 @@ function iaFalsa(respuestas) {
   let i = 0;
   const llamar = async ({ system, mensajes }) => {
     recibido.systems.push(system);
-    for (const m of mensajes) {
-      if (m.role === 'tool') recibido.toolResults.push(String(m.content));
-    }
+    // Cada vuelta recibe el historial COMPLETO del turno, asi que hay que
+    // quedarse solo con los resultados nuevos: si no, se duplican y los
+    // indices dejan de corresponder al orden real de las tool calls.
+    const tools = mensajes.filter((m) => m.role === 'tool').map((m) => String(m.content));
+    recibido.toolResults = tools;
     const r = respuestas[Math.min(i, respuestas.length - 1)];
     i += 1;
     return { content: r.content || '', tool_calls: r.tool_calls || [] };
@@ -279,5 +281,37 @@ describe('cierre del pedido: confirmacion obligatoria', () => {
 
     assert.match(recibido.toolResults[0], /no tiene cargada la direccion de su local/);
     assert.match(recibido.toolResults[0], /NUNCA inventes una direccion/);
+  });
+});
+
+describe('tope duro de fotos por turno', () => {
+  test('aunque el modelo llame dos veces, nunca se mandan mas de 3 fotos en un turno', async () => {
+    await reiniciarLead({ atributosLead: { Genero: 'Hombre' } });
+    // El modelo intenta mostrar en dos tandas dentro del mismo turno.
+    const { llamar, recibido } = iaFalsa([
+      { tool_calls: [tool('mostrar_productos', { idsProductos: productos.map((p) => p.id) })] },
+      { tool_calls: [tool('ver_mas_productos', {})] },
+      { content: 'Ahi las tenes.' },
+    ]);
+    const salida = await generarRespuesta(agenteId, TELEFONO, [], 'mostrame todo', undefined, { llamarInyectado: llamar });
+
+    assert.ok(salida.fotos.length <= 3, `se mandaron ${salida.fotos.length} fotos, el tope es 3`);
+    assert.equal(salida.fotos.length, 3);
+    const segundoResultado = recibido.toolResults[1] || '';
+    assert.match(segundoResultado, /maximo para no llenarle el chat/);
+  });
+
+  test('el texto que se le pide al modelo ya no lo empuja a cerrar la venta', async () => {
+    await reiniciarLead({ atributosLead: { Genero: 'Hombre' } });
+    const { llamar, recibido } = iaFalsa([
+      { tool_calls: [tool('mostrar_productos', { idsProductos: [productos[0].id] })] },
+      { content: 'Listo.' },
+    ]);
+    await generarRespuesta(agenteId, TELEFONO, [], 'mostrame', undefined, { llamarInyectado: llamar });
+
+    const r = recibido.toolResults[0];
+    assert.match(r, /NO lo presiones para que compre/);
+    assert.match(r, /NO le preguntes si alguna lo convencio/);
+    assert.doesNotMatch(r, /CIERRE empujando el pedido/);
   });
 });
