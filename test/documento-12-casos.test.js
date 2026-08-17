@@ -661,3 +661,34 @@ describe('BUG - "blancas" no matcheaba con "blanco"', () => {
     assert.match(system, /usa "tenemos", "ahora mismo contamos con"/);
   });
 });
+
+// Pedidos del dueño: que tras un rato sin hablar el bot no diga "ya te lo
+// mostre", y que nunca nombre un producto sin mandar su tarjeta.
+describe('reenvio de tarjetas y "aqui esta" sin tarjeta', () => {
+  const { contextoReiniciadoPorInactividad, nombraUnProductoReal } = require('../lib/services/agente');
+
+  test('tras 15 minutos de silencio se olvida lo mostrado', () => {
+    const hace15 = new Date(Date.now() - 15 * 60 * 1000).toISOString();
+    const fresco = contextoReiniciadoPorInactividad({ fotosEnviadas: [1, 2], urlsFotosEnviadas: ['a.jpg'], ultimoTurnoAt: hace15 });
+    assert.ok(fresco, 'tiene que reiniciar');
+    assert.deepEqual(fresco.fotosEnviadas, []);
+    assert.deepEqual(fresco.urlsFotosEnviadas, []);
+  });
+
+  test('a los 2 minutos NO se reinicia (sigue siendo la misma charla)', () => {
+    const hace2 = new Date(Date.now() - 2 * 60 * 1000).toISOString();
+    assert.equal(contextoReiniciadoPorInactividad({ fotosEnviadas: [1], ultimoTurnoAt: hace2 }), null);
+  });
+
+  test('lo que el cliente DIJO no se borra: solo lo que se le mostro', () => {
+    const hace15 = new Date(Date.now() - 15 * 60 * 1000).toISOString();
+    const fresco = contextoReiniciadoPorInactividad({ fotosEnviadas: [1], resumenConfirmado: 'x', ultimoTurnoAt: hace15 });
+    assert.equal(fresco.resumenConfirmado, 'x');
+  });
+
+  test('detecta cuando el texto nombra un producto real del catalogo', () => {
+    const candidatos = [producto({ id: 1, nombre: 'Zapatillas Park St 2.0' })];
+    assert.equal(nombraUnProductoReal('En este momento tenemos las Zapatillas Park St 2.0 disponibles.', candidatos), 'Zapatillas Park St 2.0');
+    assert.equal(nombraUnProductoReal('¿Para hombre o para mujer?', candidatos), null);
+  });
+});

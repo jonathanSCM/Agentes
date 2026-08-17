@@ -286,3 +286,24 @@ Ese último caso es una trampa nueva que trajo el menú de dos niveles y no era 
 **Además, ya no se manda la foto de otro color.** Antes se enviaba "como referencia" con un aviso, y el modelo se comía el aviso y la presentaba como si fuera el color pedido. Ahora `fotoParaMostrar` devuelve **sin foto** cuando el color pedido no tiene imagen, e informa cuál se podría **ofrecer** como referencia — que es lo que pide el punto 22 del documento: preguntar antes, no mandar y avisar después.
 
 **Y el "aquí tienes" vacío**: regla nueva en el prompt. Esa frase (y "acá te dejo", "te paso") anuncia un adjunto; si en ese turno no se envió ninguna imagen, el cliente lee la frase y no ve nada. Cuando solo se está contando lo que hay, va *"tenemos"* / *"ahora mismo contamos con"*.
+
+## 17. Reinicio de "lo ya mostrado" y prohibido nombrar un producto sin su tarjeta
+
+Dos pedidos del dueño, y el segundo era la causa del primero.
+
+### El bot se negaba a repetir lo que ya había mostrado
+
+Captura: el cliente pregunta *"¿qué modelos tenés?"* y el bot contesta en texto *"tenemos las Zapatillas Park St 2.0... **ya te mostré las opciones antes**"*. El cliente no ve ninguna tarjeta: ni foto, ni precio, ni tallas.
+
+Dos cambios:
+
+- **`MINUTOS_PARA_REINICIAR_VISTOS = 10`** (configurable por `MINUTOS_REINICIO_VISTOS`): si el cliente estuvo ese rato sin escribir, se olvida **qué se le mostró** y las tarjetas vuelven a salir. Lo que el cliente **dijo** —categoría, talla, color, nombre, dirección— se conserva: esa memoria sí le sirve. En WhatsApp, a los 20 mensajes una tarjeta vieja ya no está a la vista.
+- **El bloqueo de reenvío pasa a ser por turno, no por conversación.** Antes, una vez mostrado un producto, `mostrar_productos` lo rechazaba para siempre. Ahora solo evita repetir la misma tarjeta dentro del mismo mensaje (que era el problema original: el modelo la mandaba tres veces seguidas). Si el cliente la pide de nuevo, se le manda.
+
+### Nombrar un producto en texto sin mandar la tarjeta
+
+Backstop nuevo (`nombraUnProductoReal`): si el texto final menciona el nombre de un producto real del catálogo y en ese turno **no se envió ninguna tarjeta**, se rechaza y se le exige llamar a `mostrar_productos`.
+
+El de "listado en texto plano" que ya existía sólo saltaba con 2+ precios y 2+ viñetas; con **un solo producto** no se activaba, que es justo el caso de la captura. Este cubre ese hueco.
+
+Verificado contra la base: tras 15 min reenvía la tarjeta, a los 2 min también si el cliente la pide, y el modelo que nombra el producto sin tarjeta es forzado a mandarla.
