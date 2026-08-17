@@ -251,3 +251,26 @@ Es un caso clásico de "funciona en pruebas cortas, falla en uso real": ninguna 
 **Tope duro además**: si ya se pidió permiso **dos veces** por el mismo filtro, se muestra igual. Preferimos mostrar de más que dejar al cliente golpeando una puerta cerrada. Cualquier bug futuro de este tipo se degrada a "mostró una opción de más" en vez de "el bot no funciona".
 
 Cubierto por un test que arma una conversación de 30 mensajes, justamente para que el corte del historial esté en juego.
+
+## 14. BUG: pedir otro color de un producto ya mostrado no mandaba nada
+
+**Captura del dueño**: el bot muestra la tarjeta de las Park St 2.0, el cliente pregunta *"¿en qué otro color las tenés?"*, el bot responde bien (*"blanco, gris y negro"*), el cliente pide *"mostrame en blanco"* y el bot contesta **"ya te envié las fotos en color blanco"** — sin haber mandado ninguna.
+
+**Causa**: `enviar_fotos_producto` cortaba si el **producto** ya figuraba en `fotosEnviadas`. Como la tarjeta inicial ya lo había marcado, cualquier pedido posterior de otro color devolvía "ya te envié todas las fotos" sin enviar nada, y el modelo se lo repetía al cliente.
+
+**Solución**: el control de duplicados pasa a ser **por foto**, no por producto (`contexto.urlsFotosEnviadas`). Además, pedir un color ahora manda **todas** las fotos de ese color (un color suele estar repartido en varias tallas, cada una con sus imágenes), respetando el tope de 3 por turno.
+
+Verificado de punta a punta: tarjeta → pide blanco → llegan las 2 fotos blancas → pide gris → llega la gris → pide blanco de nuevo → ahí sí avisa que ya se la mandó, sin reenviar.
+
+## 15. El panel ahora dice por qué el agente no muestra un producto
+
+El dueño reportó que tenía 4 productos cargados y el bot mostraba 1. Dos estaban sin stock, pero **eso solo se descubría hablando con el bot**.
+
+`/panel/productos` gana una columna **"¿El agente lo muestra?"** con el motivo exacto cuando no:
+
+- está desactivado
+- no tiene stock (el agente nunca ofrece algo agotado)
+- no tiene categoría
+- **su categoría es un rubro dividido en subcategorías**: el cliente siempre elige una subcategoría, así que un producto colgado del rubro padre nunca se alcanza. Hay que moverlo a la subcategoría que corresponda.
+
+Ese último caso es una trampa nueva que trajo el menú de dos niveles y no era evidente desde el panel.

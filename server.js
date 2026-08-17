@@ -1282,11 +1282,25 @@ app.get('/panel/productos', requireCliente, async (req, res, next) => {
     // Si el producto tiene variantes, el stock real es la suma de sus
     // variantes (el stock del producto en si queda en 0 a proposito). Se
     // calcula aca para que la lista no muestre "0" enganosamente.
-    const productos = productosDb.map((p) => ({
-      ...p,
-      stockMostrado: p.variantes.length ? p.variantes.reduce((suma, v) => suma + v.stock, 0) : p.stock,
-      tieneVariantes: p.variantes.length > 0,
-    }));
+    // Un producto puede estar cargado y aun asi ser invisible para el agente.
+    // Antes eso solo se descubria hablando con el bot y viendo que no lo
+    // ofrecia; ahora la lista dice el motivo exacto.
+    const subcategoriasPorRubro = await prisma.categoria.groupBy({
+      by: ['padreId'], where: { empresaId: req.session.empresaId, padreId: { not: null } }, _count: true,
+    });
+    const rubrosDivididos = new Set(subcategoriasPorRubro.map((r) => r.padreId));
+
+    const productos = productosDb.map((p) => {
+      const stockMostrado = p.variantes.length ? p.variantes.reduce((suma, v) => suma + v.stock, 0) : p.stock;
+      let motivoOculto = null;
+      if (!p.activo) motivoOculto = 'Está desactivado.';
+      else if (stockMostrado <= 0) motivoOculto = 'No tiene stock: el agente nunca ofrece algo agotado.';
+      else if (!p.categoriaId) motivoOculto = 'No tiene categoría, así que el agente no sabe cuándo ofrecerlo.';
+      else if (rubrosDivididos.has(p.categoriaId)) {
+        motivoOculto = `"${p.categoria.nombre}" está dividido en subcategorías, y el cliente siempre elige una. Mové el producto a la subcategoría que corresponda.`;
+      }
+      return { ...p, stockMostrado, tieneVariantes: p.variantes.length > 0, motivoOculto };
+    });
     res.render('cliente/productos', {
       title: 'Mis productos - Proshop', tituloPagina: 'Mis productos', activo: 'productos',
       productos, maxProductos: plan ? plan.maxProductos : 10, mensaje: req.query.ok || null,

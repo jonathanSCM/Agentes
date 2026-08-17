@@ -19,6 +19,7 @@
   <div class="stat-card"><span class="stat-num"><%= productos.length %></span><span class="stat-label">Productos</span></div>
   <div class="stat-card stat-new"><span class="stat-num"><%= productos.filter(p=>p.activo).length %></span><span class="stat-label">Activos</span></div>
   <div class="stat-card stat-done"><span class="stat-num"><%= productos.filter(p=>p.stockMostrado<=5).length %></span><span class="stat-label">Stock bajo (≤5)</span></div>
+  <div class="stat-card <%= productos.filter(p=>p.motivoOculto).length ? 'stat-off' : '' %>"><span class="stat-num"><%= productos.filter(p=>p.motivoOculto).length %></span><span class="stat-label">Que el agente NO muestra</span></div>
 </div>
 
 <% if (productos.length === 0) { %>
@@ -31,7 +32,7 @@
   <div class="table-wrap">
     <table class="leads-table">
       <thead>
-        <tr><th></th><th>Producto</th><th>Categoría</th><th class="num">Precio</th><th class="num">Stock</th><th>Estado</th><th>Acciones</th></tr>
+        <tr><th></th><th>Producto</th><th>Categoría</th><th class="num">Precio</th><th class="num">Stock</th><th>¿El agente lo muestra?</th><th>Acciones</th></tr>
       </thead>
       <tbody>
         <% productos.forEach(function (p) { %>
@@ -52,7 +53,14 @@
             <td class="num <%= p.stockMostrado <= 5 ? 'saldo-ok' : '' %>">
               <%= p.stockMostrado %><% if (p.tieneVariantes) { %> <span class="muted" style="font-size:.75rem">(variantes)</span><% } %>
             </td>
-            <td><span class="badge <%= p.activo ? 'badge-new' : 'badge-off' %>"><%= p.activo ? 'Activo' : 'Inactivo' %></span></td>
+            <td>
+              <% if (p.motivoOculto) { %>
+                <span class="badge badge-off" title="<%= p.motivoOculto %>">No lo ofrece</span>
+                <div class="muted" style="font-size:.75rem;margin-top:.25rem;max-width:230px"><%= p.motivoOculto %></div>
+              <% } else { %>
+                <span class="badge badge-new">Lo ofrece</span>
+              <% } %>
+            </td>
             <td class="actions-cell">
               <a class="icon-btn" title="Editar" href="/panel/productos/<%= p.id %>/editar"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8"><path d="m16.5 3.5 4 4L7 21l-4.5 1L3.5 17.5 16.5 3.5Z"/></svg></a>
               <form method="POST" action="/panel/productos/<%= p.id %>/eliminar" class="inline-form"

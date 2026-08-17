@@ -567,3 +567,45 @@ describe('BUG - "es el unico modelo que tenemos" siendo mentira', () => {
     assert.match(texto, /PROHIBIDO decir "es el unico modelo que tenemos"/);
   });
 });
+
+// Bug real: el cliente pidio las fotos en blanco de un producto que ya se le
+// habia mostrado en tarjeta, y el bot respondio "ya te las envie" sin mandar
+// nada. El control de duplicados era por producto en vez de por foto.
+describe('BUG - pedir otro color de un producto ya mostrado', () => {
+  const conColores = producto({
+    id: 1, nombre: 'Park St 2.0', categoria: 'Urbanas', fotos: ['generica.jpg'],
+    variantes: [
+      { activa: true, atributos: { Talla: '9', Color: 'blanco' }, stock: 2, fotos: ['blanco-1.jpg', 'blanco-2.jpg'] },
+      { activa: true, atributos: { Talla: '10', Color: 'Gris' }, stock: 6, fotos: ['gris-1.jpg'] },
+    ],
+  });
+
+  test('pedir un color devuelve TODAS las fotos de ese color, no una sola', () => {
+    const foto = fotoParaMostrar(conColores, { color: 'blanco' });
+    assert.deepEqual(foto.urls, ['blanco-1.jpg', 'blanco-2.jpg']);
+    assert.equal(foto.esDelColorPedido, true);
+  });
+
+  test('cada color trae las suyas, no las del otro', () => {
+    assert.deepEqual(fotoParaMostrar(conColores, { color: 'gris' }).urls, ['gris-1.jpg']);
+  });
+
+  test('sin color pedido, la tarjeta usa la foto generica del producto', () => {
+    const foto = fotoParaMostrar(conColores, {});
+    assert.equal(foto.url, 'generica.jpg');
+  });
+
+  test('un color sin foto propia devuelve la de otro color, marcada como referencial', () => {
+    const sinFotoNegro = producto({
+      id: 2, nombre: 'Otro', categoria: 'Urbanas', fotos: [],
+      variantes: [
+        { activa: true, atributos: { Color: 'blanco' }, stock: 2, fotos: ['blanco.jpg'] },
+        { activa: true, atributos: { Color: 'negro' }, stock: 2, fotos: [] },
+      ],
+    });
+    const foto = fotoParaMostrar(sinFotoNegro, { color: 'negro' });
+    assert.equal(foto.esDelColorPedido, false);
+    assert.equal(foto.colorDeLaFoto, 'blanco');
+    assert.match(avisosDeFoto(sinFotoNegro, foto).join(' '), /NO hay foto cargada de ese color/);
+  });
+});
