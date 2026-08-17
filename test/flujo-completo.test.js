@@ -54,7 +54,7 @@ before(async () => {
   const empresa = await prisma.empresa.create({
     data: {
       nombre: 'Tienda Flujo', slug: SLUG, moneda: 'BOB',
-      agentes: { create: [{ nombre: 'Vendedor', estado: 'ACTIVO', config: { create: { aceptaEfectivo: true } } }] },
+      agentes: { create: [{ nombre: 'Vendedor', estado: 'ACTIVO', config: { create: { aceptaEfectivo: true, preguntasIniciales: [] } } }] },
     },
     include: { agentes: true },
   });
@@ -395,5 +395,93 @@ describe('menu de categorias en dos niveles', () => {
     const salida = await generarRespuesta(agenteId, TELEFONO, [], 'mostrame', undefined, { llamarInyectado: llamar });
     assert.match(recibido.toolResults[0], /TOOL_SUCCESS/);
     assert.ok(salida.fotos.length > 0, 'sin subcategorias no hay paso intermedio');
+  });
+});
+
+describe('preguntas iniciales: nada se muestra hasta responderlas', () => {
+  before(async () => {
+    // Esta tienda pide saber el genero antes de cualquier cosa.
+    await prisma.agenteConfig.updateMany({ where: { agenteId }, data: { preguntasIniciales: ['Genero'] } });
+  });
+  after(async () => {
+    await prisma.agenteConfig.updateMany({ where: { agenteId }, data: { preguntasIniciales: [] } });
+  });
+
+  test('ni siquiera el MENU de rubros sale antes de saber el genero', async () => {
+    await reiniciarLead({ categoriaInteres: null, categoriaId: null, atributosLead: {} });
+    const { llamar, recibido } = iaFalsa([
+      { tool_calls: [tool('mostrar_categorias', {})] },
+      { content: '¿Para hombre o para mujer?' },
+    ]);
+    await generarRespuesta(agenteId, TELEFONO, [], 'cual es tu catalogo', undefined, { llamarInyectado: llamar });
+
+    assert.match(recibido.toolResults[0], /TODAVIA NO le muestres el menu/);
+    assert.match(recibido.toolResults[0], /Genero/);
+  });
+
+  test('tampoco productos, aunque el cliente nombre una categoria', async () => {
+    await reiniciarLead({ atributosLead: {} });
+    const { llamar, recibido } = iaFalsa([
+      { tool_calls: [tool('mostrar_productos', { idsProductos: productos.map((p) => p.id) })] },
+      { content: '¿Para quien es?' },
+    ]);
+    const salida = await generarRespuesta(agenteId, TELEFONO, [], 'quiero zapatillas', undefined, { llamarInyectado: llamar });
+
+    assert.match(recibido.toolResults[0], /TODAVIA NO le muestres productos/);
+    assert.match(recibido.toolResults[0], /Genero/);
+    assert.deepEqual(salida.fotos, []);
+  });
+
+  test('el prompt le dice que pregunte UNA sola cosa y de forma natural', async () => {
+    await reiniciarLead({ atributosLead: {} });
+    const { llamar, recibido } = iaFalsa([{ content: '¿Para hombre o para mujer?' }]);
+    await generarRespuesta(agenteId, TELEFONO, [], 'hola', undefined, { llamarInyectado: llamar });
+
+    const system = recibido.systems[0];
+    assert.match(system, /TODAVIA NO PODES MOSTRAR NADA/);
+    assert.match(system, /preguntá UNA sola cosa/);
+    assert.match(system, /NUNCA como un formulario/);
+  });
+
+  test('respondido el genero, el catalogo se habilita', async () => {
+    await reiniciarLead({ atributosLead: { Genero: 'Hombre' } });
+    const { llamar, recibido } = iaFalsa([
+      { tool_calls: [tool('mostrar_categorias', {})] },
+      { content: 'Esto tenemos.' },
+    ]);
+    await generarRespuesta(agenteId, TELEFONO, [], 'que tenes', undefined, { llamarInyectado: llamar });
+    assert.match(recibido.toolResults[0], /TOOL_SUCCESS/);
+  });
+});
+
+describe('el bot ofrece los valores REALES, no pregunta al aire', () => {
+  test('cuando falta un dato obligatorio, le pasa las opciones que existen', async () => {
+    // Caso real: el bot pedia un color sin decir cuales habia, y ante
+    // "no se que colores tenes" devolvia la pregunta.
+    await prisma.categoriaAtributo.updateMany({
+      where: { categoriaId, nombre: 'Genero' }, data: { nivel: 'OBLIGATORIO' },
+    });
+    await reiniciarLead({ atributosLead: {} });
+    const { llamar, recibido } = iaFalsa([{ content: '¿Para quien es?' }]);
+    await generarRespuesta(agenteId, TELEFONO, [], 'quiero zapatillas', undefined, { llamarInyectado: llamar });
+
+    const system = recibido.systems[0];
+    assert.match(system, /VALORES REALES DISPONIBLES/);
+    assert.match(system, /Genero: Hombre/);
+    assert.match(system, /PROHIBIDO preguntar al aire/);
+  });
+
+  test('con productos en pantalla, tambien le pasa colores y tallas reales', async () => {
+    await prisma.categoriaAtributo.updateMany({
+      where: { categoriaId, nombre: 'Genero' }, data: { nivel: 'RECOMENDADO' },
+    });
+    await reiniciarLead({ atributosLead: { Genero: 'Hombre' } });
+    const { llamar, recibido } = iaFalsa([{ content: 'Mira estas.' }]);
+    await generarRespuesta(agenteId, TELEFONO, [], 'mostrame', undefined, { llamarInyectado: llamar });
+
+    const system = recibido.systems[0];
+    assert.match(system, /VALORES REALES DISPONIBLES/);
+    assert.match(system, /Color: Gris, Negro/);
+    assert.match(system, /Talla: 42/);
   });
 });

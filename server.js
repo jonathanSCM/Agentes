@@ -1536,7 +1536,7 @@ app.get('/panel/configuracion', requireCliente, async (req, res, next) => {
 const MONEDAS_CATALOGO = ['BOB', 'USD', 'PEN'];
 
 app.post('/panel/configuracion', requireCliente, upload.single('qr'), async (req, res, next) => {
-  const { nombre, numeroWhatsapp, mensajeBienvenida, tono, estado, instrucciones, derivarAHumano, aceptaEfectivo, aceptaTarjeta, aceptaQr, quitarQr, moneda, direccionTienda, tiendaLat, tiendaLng } = req.body || {};
+  const { nombre, numeroWhatsapp, mensajeBienvenida, tono, estado, instrucciones, derivarAHumano, aceptaEfectivo, aceptaTarjeta, aceptaQr, quitarQr, moneda, direccionTienda, tiendaLat, tiendaLng, preguntasIniciales } = req.body || {};
   try {
     const agente = await obtenerAgente(req.session.empresaId);
 
@@ -1580,6 +1580,10 @@ app.post('/panel/configuracion', requireCliente, upload.single('qr'), async (req
         qrCobroUrl,
         // Ubicacion real del local: si esta vacia, el bot directamente no
         // ofrece retiro en tienda (nunca inventa una direccion).
+        // Lo que el bot pregunta antes de mostrar nada. Se guarda como lista
+        // de nombres de atributo, en el orden en que se van a preguntar.
+        preguntasIniciales: String(preguntasIniciales || '')
+          .split(',').map((t) => t.trim()).filter(Boolean).slice(0, 5),
         direccionTienda: direccionTienda ? String(direccionTienda).trim().slice(0, 200) : null,
         tiendaLat: tiendaLat ? Number(tiendaLat) : null,
         tiendaLng: tiendaLng ? Number(tiendaLng) : null,

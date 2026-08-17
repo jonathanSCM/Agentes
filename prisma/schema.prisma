@@ -374,6 +374,13 @@ model AgenteConfig {
   direccionTienda   String?
   tiendaLat         Float?
   tiendaLng         Float?
+  // Datos que el bot pregunta ANTES de mostrar nada, ni siquiera el menu de
+  // rubros: son filtros que aplican a TODO el catalogo (el caso tipico es el
+  // genero en una tienda de ropa). Se preguntan de a uno y en este orden.
+  // Vacio = el bot arranca mostrando el menu, como antes.
+  // A diferencia de CategoriaAtributo, esto no depende de la categoria:
+  // justamente se pregunta cuando todavia no hay ninguna elegida.
+  preguntasIniciales String[] @default(["Genero"])
   updatedAt         DateTime @updatedAt
 
   @@map("agente_config")

@@ -181,3 +181,33 @@ La migración solo toca empresas que tengan al menos 8 de esos 18 nombres (o sea
 ### Además
 
 La espera antes de responder bajó de 8 a **5 segundos** (`MENSAJE_DEBOUNCE_MS`). Se sentía lento del otro lado. Más abajo agrupa menos mensajes seguidos y gasta más llamadas a la IA.
+
+## 11. Preguntar antes de mostrar, y ofrecer los valores que existen de verdad
+
+Dos pedidos del dueño después de probar el bot, que resultaron ser el mismo problema de fondo: **el bot preguntaba sin dar contexto y mostraba sin filtrar**.
+
+### El bot pedía un color sin decir cuáles había
+
+Captura real: el bot pregunta *"¿qué color prefieres?"* sin haber mostrado ningún color. El cliente responde *"no sé qué colores tienes"* y el bot le devuelve la pregunta: *"decime qué colores te gustan y reviso"*. Conversación trabada.
+
+El sistema **sí conocía** los colores reales (viven en `Variante.atributos.Color`), simplemente nunca se los pasaba al modelo.
+
+**Solución**: `opcionesDisponibles()` calcula los valores que existen con stock en lo que el cliente está mirando, y `bloqueDeOpciones()` los inyecta en el prompt. El modelo ahora recibe `Color: Azul marino, Beige, Blanco, Gris, Negro, Rosa palo` y tiene prohibido preguntar al aire. Los valores se separan por coma (un atributo puede guardar `"Diario, Salida"`) y las tallas se ordenan por talle real, no alfabéticamente.
+
+### Preguntar el género antes de mostrar nada
+
+`AgenteConfig.preguntasIniciales` (array, default `["Genero"]`): datos que el bot pide **antes que nada**, ni siquiera el menú de rubros. Son filtros que aplican a todo el catálogo, a diferencia de `CategoriaAtributo`, que depende de una categoría ya elegida — y acá justamente todavía no hay ninguna.
+
+Forzado en código en los tres puntos de salida: `seccionProductos`, `mostrar_categorias` y `mostrar_productos`.
+
+**La talla NO va por defecto**, aunque el dueño la mencionó: en el mismo catálogo conviven talla `42` (calzado) y `M` (ropa). Preguntarla antes de saber qué busca confunde. Queda configurable desde `/panel/configuracion` por si el negocio prefiere lo contrario.
+
+### El menú se adapta a lo que ya sabe
+
+`arbolDeCategorias(productos, lead)` filtra por los atributos ya conocidos. Con el catálogo real:
+
+- Sin género: 7 rubros
+- **Hombre: 4 rubros** (75 productos) — desaparecen Vestidos, Ropa Deportiva y Ropa de baño, que ahí no tienen nada para él
+- **Mujer: 7 rubros** (75 productos)
+
+Un rubro sin nada que ofrecerle a ese cliente no se muestra: el menú deja de ser una lista fija y pasa a ser lo que de verdad le sirve.
