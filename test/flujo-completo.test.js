@@ -197,7 +197,7 @@ describe('paginacion real contra la base', () => {
 });
 
 describe('foto de un color sin imagen cargada', () => {
-  test('avisa que la foto es de otro color y cual color no tiene imagen', async () => {
+  test('no manda la foto de otro color: avisa y ofrece la otra como referencia', async () => {
     await reiniciarLead({ atributosLead: { Genero: 'Hombre' }, color: 'Gris' });
 
     const { llamar, recibido } = iaFalsa([
@@ -207,10 +207,10 @@ describe('foto de un color sin imagen cargada', () => {
     await generarRespuesta(agenteId, TELEFONO, [], 'mandame foto de la gris', undefined, { llamarInyectado: llamar });
 
     const r = recibido.toolResults[0];
-    assert.match(r, /TOOL_SUCCESS/);
-    assert.match(r, /el cliente pidio Gris y NO hay foto cargada de ese color/);
-    assert.match(r, /La foto que se envio es del color Negro/);
-    assert.match(r, /SIN foto cargada: Gris/);
+    assert.match(r, /NO SE ENVIO NINGUNA FOTO/);
+    assert.match(r, /en Gris: ese color no tiene imagen cargada/);
+    assert.match(r, /Ofrecele verla en Negro COMO REFERENCIA/);
+    assert.match(r, /PROHIBIDO escribir "aqui tienes"/);
   });
 });
 

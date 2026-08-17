@@ -274,3 +274,15 @@ El dueño reportó que tenía 4 productos cargados y el bot mostraba 1. Dos esta
 - **su categoría es un rubro dividido en subcategorías**: el cliente siempre elige una subcategoría, así que un producto colgado del rubro padre nunca se alcanza. Hay que moverlo a la subcategoría que corresponda.
 
 Ese último caso es una trampa nueva que trajo el menú de dos niveles y no era evidente desde el panel.
+
+## 16. BUG: "blancas" no matcheaba con "blanco" (y el bot mandaba la foto negra)
+
+**Reportado con capturas.** El cliente pide *"blancas"*, el bot responde *"aquí tienes las Park St 2.0 en blanco"* y manda **una zapatilla negra**. Después pide *"talla 9 en blanco"* y la ficha dice **"Talla 9: negro"**.
+
+**Causa raíz, una sola para los tres síntomas**: la comparación de color era literal (`"blanco".includes("blancas")` → `false`). Nadie escribe "quiero unas blanco": de unas zapatillas se dice *blancas*. Al no encontrar el color pedido, el sistema caía a la primera variante con foto —la negra— y la mandaba.
+
+**Solución**: `valoresEquivalentes` compara en tres pasadas, de más exacta a más laxa: igualdad literal → grupo de equivalencia (`hombre ≡ masculino`) → **raíces de palabra**, que tolera plural y género (`blancas ≈ blanco ≈ Blanco nube`, `grises ≈ Gris`, `azules ≈ Azul marino`). Sigue distinguiendo colores distintos: `blancas` nunca matchea `negro`. La misma comparación se usa en la selección de foto y en la ficha, así que los dos síntomas se corrigen juntos.
+
+**Además, ya no se manda la foto de otro color.** Antes se enviaba "como referencia" con un aviso, y el modelo se comía el aviso y la presentaba como si fuera el color pedido. Ahora `fotoParaMostrar` devuelve **sin foto** cuando el color pedido no tiene imagen, e informa cuál se podría **ofrecer** como referencia — que es lo que pide el punto 22 del documento: preguntar antes, no mandar y avisar después.
+
+**Y el "aquí tienes" vacío**: regla nueva en el prompt. Esa frase (y "acá te dejo", "te paso") anuncia un adjunto; si en ese turno no se envió ninguna imagen, el cliente lee la frase y no ve nada. Cuando solo se está contando lo que hay, va *"tenemos"* / *"ahora mismo contamos con"*.

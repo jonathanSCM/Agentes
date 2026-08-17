@@ -258,15 +258,19 @@ describe('TEST 5 - Color disponible pero SIN foto de ese color', () => {
     assert.deepEqual(foto.coloresSinFoto, ['Gris']);
   });
 
-  test('el bot recibe la orden explicita de avisar que no hay foto de ese color', () => {
-    const avisos = avisosDeFoto(camiseta, fotoParaMostrar(camiseta, { color: 'Gris' })).join(' ');
-    assert.match(avisos, /NO hay foto cargada de ese color/);
+  test('NO se manda la foto de otro color: se avisa y se ofrece como referencia', () => {
+    const foto = fotoParaMostrar(camiseta, { color: 'Gris' });
+    assert.equal(foto.url, null, 'no se manda ninguna imagen del color equivocado');
+    const avisos = avisosDeFoto(camiseta, foto).join(' ');
+    assert.match(avisos, /NO SE ENVIO NINGUNA FOTO/);
     assert.match(avisos, /SI hay stock/);
+    assert.match(avisos, /COMO REFERENCIA/);
+    assert.match(avisos, /PROHIBIDO escribir "aqui tienes"/);
   });
 
   test('tambien le dice que colores SI tienen foto (para poder ofrecerlos)', () => {
     const avisos = avisosDeFoto(camiseta, fotoParaMostrar(camiseta, { color: 'Gris' })).join(' ');
-    assert.match(avisos, /CON foto: Blanco/);
+    assert.match(avisos, /De estos colores SI tenes foto: Blanco/);
     assert.match(avisos, /SIN foto cargada: Gris/);
   });
 });
@@ -280,18 +284,18 @@ describe('TEST 6 - Nunca hacer pasar la foto de un color por otro', () => {
     ],
   });
 
-  test('si pide negro y solo hay foto blanca, la foto queda marcada como NO del color pedido', () => {
+  test('si pide negro y solo hay foto blanca, NO se manda nada y se marca el desvio', () => {
     const foto = fotoParaMostrar(camiseta, { color: 'Negro' });
-    assert.equal(foto.url, 'blanco_frente.jpg');
+    assert.equal(foto.url, null, 'jamas se manda la blanca haciendola pasar por negra');
     assert.equal(foto.esDelColorPedido, false);
-    assert.equal(foto.colorDeLaFoto, 'Blanco');
     assert.equal(foto.colorPedido, 'Negro');
+    assert.equal(foto.referenciaDisponible, 'Blanco', 'pero se puede OFRECER la blanca como referencia');
   });
 
   test('el aviso nombra los dos colores, para que el bot no pueda confundirlos', () => {
     const avisos = avisosDeFoto(camiseta, fotoParaMostrar(camiseta, { color: 'Negro' })).join(' ');
-    assert.match(avisos, /la foto es solo de referencia/i);
-    assert.match(avisos, /Nunca la presentes como si fuera Negro/);
+    assert.match(avisos, /en Negro: ese color no tiene imagen cargada/);
+    assert.match(avisos, /Ofrecele verla en Blanco COMO REFERENCIA/);
   });
 
   test('si SI existe la foto del color pedido, se manda esa y sin aclaracion de referencia', () => {
@@ -595,7 +599,7 @@ describe('BUG - pedir otro color de un producto ya mostrado', () => {
     assert.equal(foto.url, 'generica.jpg');
   });
 
-  test('un color sin foto propia devuelve la de otro color, marcada como referencial', () => {
+  test('un color sin foto propia NO manda otra: la ofrece como referencia', () => {
     const sinFotoNegro = producto({
       id: 2, nombre: 'Otro', categoria: 'Urbanas', fotos: [],
       variantes: [
@@ -605,7 +609,55 @@ describe('BUG - pedir otro color de un producto ya mostrado', () => {
     });
     const foto = fotoParaMostrar(sinFotoNegro, { color: 'negro' });
     assert.equal(foto.esDelColorPedido, false);
-    assert.equal(foto.colorDeLaFoto, 'blanco');
-    assert.match(avisosDeFoto(sinFotoNegro, foto).join(' '), /NO hay foto cargada de ese color/);
+    assert.equal(foto.url, null);
+    assert.equal(foto.referenciaDisponible, 'blanco');
+    assert.match(avisosDeFoto(sinFotoNegro, foto).join(' '), /NO SE ENVIO NINGUNA FOTO/);
+  });
+});
+
+// Bug real: el cliente escribe "blancas" (como se dice de unas zapatillas) y
+// el catalogo tiene el color cargado como "blanco". La comparacion literal
+// fallaba y el bot terminaba mandando la foto negra.
+describe('BUG - "blancas" no matcheaba con "blanco"', () => {
+  const { valoresEquivalentes, fotoParaMostrar: foto } = require('../lib/services/catalogo');
+
+  test('plural y genero no rompen el match de color', () => {
+    assert.equal(valoresEquivalentes('blancas', 'blanco'), true);
+    assert.equal(valoresEquivalentes('negras', 'Negro'), true);
+    assert.equal(valoresEquivalentes('grises', 'Gris'), true);
+    assert.equal(valoresEquivalentes('azules', 'Azul marino'), true);
+    assert.equal(valoresEquivalentes('blancas', 'Blanco nube'), true);
+  });
+
+  test('pero sigue distinguiendo colores distintos', () => {
+    assert.equal(valoresEquivalentes('blancas', 'negro'), false);
+    assert.equal(valoresEquivalentes('negro', 'Blanco nube'), false);
+  });
+
+  const zapa = producto({
+    id: 1, nombre: 'Park St', categoria: 'Urbanas', fotos: [],
+    variantes: [
+      { activa: true, atributos: { Talla: '9', Color: 'blanco' }, stock: 2, fotos: ['blanco-1.jpg', 'blanco-2.jpg'] },
+      { activa: true, atributos: { Talla: '9', Color: 'negro' }, stock: 5, fotos: ['negro-1.jpg'] },
+    ],
+  });
+
+  test('pedir "blancas" trae las BLANCAS, no la primera que tenga foto', () => {
+    const f = foto(zapa, { color: 'blancas' });
+    assert.deepEqual(f.urls, ['blanco-1.jpg', 'blanco-2.jpg']);
+    assert.equal(f.esDelColorPedido, true);
+  });
+
+  test('la ficha tambien respeta el color pedido en plural', () => {
+    const ficha = fichaProducto(zapa, { color: 'blancas', talla: '9' }, 'BOB');
+    assert.match(ficha, /Talla 9: blanco/);
+    assert.doesNotMatch(ficha, /negro/);
+  });
+
+  test('el prompt prohibe decir "aqui tienes" sin haber mandado nada', () => {
+    const { construirSystem } = require('../lib/services/agente');
+    const system = construirSystem({ nombre: 'T' }, [producto({ id: 1 })], {}, {}, false, false, '');
+    assert.match(system, /"AQUI TIENES" SOLO SI DE VERDAD MANDASTE ALGO/);
+    assert.match(system, /usa "tenemos", "ahora mismo contamos con"/);
   });
 });
