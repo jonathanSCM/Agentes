@@ -211,3 +211,29 @@ Forzado en código en los tres puntos de salida: `seccionProductos`, `mostrar_ca
 - **Mujer: 7 rubros** (75 productos)
 
 Un rubro sin nada que ofrecerle a ese cliente no se muestra: el menú deja de ser una lista fija y pasa a ser lo que de verdad le sirve.
+
+## 12. BUG GRAVE: el bot veía 1 de 4 productos y decía que era el único
+
+**Reportado por el dueño** con capturas: la tienda tenía 4 zapatillas cargadas y el bot insistía *"las Zapatillas Park St 2.0 son el único modelo que tenemos en el inventario"*. Además dejó de mandar tarjetas con foto.
+
+Reproducido con un escenario idéntico. Eran **dos causas distintas**:
+
+### 1. El filtro de género escondía productos (regresión propia)
+
+`coincideAtributosLead` comparaba el valor palabra por palabra. Un producto etiquetado `Genero: "Masculino"` quedaba invisible para un cliente que dijo *"hombre"*. Lo mismo con *Varón*, *Caballero*, *Femenino*, *Dama*.
+
+**Solución**: tabla de equivalencias (`hombre ≡ masculino ≡ varón ≡ caballero`, etc.) usada al comparar valores de atributo. No es lógica de rubro, es vocabulario del idioma: agregar un sinónimo es sumar una palabra a su fila. Además, un producto puede declarar varios valores (`"Hombre, Mujer"`) y alcanza con que uno coincida.
+
+Sigue separando de verdad los géneros distintos: una zapatilla de mujer no le aparece a un hombre.
+
+### 2. Decía "es el único" cuando solo era el único *para él*
+
+`total_matches` cuenta lo que calza con lo que pidió ese cliente. El modelo lo leía como "todo el inventario".
+
+**Solución**: bloque `PANORAMA REAL` en el prompt, con cuántos productos hay cargados en la categoría, cuántos con stock y cuántos calzan con este cliente, más la prohibición explícita de decir *"es el único modelo que tenemos"*. Lo correcto es acotarlo: *"de hombre tengo estos 3"*.
+
+De paso resuelve el otro pedido del dueño ("analizá si hay stock o no y de qué hay"): el modelo ahora sabe cuántos están agotados y tiene prohibido ofrecerlos.
+
+### Lo de las fotos NO era del código
+
+Las tarjetas dejaron de llegar porque **`public/uploads` se borra en cada redeploy** mientras no se monte el volumen en Coolify (ver `docs/04`). Sin las imágenes en disco, las URLs dan 404 y WhatsApp no puede adjuntarlas. El código ya detecta el fallo y le prohíbe al bot decir que las mandó — pero la foto no existe hasta que se monte el volumen y se vuelvan a subir.

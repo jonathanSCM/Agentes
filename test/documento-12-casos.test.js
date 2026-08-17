@@ -518,3 +518,52 @@ describe('PUNTO 4 - el bot no puede interrogar ni prometer sin entregar', () => 
     assert.match(system, /NO los preguntes antes de mostrar productos/);
   });
 });
+
+// Bug real de produccion: el negocio tenia 4 zapatillas cargadas y el bot le
+// juraba al cliente que solo existia una.
+describe('BUG - "es el unico modelo que tenemos" siendo mentira', () => {
+  const { coincideAtributosLead } = require('../lib/services/catalogo');
+
+  const zapa = (nombre, genero, stock) => producto({
+    id: Math.floor(Math.random() * 100000), nombre, categoria: 'Zapatillas', stock, atributos: genero ? { Genero: genero } : {},
+  });
+
+  test('"Masculino" y "hombre" son el mismo genero (era lo que escondia productos)', () => {
+    assert.equal(coincideAtributosLead(zapa('A', 'Masculino', 3), { atributosLead: { Genero: 'Hombre' } }), true);
+    assert.equal(coincideAtributosLead(zapa('B', 'Varon', 3), { atributosLead: { Genero: 'hombre' } }), true);
+    assert.equal(coincideAtributosLead(zapa('C', 'Caballero', 3), { atributosLead: { Genero: 'Hombre' } }), true);
+    assert.equal(coincideAtributosLead(zapa('D', 'Femenino', 3), { atributosLead: { Genero: 'Mujer' } }), true);
+    assert.equal(coincideAtributosLead(zapa('E', 'Dama', 3), { atributosLead: { Genero: 'mujer' } }), true);
+  });
+
+  test('pero sigue separando de verdad los generos distintos', () => {
+    assert.equal(coincideAtributosLead(zapa('F', 'Femenino', 3), { atributosLead: { Genero: 'Hombre' } }), false);
+    assert.equal(coincideAtributosLead(zapa('G', 'Masculino', 3), { atributosLead: { Genero: 'Mujer' } }), false);
+  });
+
+  test('un producto para ambos generos le sirve a los dos', () => {
+    assert.equal(coincideAtributosLead(zapa('H', 'Hombre, Mujer', 3), { atributosLead: { Genero: 'Mujer' } }), true);
+    assert.equal(coincideAtributosLead(zapa('I', 'Unisex', 3), { atributosLead: { Genero: 'Unisex' } }), true);
+  });
+
+  test('un producto sin genero cargado no se esconde (no hay dato que lo contradiga)', () => {
+    assert.equal(coincideAtributosLead(zapa('J', null, 3), { atributosLead: { Genero: 'Hombre' } }), true);
+  });
+
+  test('el prompt le prohibe al bot decir que el inventario entero es un solo modelo', () => {
+    const cat = categoria('Zapatillas', []);
+    const productos = [
+      producto({ id: 1, nombre: 'Park St', categoria: 'Zapatillas', stock: 3, atributos: { Genero: 'Hombre' } }),
+      producto({ id: 2, nombre: 'Superstar', categoria: 'Zapatillas', stock: 0, atributos: { Genero: 'Hombre' } }),
+      producto({ id: 3, nombre: 'Tendencia', categoria: 'Zapatillas', stock: 0, atributos: { Genero: 'Hombre' } }),
+    ];
+    productos.forEach((p) => { p.categoria = cat; });
+    const lead = { categoriaInteres: 'Zapatillas', categoriaId: cat.id, atributosLead: { Genero: 'Hombre' }, contexto: {} };
+    const texto = seccionProductos(productos, lead, cat, 'BOB');
+
+    assert.match(texto, /PANORAMA REAL/);
+    assert.match(texto, /3 producto\(s\) cargado\(s\) en total/);
+    assert.match(texto, /2 esta\(n\) sin stock/);
+    assert.match(texto, /PROHIBIDO decir "es el unico modelo que tenemos"/);
+  });
+});
