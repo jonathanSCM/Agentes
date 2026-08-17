@@ -307,3 +307,19 @@ Backstop nuevo (`nombraUnProductoReal`): si el texto final menciona el nombre de
 El de "listado en texto plano" que ya existía sólo saltaba con 2+ precios y 2+ viñetas; con **un solo producto** no se activaba, que es justo el caso de la captura. Este cubre ese hueco.
 
 Verificado contra la base: tras 15 min reenvía la tarjeta, a los 2 min también si el cliente la pide, y el modelo que nombra el producto sin tarjeta es forzado a mandarla.
+
+## 18. BUG: "quiero otras opciones" → "no tenemos más", teniendo más
+
+**Charla real del dueño del negocio con el bot**: le muestran las Park St 2.0, dice *"no quiero esas, quiero otras opciones"* y el bot responde *"lamento que no tengamos más opciones por el momento"*. En la categoría había **otro producto con stock**.
+
+**Causa**: `buscarConFallback` recorre escalones (exacto → aflojar color → marca → presupuesto → talla) y **corta en el primero que devuelve algo**. Si el cliente venía pidiendo un color y UN producto calzaba exacto, la cascada terminaba ahí y los que estaban a un color de distancia **nunca se calculaban**. El bot decía "no hay más" con total honestidad: para él no existían.
+
+Es un bug de diseño de la cascada, no del modelo.
+
+**Solución**: `buscarConFallback` devuelve además `adicionales` — lo que aparece aflojando todo lo aflojable (nunca la categoría ni el género), menos lo que ya está en `resultados`. Cuando el cliente ya vio los exactos, `seccionProductos` se los ofrece:
+
+> *"OJO, SÍ HAY MÁS PRODUCTOS que este cliente todavía no vio... PROHIBIDO contestarle que no hay más: tenés N opción(es) para ofrecerle."*
+
+Y cuando de verdad no queda nada, el bloque sigue diciendo que no hay más — sin `adicionales`, el texto es el de antes.
+
+**De paso**: se levantó la prohibición de repetir una tarjeta ya mostrada. Negarle al cliente una tarjeta que está pidiendo porque "ya se la mostraron" hace 20 mensajes lo trata mal; en WhatsApp esa tarjeta ya no está a la vista. Solo se evita repetirla dentro del mismo mensaje.

@@ -219,14 +219,17 @@ describe('seccionProductos - no repetir tarjetas ya enviadas (bug real de produc
     assert.doesNotMatch(texto, /\[ID 11\]/, 'la que ya se mostro no debe volver a ofrecerse como "nueva" para tarjeta');
   });
 
-  test('si TODOS los productos ya fueron enviados, avisa explicitamente que no vuelva a llamar mostrar_productos', () => {
+  test('si TODOS los productos ya fueron enviados, lo dice y confirma que no queda nada mas', () => {
     const productos = [
       producto({ id: 10, nombre: 'Sandalia de verano', categoria: 'Calzado' }),
     ];
     const lead = { categoriaInteres: 'Calzado', contexto: { fotosEnviadas: [10] } };
     const texto = seccionProductos(productos, lead);
-    assert.match(texto, /YA SE LOS MOSTRASTE/);
-    assert.match(texto, /NO vuelvas a llamar mostrar_productos/);
+    assert.match(texto, /ya se los mostraste/i);
+    assert.match(texto, /Estas son TODAS las opciones reales/);
+    // Repetir una tarjeta que el cliente vuelve a pedir SI esta permitido:
+    // negarsela porque "ya se la mostro" hace 20 mensajes lo trata mal.
+    assert.match(texto, /mandasela de nuevo sin problema/);
   });
 });
 

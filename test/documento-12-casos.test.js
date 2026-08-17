@@ -692,3 +692,44 @@ describe('reenvio de tarjetas y "aqui esta" sin tarjeta', () => {
     assert.equal(nombraUnProductoReal('¿Para hombre o para mujer?', candidatos), null);
   });
 });
+
+// Bug reportado por el dueño del negocio en una charla real con el bot: el
+// cliente dice "no quiero esas, quiero otras opciones" y el bot contesta que
+// no hay mas, teniendo otro producto con stock en la misma categoria.
+describe('BUG - "quiero otras opciones" y el bot dice que no hay', () => {
+  const parkSt = producto({
+    id: 1, nombre: 'Zapatillas Park St 2.0', categoria: 'Urbanas', precio: 379, stock: 36,
+    variantes: [{ activa: true, atributos: { Talla: '9', Color: 'negro' }, stock: 10, fotos: ['n.jpg'] }],
+  });
+  const tekkira = producto({
+    id: 2, nombre: 'ZAPATILLAS TEKKIRA CUP', categoria: 'Urbanas', precio: 303, stock: 10,
+    atributos: { Color: 'Blanco nube' },
+  });
+  const cat = parkSt.categoria;
+  tekkira.categoria = cat;
+  const productos = [parkSt, tekkira];
+
+  test('la cascada ya no esconde lo que esta un escalon mas abajo', () => {
+    // El cliente venia pidiendo negro: Park St calza exacto, y antes la
+    // busqueda cortaba ahi y TEKKIRA no existia para el sistema.
+    const b = buscarConFallback(productos, { categoriaInteres: 'Urbanas', color: 'negro' });
+    assert.deepEqual(b.resultados.map((p) => p.nombre), ['Zapatillas Park St 2.0']);
+    assert.deepEqual(b.adicionales.map((p) => p.nombre), ['ZAPATILLAS TEKKIRA CUP']);
+  });
+
+  test('cuando ya vio lo exacto, el sistema le ofrece las otras en vez de decir que no hay', () => {
+    const lead = { categoriaInteres: 'Urbanas', categoriaId: cat.id, color: 'negro', contexto: { fotosEnviadas: [parkSt.id] } };
+    const texto = seccionProductos(productos, lead, cat, 'BOB');
+    assert.match(texto, /OJO, SI HAY MAS PRODUCTOS/);
+    assert.match(texto, /TEKKIRA CUP/);
+    assert.match(texto, /PROHIBIDO contestarle que no hay mas/);
+  });
+
+  test('si de verdad no queda nada mas, ahi si puede decirlo', () => {
+    const solo = [parkSt];
+    const lead = { categoriaInteres: 'Urbanas', categoriaId: cat.id, color: 'negro', contexto: { fotosEnviadas: [parkSt.id] } };
+    const texto = seccionProductos(solo, lead, cat, 'BOB');
+    assert.match(texto, /Estas son TODAS las opciones reales/);
+    assert.doesNotMatch(texto, /OJO, SI HAY MAS PRODUCTOS/);
+  });
+});
