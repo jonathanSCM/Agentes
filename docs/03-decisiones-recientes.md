@@ -360,3 +360,39 @@ Esa regla se había puesto para no saturar la tarjeta con 15-20 combinaciones. E
 Y si esa combinación no tiene stock: *"sin stock por ahora, pero mirá lo que sí hay 👇"*. Antes, en ese caso, la tarjeta caía al listado completo sin explicar nada.
 
 Sigue vigente el agrupado por talla y el colapso cuando todas comparten los mismos colores, que es lo que evita la saturación de verdad.
+
+## 21. Carrito y el recorrido de venta acordado con el negocio
+
+Después de que el ingeniero del cliente probara el bot en vivo, se acordó punto por punto el recorrido que tiene que seguir. Esta es la referencia: si algo del bot no encaja acá, es un bug.
+
+```
+1. Cliente pregunta qué vendés  → el bot lista las CATEGORÍAS
+2. Elige una (por número, por nombre o "me interesa")
+                                → el bot manda las TARJETAS, máximo 3
+3. "más"                        → 3 más, hasta agotar el stock
+4. Elige mirando la tarjeta ("la Ginger Tav en blanco talla 9")
+                                → agregar_al_carrito
+5. "¿Deseás ver algo más?"      SÍ → vuelve al MENÚ DE CATEGORÍAS
+                                NO → cierre
+6. Cierre: nombre, entrega, forma de pago → resumen → crear_pedido
+```
+
+### La decisión que más cambia el flujo
+
+**"Las tallas disponibles están en la tarjeta"** (textual del ingeniero). El bot **no pregunta talla ni color** para buscar: el cliente los lee en la tarjeta y los dice. La única vez que se pregunta una talla es cuando ya eligió un producto y falta saber qué combinación exacta se lleva — ahí no está filtrando, está completando la compra.
+
+### El carrito
+
+No existía: el pedido se armaba de una sola vez y el modelo tenía que "acordarse" de todos los ítems. Si se olvidaba uno, se vendía de menos.
+
+`lib/services/carrito.js` + tres herramientas (`agregar_al_carrito`, `ver_carrito`, `quitar_del_carrito`). `confirmar_pedido` y `crear_pedido` ahora **cobran lo que hay en el carrito**; el parámetro `items` quedó opcional.
+
+Vive en `ClienteFinal.contexto.carrito`, no en una tabla, y guarda el `conversacionId`: **si el cliente vuelve otro día, arranca limpio** (decisión explícita del negocio). Se vacía también al crear el pedido.
+
+Decisiones puntuales que confirmó el negocio:
+- **Forma de pago**: se ofrece en el cierre, después del carrito.
+- **Nombre y dirección**: se piden al final, cuando ya aceptó todo lo que va a comprar.
+- **"¿Algo más?" → sí**: vuelve al menú de categorías, no a las tarjetas de la misma.
+- **Género**: se mantiene como pregunta inicial.
+
+Verificado de punta a punta contra la base: el cliente agrega dos productos distintos en dos momentos, y el pedido creado tiene los dos, con el total correcto y el carrito vacío después.

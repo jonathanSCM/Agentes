@@ -542,3 +542,59 @@ describe('BUG - pedir permiso en bucle en una conversacion larga', () => {
     assert.equal(r.salida.fotos.length, 1);
   });
 });
+
+// El recorrido completo acordado con el negocio: categorias -> tarjetas ->
+// elige de la tarjeta -> carrito -> "¿algo mas?" -> cierre con resumen.
+describe('recorrido de venta acordado con el negocio', () => {
+  test('el cliente compra DOS productos distintos y el pedido los tiene a los dos', async () => {
+    await reiniciarLead({ atributosLead: { Genero: 'Hombre' } });
+    const conv = await prisma.conversacion.create({ data: { agenteId, telefonoCliente: TELEFONO, ultimoMensajeAt: new Date() } });
+    const variante = await prisma.variante.findFirst({ where: { productoId: productos[0].id }, orderBy: { id: 'asc' } });
+
+    // 1) agrega el primero
+    const a = iaFalsa([{ tool_calls: [tool('agregar_al_carrito', { idProducto: productos[0].id, idVariante: variante.id, cantidad: 1 })] }, { content: '¿Deseas ver algo mas?' }]);
+    await generarRespuesta(agenteId, TELEFONO, [], 'me interesa la primera', conv.id, { llamarInyectado: a.llamar });
+    assert.match(a.recibido.toolResults[0], /agregado al carrito/);
+    assert.match(a.recibido.toolResults[0], /DESEA VER ALGO MAS/);
+
+    // 2) dice que si y agrega otro (con su variante: el cliente la vio en la tarjeta)
+    const variante2 = await prisma.variante.findFirst({ where: { productoId: productos[1].id }, orderBy: { id: 'asc' } });
+    const b = iaFalsa([{ tool_calls: [tool('agregar_al_carrito', { idProducto: productos[1].id, idVariante: variante2.id, cantidad: 2 })] }, { content: 'Listo.' }]);
+    await generarRespuesta(agenteId, TELEFONO, [], 'agregame tambien la otra', conv.id, { llamarInyectado: b.llamar });
+    assert.match(b.recibido.toolResults[0], /Zapatilla 1/, 'el primero sigue en el carrito');
+    assert.match(b.recibido.toolResults[0], /Zapatilla 2/);
+
+    // 3) cierra
+    await prisma.clienteFinal.updateMany({
+      where: { telefono: TELEFONO },
+      data: { nombre: 'Juan Perez', tipoEntrega: 'DOMICILIO', direccionEntrega: 'Av 123', formaPago: 'EFECTIVO' },
+    });
+    const c = iaFalsa([{ tool_calls: [tool('confirmar_pedido', {})] }, { content: '¿Esta todo bien?' }]);
+    await generarRespuesta(agenteId, TELEFONO, [], 'no, eso es todo', conv.id, { llamarInyectado: c.llamar });
+    assert.match(c.recibido.toolResults[0], /Resumen REAL del pedido/);
+
+    const d = iaFalsa([{ tool_calls: [tool('crear_pedido', {})] }, { content: 'Pedido tomado.' }]);
+    await generarRespuesta(agenteId, TELEFONO, [], 'si', conv.id, { llamarInyectado: d.llamar });
+
+    const pedido = await prisma.pedido.findFirst({ where: { empresaId }, include: { items: true }, orderBy: { id: 'desc' } });
+    assert.equal(pedido.items.length, 2, 'el pedido tiene los DOS productos que agrego');
+
+    const lead = await prisma.clienteFinal.findFirst({ where: { telefono: TELEFONO } });
+    assert.deepEqual((lead.contexto || {}).carrito, null, 'el carrito se vacia al comprar');
+  });
+
+  test('no se puede confirmar con el carrito vacio', async () => {
+    await reiniciarLead({ atributosLead: { Genero: 'Hombre' }, nombre: 'Juan', tipoEntrega: 'DOMICILIO', direccionEntrega: 'Av 1', formaPago: 'EFECTIVO' });
+    const { llamar, recibido } = iaFalsa([{ tool_calls: [tool('confirmar_pedido', {})] }, { content: 'ok' }]);
+    await generarRespuesta(agenteId, TELEFONO, [], 'cerra el pedido', undefined, { llamarInyectado: llamar });
+    assert.match(recibido.toolResults[0], /carrito esta vacio/);
+  });
+
+  test('no deja agregar mas unidades de las que hay en stock', async () => {
+    await reiniciarLead({ atributosLead: { Genero: 'Hombre' } });
+    const variante = await prisma.variante.findFirst({ where: { productoId: productos[0].id }, orderBy: { id: 'asc' } });
+    const { llamar, recibido } = iaFalsa([{ tool_calls: [tool('agregar_al_carrito', { idProducto: productos[0].id, idVariante: variante.id, cantidad: 999 })] }, { content: 'ok' }]);
+    await generarRespuesta(agenteId, TELEFONO, [], 'quiero 999', undefined, { llamarInyectado: llamar });
+    assert.match(recibido.toolResults[0], /No hay stock suficiente/);
+  });
+});
