@@ -733,3 +733,40 @@ describe('BUG - "quiero otras opciones" y el bot dice que no hay', () => {
     assert.doesNotMatch(texto, /OJO, SI HAY MAS PRODUCTOS/);
   });
 });
+
+// El dueño, despues de ver una charla real: "AHORA DICE QUE NO TIENE QUE
+// PREGUNTAR POR COLOR NI POR TALLA, QUE TIENE QUE MOSTRAR PRIMERO".
+describe('mostrar primero, afinar despues', () => {
+  const { pidePreferenciaSinMostrar, construirSystem } = require('../lib/services/agente');
+
+  test('detecta que esta pidiendo una preferencia en vez de mostrar', () => {
+    assert.equal(pidePreferenciaSinMostrar('¿En que color las estas buscando? Disponemos de blanco, gris y negro.'), true);
+    assert.equal(pidePreferenciaSinMostrar('Necesito saber en que color las prefieres: blanco o gris. ¿Cual te gusta mas?'), true);
+    assert.equal(pidePreferenciaSinMostrar('¿Que talla usas?'), true);
+    assert.equal(pidePreferenciaSinMostrar('¿Tenes alguna marca preferida?'), true);
+  });
+
+  test('no se mete con preguntas que SI corresponden', () => {
+    assert.equal(pidePreferenciaSinMostrar('¿Es para hombre o para mujer?'), false);
+    assert.equal(pidePreferenciaSinMostrar('¿Queres que te arme el pedido?'), false);
+    assert.equal(pidePreferenciaSinMostrar('Estas son las tres que tenemos. ¿Alguna duda?'), false);
+    assert.equal(pidePreferenciaSinMostrar('Te muestro las que tenemos'), false);
+  });
+
+  test('el prompt ordena mostrar antes de pedir color o talla', () => {
+    const system = construirSystem({ nombre: 'T' }, [producto({ id: 1 })], {}, {}, false, false, '');
+    assert.match(system, /SI HAY PRODUCTOS EN EL BLOQUE DE RESULTADOS, MOSTRALOS YA/);
+    assert.match(system, /No pidas color, talla, marca ni presupuesto antes/);
+  });
+
+  test('la lista de valores reales se presenta para RESPONDER, no para interrogar', () => {
+    const conColores = producto({
+      id: 1, nombre: 'Zapa', categoria: 'Urbanas', stock: 5,
+      variantes: [{ activa: true, atributos: { Color: 'negro', Talla: '9' }, stock: 3 }],
+    });
+    const lead = { categoriaInteres: 'Urbanas', categoriaId: conColores.categoria.id, contexto: {} };
+    const texto = seccionProductos([conColores], lead, conColores.categoria, 'BOB');
+    assert.match(texto, /NO es un cuestionario para completar antes de mostrar/);
+    assert.match(texto, /mostraselos PRIMERO/);
+  });
+});

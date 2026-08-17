@@ -468,7 +468,9 @@ describe('el bot ofrece los valores REALES, no pregunta al aire', () => {
     const system = recibido.systems[0];
     assert.match(system, /VALORES REALES DISPONIBLES/);
     assert.match(system, /Genero: Hombre/);
-    assert.match(system, /PROHIBIDO preguntar al aire/);
+    // La lista existe para responder y para ofrecer opciones concretas cuando
+    // SI corresponde preguntar, nunca para interrogar antes de mostrar.
+    assert.match(system, /ofrece estas opciones concretas/);
   });
 
   test('con productos en pantalla, tambien le pasa colores y tallas reales', async () => {

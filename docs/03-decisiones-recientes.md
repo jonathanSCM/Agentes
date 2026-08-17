@@ -323,3 +323,17 @@ Es un bug de diseño de la cascada, no del modelo.
 Y cuando de verdad no queda nada, el bloque sigue diciendo que no hay más — sin `adicionales`, el texto es el de antes.
 
 **De paso**: se levantó la prohibición de repetir una tarjeta ya mostrada. Negarle al cliente una tarjeta que está pidiendo porque "ya se la mostraron" hace 20 mensajes lo trata mal; en WhatsApp esa tarjeta ya no está a la vista. Solo se evita repetirla dentro del mismo mensaje.
+
+## 19. Mostrar primero, afinar después (revierte parte del punto 2 del documento)
+
+**Charla real del dueño con el bot**: pide comprar, el bot le pregunta el color; pide ver, el bot le vuelve a pedir el color; elige *"Blanco nube"* —un color que **el propio bot le había ofrecido**— y recibe *"no tenemos zapatillas exactamente en Blanco nube"*. Nunca vio una foto. Veredicto del dueño: **"no tiene que preguntar por color ni por talla, tiene que mostrar primero"**.
+
+**Causa**: el bloque `VALORES REALES DISPONIBLES` (punto 11 de esta bitácora) se agregó para que el bot pudiera **responder** *"¿qué colores tenés?"*. El modelo lo leyó como una lista de datos **para pedir antes de mostrar** y convirtió la conversación en un formulario.
+
+**Decisión**: se invierte la prioridad.
+
+- El bloque de valores ahora dice explícitamente que es **para responder y para afinar después de mostrar**, no un cuestionario previo.
+- Regla dura en el prompt: *si hay productos en el bloque de resultados, se muestran ya*. Color, talla, marca y presupuesto solo se piden **después** de que el cliente vio opciones.
+- Backstop en código (`pidePreferenciaSinMostrar`): si hay candidatos listos y el modelo pide color/talla/marca/presupuesto sin haber mandado ninguna tarjeta en ese turno, se rechaza y se le exige mostrar.
+
+**Esto matiza el punto 2 del documento original** ("antes de mostrar productos debe entender al cliente"). Sigue vigente para lo que la tienda marcó como `OBLIGATORIO` —típicamente el género, que parte el catálogo en dos—, pero **el color y la talla dejaron de ser previos**: no aportan lo suficiente como para pagar el costo de que el cliente abandone antes de ver nada. Es una decisión explícita del dueño después de probarlo en vivo, no un olvido.
