@@ -1064,9 +1064,14 @@ app.get('/panel/categorias/:id', requireCliente, async (req, res, next) => {
       },
     });
     if (!categoria) return res.redirect('/panel/categorias');
+    const rubrosDisponibles = await prisma.categoria.findMany({
+      where: { empresaId: req.session.empresaId, padreId: null, NOT: { id: categoria.id } },
+      orderBy: [{ orden: 'asc' }, { nombre: 'asc' }],
+      select: { id: true, nombre: true },
+    });
     res.render('cliente/categoria-detalle', {
       title: `${categoria.nombre} - Categorías - Proshop`, tituloPagina: 'Categorías', activo: 'categorias',
-      categoria, mensaje: req.query.ok || null, error: req.query.err || null,
+      categoria, rubrosDisponibles, mensaje: req.query.ok || null, error: req.query.err || null,
     });
   } catch (err) { next(err); }
 });
@@ -1090,6 +1095,89 @@ app.post('/panel/categorias/:id/eliminar', requireCliente, async (req, res, next
   try {
     await prisma.categoria.deleteMany({ where: { id: Number(req.params.id), empresaId: req.session.empresaId } });
     res.redirect('/panel/categorias?ok=' + encodeURIComponent('Categoría eliminada.'));
+  } catch (err) { next(err); }
+});
+
+// Estructura sugerida para una tienda de ropa y calzado. Existe porque toda
+// tienda nueva arranca con el panel vacio y armar 7 rubros con sus tipos a
+// mano es media hora de trabajo repetido en cada alta. No inventa productos:
+// solo crea las carpetas, el negocio despues acomoda lo suyo.
+const PLANTILLAS_CATEGORIAS = {
+  ropa: {
+    nombre: 'Tienda de ropa y calzado',
+    rubros: [
+      { nombre: 'Calzado', hijas: ['Zapatillas urbanas', 'Zapatillas deportivas', 'Botas y botines', 'Zapatos de vestir', 'Sandalias'] },
+      { nombre: 'Prendas de arriba', hijas: ['Poleras', 'Camisas', 'Blusas', 'Tops'] },
+      { nombre: 'Prendas de abajo', hijas: ['Jeans', 'Pantalones', 'Shorts', 'Faldas'] },
+      { nombre: 'Abrigos', hijas: ['Casacas y abrigos', 'Chompas y chalecos'] },
+      { nombre: 'Vestidos y enterizos', hijas: [] },
+      { nombre: 'Ropa deportiva', hijas: [] },
+      { nombre: 'Ropa de baño', hijas: [] },
+      { nombre: 'Accesorios', hijas: ['Mochilas y bolsos', 'Gorras', 'Cinturones'] },
+    ],
+  },
+};
+
+app.post('/panel/categorias/plantilla', requireCliente, async (req, res, next) => {
+  try {
+    const plantilla = PLANTILLAS_CATEGORIAS[req.body.plantilla];
+    if (!plantilla) return res.redirect('/panel/categorias?err=' + encodeURIComponent('Esa plantilla no existe.'));
+    const empresaId = req.session.empresaId;
+
+    // Nunca pisa lo que ya existe: si el negocio ya tiene una categoria con
+    // ese nombre, se respeta tal cual esta (puede tener productos cargados).
+    const existentes = new Set(
+      (await prisma.categoria.findMany({ where: { empresaId }, select: { nombre: true } })).map((c) => c.nombre.toLowerCase()),
+    );
+
+    let creadas = 0;
+    for (const [i, rubro] of plantilla.rubros.entries()) {
+      let padre = await prisma.categoria.findFirst({ where: { empresaId, nombre: rubro.nombre } });
+      if (!padre) {
+        padre = await prisma.categoria.create({ data: { empresaId, nombre: rubro.nombre, orden: i + 1 } });
+        creadas += 1;
+      }
+      for (const [j, hija] of rubro.hijas.entries()) {
+        if (existentes.has(hija.toLowerCase())) continue;
+        await prisma.categoria.create({ data: { empresaId, nombre: hija, padreId: padre.id, orden: j + 1 } });
+        creadas += 1;
+      }
+    }
+
+    const msg = creadas
+      ? `Se agregaron ${creadas} categorías. Las que ya tenías quedaron intactas: movelas al rubro que corresponda desde su página.`
+      : 'Ya tenías todas esas categorías: no se creó ninguna.';
+    res.redirect('/panel/categorias?ok=' + encodeURIComponent(msg));
+  } catch (err) { next(err); }
+});
+
+// Mover una categoria dentro de un rubro (o sacarla al primer nivel). Sin
+// esto, una categoria creada antes de tener rubros se quedaba suelta para
+// siempre.
+app.post('/panel/categorias/:id/mover', requireCliente, async (req, res, next) => {
+  try {
+    const empresaId = req.session.empresaId;
+    const categoria = await prisma.categoria.findFirst({ where: { id: Number(req.params.id), empresaId } });
+    if (!categoria) return res.redirect('/panel/categorias');
+
+    const destino = req.body.padreId ? Number(req.body.padreId) : null;
+    if (destino) {
+      const padre = await prisma.categoria.findFirst({ where: { id: destino, empresaId, padreId: null } });
+      // Solo se cuelga de un rubro real, y nunca de si misma: eso dejaria la
+      // categoria fuera del arbol y sus productos invisibles para el bot.
+      if (!padre || padre.id === categoria.id) {
+        return res.redirect(`/panel/categorias/${categoria.id}?err=` + encodeURIComponent('Ese rubro no es válido.'));
+      }
+      // Una categoria que tiene subcategorias no puede volverse subcategoria:
+      // solo se manejan dos niveles.
+      const tieneHijas = await prisma.categoria.count({ where: { padreId: categoria.id } });
+      if (tieneHijas) {
+        return res.redirect(`/panel/categorias/${categoria.id}?err=` + encodeURIComponent('Esta categoría tiene subcategorías propias: sacáselas antes de moverla.'));
+      }
+    }
+
+    await prisma.categoria.update({ where: { id: categoria.id }, data: { padreId: destino } });
+    res.redirect(`/panel/categorias/${categoria.id}?ok=` + encodeURIComponent(destino ? 'Categoría movida.' : 'Ahora es un rubro de primer nivel.'));
   } catch (err) { next(err); }
 });
 

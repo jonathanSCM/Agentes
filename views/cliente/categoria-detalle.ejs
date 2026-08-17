@@ -36,6 +36,24 @@
   </div>
 </form>
 
+<form method="POST" action="/panel/categorias/<%= categoria.id %>/mover" class="form-card" style="max-width:500px;margin-top:1rem">
+  <div class="field">
+    <label for="padreId">Pertenece al rubro</label>
+    <p class="muted" style="font-size:.82rem;margin:0 0 .5rem">
+      Si la dejás en "Ninguno", es un rubro de primer nivel y aparece en el menú principal del agente.
+    </p>
+    <select id="padreId" name="padreId">
+      <option value="">Ninguno (es un rubro)</option>
+      <% (typeof rubrosDisponibles !== 'undefined' ? rubrosDisponibles : []).forEach(function (r) { %>
+        <option value="<%= r.id %>" <%= categoria.padreId === r.id ? 'selected' : '' %>><%= r.nombre %></option>
+      <% }); %>
+    </select>
+  </div>
+  <div class="form-actions">
+    <button class="btn btn-ghost" type="submit">Mover</button>
+  </div>
+</form>
+
 <% if (!categoria.padre) { %>
   <div class="page-head" style="margin-top:1.6rem">
     <h3 style="font-size:1rem">Subcategorías</h3>
