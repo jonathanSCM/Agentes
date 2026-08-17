@@ -648,10 +648,11 @@ describe('BUG - "blancas" no matcheaba con "blanco"', () => {
     assert.equal(f.esDelColorPedido, true);
   });
 
-  test('la ficha tambien respeta el color pedido en plural', () => {
+  test('la ficha reconoce el color pedido en plural para decir si esta', () => {
     const ficha = fichaProducto(zapa, { color: 'blancas', talla: '9' }, 'BOB');
-    assert.match(ficha, /Talla 9: blanco/);
-    assert.doesNotMatch(ficha, /negro/);
+    assert.ok(ficha.includes('Lo que buscabas* (talla 9 en blancas): disponible'), ficha);
+    // Y sigue mostrando todo el abanico, no solo lo pedido.
+    assert.match(ficha, /Talla 9: blanco, negro/);
   });
 
   test('el prompt prohibe decir "aqui tienes" sin haber mandado nada', () => {

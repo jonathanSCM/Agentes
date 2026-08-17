@@ -337,3 +337,26 @@ Y cuando de verdad no queda nada, el bloque sigue diciendo que no hay más — s
 - Backstop en código (`pidePreferenciaSinMostrar`): si hay candidatos listos y el modelo pide color/talla/marca/presupuesto sin haber mandado ninguna tarjeta en ese turno, se rechaza y se le exige mostrar.
 
 **Esto matiza el punto 2 del documento original** ("antes de mostrar productos debe entender al cliente"). Sigue vigente para lo que la tienda marcó como `OBLIGATORIO` —típicamente el género, que parte el catálogo en dos—, pero **el color y la talla dejaron de ser previos**: no aportan lo suficiente como para pagar el costo de que el cliente abandone antes de ver nada. Es una decisión explícita del dueño después de probarlo en vivo, no un olvido.
+
+## 20. La tarjeta mostraba una sola variante de seis
+
+**Reportado por el dueño con una captura del panel**: el producto tiene 6 variantes cargadas y la tarjeta que recibe el cliente dice *"Talla 9: blanco"* y nada más.
+
+**Causa**: `fichaProducto` recortaba las variantes a la talla y el color que el cliente hubiera pedido antes. En ese producto el blanco **solo tiene stock en la talla 9** (el 10 y el 8.5 están en 0), así que la intersección "talla 9 + blanco" dejaba una línea sola. Un producto con 6 combinaciones parecía tener una.
+
+Esa regla se había puesto para no saturar la tarjeta con 15-20 combinaciones. El costo real resultó peor: el cliente no ve el abanico y no puede elegir.
+
+**Solución**: la tarjeta muestra **todo lo que tiene stock**, y lo que el cliente pidió no se esconde — se le dice aparte, arriba de la lista:
+
+```
+· *Lo que buscabas* (talla 9 en blanco): disponible ✅
+
+*Tallas y colores disponibles*:
+· Talla 9: blanco, Gris
+· Talla 9.5: Gris
+· Talla 10: Gris
+```
+
+Y si esa combinación no tiene stock: *"sin stock por ahora, pero mirá lo que sí hay 👇"*. Antes, en ese caso, la tarjeta caía al listado completo sin explicar nada.
+
+Sigue vigente el agrupado por talla y el colapso cuando todas comparten los mismos colores, que es lo que evita la saturación de verdad.

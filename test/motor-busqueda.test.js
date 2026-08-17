@@ -326,18 +326,25 @@ describe('fichaProducto - la tarjeta del cliente no debe saturarlo de datos inte
     assert.equal(lineasTalla, 3);
   });
 
-  test('si el cliente ya pidio una talla puntual, la ficha se filtra a esa talla nada mas', () => {
+  // El dueño reporto que un producto con 6 variantes se veia con una sola
+  // linea porque la ficha se recortaba a lo que el cliente habia pedido. Ahora
+  // se muestra TODO el abanico y aparte se le dice si lo suyo esta o no.
+  test('la ficha muestra TODAS las tallas con stock, no solo la pedida', () => {
     const ficha = fichaProducto(productoConVariantes, { talla: 'L' });
     assert.match(ficha, /Talla L: Negro, Azul/);
-    assert.doesNotMatch(ficha, /Talla S/);
-    assert.doesNotMatch(ficha, /Talla XL/);
+    assert.match(ficha, /Talla S/, 'el cliente tiene que ver el abanico real');
+    assert.match(ficha, /Talla XL/);
   });
 
-  test('si pidio varias tallas ("L y XL"), muestra solo esas', () => {
-    const ficha = fichaProducto(productoConVariantes, { talla: 'L y XL' });
-    assert.match(ficha, /Talla L:/);
-    assert.match(ficha, /Talla XL:/);
-    assert.doesNotMatch(ficha, /Talla S/);
+  test('y le dice explicitamente si lo que pidio esta disponible', () => {
+    const ficha = fichaProducto(productoConVariantes, { talla: 'L' });
+    assert.ok(ficha.includes('Lo que buscabas* (talla L): disponible'), ficha);
+  });
+
+  test('si lo que pidio NO tiene stock, se lo dice y le muestra lo que si hay', () => {
+    const ficha = fichaProducto(productoConVariantes, { talla: 'XXL' });
+    assert.ok(ficha.includes('Lo que buscabas* (talla XXL): sin stock'), ficha);
+    assert.match(ficha, /Talla S/);
   });
 });
 
