@@ -485,3 +485,58 @@ describe('el bot ofrece los valores REALES, no pregunta al aire', () => {
     assert.match(system, /Talla: 42/);
   });
 });
+
+// Bucle real de produccion: el bot pedia permiso para mostrar alternativas, el
+// cliente decia "si quiero ver" tres veces, y el bot volvia a pedir permiso.
+describe('BUG - pedir permiso en bucle en una conversacion larga', () => {
+  let convId;
+  let prodId;
+
+  before(async () => {
+    const cat = await prisma.categoria.create({ data: { empresaId, nombre: 'Urbanas' } });
+    const p = await prisma.producto.create({
+      data: {
+        empresaId, categoriaId: cat.id, nombre: 'Park St 2.0', precio: 379, stock: 20,
+        atributos: { Talla: '8,9,10', Color: 'Blanco nube' }, fotos: ['f.jpg'],
+      },
+    });
+    prodId = p.id;
+    const conv = await prisma.conversacion.create({ data: { agenteId, telefonoCliente: TELEFONO, ultimoMensajeAt: new Date() } });
+    convId = conv.id;
+    // Mas de 20 mensajes: es lo que hacia que el contador de turno se clavara.
+    for (let i = 0; i < 30; i += 1) {
+      await prisma.mensaje.create({ data: { conversacionId: convId, rol: i % 2 ? 'AGENTE' : 'CLIENTE', contenido: 'relleno ' + i } });
+    }
+    await prisma.clienteFinal.deleteMany({ where: { telefono: TELEFONO } });
+    await prisma.clienteFinal.create({
+      data: { empresaId, telefono: TELEFONO, categoriaInteres: 'Urbanas', categoriaId: cat.id, talla: '42' },
+    });
+  });
+
+  const historialCorto = async () => (await prisma.mensaje.findMany({
+    where: { conversacionId: convId }, orderBy: { createdAt: 'desc' }, take: 20,
+  })).reverse().map((m) => ({ rol: m.rol, contenido: m.contenido }));
+
+  async function turnoDelCliente(texto) {
+    await prisma.mensaje.create({ data: { conversacionId: convId, rol: 'CLIENTE', contenido: texto } });
+    const { llamar, recibido } = iaFalsa([
+      { tool_calls: [tool('mostrar_productos', { idsProductos: [prodId] })] },
+      { content: 'ok' },
+    ]);
+    const salida = await generarRespuesta(agenteId, TELEFONO, await historialCorto(), texto, convId, { llamarInyectado: llamar });
+    await prisma.mensaje.create({ data: { conversacionId: convId, rol: 'AGENTE', contenido: 'resp' } });
+    return { salida, bloqueado: /NO se mostro nada todavia/.test(recibido.toolResults[0] || '') };
+  }
+
+  test('la primera vez SI pide permiso (la talla no calza)', async () => {
+    const r = await turnoDelCliente('quiero urbanas');
+    assert.equal(r.bloqueado, true);
+    assert.deepEqual(r.salida.fotos, []);
+  });
+
+  test('cuando el cliente dice que si, MUESTRA (antes volvia a preguntar para siempre)', async () => {
+    const r = await turnoDelCliente('si muestrame todas las urbanas');
+    assert.equal(r.bloqueado, false, 'no puede volver a pedir permiso: el cliente ya dijo que si');
+    assert.equal(r.salida.fotos.length, 1);
+  });
+});

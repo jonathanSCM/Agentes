@@ -237,3 +237,17 @@ De paso resuelve el otro pedido del dueño ("analizá si hay stock o no y de qu�
 ### Lo de las fotos NO era del código
 
 Las tarjetas dejaron de llegar porque **`public/uploads` se borra en cada redeploy** mientras no se monte el volumen en Coolify (ver `docs/04`). Sin las imágenes en disco, las URLs dan 404 y WhatsApp no puede adjuntarlas. El código ya detecta el fallo y le prohíbe al bot decir que las mandó — pero la foto no existe hasta que se monte el volumen y se vuelvan a subir.
+
+## 13. BUG: el bot pedía permiso en bucle y nunca mostraba
+
+**Captura del dueño**: el bot ofrece mostrar opciones que no calzan exacto, el cliente responde *"sí muéstrame todas las opciones"*, y el bot vuelve a preguntar lo mismo. Tres veces seguidas. La conversación queda trabada sin mostrar un solo producto.
+
+**Causa raíz**: el permiso para mostrar alternativas con un filtro aflojado exige que el cliente haya contestado *en un turno posterior* al de la pregunta. El número de turno salía de `historial.length`… y `obtenerHistorial` corta en los **últimos 20 mensajes**. En una conversación larga ese largo **se queda clavado en 20**, el número de turno deja de avanzar, y el sistema nunca se entera de que el cliente contestó.
+
+Es un caso clásico de "funciona en pruebas cortas, falla en uso real": ninguna conversación de test pasaba de 20 mensajes.
+
+**Solución**: el turno pasa a ser la cantidad de mensajes del CLIENTE en la conversación (`prisma.mensaje.count`), que es monótona de verdad. Sin `conversacionId` (chat de prueba del panel) cae a `historial.length`, que ahí alcanza.
+
+**Tope duro además**: si ya se pidió permiso **dos veces** por el mismo filtro, se muestra igual. Preferimos mostrar de más que dejar al cliente golpeando una puerta cerrada. Cualquier bug futuro de este tipo se degrada a "mostró una opción de más" en vez de "el bot no funciona".
+
+Cubierto por un test que arma una conversación de 30 mensajes, justamente para que el corte del historial esté en juego.
