@@ -63,15 +63,28 @@
     <select id="categoriaId" name="categoriaId">
       <option value="">Sin categoría</option>
       <% categorias.forEach(function (c) { %>
-        <option value="<%= c.id %>" <%= categoriaIdActual === c.id ? 'selected' : '' %>><%= c.nombre %></option>
+        <% if (c.hijas && c.hijas.length) { %>
+          <%# Rubro dividido: el producto va en una subcategoria, no en el rubro %>
+          <optgroup label="<%= c.nombre %>">
+            <% c.hijas.forEach(function (h) { %>
+              <option value="<%= h.id %>" <%= categoriaIdActual === h.id ? 'selected' : '' %>><%= h.nombre %></option>
+            <% }); %>
+          </optgroup>
+        <% } else { %>
+          <option value="<%= c.id %>" <%= categoriaIdActual === c.id ? 'selected' : '' %>><%= c.nombre %></option>
+        <% } %>
       <% }); %>
     </select>
     <p class="muted" style="font-size:.82rem;margin:.4rem 0 0" id="hint-atributos-categoria"></p>
-    <p class="muted" style="font-size:.8rem;margin:.3rem 0 0"><a href="/panel/categorias" style="color:var(--primary-2)">+ Crear categoría nueva</a> o editar sus atributos</p>
+    <p class="muted" style="font-size:.8rem;margin:.3rem 0 0"><a href="/panel/categorias" style="color:var(--primary-2)">Administrar rubros y subcategorías</a></p>
   </div>
   <script>
     window.__categoriasAtributos = <%- JSON.stringify(categorias.reduce(function (acc, c) {
-      acc[c.id] = c.atributos.filter(function (a) { return a.nivel === 'OBLIGATORIO' && !a.esDeVariante; }).map(function (a) { return a.nombre; });
+      var obligatorios = function (cat) {
+        return cat.atributos.filter(function (a) { return a.nivel === 'OBLIGATORIO' && !a.esDeVariante; }).map(function (a) { return a.nombre; });
+      };
+      acc[c.id] = obligatorios(c);
+      (c.hijas || []).forEach(function (h) { acc[h.id] = obligatorios(h); });
       return acc;
     }, {})) %>;
   </script>

@@ -2,7 +2,8 @@
 
 <div class="page-head">
   <h2>Categorías</h2>
-  <p>Cada categoría define qué necesita saber el agente antes de recomendar. Los atributos <strong>obligatorios</strong> (ej: Género, Talla) bloquean: el agente no muestra ningún producto hasta preguntarlos. Entrá a una categoría para configurar los suyos.</p>
+  <p>Esto es lo que el agente le ofrece al cliente cuando pregunta qué vendés. Son los <strong>rubros</strong>: el primer nivel del menú.</p>
+  <p class="muted" style="font-size:.9rem;margin:.3rem 0 0">Cada rubro puede dividirse en <strong>subcategorías</strong> (Calzado → Botas, Zapatillas...). El cliente elige primero el rubro y después el tipo, así no recibe 40 productos de golpe. Para agregar una subcategoría, entrá al rubro: nunca se crea desde acá.</p>
 </div>
 
 <% if (mensaje) { %><div class="alert-ok"><%= mensaje %></div><% } %>
@@ -10,23 +11,30 @@
 
 <% if (!categorias.length) { %>
   <div class="empty-state">
-    <h3>Todavía no hay categorías cargadas</h3>
-    <p>Agregá la primera abajo. Después la vas a poder elegir al crear o editar un producto.</p>
+    <h3>Todavía no hay rubros cargados</h3>
+    <p>Agregá el primero abajo. Después lo vas a poder dividir en subcategorías y elegirlo al crear un producto.</p>
   </div>
 <% } else { %>
   <div class="table-wrap">
     <table class="leads-table">
-      <thead><tr><th>Categoría</th><th class="num">Productos</th><th class="num">Atributos configurados</th><th>Acciones</th></tr></thead>
+      <thead><tr><th>Rubro</th><th>Subcategorías</th><th class="num">Productos</th><th class="num">Atributos</th><th>Acciones</th></tr></thead>
       <tbody>
         <% categorias.forEach(function (cat) { %>
           <tr>
             <td><a href="/panel/categorias/<%= cat.id %>" style="color:inherit;font-weight:600"><%= cat.nombre %></a></td>
-            <td class="num"><%= cat._count.productos %></td>
+            <td class="muted" style="font-size:.86rem">
+              <% if (cat.hijas.length) { %>
+                <%= cat.hijas.map(function (h) { return h.nombre + ' (' + h._count.productos + ')'; }).join(' · ') %>
+              <% } else { %>
+                <span style="opacity:.6">sin dividir</span>
+              <% } %>
+            </td>
+            <td class="num"><%= cat._count.productos + cat.hijas.reduce(function (n, h) { return n + h._count.productos; }, 0) %></td>
             <td class="num"><%= cat._count.atributos %></td>
             <td class="actions-cell">
               <a class="btn btn-ghost" style="padding:.4rem .8rem;font-size:.85rem" href="/panel/categorias/<%= cat.id %>">Configurar</a>
               <form method="POST" action="/panel/categorias/<%= cat.id %>/eliminar" class="inline-form"
-                    onsubmit="return confirm('¿Eliminar esta categoría? Los productos que la usan quedan sin categoría.');">
+                    onsubmit="return confirm('¿Eliminar este rubro? Se eliminan también sus subcategorías, y los productos que las usan quedan sin categoría.');">
                 <button class="btn btn-ghost" style="padding:.4rem .8rem;font-size:.85rem" type="submit">Eliminar</button>
               </form>
             </td>
@@ -38,10 +46,11 @@
 <% } %>
 
 <form method="POST" action="/panel/categorias" class="form-card" style="max-width:500px;margin-top:1.4rem">
-  <h3 style="margin:0 0 1rem;font-size:.95rem">+ Agregar categoría nueva</h3>
+  <h3 style="margin:0 0 1rem;font-size:.95rem">+ Agregar rubro nuevo</h3>
+  <p class="muted" style="font-size:.85rem;margin:0 0 .8rem">Un rubro es una opción del menú principal (Calzado, Abrigos). Si lo que querés agregar es un tipo dentro de uno existente, entrá a ese rubro.</p>
   <div class="field">
     <label for="nombre">Nombre *</label>
-    <input id="nombre" name="nombre" type="text" required maxlength="120" placeholder="Ej: Zapatillas deportivas" />
+    <input id="nombre" name="nombre" type="text" required maxlength="120" placeholder="Ej: Calzado" />
   </div>
   <div class="form-actions">
     <button class="btn btn-primary" type="submit">Agregar y configurar</button>

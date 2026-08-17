@@ -1,7 +1,15 @@
 <%- include('partials/inicio') %>
 
 <div class="page-head">
-  <h2><a href="/panel/categorias" style="color:var(--tenue);font-size:.85rem;font-weight:400">← Categorías</a><br /><%= categoria.nombre %></h2>
+  <h2>
+    <% if (categoria.padre) { %>
+      <a href="/panel/categorias/<%= categoria.padre.id %>" style="color:var(--tenue);font-size:.85rem;font-weight:400">← <%= categoria.padre.nombre %></a>
+    <% } else { %>
+      <a href="/panel/categorias" style="color:var(--tenue);font-size:.85rem;font-weight:400">← Rubros</a>
+    <% } %>
+    <br /><%= categoria.nombre %>
+    <span class="muted" style="font-size:.75rem;font-weight:400"><%= categoria.padre ? 'subcategoría de ' + categoria.padre.nombre : 'rubro' %></span>
+  </h2>
   <p>Definí cuánto le importa cada atributo al agente antes de recomendar productos de esta categoría:</p>
   <ul style="margin:.4rem 0 .6rem 1.1rem;padding:0;font-size:.9rem">
     <li><strong>Obligatorio</strong>: el agente NO le muestra ningún producto al cliente hasta saberlo (ej: Género en una tienda de ropa).</li>
@@ -27,6 +35,49 @@
     <button class="btn btn-primary" type="submit">Guardar nombre</button>
   </div>
 </form>
+
+<% if (!categoria.padre) { %>
+  <div class="page-head" style="margin-top:1.6rem">
+    <h3 style="font-size:1rem">Subcategorías</h3>
+    <p class="muted" style="font-size:.88rem;margin:.2rem 0 0">
+      Los tipos que hay dentro de este rubro. Cuando el cliente elige "<%= categoria.nombre %>", el agente le ofrece esta lista
+      y recién muestra productos cuando elige uno. Si dejás el rubro sin subcategorías, el agente pasa directo a los productos.
+    </p>
+  </div>
+
+  <% if (categoria.hijas && categoria.hijas.length) { %>
+    <div class="table-wrap">
+      <table class="leads-table">
+        <thead><tr><th>Subcategoría</th><th class="num">Productos</th><th>Acciones</th></tr></thead>
+        <tbody>
+          <% categoria.hijas.forEach(function (h) { %>
+            <tr>
+              <td><a href="/panel/categorias/<%= h.id %>" style="color:inherit;font-weight:600"><%= h.nombre %></a></td>
+              <td class="num"><%= h._count.productos %></td>
+              <td class="actions-cell">
+                <a class="btn btn-ghost" style="padding:.3rem .7rem;font-size:.8rem" href="/panel/categorias/<%= h.id %>">Configurar</a>
+                <form method="POST" action="/panel/categorias/<%= h.id %>/eliminar" class="inline-form"
+                      onsubmit="return confirm('¿Eliminar esta subcategoría? Sus productos quedan sin categoría.');">
+                  <button class="btn btn-ghost" style="padding:.3rem .7rem;font-size:.8rem" type="submit">Eliminar</button>
+                </form>
+              </td>
+            </tr>
+          <% }); %>
+        </tbody>
+      </table>
+    </div>
+  <% } else { %>
+    <p class="muted" style="font-size:.85rem;margin:.4rem 0">Sin subcategorías: el agente muestra los productos del rubro directamente.</p>
+  <% } %>
+
+  <form method="POST" action="/panel/categorias/<%= categoria.id %>/subcategorias" class="field-row" style="margin-top:1rem;align-items:flex-end">
+    <div class="field" style="max-width:260px">
+      <label>Nueva subcategoría</label>
+      <input name="nombre" type="text" maxlength="120" required placeholder="Ej: Pantalones elegantes" />
+    </div>
+    <button class="btn btn-ghost" type="submit">+ Agregar subcategoría</button>
+  </form>
+<% } %>
 
 <div class="page-head" style="margin-top:1.6rem">
   <h3 style="font-size:1rem">Atributos</h3>

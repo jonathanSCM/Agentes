@@ -148,3 +148,36 @@ Además se agregó `MAX_ATRIBUTOS_SUGERIDOS = 3`: aunque una categoría tenga 8 
 - `pareceAnuncioDeBusqueda()` — si promete buscar ("dame un momento", "ya te muestro", "voy a revisar"), se rechaza y se le exige mostrar de verdad o hacer la pregunta que falta.
 
 Ambos backstops corren en el mismo punto del loop que el de "listado en texto plano", y están cubiertos por tests con los mensajes textuales de las capturas.
+
+## 10. Catálogo en dos niveles y sin link a la web
+
+**Problema reportado por el dueño** (capturas de WhatsApp): el cliente pedía "muéstrame los productos" / "tus categorías" y el bot mandaba **el link al catálogo web**, dos veces seguidas. El cliente tiene que salir de WhatsApp, abrir una página y volver — se pierde la venta en el camino. Además, con 18 categorías sueltas, listarlas era un muro de texto.
+
+### Qué se decidió
+
+- **El link se elimina del bot.** La tool `mostrar_catalogo` se reemplazó por `mostrar_categorias`, que arma la lista con lo que existe de verdad **y tiene stock**. La página `/catalogo/:slug` sigue existiendo para compartirla por otros medios; el bot no la usa.
+- **Menú de dos niveles.** `Categoria.padreId` (auto-relación): un **rubro** agrupa **subcategorías**. El cliente pide el catálogo → ve los rubros; elige uno → ve los tipos; elige un tipo → recién ahí productos. Más de dos niveles no se hizo a propósito: en WhatsApp un tercer nivel es un laberinto.
+- **Los productos cuelgan siempre de la hoja.** Si el rubro está dividido, sus productos viven en las subcategorías; si no, en el rubro.
+- **Forzado en código, no solo en el prompt**: si el cliente está parado en un rubro que se subdivide, `seccionProductos` no le pasa ningún producto al modelo y `mostrar_productos` rechaza la llamada. Mismo patrón que el gate de atributos obligatorios.
+
+### Por qué NO se usó el atributo `Tipo` que ya existía
+
+Era la opción sin migración, pero los datos la descartaron: en el catálogo real hay **12 valores distintos de `Tipo` para 13 jeans**, 10 para 12 pantalones, 9 para 14 poleras. `Tipo` es el nombre del modelo ("Jean skinny", "Jean mom"), no un agrupador — un menú con eso tendría casi tantas opciones como productos.
+
+### Reorganización del catálogo existente
+
+Se hizo en una migración, verificada contra una copia del backup real (150 productos):
+
+- **18 categorías sueltas → 7 rubros con 13 subcategorías.**
+- **Se fusionaron dos pares que eran la misma prenda partida por género**: `Casacas` (solo mujer) con `Casacas y abrigos` (solo hombre), y `Chompas` con `Chompas y chalecos`. El género ya es un atributo de cada producto (los 150 lo tienen cargado) y el buscador filtra por él, así que una clienta sigue viendo solo lo de mujer — pero el menú deja de mostrar dos opciones que parecían repetidas.
+- `Zapatos hombre` → `Zapatos de vestir`: el género no va en el nombre de la categoría, lo filtra el atributo.
+
+La migración solo toca empresas que tengan al menos 8 de esos 18 nombres (o sea, ese catálogo), y solo mueve categorías que sigan siendo de primer nivel: no pisa una reorganización hecha después a mano.
+
+### En el panel
+
+`/panel/categorias` muestra **solo los rubros**. Las subcategorías se agregan **dentro** de cada rubro, en su página de detalle — así es imposible crear un rubro suelto queriendo agregar un tipo, que era la duda concreta del dueño. En el formulario de producto, el selector de categoría pasó a agrupar por rubro (`optgroup`) y se elige la hoja.
+
+### Además
+
+La espera antes de responder bajó de 8 a **5 segundos** (`MENSAJE_DEBOUNCE_MS`). Se sentía lento del otro lado. Más abajo agrupa menos mensajes seguidos y gasta más llamadas a la IA.

@@ -348,13 +348,21 @@ describe('construirSystem - "que vendes" no debe listar 1 sola categoria como me
     assert.match(system, /UN SOLO rubro/i, 'debe reconocer explicitamente que es un solo rubro');
   });
 
-  test('con 2+ categorias, SI arma la lista numerada de opciones para elegir', () => {
+  test('con 2+ categorias, delega la lista en la herramienta (no la arma de memoria)', () => {
     const productos = [
       producto({ id: 1, categoria: 'Ropa' }),
       producto({ id: 2, categoria: 'Calzado' }),
     ];
     const system = construirSystem(empresa, productos, {}, {}, false, false, 'Raul');
-    assert.match(system, /LISTA \(numerada o con guiones/, 'con varias categorias si tiene sentido pedir una lista');
+    assert.match(system, /llama a \*\*mostrar_categorias\*\*/);
+    assert.match(system, /NUNCA armes vos la lista de memoria/);
+  });
+
+  test('ya no le ofrece mandar un link a una pagina: el cliente compra dentro de WhatsApp', () => {
+    const productos = [producto({ id: 1, categoria: 'Ropa' }), producto({ id: 2, categoria: 'Calzado' })];
+    const system = construirSystem(empresa, productos, {}, {}, false, false, 'Raul');
+    assert.doesNotMatch(system, /mostrar_catalogo/);
+    assert.match(system, /PROHIBIDO mandarle un link/);
   });
 });
 

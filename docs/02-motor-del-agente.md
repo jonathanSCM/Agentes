@@ -26,7 +26,7 @@ Están separados a propósito:
 - **`enviar_fotos_producto`** — fotos de un producto puntual, con aviso de si la foto es del color pedido o solo referencial.
 - **`confirmar_pedido`** — arma el resumen real (producto, variante, cantidad, precios de la base, entrega) para que el bot se lo lea al cliente. Obligatoria antes de crear.
 - **`crear_pedido`** — revalida stock y precio, arma el pedido. Requiere nombre, tipo de entrega (y dirección si es a domicilio), forma de pago, y **que el cliente haya confirmado ese pedido exacto** (se compara una firma de los ítems contra la que dejó `confirmar_pedido`).
-- **`mostrar_catalogo`** — manda el link público del catálogo (`/catalogo/:slug`), con el dominio tomado del request real, no de una variable de entorno (ver decisiones recientes).
+- **`mostrar_categorias`** — arma el menú real: los rubros si el cliente todavía no eligió ninguno, o los tipos del rubro que eligió. Solo aparecen los que tienen stock. **Reemplazó a `mostrar_catalogo`**, que mandaba un link a la web y sacaba al cliente de WhatsApp (ver decisiones recientes, punto 10).
 - **`derivar_a_asesor`** — deriva a un humano (pedidos mayoristas, cliente molesto, negociación especial, etc.)
 
 ## Backstops en código (no confiar solo en el prompt)

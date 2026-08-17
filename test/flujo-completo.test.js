@@ -20,6 +20,8 @@ const TELEFONO = '000-test-flujo';
 let empresaId;
 let agenteId;
 let categoriaId;
+let rubro;
+let subcategoria;
 let productos = [];
 
 /**
@@ -72,6 +74,16 @@ before(async () => {
     },
   });
   categoriaId = categoria.id;
+
+  // Un rubro que se subdivide, para probar el menu de dos niveles.
+  rubro = await prisma.categoria.create({ data: { empresaId, nombre: 'Calzado', orden: 1 } });
+  subcategoria = await prisma.categoria.create({ data: { empresaId, nombre: 'Botas', padreId: rubro.id, orden: 1 } });
+  const otraSub = await prisma.categoria.create({ data: { empresaId, nombre: 'Sandalias', padreId: rubro.id, orden: 2 } });
+  for (const [nombre, catId] of [['Bota alta', subcategoria.id], ['Sandalia playa', otraSub.id]]) {
+    await prisma.producto.create({
+      data: { empresaId, categoriaId: catId, nombre, precio: 200, stock: 4, atributos: { Genero: 'Mujer' }, fotos: ['f.jpg'] },
+    });
+  }
 
   // 5 productos de hombre: alcanzan para 2 paginas (3 + 2).
   for (let n = 1; n <= 5; n += 1) {
@@ -313,5 +325,75 @@ describe('tope duro de fotos por turno', () => {
     assert.match(r, /NO lo presiones para que compre/);
     assert.match(r, /NO le preguntes si alguna lo convencio/);
     assert.doesNotMatch(r, /CIERRE empujando el pedido/);
+  });
+});
+
+describe('menu de categorias en dos niveles', () => {
+  test('"que vendes" devuelve los RUBROS, no las subcategorias ni un link', async () => {
+    await reiniciarLead({ categoriaInteres: null, categoriaId: null });
+    const { llamar, recibido } = iaFalsa([
+      { tool_calls: [tool('mostrar_categorias', {})] },
+      { content: '¿Cual te interesa?' },
+    ]);
+    await generarRespuesta(agenteId, TELEFONO, [], 'cual es tu catalogo', undefined, { llamarInyectado: llamar });
+
+    const r = recibido.toolResults[0];
+    assert.match(r, /TOOL_SUCCESS/);
+    assert.match(r, /Calzado/, 'tiene que listar el rubro');
+    assert.doesNotMatch(r, /Botas/, 'las subcategorias son del segundo nivel, no de este');
+    assert.doesNotMatch(r, /http/, 'nunca mas un link al catalogo web');
+  });
+
+  test('elegido el rubro, el sistema NO muestra productos: ofrece los tipos', async () => {
+    await reiniciarLead({ categoriaInteres: 'Calzado', categoriaId: rubro.id });
+    const { llamar, recibido } = iaFalsa([
+      { tool_calls: [tool('mostrar_productos', { idsProductos: [] })] },
+      { content: '¿Botas o sandalias?' },
+    ]);
+    const salida = await generarRespuesta(agenteId, TELEFONO, [], 'quiero calzado', undefined, { llamarInyectado: llamar });
+
+    assert.match(recibido.toolResults[0], /TODAVIA NO le muestres productos/);
+    assert.match(recibido.toolResults[0], /Botas, Sandalias/);
+    assert.deepEqual(salida.fotos, [], 'no se mando ninguna tarjeta');
+  });
+
+  test('dentro del rubro, mostrar_categorias baja al segundo nivel', async () => {
+    await reiniciarLead({ categoriaInteres: 'Calzado', categoriaId: rubro.id });
+    const { llamar, recibido } = iaFalsa([
+      { tool_calls: [tool('mostrar_categorias', {})] },
+      { content: 'Estos tipos hay.' },
+    ]);
+    await generarRespuesta(agenteId, TELEFONO, [], 'que tipos tenes', undefined, { llamarInyectado: llamar });
+
+    const r = recibido.toolResults[0];
+    assert.match(r, /Dentro de "Calzado"/);
+    assert.match(r, /1\. Botas/);
+    assert.match(r, /2\. Sandalias/);
+  });
+
+  test('elegida la subcategoria, RECIEN AHI aparecen los productos', async () => {
+    await reiniciarLead({ categoriaInteres: 'Botas', categoriaId: subcategoria.id });
+    const producto = await prisma.producto.findFirst({ where: { categoriaId: subcategoria.id } });
+    const { llamar, recibido } = iaFalsa([
+      { tool_calls: [tool('mostrar_productos', { idsProductos: [producto.id] })] },
+      { content: 'Mira esta.' },
+    ]);
+    const salida = await generarRespuesta(agenteId, TELEFONO, [], 'botas', undefined, { llamarInyectado: llamar });
+
+    assert.match(recibido.toolResults[0], /TOOL_SUCCESS/);
+    assert.equal(salida.fotos.length, 1);
+    assert.match(salida.fotos[0].caption, /Bota alta/);
+  });
+
+  test('un rubro SIN subcategorias muestra sus productos directamente', async () => {
+    // "Zapatillas" del fixture principal no se subdivide.
+    await reiniciarLead({ atributosLead: { Genero: 'Hombre' } });
+    const { llamar, recibido } = iaFalsa([
+      { tool_calls: [tool('mostrar_productos', { idsProductos: [productos[0].id] })] },
+      { content: 'Ahi van.' },
+    ]);
+    const salida = await generarRespuesta(agenteId, TELEFONO, [], 'mostrame', undefined, { llamarInyectado: llamar });
+    assert.match(recibido.toolResults[0], /TOOL_SUCCESS/);
+    assert.ok(salida.fotos.length > 0, 'sin subcategorias no hay paso intermedio');
   });
 });

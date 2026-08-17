@@ -498,16 +498,27 @@ model Producto {
 // El formulario de productos valida los obligatorios de nivel producto al
 // guardar, y el bot usa esto para saber que preguntarle al cliente antes de
 // recomendar (ver CategoriaAtributo mas abajo).
+// Dos niveles: un RUBRO (padreId null, ej "Calzado") agrupa SUBCATEGORIAS
+// (ej "Zapatillas urbanas"). Los productos siempre cuelgan de la hoja: si un
+// rubro tiene hijas, sus productos viven en las hijas; si no tiene, los tiene
+// el mismo. Mas de dos niveles no aporta y complica el menu de WhatsApp.
 model Categoria {
   id        Int                 @id @default(autoincrement())
   empresaId Int
   empresa   Empresa             @relation(fields: [empresaId], references: [id], onDelete: Cascade)
   nombre    String
+  // null = es un rubro de primer nivel (lo que el bot lista cuando le piden
+  // "el catalogo"). Con valor = es una subcategoria de ese rubro.
+  padreId   Int?
+  padre     Categoria?          @relation("SubcategoriasDeCategoria", fields: [padreId], references: [id], onDelete: Cascade)
+  hijas     Categoria[]         @relation("SubcategoriasDeCategoria")
   atributos CategoriaAtributo[]
   productos Producto[]
+  orden     Int                 @default(0)
   createdAt DateTime            @default(now())
 
   @@unique([empresaId, nombre])
+  @@index([empresaId, padreId])
   @@map("categorias")
 }
 

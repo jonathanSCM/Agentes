@@ -225,7 +225,7 @@ app.get('/catalogo/:slug', async (req, res, next) => {
     const productosDb = await prisma.producto.findMany({
       where: { empresaId: empresa.id, activo: true },
       orderBy: [{ categoria: { nombre: 'asc' } }, { nombre: 'asc' }],
-      include: { variantes: { where: { activa: true }, select: { stock: true } }, categoria: true },
+      include: { variantes: { where: { activa: true }, select: { stock: true } }, categoria: { include: { padre: true } } },
     });
     // Si el producto tiene variantes, el stock real es la suma de sus
     // variantes (Producto.stock queda en 0 a proposito en ese caso) - mismo
@@ -242,7 +242,7 @@ app.get('/catalogo/:slug', async (req, res, next) => {
     // secciones en vez de una sola lista larga.
     const grupos = new Map();
     for (const p of productos) {
-      const cat = p.categoria?.nombre || 'Otros';
+      const cat = p.categoria?.padre?.nombre || p.categoria?.nombre || 'Otros';
       if (!grupos.has(cat)) grupos.set(cat, []);
       grupos.get(cat).push(p);
     }
@@ -1013,16 +1013,22 @@ app.get('/panel/compras', requireCliente, async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-// -------- Categorias (con atributos obligatorios/opcionales por categoria) --------
-// Lista simple (solo nombre + cuantos atributos tiene) - el detalle de cada
-// una (sus atributos) vive en su propia pagina, para no saturar la lista con
-// las tablas de las 18+ categorias abiertas al mismo tiempo.
+// -------- Categorias en dos niveles: RUBRO -> subcategorias --------
+// La lista muestra SOLO los rubros (lo que el bot le ofrece primero al
+// cliente). Las subcategorias se cargan dentro de cada rubro, en su pagina de
+// detalle: asi no se crea sin querer un rubro nuevo al querer agregar un tipo.
 app.get('/panel/categorias', requireCliente, async (req, res, next) => {
   try {
     const categorias = await prisma.categoria.findMany({
-      where: { empresaId: req.session.empresaId },
-      orderBy: { nombre: 'asc' },
-      include: { _count: { select: { atributos: true, productos: true } } },
+      where: { empresaId: req.session.empresaId, padreId: null },
+      orderBy: [{ orden: 'asc' }, { nombre: 'asc' }],
+      include: {
+        _count: { select: { atributos: true, productos: true } },
+        hijas: {
+          orderBy: [{ orden: 'asc' }, { nombre: 'asc' }],
+          include: { _count: { select: { productos: true } } },
+        },
+      },
     });
     res.render('cliente/categorias', {
       title: 'Categorías - Proshop', tituloPagina: 'Categorías', activo: 'categorias',
@@ -1048,7 +1054,14 @@ app.get('/panel/categorias/:id', requireCliente, async (req, res, next) => {
   try {
     const categoria = await prisma.categoria.findFirst({
       where: { id: Number(req.params.id), empresaId: req.session.empresaId },
-      include: { atributos: { orderBy: { orden: 'asc' } } },
+      include: {
+        atributos: { orderBy: { orden: 'asc' } },
+        padre: true,
+        hijas: {
+          orderBy: [{ orden: 'asc' }, { nombre: 'asc' }],
+          include: { _count: { select: { productos: true } } },
+        },
+      },
     });
     if (!categoria) return res.redirect('/panel/categorias');
     res.render('cliente/categoria-detalle', {
@@ -1078,6 +1091,30 @@ app.post('/panel/categorias/:id/eliminar', requireCliente, async (req, res, next
     await prisma.categoria.deleteMany({ where: { id: Number(req.params.id), empresaId: req.session.empresaId } });
     res.redirect('/panel/categorias?ok=' + encodeURIComponent('Categoría eliminada.'));
   } catch (err) { next(err); }
+});
+
+// Agregar una subcategoria SIEMPRE pasa por su rubro: no hay forma de crear
+// un rubro nuevo sin querer desde aca (la ruta exige un padre que ya exista y
+// que sea de la empresa).
+app.post('/panel/categorias/:id/subcategorias', requireCliente, async (req, res, next) => {
+  try {
+    const padre = await prisma.categoria.findFirst({
+      where: { id: Number(req.params.id), empresaId: req.session.empresaId, padreId: null },
+    });
+    if (!padre) return res.redirect('/panel/categorias');
+
+    const nombre = String(req.body.nombre || '').trim().slice(0, 120);
+    if (!nombre) return res.redirect(`/panel/categorias/${padre.id}?err=` + encodeURIComponent('El nombre de la subcategoría es obligatorio.'));
+
+    const ultima = await prisma.categoria.findFirst({ where: { padreId: padre.id }, orderBy: { orden: 'desc' } });
+    await prisma.categoria.create({
+      data: { empresaId: req.session.empresaId, nombre, padreId: padre.id, orden: (ultima?.orden || 0) + 1 },
+    });
+    res.redirect(`/panel/categorias/${padre.id}?ok=` + encodeURIComponent('Subcategoría agregada.'));
+  } catch (err) {
+    if (err.code === 'P2002') return res.redirect(`/panel/categorias/${req.params.id}?err=` + encodeURIComponent('Ya existe una categoría con ese nombre.'));
+    next(err);
+  }
 });
 
 // Tres niveles reales, no un checkbox: OBLIGATORIO bloquea que el bot muestre
@@ -1150,7 +1187,7 @@ app.get('/panel/productos', requireCliente, async (req, res, next) => {
       prisma.producto.findMany({
         where: { empresaId: req.session.empresaId },
         orderBy: { createdAt: 'desc' },
-        include: { variantes: { where: { activa: true }, select: { stock: true } }, categoria: true },
+        include: { variantes: { where: { activa: true }, select: { stock: true } }, categoria: { include: { padre: true } } },
       }),
       planDeEmpresa(req.session.empresaId),
     ]);
@@ -1171,11 +1208,20 @@ app.get('/panel/productos', requireCliente, async (req, res, next) => {
 
 // Categorias reales de la tienda (con sus atributos), para el <select> del
 // formulario de productos y para saber que atributos son obligatorios.
+// Devuelve el arbol: rubros de primer nivel con sus subcategorias adentro. El
+// formulario de producto lo usa para que se elija la HOJA (un producto cuelga
+// de la subcategoria cuando el rubro esta dividido).
 async function categoriasExistentes(empresaId) {
   return prisma.categoria.findMany({
-    where: { empresaId },
-    orderBy: { nombre: 'asc' },
-    include: { atributos: { orderBy: { orden: 'asc' } } },
+    where: { empresaId, padreId: null },
+    orderBy: [{ orden: 'asc' }, { nombre: 'asc' }],
+    include: {
+      atributos: { orderBy: { orden: 'asc' } },
+      hijas: {
+        orderBy: [{ orden: 'asc' }, { nombre: 'asc' }],
+        include: { atributos: { orderBy: { orden: 'asc' } } },
+      },
+    },
   });
 }
 
