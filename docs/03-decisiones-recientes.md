@@ -428,3 +428,90 @@ El id encontrado se agrega a los ids válidos de `mostrar_productos`, para que p
 La búsqueda (`buscarPorNombre`, en `catalogo.js`, pura y testeada sin base de datos) **puntúa por cuántas palabras del pedido aparecen en el nombre y se queda con las mejores**. Sin eso, buscar "ZAPATILLAS TEKKIRA CUP" también devolvía "ZAPATILLAS GINGER TAV" — comparten "zapatillas" — y el bot le terminaba nombrando al cliente un producto que no pidió. Acepta nombres parciales: "tekkira" encuentra "ZAPATILLAS TEKKIRA CUP".
 
 **Lo que sigue sin cubrir:** nombres mal escritos ("tekira" con una k). No se agregó búsqueda difusa a propósito: confundir un producto con otro parecido es peor que no encontrarlo.
+
+## 24. BUG GRAVE: el bot preguntaba el género para siempre y nunca mostraba nada
+
+Reportado con captura. Chat real, tienda "Tienda Demo — Zapatillas Urbanas Para Hombre":
+
+```
+cliente: hola
+bot:     ¡Hola! Soy Raúl... ¿Qué andas buscando hoy?
+cliente: que modelos tienes
+bot:     ¿Buscas algo para hombre o para mujer?
+cliente: hombre
+bot:     ¡Perfecto! Solo para confirmar, ¿es para hombre o para mujer?
+cliente: hombre
+bot:     ¿Es para vos o para regalar?
+cliente: para mi
+bot:     ¿Y qué género estás buscando?
+cliente: hombre
+bot:     Una última cosita, ¿podés decirme el género?
+```
+
+El cliente contestó **tres veces** y nunca vio un producto.
+
+### Por qué pasaba (cuatro fallas encadenadas, no una)
+
+1. **No había respaldo en código.** El gate de `preguntasIniciales` solo se
+   destrababa si el modelo llamaba a `actualizar_datos_lead`. `extraerFiltros`
+   —el respaldo determinista que existe justamente porque el modelo a veces no
+   llama a la tool— extraía categoría, talla y cantidad, pero **no** los
+   atributos. La palabra "hombre" no la leía nadie.
+2. **La clave se comparaba literal.** `atributosLead[a.nombre]`, sensible a
+   mayúsculas y tildes. El negocio configura "Genero" a mano en el panel y el
+   modelo escribe "género" cuando se le canta: el dato quedaba guardado bajo
+   una clave y el gate seguía mirando la otra.
+3. **Se preguntaba algo que el catálogo no podía responder.** La migración
+   `20260815040000_preguntas_iniciales` puso `DEFAULT ARRAY['Genero']` para
+   **todas** las tiendas ya existentes, incluidas las que no cargaron el
+   atributo en ningún producto (Tienda Demo tiene `atributos: {}` en todos) y
+   las que venden un solo género. La respuesta no podía cambiar lo que se
+   mostraba: era puro trámite.
+4. **La pregunta era abierta.** El texto del gate le daba al modelo ejemplos
+   como *"¿es para vos o para regalar?"*, y el modelo la usó literal. La
+   respuesta ("para mi") no contesta el género, así que ni siquiera un
+   respaldo podía resolverla. Sumado a la instrucción de "variá cómo
+   preguntás", el cliente veía la misma pregunta con cuatro redacciones.
+
+### Qué se hizo
+
+- **`resolverValorDeAtributo(texto, atributo, productos)`** en `catalogo.js`:
+  lee la respuesta del cliente **en código** y la resuelve contra los valores
+  que existen de verdad en el catálogo ("hombre" → `Hombre`, "para caballero"
+  → `Masculino`, reusando el diccionario de equivalencias que ya estaba).
+  Se llama desde `generarRespuesta` al lado de `extraerFiltros`: mismo patrón,
+  mismo lugar.
+- **Búsqueda tolerante de la clave** (`valorEnAtributosLead` / `leadYaTiene`):
+  "Genero", "Género" y "GENERO" son el mismo dato. Además, al escribir desde
+  `actualizar_datos_lead` se reusa la clave que ya existía, para no terminar
+  con dos entradas del mismo atributo.
+- **No se pregunta lo que no sirve.** `preguntasInicialesFaltantes` ahora
+  recibe el catálogo y descarta los atributos con menos de dos valores reales.
+  Con un solo valor, `resolverDatosIniciales` lo completa solo. Esto apaga la
+  pregunta en Tienda Demo y en cualquier tienda de un solo rubro/género.
+- **La pregunta pasa a ser cerrada.** El gate le pasa al modelo los valores
+  reales y le exige nombrarlos ("¿lo buscás de Hombre o de Mujer?"). Una
+  pregunta abierta no se puede resolver después.
+- **Anti-bucle duro.** `contexto.intentosPreguntaInicial` cuenta los turnos en
+  que el dato siguió sin resolverse; a los 2, el gate se libera y el cliente ve
+  el catálogo igual. Es preferible mostrar de más que dejarlo atrapado. Queda
+  el log `gate_inicial_liberado` para detectar tiendas mal configuradas.
+
+### Falso positivo encontrado al escribir los tests
+
+La primera versión del resolvedor daba `Genero: Hombre` para la respuesta
+**"para mi"**. Causa: `valoresEquivalentes` termina en `coincideTexto`, que por
+diseño devuelve `true` cuando el lado del cliente no tiene ninguna palabra útil
+— y "para" es un conector genérico que `palabrasClave` descarta, dejando la
+lista vacía. Un "para" suelto matcheaba contra *cualquier* valor. Se arregló
+tokenizando con `palabrasClave` y exigiendo al menos una palabra real.
+
+Cubierto por `test/preguntas-iniciales.test.js` (16 casos, incluido el chat de
+la captura completo). Suite determinista: 174 tests en verde.
+
+### Pendiente para el dueño
+
+Las tiendas que **sí** venden varios géneros y quieran la pregunta tienen que
+tener el atributo cargado en los productos (`/panel/productos`). Si el catálogo
+no lo tiene, el bot ya no pregunta — mostrar todo es mejor que preguntar al
+pedo. La pregunta se prende y apaga desde `/panel/configuracion`.
