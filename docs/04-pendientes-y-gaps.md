@@ -34,6 +34,11 @@ Si algún día se retoma: el lugar natural es `Pedido` (campos de facturación) 
 
 ## ⚠️ Acción pendiente del dueño después de aplicar la migración
 
+> **Actualizado (ver `docs/03-decisiones-recientes.md` punto 25):** marcar **Talla** o **Color**
+> como Obligatorio ya no bloquea nada. Son atributos de variante y salen en la tarjeta, así que
+> el bot los ignora como requisito para mostrar. El único que conviene promover es **Género**
+> (atributo de nivel producto), y solo en tiendas que de verdad vendan más de uno.
+
 Los atributos que hoy están marcados obligatorio pasan a **RECOMENDADO** (el bot los pregunta pero no bloquea). Para que funcione el punto 1 del documento ("no mostrar antes de preguntar género/talla"), hay que entrar a `/panel/categorias/:id` y **promover a Obligatorio los 1-2 atributos que de verdad importan** en cada categoría — normalmente Género y Talla. Mientras nadie lo haga, el bot se comporta como antes en ese punto: muestra apenas sabe la categoría.
 
 El motivo de no hacerlo automático está en `docs/03-decisiones-recientes.md`: las 18 categorías tienen 8 atributos marcados, y activarlos todos como bloqueantes convertiría la conversación en un interrogatorio.

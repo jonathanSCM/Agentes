@@ -515,3 +515,67 @@ Las tiendas que **sí** venden varios géneros y quieran la pregunta tienen que
 tener el atributo cargado en los productos (`/panel/productos`). Si el catálogo
 no lo tiene, el bot ya no pregunta — mostrar todo es mejor que preguntar al
 pedo. La pregunta se prende y apaga desde `/panel/configuracion`.
+
+## 25. BUG: el color frenaba la venta, y "cualquiera" no contaba como respuesta
+
+Reportado por el negocio (JGO) después de probar el bot:
+
+> *"quedamos en que ya no le preguntaba genero y color... que eso aparecería en
+> las tarjetas. El bot lo sigue obligando a escoger un color. Si el usuario dice
+> cualquiera el bot le dice: no, tienes que escoger un color antes de seguir."*
+
+Eran **dos fallas distintas**, no una.
+
+### 1. El bot trataba los atributos de variante como bloqueo
+
+`atributosFaltantes()` miraba solo `nivel === 'OBLIGATORIO'` e ignoraba
+`esDeVariante`. Si la tienda marcaba **Color** (o Talla) como obligatorio, el
+gate de `mostrar_productos` no dejaba mandar una sola tarjeta hasta tenerlo.
+
+Lo llamativo es que **el panel ya hacía lo contrario**: al guardar un producto,
+`atributosObligatoriosFaltantes()` en `server.js` filtra por
+`esDeVariante: false` justamente porque los de variante *"son guía, no
+bloqueo"*. El bot era el único lugar del sistema que los trataba como
+requisito, y contradecía además a su propio prompt, que dice textual: *"Las
+tallas y colores VAN EN LA TARJETA"*.
+
+Ahora `atributosFaltantes` descarta los de variante cuando el nivel es
+OBLIGATORIO. En RECOMENDADO se siguen incluyendo: ahí no bloquean nada, son
+sugerencias para afinar **después** de que el cliente vio opciones.
+
+### 2. "cualquiera" no se reconocía como respuesta
+
+Contestar *"me da igual"* dejaba el dato como faltante para siempre: el cliente
+había respondido, pero el sistema seguía esperando un valor concreto y volvía a
+preguntar. `expresaSinPreferencia()` (en `catalogo.js`, puro y testeable)
+reconoce las formas normales de decirlo, y `generarRespuesta` anota los
+atributos pendientes en **`contexto.sinPreferencia`**.
+
+Se guarda ahí a propósito y **no** como si fuera un valor del lead: poner
+`lead.color = 'cualquiera'` habría hecho que el buscador filtrara por un color
+inexistente y no encontrara nada. Marcado así, el dato deja de faltar **y** la
+búsqueda no se filtra por él.
+
+Deliberadamente **"no sé" NO cuenta** como falta de preferencia. Son clientes
+distintos: el que dice "cualquiera" renunció a elegir; el que dice "no sé"
+necesita que le muestren opciones para poder decidir. Tratarlos igual haría que
+el bot le diera por respondida una pregunta a alguien que estaba pidiendo ayuda.
+
+### Dos tests viejos que hubo que cambiar (no borrar)
+
+`documento-12-casos.test.js` afirmaba que faltando la **talla** el bot no podía
+mostrar (punto 42 del documento original del dueño). Esa regla quedó revertida
+por decisión explícita del negocio — la misma reversión que ya había empezado
+en los puntos 19 y 21 ("las tallas disponibles están en la tarjeta", textual
+del ingeniero). Los dos tests se actualizaron a la regla nueva, con el motivo
+anotado al lado; no se eliminaron, para que quede el rastro de qué cambió y
+por qué.
+
+`docs/04-pendientes-y-gaps.md` también quedó desactualizado: decía que el dueño
+tenía que promover Género **y Talla** a Obligatorio. Ya lleva la nota de que
+promover Talla o Color no hace nada.
+
+### Verificación
+
+`test/atributos-bloqueantes.test.js` (11 casos) cubre las dos fallas y el chat
+reportado. Suite determinista completa: **194 tests en verde**.

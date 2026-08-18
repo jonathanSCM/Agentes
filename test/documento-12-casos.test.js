@@ -62,7 +62,7 @@ function producto(overrides) {
 
 // ---------------------------------------------------------------------------
 
-describe('TEST 1 - No mostrar antes de preguntar genero/talla', () => {
+describe('TEST 1 - No mostrar antes de preguntar el genero', () => {
   const zapatillas = categoria('Zapatillas deportivas', [
     { nombre: 'Genero', nivel: 'OBLIGATORIO' },
     { nombre: 'Talla', nivel: 'OBLIGATORIO', esDeVariante: true },
@@ -80,11 +80,15 @@ describe('TEST 1 - No mostrar antes de preguntar genero/talla', () => {
     assert.doesNotMatch(texto, /Urban Flex/);
   });
 
-  test('dice exactamente que falta preguntar', () => {
+  // ACTUALIZADO: la talla dejo de ser bloqueante (ver decisiones recientes,
+  // punto 25). El negocio lo reverso de forma explicita: la talla y el color
+  // van en la tarjeta, el cliente los lee ahi. El gate solo nombra lo que de
+  // verdad frena la busqueda, que es el genero (atributo de nivel producto).
+  test('dice exactamente que falta preguntar, y NO pide lo que va en la tarjeta', () => {
     const lead = { categoriaInteres: 'Zapatillas deportivas', categoriaId: zapatillas.id, atributosLead: {} };
     const texto = seccionProductos(productos, lead, zapatillas);
     assert.match(texto, /Genero/);
-    assert.match(texto, /Talla/);
+    assert.doesNotMatch(texto, /falta saber[^.]*Talla/, 'la talla no puede figurar como requisito para mostrar');
   });
 
   test('con genero y talla ya sabidos, RECIEN AHI aparecen los productos', () => {
@@ -442,9 +446,12 @@ describe('TEST 12 - No repetir preguntas que ya tienen respuesta', () => {
     assert.deepEqual(atributosFaltantes(ropa, lead, 'OBLIGATORIO'), []);
   });
 
+  // ACTUALIZADO junto con el punto 25: con el genero sabido ya se puede
+  // mostrar. La talla es de variante y sale en la tarjeta, asi que no bloquea
+  // aunque la tienda la haya marcado obligatoria.
   test('solo se pide lo que realmente falta, no toda la lista de nuevo', () => {
     const lead = { categoriaInteres: 'Ropa', categoriaId: ropa.id, atributosLead: { Genero: 'Hombre' } };
-    assert.deepEqual(atributosFaltantes(ropa, lead, 'OBLIGATORIO'), ['Talla']);
+    assert.deepEqual(atributosFaltantes(ropa, lead, 'OBLIGATORIO'), []);
   });
 
   test('un atributo guardado en su campo propio (talla) cuenta igual que uno libre', () => {
