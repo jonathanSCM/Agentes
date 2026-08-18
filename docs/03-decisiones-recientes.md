@@ -396,3 +396,35 @@ Decisiones puntuales que confirmó el negocio:
 - **Género**: se mantiene como pregunta inicial.
 
 Verificado de punta a punta contra la base: el cliente agrega dos productos distintos en dos momentos, y el pedido creado tiene los dos, con el total correcto y el carrito vacío después.
+
+---
+
+## 22. BUG: un producto "Unisex" era invisible para todo el mundo
+
+**Qué pasó.** El dueño vio en el panel `ZAPATILLAS TEKKIRA CUP`, **stock 10**, columna "¿El agente lo muestra?" en **"Lo ofrece"** — y en WhatsApp el bot le contestó al cliente *"lamento decirte que no tenemos zapatillas Tekkira Cup en nuestro inventario actualmente"*. Un producto con stock, negado en la cara del cliente: el peor error posible para un agente de ventas.
+
+**Causa.** El producto está cargado con `Genero: Unisex` y el cliente había dicho "hombre". En `EQUIVALENCIAS` (`lib/services/catalogo.js`) `unisex` era su propio grupo de sinónimos, así que `valoresEquivalentes('Hombre', 'Unisex')` daba `false` y `coincideAtributosLead` lo descartaba. El efecto era peor de lo que suena: como el bot siempre pregunta el género al inicio, **un producto unisex quedaba oculto para el cliente que dijo hombre Y para el que dijo mujer**. O sea, para todos.
+
+La columna del panel no mentía: ahí el producto se evalúa sin lead, y sin género pedido sí se ofrece.
+
+**Decisión.** Un valor "unisex" (o "ambos", "todos") **satisface cualquier valor pedido para ese atributo**. No es un sinónimo de hombre ni de mujer — es un comodín, y se trata como tal en `coincideAtributosLead`, saltando el filtro para ese atributo. `Hombre` y `Mujer` siguen sin mezclarse entre sí.
+
+## 23. El bot ahora busca antes de decir "no lo tenemos"
+
+**Qué pasó.** En la misma conversación, el cliente preguntó por un modelo *por su nombre* ("¿no tenés de casualidad las Tekkira Cup?"). El bot solo ve el bloque de resultados que le arma el backend, y ese bloque viene **filtrado por lo que el cliente venía pidiendo** (género, color, talla, presupuesto). Si el producto no entraba en ese filtro, para el modelo simplemente no existía, y respondía que no lo manejaban.
+
+Arreglar el filtro de unisex tapa este caso puntual, pero no la clase de bug: cualquier filtro activo puede esconder algo que el cliente nombra explícitamente.
+
+**Decisión.** Nueva tool `buscar_producto(nombre)`. Cuando el cliente nombra algo que el modelo no ve en su bloque, busca en **todo el catálogo de la empresa, sin los filtros de la conversación**, y devuelve una de tres respuestas, todas terminantes:
+
+| Situación | Qué se le devuelve al modelo |
+|---|---|
+| Existe y tiene stock | La ficha completa + "PROHIBIDO decirle que no lo tenés: lo tenés" |
+| Existe, sin stock | "SÍ existe pero está SIN STOCK: decile que lo manejan pero ahora no hay" |
+| No existe | "No existe ningún producto con ese nombre. Ahora sí podés decirle que no lo manejan" |
+
+El id encontrado se agrega a los ids válidos de `mostrar_productos`, para que pueda mostrarlo en el acto en vez de solo describirlo.
+
+La búsqueda (`buscarPorNombre`, en `catalogo.js`, pura y testeada sin base de datos) **puntúa por cuántas palabras del pedido aparecen en el nombre y se queda con las mejores**. Sin eso, buscar "ZAPATILLAS TEKKIRA CUP" también devolvía "ZAPATILLAS GINGER TAV" — comparten "zapatillas" — y el bot le terminaba nombrando al cliente un producto que no pidió. Acepta nombres parciales: "tekkira" encuentra "ZAPATILLAS TEKKIRA CUP".
+
+**Lo que sigue sin cubrir:** nombres mal escritos ("tekira" con una k). No se agregó búsqueda difusa a propósito: confundir un producto con otro parecido es peor que no encontrarlo.
