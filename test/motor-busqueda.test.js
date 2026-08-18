@@ -17,6 +17,7 @@ const {
   limpiezaPorCambioDeCategoria,
   datosDeActualizacionDeLead,
 } = require('../lib/services/agente');
+const { coincideAtributosLead, buscarConFallback, buscarPorNombre } = require('../lib/services/catalogo');
 
 // Categoria ahora es una relacion ({id, nombre}), no texto libre. Los tests
 // de este archivo siguen pasando `categoria: 'Zapatillas'` como string por
@@ -468,5 +469,80 @@ describe('datosDeActualizacionDeLead - la memoria del cliente', () => {
   test('el tipo de entrega se normaliza al enum de la base', () => {
     assert.equal(datosDeActualizacionDeLead({ tipoEntrega: 'recojo' }, {}, productos).tipoEntrega, 'RECOJO');
     assert.equal(datosDeActualizacionDeLead({ tipoEntrega: 'domicilio' }, {}, productos).tipoEntrega, 'DOMICILIO');
+  });
+});
+
+// Bug real de produccion: el panel mostraba "ZAPATILLAS TEKKIRA CUP, stock 10,
+// lo ofrece" y el bot le juraba al cliente que no la tenian. Estaba cargada
+// como "Genero: Unisex" y el cliente habia dicho "hombre": el filtro la
+// descartaba porque unisex != hombre. Un producto unisex es justamente el que
+// le sirve a todos.
+describe('un producto Unisex tiene que verlo cualquiera', () => {
+  const zapatilla = (genero) => ({
+    id: 1, nombre: 'ZAPATILLAS TEKKIRA CUP', precio: 350,
+    atributos: genero ? { Genero: genero } : {},
+    variantes: [{ id: 10, activa: true, stock: 10, atributos: { Talla: '40' } }],
+  });
+
+  for (const pidio of ['Hombre', 'Mujer']) {
+    test(`el cliente que pidio "${pidio}" ve la unisex`, () => {
+      assert.equal(coincideAtributosLead(zapatilla('Unisex'), { atributosLead: { Genero: pidio } }), true);
+    });
+  }
+
+  test('"ambos" y "todos" valen igual que unisex', () => {
+    for (const valor of ['ambos', 'Todos', 'UNISEX']) {
+      assert.equal(coincideAtributosLead(zapatilla(valor), { atributosLead: { Genero: 'Hombre' } }), true, valor);
+    }
+  });
+
+  test('pero hombre y mujer siguen sin mezclarse', () => {
+    assert.equal(coincideAtributosLead(zapatilla('Mujer'), { atributosLead: { Genero: 'Hombre' } }), false);
+    assert.equal(coincideAtributosLead(zapatilla('Masculino'), { atributosLead: { Genero: 'Mujer' } }), false);
+  });
+
+  test('la unisex aparece en la busqueda real, no solo en el filtro', () => {
+    const { resultados } = buscarConFallback([zapatilla('Unisex')], { atributosLead: { Genero: 'Hombre' } });
+    assert.equal(resultados.length, 1);
+    assert.equal(resultados[0].nombre, 'ZAPATILLAS TEKKIRA CUP');
+  });
+});
+
+// El cliente nombra un producto puntual ("¿no tenes de casualidad las Tekkira
+// Cup?"). Antes el bot solo veia el bloque de resultados ya filtrado por lo
+// que venia pidiendo, asi que respondia "no lo tenemos" sobre cosas que si
+// estaban cargadas. buscar_producto mira TODO el catalogo.
+describe('buscarPorNombre - antes de decir "no lo tenemos"', () => {
+  const productos = [
+    { id: 1, nombre: 'ZAPATILLAS TEKKIRA CUP', variantes: [{ id: 1, activa: true, stock: 10 }] },
+    { id: 2, nombre: 'ZAPATILLAS GINGER TAV', variantes: [{ id: 2, activa: true, stock: 0 }] },
+    { id: 3, nombre: 'POLERA BASICA', variantes: [{ id: 3, activa: true, stock: 5 }] },
+  ];
+  const nombres = (lista) => lista.map((p) => p.nombre);
+
+  test('lo encuentra por una parte del nombre', () => {
+    assert.deepEqual(nombres(buscarPorNombre(productos, 'tekkira').conStock), ['ZAPATILLAS TEKKIRA CUP']);
+  });
+
+  test('gana la coincidencia mas especifica, no la palabra generica compartida', () => {
+    // "ZAPATILLAS" lo comparten dos productos: no debe colar el que no pidio.
+    const r = buscarPorNombre(productos, 'ZAPATILLAS TEKKIRA CUP');
+    assert.deepEqual(nombres(r.conStock), ['ZAPATILLAS TEKKIRA CUP']);
+    assert.deepEqual(nombres(r.agotados), []);
+  });
+
+  test('distingue "existe pero sin stock" de "no existe"', () => {
+    const agotado = buscarPorNombre(productos, 'ginger tav');
+    assert.deepEqual(nombres(agotado.agotados), ['ZAPATILLAS GINGER TAV']);
+    assert.deepEqual(agotado.conStock, []);
+
+    const inexistente = buscarPorNombre(productos, 'nike air max');
+    assert.deepEqual(inexistente.conStock, []);
+    assert.deepEqual(inexistente.agotados, []);
+  });
+
+  test('no explota con nombre vacio', () => {
+    assert.deepEqual(buscarPorNombre(productos, '').conStock, []);
+    assert.deepEqual(buscarPorNombre(null, 'algo').conStock, []);
   });
 });
