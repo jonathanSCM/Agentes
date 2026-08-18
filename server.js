@@ -679,6 +679,29 @@ app.post('/panel/conversaciones/:id/reiniciar', requireCliente, async (req, res,
   } catch (err) { next(err); }
 });
 
+// Borra COMPLETAMENTE la conversacion y al cliente: todos los mensajes, todas
+// las conversaciones que haya tenido ese telefono con esta empresa, y el
+// registro de ClienteFinal (memoria, categoria, favoritos, carrito, etc.) -
+// no queda ni rastro en la base. Los pedidos ya creados NO se borran (son
+// registros de negocio reales), pero quedan sin cliente asociado.
+app.post('/panel/conversaciones/:id/eliminar', requireCliente, async (req, res, next) => {
+  try {
+    const conversacion = await cargarConversacion(req);
+    if (!conversacion) return res.redirect('/panel/conversaciones');
+
+    const agenteIds = await agenteIdsDe(req.session.empresaId);
+    const telefono = conversacion.telefonoCliente;
+
+    await prisma.$transaction([
+      prisma.mensaje.deleteMany({ where: { conversacion: { agenteId: { in: agenteIds }, telefonoCliente: telefono } } }),
+      prisma.conversacion.deleteMany({ where: { agenteId: { in: agenteIds }, telefonoCliente: telefono } }),
+      prisma.clienteFinal.deleteMany({ where: { empresaId: req.session.empresaId, telefono } }),
+    ]);
+
+    res.redirect('/panel/conversaciones?ok=' + encodeURIComponent('Se borró por completo la conversación y los datos de ese cliente.'));
+  } catch (err) { next(err); }
+});
+
 // Mandar un mensaje real por WhatsApp como humano (solo si ya se tomo el
 // control de este chat).
 app.post('/panel/conversaciones/:id/mensaje', requireCliente, async (req, res, next) => {

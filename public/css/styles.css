@@ -73,6 +73,8 @@ h1, h2, h3, h4 { font-family: var(--display); line-height: 1.15; letter-spacing:
 .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 16px 34px -12px var(--ring); }
 .btn-ghost { background: rgba(255,255,255,.04); border-color: var(--border); color: var(--text); }
 .btn-ghost:hover { background: rgba(255,255,255,.08); border-color: rgba(255,255,255,.2); }
+.btn-danger { background: rgba(251,113,133,.12); border-color: rgba(251,113,133,.4); color: #fecdd3; }
+.btn-danger:hover { background: #fb7185; border-color: #fb7185; color: #fff; }
 
 /* ---------- Header ---------- */
 .site-header {
