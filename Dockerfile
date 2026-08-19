@@ -2,6 +2,13 @@ FROM node:20-alpine
 
 WORKDIR /app
 
+# Fuentes del sistema. La imagen de alpine viene SIN ninguna, y sharp (que usa
+# librsvg para rasterizar SVG) necesita al menos una para dibujar texto: sin
+# esto no falla, dibuja cuadraditos vacios. Se noto en las fotos generadas por
+# scripts/seed-catalogo-demo.js, que llegaron al chat del cliente con el nombre
+# del producto en ▯▯▯.
+RUN apk add --no-cache ttf-dejavu fontconfig && fc-cache -f
+
 # npm ci respeta package-lock.json: dos deploys del mismo commit instalan
 # exactamente las mismas versiones (npm install podia traer versiones nuevas).
 #

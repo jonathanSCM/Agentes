@@ -408,11 +408,11 @@ async function generarFoto(producto, subtipo, rubro) {
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="800" height="800">
   <rect width="800" height="800" fill="${fondo}"/>
   <rect x="40" y="40" width="720" height="720" fill="none" stroke="rgba(255,255,255,0.28)" stroke-width="3"/>
-  <text x="400" y="150" font-family="Arial, sans-serif" font-size="30" fill="rgba(255,255,255,0.75)" text-anchor="middle">${escaparXml(rubro.toUpperCase())}</text>
-  <text x="400" y="200" font-family="Arial, sans-serif" font-size="40" font-weight="bold" fill="rgba(255,255,255,0.9)" text-anchor="middle">${escaparXml(subtipo)}</text>
-  ${lineas.map((l, i) => `<text x="400" y="${380 + i * 62}" font-family="Arial, sans-serif" font-size="52" font-weight="bold" fill="#ffffff" text-anchor="middle">${escaparXml(l)}</text>`).join('\n  ')}
-  <text x="400" y="660" font-family="Arial, sans-serif" font-size="34" fill="rgba(255,255,255,0.85)" text-anchor="middle">${escaparXml(colorVariante)}</text>
-  <text x="400" y="715" font-family="Arial, sans-serif" font-size="30" fill="rgba(255,255,255,0.7)" text-anchor="middle">Bs ${producto.precio}.00</text>
+  <text x="400" y="150" font-family="DejaVu Sans, Arial, sans-serif" font-size="30" fill="rgba(255,255,255,0.75)" text-anchor="middle">${escaparXml(rubro.toUpperCase())}</text>
+  <text x="400" y="200" font-family="DejaVu Sans, Arial, sans-serif" font-size="40" font-weight="bold" fill="rgba(255,255,255,0.9)" text-anchor="middle">${escaparXml(subtipo)}</text>
+  ${lineas.map((l, i) => `<text x="400" y="${380 + i * 62}" font-family="DejaVu Sans, Arial, sans-serif" font-size="52" font-weight="bold" fill="#ffffff" text-anchor="middle">${escaparXml(l)}</text>`).join('\n  ')}
+  <text x="400" y="660" font-family="DejaVu Sans, Arial, sans-serif" font-size="34" fill="rgba(255,255,255,0.85)" text-anchor="middle">${escaparXml(colorVariante)}</text>
+  <text x="400" y="715" font-family="DejaVu Sans, Arial, sans-serif" font-size="30" fill="rgba(255,255,255,0.7)" text-anchor="middle">Bs ${producto.precio}.00</text>
 </svg>`;
 
   await sharp(Buffer.from(svg)).png().toFile(destino);

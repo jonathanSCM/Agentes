@@ -628,3 +628,50 @@ describe('el cliente recibe exactamente lo que pidio', () => {
     assert.equal(salida.fotos.length, 3, 'sin pedido puntual el relleno tiene que seguir vivo');
   });
 });
+
+// Bug reportado con capturas: el cliente contesto "si" a "¿alguna te
+// interesa?" y el bot salto directo a "¿te lo enviamos a domicilio?" sin
+// preguntarle nunca talla ni color. El pedido se armaba a ciegas.
+describe('no se cierra sin saber que se lleva el cliente', () => {
+  test('si el bot pide datos de entrega sin variante elegida, se lo frena y pregunta la talla', async () => {
+    await reiniciarLead({ atributosLead: { Genero: 'Hombre' }, productosMostrados: [productos[0].id] });
+
+    const { llamar } = iaFalsa([
+      { content: '¡Listo! Para la entrega, ¿te gustaría que lo enviemos a domicilio?' },
+      { content: '¿En qué talla lo querés?' },
+    ]);
+    const salida = await generarRespuesta(agenteId, TELEFONO, [], 'si', undefined, { llamarInyectado: llamar });
+
+    assert.doesNotMatch(salida.respuesta, /domicilio/i, 'no puede pasar al cierre sin saber la combinacion');
+    assert.match(salida.respuesta, /talla/i);
+  });
+
+  test('si insiste hasta la ultima vuelta, la pregunta la arma el codigo con las tallas reales', async () => {
+    await reiniciarLead({ atributosLead: { Genero: 'Hombre' }, productosMostrados: [productos[0].id] });
+
+    const { llamar } = iaFalsa([
+      { content: '¿Te lo enviamos a domicilio?' },
+      { content: 'Perfecto, ¿cuál es tu nombre?' },
+      { content: '¿Y la forma de pago?' },
+    ]);
+    const salida = await generarRespuesta(agenteId, TELEFONO, [], 'si', undefined, { llamarInyectado: llamar });
+
+    assert.match(salida.respuesta, /talla/i);
+    assert.match(salida.respuesta, /42/, 'lista las tallas que existen de verdad');
+  });
+
+  test('con algo YA en el carrito, preguntar la entrega es correcto y no se frena', async () => {
+    await reiniciarLead({ atributosLead: { Genero: 'Hombre' }, productosMostrados: [productos[0].id] });
+
+    const conVariante = iaFalsa([
+      { tool_calls: [tool('agregar_al_carrito', { idProducto: productos[0].id, idVariante: productos[0].variantes[0].id })] },
+      { content: '¿Te lo enviamos a domicilio?' },
+    ]);
+    await generarRespuesta(agenteId, TELEFONO, [], 'quiero la 42 negra', undefined, { llamarInyectado: conVariante.llamar });
+
+    const cierre = iaFalsa([{ content: 'Para la entrega, ¿te lo enviamos a domicilio?' }]);
+    const salida = await generarRespuesta(agenteId, TELEFONO, [], 'dale', undefined, { llamarInyectado: cierre.llamar });
+
+    assert.match(salida.respuesta, /domicilio/i, 'ya sabe que se lleva: el cierre tiene que avanzar');
+  });
+});
