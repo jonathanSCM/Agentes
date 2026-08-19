@@ -59,6 +59,7 @@ const { detectarPais } = require('./lib/services/geo');
 const { precioPlanParaPais, precioPaqueteParaPais, simboloMoneda } = require('./lib/services/precios');
 const { buscarProductosFiltrados, fotoParaMostrar } = require('./lib/services/catalogo');
 const { generarTokenSesion, verificarTokenSesion } = require('./lib/services/sesionWeb');
+const { resolverCoordenadas } = require('./lib/services/ubicacion');
 const { carritoDe, guardarCarrito, agregarItem } = require('./lib/services/carrito');
 const { transicionValida, requiereRestock, dentroDeVentana24h } = require('./lib/services/pedidos');
 
@@ -1011,6 +1012,10 @@ async function notificarConfirmacionPedido(empresaId, pedido) {
 // pedido (ver crear_pedido en lib/services/agente.js) - confirmar/entregar
 // NO tocan el stock, ya se reservo al crearse.
 app.post('/panel/pedidos/:id/estado', requireCliente, async (req, res, next) => {
+  // La lista y el detalle comparten esta misma accion: cada form manda de
+  // vuelta a donde estaba parado el usuario (hidden input "volver"), asi no
+  // lo saca del detalle del pedido que esta gestionando.
+  const volverA = req.body.volver === 'detalle' ? `/panel/pedidos/${req.params.id}` : '/panel/pedidos';
   try {
     const empresaId = req.session.empresaId;
     const pedido = await prisma.pedido.findFirst({
@@ -1021,7 +1026,7 @@ app.post('/panel/pedidos/:id/estado', requireCliente, async (req, res, next) => 
 
     const estadoNuevo = String(req.body.estado || '').toUpperCase();
     if (!transicionValida(pedido.estado, estadoNuevo)) {
-      return res.redirect('/panel/pedidos?err=' + encodeURIComponent('Ese cambio de estado no es válido.'));
+      return res.redirect(`${volverA}?err=` + encodeURIComponent('Ese cambio de estado no es válido.'));
     }
 
     await prisma.$transaction(async (tx) => {
@@ -1043,7 +1048,40 @@ app.post('/panel/pedidos/:id/estado', requireCliente, async (req, res, next) => 
       mensajeOk = notificado ? 'Pedido confirmado y cliente avisado por WhatsApp.' : 'Pedido confirmado (no se pudo avisar por WhatsApp: sin conexión o fuera de la ventana de 24hs).';
     }
 
-    res.redirect('/panel/pedidos?ok=' + encodeURIComponent(mensajeOk));
+    res.redirect(`${volverA}?ok=` + encodeURIComponent(mensajeOk));
+  } catch (err) { next(err); }
+});
+
+// Detalle de un pedido: items desglosados con precio real por linea,
+// entrega (con mini-mapa si hay coordenadas), forma de pago.
+app.get('/panel/pedidos/:id', requireCliente, async (req, res, next) => {
+  try {
+    const empresaId = req.session.empresaId;
+    const pedido = await prisma.pedido.findFirst({
+      where: { id: Number(req.params.id), empresaId },
+      include: { items: true, cliente: true },
+    });
+    if (!pedido) return res.redirect('/panel/pedidos');
+
+    // Pedidos viejos, de antes de esta funcion: si la direccion tiene pinta
+    // de link de Google Maps pero todavia no se resolvio a coordenadas, se
+    // intenta ahora y se guarda para no repetir la resolucion cada vez que
+    // se abre esta pagina. Nunca inventa nada: si no se puede, sigue igual.
+    if (pedido.tipoEntrega !== 'RECOJO' && !pedido.entregaLat && pedido.direccionEntrega) {
+      const resuelto = await resolverCoordenadas(pedido.direccionEntrega);
+      if (resuelto) {
+        await prisma.pedido.update({ where: { id: pedido.id }, data: { entregaLat: resuelto.lat, entregaLng: resuelto.lng } });
+        pedido.entregaLat = resuelto.lat;
+        pedido.entregaLng = resuelto.lng;
+      }
+    }
+
+    const empresa = await prisma.empresa.findUnique({ where: { id: empresaId } });
+    res.render('cliente/pedido-detalle', {
+      title: `Pedido #${pedido.id} - Proshop`, tituloPagina: 'Pedidos', activo: 'pedidos',
+      pedido, simboloCatalogo: simboloMoneda(empresa.moneda),
+      mensaje: req.query.ok || null, errorEstado: req.query.err || null,
+    });
   } catch (err) { next(err); }
 });
 

@@ -1,0 +1,162 @@
+<%- include('partials/inicio') %>
+
+<div class="page-head page-head-row">
+  <div>
+    <h2>
+      <a href="/panel/pedidos" style="color:var(--tenue);font-size:.85rem;font-weight:400">← Pedidos</a>
+      <br />Pedido #<%= pedido.id %>
+    </h2>
+    <p><%= new Date(pedido.createdAt).toLocaleString('es-BO', { dateStyle: 'long', timeStyle: 'short' }) %></p>
+  </div>
+  <span class="badge <%= pedido.estado === 'ENTREGADO' ? 'badge-new' : (pedido.estado === 'CANCELADO' ? 'badge-off' : 'badge-done') %>" style="font-size:.9rem;height:fit-content"><%= pedido.estado %></span>
+</div>
+
+<% if (mensaje) { %><div class="alert-ok"><%= mensaje %></div><% } %>
+<% if (errorEstado) { %><div class="alert-err"><%= errorEstado %></div><% } %>
+
+<div class="dash-grid" style="grid-template-columns:1.4fr 1fr">
+  <div class="dash-card">
+    <div class="dash-card-head"><h3>Productos</h3></div>
+    <div class="table-wrap">
+      <table class="leads-table">
+        <thead><tr><th>Producto</th><th class="num">Cant.</th><th class="num">Precio</th><th class="num">Subtotal</th></tr></thead>
+        <tbody>
+          <% pedido.items.forEach(function (item) { %>
+            <tr>
+              <td><%= item.nombre %></td>
+              <td class="num"><%= item.cantidad %></td>
+              <td class="num"><%= simboloCatalogo %> <%= Number(item.precio).toFixed(2) %></td>
+              <td class="num"><%= simboloCatalogo %> <%= (Number(item.precio) * item.cantidad).toFixed(2) %></td>
+            </tr>
+          <% }); %>
+        </tbody>
+        <tfoot>
+          <tr>
+            <td colspan="3" style="text-align:right;font-weight:700">Total</td>
+            <td class="num" style="font-weight:700"><%= simboloCatalogo %> <%= Number(pedido.total).toFixed(2) %></td>
+          </tr>
+        </tfoot>
+      </table>
+    </div>
+
+    <% if (pedido.notas) { %>
+      <div style="margin-top:1rem">
+        <strong style="font-size:.85rem">Observaciones</strong>
+        <p class="muted" style="font-size:.88rem;margin-top:.2rem"><%= pedido.notas %></p>
+      </div>
+    <% } %>
+  </div>
+
+  <div>
+    <div class="dash-card">
+      <div class="dash-card-head"><h3>Cliente</h3></div>
+      <p style="font-weight:600"><%= pedido.cliente ? (pedido.cliente.nombre || 'Sin nombre') : 'Cliente eliminado' %></p>
+      <% if (pedido.cliente) { %>
+        <p class="muted" style="font-size:.88rem;margin-top:.2rem">
+          <%= pedido.cliente.telefono %>
+          <a href="https://wa.me/<%= pedido.cliente.telefono.replace(/\D/g,'') %>" target="_blank" rel="noopener" style="color:var(--primary-2);margin-left:.5rem">Escribir por WhatsApp</a>
+        </p>
+      <% } %>
+    </div>
+
+    <div class="dash-card" style="margin-top:1rem">
+      <div class="dash-card-head"><h3>Entrega</h3></div>
+      <% if (pedido.tipoEntrega === 'RECOJO') { %>
+        <span class="badge badge-done">Retira en tienda</span>
+      <% } else { %>
+        <span class="badge badge-new" style="margin-bottom:.6rem;display:inline-block">Envío a domicilio</span>
+        <p style="font-size:.9rem;margin-top:.4rem"><%= pedido.direccionEntrega || 'Sin dirección cargada' %></p>
+
+        <% if (pedido.entregaLat && pedido.entregaLng) { %>
+          <div style="margin-top:.8rem;border-radius:10px;overflow:hidden;border:1px solid var(--border)">
+            <iframe
+              width="100%" height="220" style="border:0;display:block"
+              loading="lazy"
+              src="https://www.openstreetmap.org/export/embed.html?bbox=<%= pedido.entregaLng - 0.01 %>%2C<%= pedido.entregaLat - 0.01 %>%2C<%= pedido.entregaLng + 0.01 %>%2C<%= pedido.entregaLat + 0.01 %>&marker=<%= pedido.entregaLat %>%2C<%= pedido.entregaLng %>"
+            ></iframe>
+          </div>
+          <div style="display:flex;gap:.5rem;margin-top:.6rem;flex-wrap:wrap">
+            <a class="btn btn-ghost" style="padding:.4rem .8rem;font-size:.82rem" href="https://www.google.com/maps?q=<%= pedido.entregaLat %>,<%= pedido.entregaLng %>" target="_blank" rel="noopener">Abrir en Google Maps</a>
+            <button class="btn btn-ghost" style="padding:.4rem .8rem;font-size:.82rem" type="button" id="btn-compartir-ubicacion">Compartir ubicación</button>
+          </div>
+          <span id="aviso-copiado" class="muted" style="font-size:.78rem;display:none;margin-top:.4rem">Link copiado ✓</span>
+          <input id="link-ubicacion-manual" type="text" readonly
+                 value="https://www.google.com/maps?q=<%= pedido.entregaLat %>,<%= pedido.entregaLng %>"
+                 style="display:none;width:100%;margin-top:.5rem;background:transparent;border:1px solid var(--border);border-radius:8px;padding:.4rem .5rem;color:inherit;font-size:.8rem" />
+        <% } %>
+      <% } %>
+    </div>
+
+    <div class="dash-card" style="margin-top:1rem">
+      <div class="dash-card-head"><h3>Forma de pago</h3></div>
+      <p style="font-size:.95rem"><%= pedido.formaPago ? pedido.formaPago.charAt(0) + pedido.formaPago.slice(1).toLowerCase() : 'No registrada' %></p>
+    </div>
+
+    <% if (pedido.estado === 'NUEVO' || pedido.estado === 'CONFIRMADO') { %>
+      <div class="dash-card" style="margin-top:1rem">
+        <div class="dash-card-head"><h3>Acciones</h3></div>
+        <div style="display:flex;gap:.6rem;flex-wrap:wrap">
+          <% if (pedido.estado === 'NUEVO') { %>
+            <form method="POST" action="/panel/pedidos/<%= pedido.id %>/estado" class="inline-form">
+              <input type="hidden" name="estado" value="CONFIRMADO" />
+              <input type="hidden" name="volver" value="detalle" />
+              <button class="btn btn-primary" type="submit">Confirmar pedido</button>
+            </form>
+          <% } else { %>
+            <form method="POST" action="/panel/pedidos/<%= pedido.id %>/estado" class="inline-form">
+              <input type="hidden" name="estado" value="ENTREGADO" />
+              <input type="hidden" name="volver" value="detalle" />
+              <button class="btn btn-primary" type="submit">Marcar entregado</button>
+            </form>
+          <% } %>
+          <form method="POST" action="/panel/pedidos/<%= pedido.id %>/estado" class="inline-form"
+                onsubmit="return confirm('¿Cancelar este pedido? Se devolverá el stock descontado.');">
+            <input type="hidden" name="estado" value="CANCELADO" />
+            <input type="hidden" name="volver" value="detalle" />
+            <button class="btn btn-ghost" type="submit">Cancelar pedido</button>
+          </form>
+        </div>
+      </div>
+    <% } %>
+  </div>
+</div>
+
+<% if (pedido.entregaLat && pedido.entregaLng) { %>
+<script>
+(function () {
+  var btn = document.getElementById('btn-compartir-ubicacion');
+  var aviso = document.getElementById('aviso-copiado');
+  var campoManual = document.getElementById('link-ubicacion-manual');
+  if (!btn) return;
+  var url = 'https://www.google.com/maps?q=<%= pedido.entregaLat %>,<%= pedido.entregaLng %>';
+
+  // Ultimo recurso si no se pudo compartir ni copiar solo: mostrar el link
+  // en un campo seleccionable para que el usuario lo copie a mano. Nunca
+  // se queda el boton sin hacer nada de forma silenciosa.
+  function mostrarLinkManual() {
+    campoManual.style.display = 'block';
+    campoManual.focus();
+    campoManual.select();
+  }
+
+  btn.addEventListener('click', function () {
+    if (navigator.share) {
+      navigator.share({ title: 'Ubicación de entrega', url: url }).catch(function (err) {
+        if (err && err.name !== 'AbortError') mostrarLinkManual();
+      });
+      return;
+    }
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(url).then(function () {
+        aviso.style.display = 'inline';
+        setTimeout(function () { aviso.style.display = 'none'; }, 2000);
+      }).catch(mostrarLinkManual);
+      return;
+    }
+    mostrarLinkManual();
+  });
+})();
+</script>
+<% } %>
+
+<%- include('partials/fin') %>

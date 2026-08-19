@@ -27,10 +27,10 @@
       </thead>
       <tbody>
         <% pedidos.forEach(function (p) { %>
-          <tr>
+          <tr class="row-link" onclick="window.location='/panel/pedidos/<%= p.id %>'" style="cursor:pointer">
             <td class="nowrap muted"><%= new Date(p.createdAt).toLocaleDateString('es-BO') %></td>
             <td><%= p.cliente ? (p.cliente.nombre || p.cliente.telefono) : '—' %></td>
-            <td><%= p.items.map(function(i){ return i.cantidad + 'x ' + i.nombre; }).join(', ') %></td>
+            <td><%= p.items.length %> producto<%= p.items.length === 1 ? '' : 's' %></td>
             <td class="muted">
               <% if (p.tipoEntrega === 'RECOJO') { %>
                 <span class="badge badge-done">Retira en tienda</span>
@@ -43,7 +43,7 @@
             </td>
             <td class="num"><%= simboloCatalogo %> <%= Number(p.total).toFixed(2) %></td>
             <td><span class="badge <%= p.estado === 'ENTREGADO' ? 'badge-new' : (p.estado === 'CANCELADO' ? 'badge-off' : 'badge-done') %>"><%= p.estado %></span></td>
-            <td class="actions-cell">
+            <td class="actions-cell" onclick="event.stopPropagation()">
               <% if (p.estado === 'NUEVO') { %>
                 <form method="POST" action="/panel/pedidos/<%= p.id %>/estado" class="inline-form">
                   <input type="hidden" name="estado" value="CONFIRMADO" />
