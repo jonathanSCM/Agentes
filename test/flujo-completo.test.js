@@ -598,3 +598,33 @@ describe('recorrido de venta acordado con el negocio', () => {
     assert.match(recibido.toolResults[0], /No hay stock suficiente/);
   });
 });
+
+// Dos bugs reportados con capturas desde WhatsApp real, el mismo dia.
+describe('el cliente recibe exactamente lo que pidio', () => {
+  test('nombro un producto: se le muestra SOLO ese, sin rellenar la pagina', async () => {
+    await reiniciarLead({ atributosLead: { Genero: 'Hombre' } });
+
+    const { llamar } = iaFalsa([
+      { tool_calls: [tool('buscar_producto', { nombre: 'Zapatilla 3' })] },
+      { tool_calls: [tool('mostrar_productos', { idsProductos: [productos[2].id] })] },
+      { content: 'Ahi la tenes.' },
+    ]);
+    const salida = await generarRespuesta(agenteId, TELEFONO, [], 'tenes la Zapatilla 3?', undefined, { llamarInyectado: llamar });
+
+    // Antes llegaban 3 tarjetas: la pedida y dos de relleno, la suya ultima.
+    assert.equal(salida.fotos.length, 1, 'pidio una sola, no se le agregan otras');
+    assert.match(salida.fotos[0].caption, /Zapatilla 3/);
+  });
+
+  test('explorando sin nombrar nada, se sigue completando la pagina', async () => {
+    await reiniciarLead({ atributosLead: { Genero: 'Hombre' } });
+
+    const { llamar } = iaFalsa([
+      { tool_calls: [tool('mostrar_productos', { idsProductos: [productos[0].id] })] },
+      { content: 'Mira estas.' },
+    ]);
+    const salida = await generarRespuesta(agenteId, TELEFONO, [], 'que modelos tenes?', undefined, { llamarInyectado: llamar });
+
+    assert.equal(salida.fotos.length, 3, 'sin pedido puntual el relleno tiene que seguir vivo');
+  });
+});
