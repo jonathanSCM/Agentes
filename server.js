@@ -57,6 +57,9 @@ const { iniciarJobFacturacion } = require('./lib/jobs/facturacion');
 const { initSocket, emitMensaje, emitConversacion } = require('./lib/services/realtime');
 const { detectarPais } = require('./lib/services/geo');
 const { precioPlanParaPais, precioPaqueteParaPais, simboloMoneda } = require('./lib/services/precios');
+const { buscarProductosFiltrados, fotoParaMostrar } = require('./lib/services/catalogo');
+const { generarTokenSesion, verificarTokenSesion } = require('./lib/services/sesionWeb');
+const { carritoDe, guardarCarrito, agregarItem } = require('./lib/services/carrito');
 const { transicionValida, requiereRestock, dentroDeVentana24h } = require('./lib/services/pedidos');
 
 const app = express();
@@ -218,14 +221,14 @@ app.get('/catalogo/:slug', async (req, res, next) => {
   try {
     const empresa = await prisma.empresa.findUnique({
       where: { slug: req.params.slug },
-      include: { agentes: { take: 1 } },
+      include: { agentes: { take: 1, include: { config: true } } },
     });
     if (!empresa) return res.status(404).render('404', { title: 'Página no encontrada' });
 
     const productosDb = await prisma.producto.findMany({
       where: { empresaId: empresa.id, activo: true },
       orderBy: [{ categoria: { nombre: 'asc' } }, { nombre: 'asc' }],
-      include: { variantes: { where: { activa: true }, select: { stock: true } }, categoria: { include: { padre: true } } },
+      include: { variantes: { where: { activa: true } }, categoria: { include: { padre: true } } },
     });
     // Si el producto tiene variantes, el stock real es la suma de sus
     // variantes (Producto.stock queda en 0 a proposito en ese caso) - mismo
@@ -236,13 +239,34 @@ app.get('/catalogo/:slug', async (req, res, next) => {
       stockMostrado: p.variantes.length ? p.variantes.reduce((suma, v) => suma + v.stock, 0) : p.stock,
     }));
     const agente = empresa.agentes[0];
+    const config = agente ? agente.config : null;
+
+    // El bot manda links con filtro real (categoria/color/talla/marca):
+    // mismas funciones que ya usa el chat, para que la web nunca muestre un
+    // criterio distinto al del bot. Sin filtros, se ve el catalogo entero
+    // agrupado por categoria (comportamiento de siempre).
+    const filtro = {
+      categoria: (req.query.categoria || '').trim(),
+      color: (req.query.color || '').trim(),
+      talla: (req.query.talla || '').trim(),
+      marca: (req.query.marca || '').trim(),
+    };
+    const hayFiltro = Boolean(filtro.categoria || filtro.color || filtro.talla || filtro.marca);
+    const productosAMostrar = hayFiltro
+      ? buscarProductosFiltrados(
+          productos,
+          { categoriaInteres: filtro.categoria || null, color: filtro.color || null, talla: filtro.talla || null, marca: filtro.marca || null },
+          { estrictoColor: true, estrictoMarca: true }
+        )
+      : productos;
 
     // Agrupa por categoria (orden alfabetico, "Otros" al final para
     // productos sin categoria) para que el catalogo se pueda navegar por
-    // secciones en vez de una sola lista larga.
+    // secciones en vez de una sola lista larga. Con filtro activo se
+    // muestra todo en una sola seccion (ya es un resultado acotado).
     const grupos = new Map();
-    for (const p of productos) {
-      const cat = p.categoria?.padre?.nombre || p.categoria?.nombre || 'Otros';
+    for (const p of productosAMostrar) {
+      const cat = hayFiltro ? 'Resultados' : (p.categoria?.padre?.nombre || p.categoria?.nombre || 'Otros');
       if (!grupos.has(cat)) grupos.set(cat, []);
       grupos.get(cat).push(p);
     }
@@ -250,12 +274,137 @@ app.get('/catalogo/:slug', async (req, res, next) => {
       .sort(([a], [b]) => (a === 'Otros' ? 1 : b === 'Otros' ? -1 : a.localeCompare(b, 'es')))
       .map(([nombre, items]) => ({ nombre, productos: items }));
 
+    // El token de sesion (si vino uno valido en la URL) se propaga a los
+    // links de "ver producto" para que la pagina de detalle sepa quien es
+    // sin pedirle nada al cliente.
+    const sesion = verificarTokenSesion(req.query.s);
+
     res.render('catalogo', {
       title: `Catálogo · ${empresa.marca || empresa.nombre}`,
-      empresa, productos, categorias,
+      empresa, config, productos: productosAMostrar, categorias,
       simboloCatalogo: simboloMoneda(empresa.moneda),
       numeroWhatsapp: agente ? agente.numeroWhatsapp : null,
+      filtro, hayFiltro, tokenSesion: sesion ? req.query.s : null,
     });
+  } catch (err) { next(err); }
+});
+
+// Ficha de UN producto puntual: foto(s), descripcion completa, selector de
+// variante con stock real, y "agregar al carrito" si vino con un token de
+// sesion valido (lo manda el bot cuando ya hay interes real en ESE
+// producto). Sin token se puede mirar pero no agregar nada.
+app.get('/catalogo/:slug/producto/:id', async (req, res, next) => {
+  try {
+    const empresa = await prisma.empresa.findUnique({
+      where: { slug: req.params.slug },
+      include: { agentes: { take: 1, include: { config: true } } },
+    });
+    if (!empresa) return res.status(404).render('404', { title: 'Página no encontrada' });
+
+    const producto = await prisma.producto.findFirst({
+      where: { id: Number(req.params.id), empresaId: empresa.id, activo: true },
+      include: { variantes: { where: { activa: true } }, categoria: true },
+    });
+    if (!producto) return res.status(404).render('404', { title: 'Producto no encontrado' });
+
+    const agente = empresa.agentes[0];
+    const config = agente ? agente.config : null;
+    const sesion = verificarTokenSesion(req.query.s);
+
+    res.render('catalogo-producto', {
+      title: `${producto.nombre} · ${empresa.marca || empresa.nombre}`,
+      empresa, config, producto,
+      simboloCatalogo: simboloMoneda(empresa.moneda),
+      numeroWhatsapp: agente ? agente.numeroWhatsapp : null,
+      tokenSesion: sesion ? req.query.s : null,
+      agregado: req.query.agregado === '1',
+    });
+  } catch (err) { next(err); }
+});
+
+// Rate-limit minimo, en memoria, para la primera ruta publica que escribe
+// datos (agregar al carrito sin login). No frena a un cliente real, solo
+// evita que alguien la use para saturar la base.
+const intentosCarritoWeb = new Map();
+function limiteCarritoWeb(req, res, next) {
+  const clave = `${req.ip}:${req.params.slug}`;
+  const ahora = Date.now();
+  const ventana = 60 * 1000;
+  const registro = intentosCarritoWeb.get(clave) || { cuenta: 0, desde: ahora };
+  if (ahora - registro.desde > ventana) {
+    registro.cuenta = 0;
+    registro.desde = ahora;
+  }
+  registro.cuenta += 1;
+  intentosCarritoWeb.set(clave, registro);
+  if (registro.cuenta > 20) {
+    return res.status(429).send('Demasiados intentos, esperá un momento.');
+  }
+  next();
+}
+
+// Agregar al carrito desde la web: mismo carrito real que usa el bot
+// (ClienteFinal.contexto.carrito), asi que cuando el cliente vuelve a
+// escribir por WhatsApp ya lo tiene ahi.
+app.post('/catalogo/:slug/producto/:id/carrito', limiteCarritoWeb, async (req, res, next) => {
+  try {
+    const sesion = verificarTokenSesion((req.body || {}).s || req.query.s);
+    if (!sesion) return res.status(401).send('Este link ya venció. Volvé a pedirlo por WhatsApp.');
+
+    const empresa = await prisma.empresa.findUnique({ where: { slug: req.params.slug } });
+    if (!empresa || empresa.id !== sesion.empresaId) return res.status(404).send('No encontrado.');
+
+    const producto = await prisma.producto.findFirst({
+      where: { id: Number(req.params.id), empresaId: empresa.id, activo: true },
+      include: { variantes: { where: { activa: true } } },
+    });
+    if (!producto) return res.status(404).send('Producto no encontrado.');
+
+    const idVariante = (req.body || {}).idVariante ? Number(req.body.idVariante) : null;
+    const cantidad = Math.max(1, Number((req.body || {}).cantidad) || 1);
+
+    let variante = null;
+    if (producto.variantes.length) {
+      if (!idVariante) return res.status(400).send('Elegí una combinación (talla/color).');
+      variante = producto.variantes.find((v) => v.id === idVariante);
+      if (!variante) return res.status(400).send('Esa combinación no existe.');
+      if (variante.stock < cantidad) return res.status(400).send('No hay stock suficiente de esa combinación.');
+    } else if (producto.stock < cantidad) {
+      return res.status(400).send('No hay stock suficiente.');
+    }
+
+    const clienteFinal = await prisma.clienteFinal.upsert({
+      where: { empresaId_telefono: { empresaId: empresa.id, telefono: sesion.telefono } },
+      update: {},
+      create: { empresaId: empresa.id, telefono: sesion.telefono },
+    });
+
+    const precioUnitario = Number(variante ? (variante.precio ?? producto.precio) : producto.precio);
+    const nombreItem = variante
+      ? `${producto.nombre} (${Object.entries(variante.atributos || {}).map(([k, v]) => `${k}: ${v}`).join(', ')})`
+      : producto.nombre;
+    const itemsActuales = carritoDe(clienteFinal.contexto || {}, sesion.conversacionId);
+    const itemsNuevos = agregarItem(itemsActuales, {
+      productoId: producto.id, varianteId: variante ? variante.id : null, nombre: nombreItem, precio: precioUnitario, cantidad,
+    });
+
+    await prisma.clienteFinal.update({
+      where: { id: clienteFinal.id },
+      data: {
+        contexto: {
+          ...guardarCarrito(clienteFinal.contexto || {}, sesion.conversacionId, itemsNuevos),
+          // El bot no vio este cambio (paso afuera de una tool call): esta
+          // marca le avisa en el proximo turno para que reaccione solo, sin
+          // que el cliente tenga que repetirselo (ver generarRespuesta).
+          carritoWebPendiente: { productoId: producto.id, varianteId: variante ? variante.id : null, agregadoEn: new Date().toISOString() },
+        },
+        productoFavoritoId: producto.id,
+        varianteFavoritaId: variante ? variante.id : null,
+        estadoConversacion: 'INTENCION_DE_COMPRA',
+      },
+    });
+
+    res.redirect(`/catalogo/${req.params.slug}/producto/${req.params.id}?s=${encodeURIComponent(req.body.s || req.query.s)}&agregado=1`);
   } catch (err) { next(err); }
 });
 
@@ -1660,8 +1809,8 @@ app.get('/panel/configuracion', requireCliente, async (req, res, next) => {
 // escribe los precios con la que este elegida aca y nunca convierte a otra.
 const MONEDAS_CATALOGO = ['BOB', 'USD', 'PEN'];
 
-app.post('/panel/configuracion', requireCliente, upload.single('qr'), async (req, res, next) => {
-  const { nombre, numeroWhatsapp, mensajeBienvenida, tono, estado, instrucciones, derivarAHumano, aceptaEfectivo, aceptaTarjeta, aceptaQr, quitarQr, moneda, direccionTienda, tiendaLat, tiendaLng, preguntasIniciales } = req.body || {};
+app.post('/panel/configuracion', requireCliente, upload.fields([{ name: 'qr', maxCount: 1 }, { name: 'logo', maxCount: 1 }]), async (req, res, next) => {
+  const { nombre, numeroWhatsapp, mensajeBienvenida, tono, estado, instrucciones, derivarAHumano, aceptaEfectivo, aceptaTarjeta, aceptaQr, quitarQr, moneda, direccionTienda, tiendaLat, tiendaLng, preguntasIniciales, colorPrimario, colorSecundario, quitarLogo } = req.body || {};
   try {
     const agente = await obtenerAgente(req.session.empresaId);
 
@@ -1687,10 +1836,21 @@ app.post('/panel/configuracion', requireCliente, upload.single('qr'), async (req
       },
     });
 
-    const nombresArchivoQr = await convertirFotosAJpg(req.file ? [req.file] : []);
+    const archivosQr = (req.files && req.files.qr) || [];
+    const archivosLogo = (req.files && req.files.logo) || [];
+    const nombresArchivoQr = await convertirFotosAJpg(archivosQr);
+    const nombresArchivoLogo = await convertirFotosAJpg(archivosLogo);
     const qrCobroUrl = nombresArchivoQr.length
       ? urlPublicaDeArchivo(req, nombresArchivoQr[0])
       : (quitarQr === '1' ? null : agente.config?.qrCobroUrl);
+    const logoUrl = nombresArchivoLogo.length
+      ? urlPublicaDeArchivo(req, nombresArchivoLogo[0])
+      : (quitarLogo === '1' ? null : agente.config?.logoUrl);
+
+    // Colores del catalogo web: solo se guarda si viene un hex valido, para
+    // no dejar la variable CSS del catalogo con basura si alguien manda
+    // cualquier cosa en el input.
+    const hexValido = (v) => typeof v === 'string' && /^#[0-9a-fA-F]{6}$/.test(v.trim());
 
     await prisma.agenteConfig.update({
       where: { agenteId: agente.id },
@@ -1703,6 +1863,9 @@ app.post('/panel/configuracion', requireCliente, upload.single('qr'), async (req
         aceptaTarjeta: aceptaTarjeta === '1',
         aceptaQr: aceptaQr === '1',
         qrCobroUrl,
+        logoUrl,
+        colorPrimario: hexValido(colorPrimario) ? colorPrimario.trim() : (agente.config?.colorPrimario || null),
+        colorSecundario: hexValido(colorSecundario) ? colorSecundario.trim() : (agente.config?.colorSecundario || null),
         // Ubicacion real del local: si esta vacia, el bot directamente no
         // ofrece retiro en tienda (nunca inventa una direccion).
         // Lo que el bot pregunta antes de mostrar nada. Se guarda como lista

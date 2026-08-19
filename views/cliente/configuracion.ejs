@@ -127,6 +127,33 @@
     <input id="qr" name="qr" type="file" accept="image/*" />
   </div>
 
+  <div class="field">
+    <label>Personalización del catálogo web</label>
+    <p class="muted" style="font-size:.82rem;margin:0 0 .5rem">Así se ve la página pública que el agente comparte cuando un cliente quiere ver fotos y precios con más detalle (<a href="/catalogo/<%= empresa.slug %>" target="_blank" rel="noopener">vista previa</a>).</p>
+
+    <div style="margin-bottom:.8rem">
+      <label for="logo" style="display:block;margin-bottom:.3rem">Logo de la tienda</label>
+      <% if (config.logoUrl) { %>
+        <div style="margin-bottom:8px;">
+          <img src="<%= config.logoUrl %>" style="width:56px;height:56px;object-fit:cover;border-radius:8px;background:#fff;padding:4px" />
+        </div>
+        <label style="margin-bottom:.5rem;display:block"><input type="checkbox" name="quitarLogo" value="1" /> Quitar el logo actual</label>
+      <% } %>
+      <input id="logo" name="logo" type="file" accept="image/*" />
+    </div>
+
+    <div class="field-row">
+      <div class="field">
+        <label for="colorPrimario">Color principal</label>
+        <input id="colorPrimario" name="colorPrimario" type="color" value="<%= config.colorPrimario || '#22c58b' %>" style="height:42px;padding:4px" />
+      </div>
+      <div class="field">
+        <label for="colorSecundario">Color secundario</label>
+        <input id="colorSecundario" name="colorSecundario" type="color" value="<%= config.colorSecundario || '#22c58b' %>" style="height:42px;padding:4px" />
+      </div>
+    </div>
+  </div>
+
   <div class="form-actions">
     <button class="btn btn-primary" type="submit">Guardar configuración</button>
   </div>

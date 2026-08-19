@@ -381,6 +381,13 @@ model AgenteConfig {
   // A diferencia de CategoriaAtributo, esto no depende de la categoria:
   // justamente se pregunta cuando todavia no hay ninguna elegida.
   preguntasIniciales String[] @default(["Genero"])
+  // Personalizacion visual del catalogo web publico (/catalogo/:slug): sin
+  // esto, todas las tiendas comparten el mismo tema oscuro fijo, que no
+  // representa la marca de cada negocio. Vacio = se usan los colores por
+  // defecto y se muestra el nombre de la tienda como texto en vez de logo.
+  logoUrl           String?
+  colorPrimario     String?
+  colorSecundario   String?
   updatedAt         DateTime @updatedAt
 
   @@map("agente_config")

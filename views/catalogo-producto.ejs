@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title><%= title %></title>
+<link rel="icon" type="image/png" href="/img/logo-icon.png" />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root{--fondo:#0f1117;--panel:#181b24;--panel-2:#1f2330;--tinta:#eef0f6;--tenue:#9aa1b5;--acento:<%= (config && config.colorPrimario) || '#22c58b' %>;--acento-2:<%= (config && config.colorSecundario) || '#22c58b' %>;--borde:#262b38;}
+  *{margin:0;padding:0;box-sizing:border-box;}
+  body{background:var(--fondo);color:var(--tinta);font-family:'Inter',system-ui,sans-serif;min-height:100vh;}
+  header{display:flex;align-items:center;gap:.7rem;padding:18px 20px;max-width:900px;margin:0 auto;}
+  header img{width:32px;height:32px;border-radius:50%;object-fit:cover;}
+  header strong{font-size:1.1rem;}
+  main{max-width:900px;margin:0 auto;padding:0 20px 60px;}
+  .volver{color:var(--tenue);text-decoration:none;font-size:.85rem;display:inline-block;margin-bottom:16px;}
+  .volver:hover{color:var(--tinta);}
+
+  .layout{display:grid;grid-template-columns:1fr 1fr;gap:28px;}
+  @media (max-width:720px){.layout{grid-template-columns:1fr;}}
+
+  .galeria img{width:100%;border-radius:14px;aspect-ratio:1/1;object-fit:cover;background:#0b0d13;}
+  .galeria .ph{width:100%;aspect-ratio:1/1;border-radius:14px;display:flex;align-items:center;justify-content:center;color:var(--tenue);background:linear-gradient(135deg,#141722,#1b1f2c);}
+  .miniaturas{display:flex;gap:8px;margin-top:10px;overflow-x:auto;}
+  .miniaturas img{width:64px;height:64px;border-radius:8px;object-fit:cover;cursor:pointer;border:2px solid transparent;flex:0 0 auto;}
+  .miniaturas img.activa{border-color:var(--acento);}
+
+  h1{font-size:1.5rem;font-weight:800;margin-bottom:6px;}
+  .marca{color:var(--tenue);font-size:.88rem;margin-bottom:10px;}
+  .precio{color:var(--acento);font-weight:800;font-size:1.6rem;margin:10px 0;}
+  .stock{font-size:.8rem;padding:3px 10px;border-radius:999px;background:rgba(255,255,255,.06);color:var(--tenue);display:inline-block;width:fit-content;margin-bottom:14px;}
+  .stock.bajo{background:rgba(255,180,60,.16);color:#ffc36b;}
+  .stock.agotado{background:rgba(255,90,90,.16);color:#ff9a9a;}
+  .descripcion{color:var(--tenue);line-height:1.6;margin-bottom:20px;font-size:.92rem;}
+
+  .campo{margin-bottom:16px;}
+  .campo label{display:block;font-size:.82rem;color:var(--tenue);margin-bottom:6px;}
+  select{width:100%;background:var(--panel);border:1px solid var(--borde);border-radius:10px;padding:11px 12px;color:var(--tinta);font-size:.92rem;font-family:inherit;}
+
+  .btn{display:block;width:100%;text-align:center;border:none;border-radius:12px;padding:14px;font-size:.95rem;font-weight:700;cursor:pointer;text-decoration:none;}
+  .btn-primario{background:var(--acento);color:#08251a;}
+  .btn-primario:disabled{opacity:.5;cursor:not-allowed;}
+  .btn-whatsapp{background:#25d366;color:#fff;margin-top:12px;}
+
+  .aviso-sesion{background:rgba(255,180,60,.12);border:1px solid rgba(255,180,60,.35);color:#ffc36b;border-radius:10px;padding:12px 14px;font-size:.85rem;margin-bottom:16px;}
+  .aviso-ok{background:rgba(34,197,139,.12);border:1px solid rgba(34,197,139,.4);color:var(--acento);border-radius:10px;padding:16px;margin-bottom:18px;}
+  .aviso-ok h2{font-size:1.05rem;margin-bottom:6px;}
+</style>
+</head>
+<body>
+  <header>
+    <% if (config && config.logoUrl) { %>
+      <img src="<%= config.logoUrl %>" alt="" />
+    <% } %>
+    <strong><%= empresa.marca || empresa.nombre %></strong>
+  </header>
+
+  <main>
+    <a class="volver" href="/catalogo/<%= empresa.slug %><%= tokenSesion ? '?s=' + encodeURIComponent(tokenSesion) : '' %>">← Volver al catálogo</a>
+
+    <% if (agregado) { %>
+      <div class="aviso-ok">
+        <h2>✅ ¡Listo, lo agregamos a tu carrito!</h2>
+        <p>Volvé a WhatsApp para seguir con tu pedido — ya lo tenemos guardado.</p>
+      </div>
+    <% } %>
+
+    <div class="layout">
+      <div class="galeria">
+        <% var fotos = (producto.fotos && producto.fotos.length) ? producto.fotos : []; %>
+        <% if (fotos.length) { %>
+          <img id="foto-principal" src="<%= fotos[0] %>" alt="<%= producto.nombre %>" />
+          <% if (fotos.length > 1) { %>
+            <div class="miniaturas">
+              <% fotos.forEach(function (f, i) { %>
+                <img src="<%= f %>" class="<%= i === 0 ? 'activa' : '' %>" onclick="document.getElementById('foto-principal').src=this.src; document.querySelectorAll('.miniaturas img').forEach(function(m){m.classList.remove('activa')}); this.classList.add('activa');" />
+              <% }); %>
+            </div>
+          <% } %>
+        <% } else { %>
+          <div class="ph">Sin foto</div>
+        <% } %>
+      </div>
+
+      <div>
+        <h1><%= producto.nombre %></h1>
+        <% var marca = producto.atributos && producto.atributos.Marca ? producto.atributos.Marca : ''; %>
+        <% if (marca) { %><p class="marca"><%= marca %></p><% } %>
+
+        <% var variantes = producto.variantes || []; %>
+        <% var stockBase = variantes.length ? variantes.reduce(function(s,v){return s+v.stock}, 0) : producto.stock; %>
+        <span class="stock <%= stockBase === 0 ? 'agotado' : (stockBase <= 5 ? 'bajo' : '') %>">
+          <%= stockBase === 0 ? 'Agotado' : (stockBase <= 5 ? 'Últimas unidades' : 'Disponible') %>
+        </span>
+        <p class="precio"><%= simboloCatalogo %> <%= Number(producto.precio).toFixed(2) %></p>
+
+        <% if (producto.descripcion) { %><p class="descripcion"><%= producto.descripcion %></p><% } %>
+
+        <% if (!tokenSesion) { %>
+          <div class="aviso-sesion">Para agregar al carrito, pedile este producto a tu asesor por WhatsApp — te va a mandar un link que ya te reconoce.</div>
+          <% if (numeroWhatsapp) { %>
+            <a class="btn btn-whatsapp" href="https://wa.me/<%= numeroWhatsapp %>?text=<%= encodeURIComponent('Estoy viendo ' + producto.nombre) %>" target="_blank" rel="noopener">Consultar por WhatsApp</a>
+          <% } %>
+        <% } else { %>
+          <form method="POST" action="/catalogo/<%= empresa.slug %>/producto/<%= producto.id %>/carrito">
+            <input type="hidden" name="s" value="<%= tokenSesion %>" />
+            <% if (variantes.length) { %>
+              <div class="campo">
+                <label for="idVariante">Elegí talla / color</label>
+                <select name="idVariante" id="idVariante" required>
+                  <option value="">Seleccioná una opción</option>
+                  <% variantes.forEach(function (v) { %>
+                    <option value="<%= v.id %>" <%= v.stock <= 0 ? 'disabled' : '' %>>
+                      <%= Object.entries(v.atributos || {}).map(function(e){return e[0]+': '+e[1]}).join(' · ') %>
+                      <%= v.stock <= 0 ? '(sin stock)' : '' %>
+                    </option>
+                  <% }); %>
+                </select>
+              </div>
+            <% } %>
+            <button class="btn btn-primario" type="submit" <%= stockBase === 0 ? 'disabled' : '' %>>
+              <%= stockBase === 0 ? 'Sin stock' : 'Agregar al carrito' %>
+            </button>
+          </form>
+          <% if (numeroWhatsapp) { %>
+            <a class="btn btn-whatsapp" href="https://wa.me/<%= numeroWhatsapp %>?text=<%= encodeURIComponent('Estoy viendo ' + producto.nombre) %>" target="_blank" rel="noopener">Volver a WhatsApp</a>
+          <% } %>
+        <% } %>
+      </div>
+    </div>
+  </main>
+</body>
+</html>

@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <style>
-  :root{--fondo:#0f1117;--panel:#181b24;--panel-2:#1f2330;--tinta:#eef0f6;--tenue:#9aa1b5;--acento:#22c58b;--borde:#262b38;}
+  :root{--fondo:#0f1117;--panel:#181b24;--panel-2:#1f2330;--tinta:#eef0f6;--tenue:#9aa1b5;--acento:<%= (config && config.colorPrimario) || '#22c58b' %>;--acento-2:<%= (config && config.colorSecundario) || '#22c58b' %>;--borde:#262b38;}
   *{margin:0;padding:0;box-sizing:border-box;}
   body{background:var(--fondo);color:var(--tinta);font-family:'Inter',system-ui,sans-serif;min-height:100vh;}
   header{display:flex;align-items:center;gap:.7rem;padding:18px 20px;max-width:1100px;margin:0 auto;}
@@ -54,15 +54,29 @@
   .vacio h2{font-size:1.8rem;}
 
   .cta{position:fixed;right:18px;bottom:18px;background:#25d366;color:#fff;width:56px;height:56px;border-radius:50%;display:grid;place-items:center;text-decoration:none;box-shadow:0 10px 25px -8px rgba(0,0,0,.6);z-index:6;}
+  .card-link{text-decoration:none;color:inherit;display:contents;}
+  .banner-filtro{background:var(--panel);border:1px solid var(--borde);border-radius:12px;padding:12px 16px;margin-bottom:18px;display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;}
+  .banner-filtro span{font-size:.88rem;color:var(--tenue);}
+  .banner-filtro a{color:var(--acento);font-size:.85rem;text-decoration:none;font-weight:600;}
 </style>
 </head>
 <body>
   <header>
-    <img src="/img/logo-icon.png" alt="" />
+    <% if (config && config.logoUrl) { %>
+      <img src="<%= config.logoUrl %>" alt="" />
+    <% } else { %>
+      <img src="/img/logo-icon.png" alt="" />
+    <% } %>
     <strong><%= empresa.marca || empresa.nombre %></strong>
   </header>
 
   <main>
+    <% if (hayFiltro) { %>
+      <div class="banner-filtro">
+        <span>Mostrando solo lo que pediste: <%= [filtro.categoria, filtro.color, filtro.talla, filtro.marca].filter(Boolean).join(' · ') %></span>
+        <a href="/catalogo/<%= empresa.slug %><%= tokenSesion ? '?s=' + encodeURIComponent(tokenSesion) : '' %>">Ver todo el catálogo</a>
+      </div>
+    <% } %>
     <h1>Nuestro catálogo</h1>
     <p class="sub"><%= productos.length %> producto<%= productos.length === 1 ? '' : 's' %> disponible<%= productos.length === 1 ? '' : 's' %></p>
 
@@ -98,21 +112,23 @@
                   var marca = p.atributos && p.atributos.Marca ? p.atributos.Marca : '';
                   var textoBusqueda = [p.nombre, c.nombre, marca].join(' ').toLowerCase();
                 %>
-                <div class="card" data-buscar="<%= textoBusqueda %>">
-                  <% if (p.fotos && p.fotos.length) { %>
-                    <img src="<%= p.fotos[0] %>" alt="<%= p.nombre %>" loading="lazy" />
-                  <% } else { %>
-                    <div class="ph">Sin foto</div>
-                  <% } %>
-                  <div class="card-body">
-                    <h3><%= p.nombre %></h3>
-                    <% if (marca) { %><span class="marca"><%= marca %></span><% } %>
-                    <span class="stock <%= p.stockMostrado === 0 ? 'agotado' : (p.stockMostrado <= 5 ? 'bajo' : '') %>">
-                      <%= p.stockMostrado === 0 ? 'Agotado' : (p.stockMostrado <= 5 ? 'Últimas unidades' : 'Disponible') %>
-                    </span>
-                    <span class="precio"><%= simboloCatalogo %> <%= Number(p.precio).toFixed(2) %></span>
+                <a class="card-link" href="/catalogo/<%= empresa.slug %>/producto/<%= p.id %><%= tokenSesion ? '?s=' + encodeURIComponent(tokenSesion) : '' %>">
+                  <div class="card" data-buscar="<%= textoBusqueda %>">
+                    <% if (p.fotos && p.fotos.length) { %>
+                      <img src="<%= p.fotos[0] %>" alt="<%= p.nombre %>" loading="lazy" />
+                    <% } else { %>
+                      <div class="ph">Sin foto</div>
+                    <% } %>
+                    <div class="card-body">
+                      <h3><%= p.nombre %></h3>
+                      <% if (marca) { %><span class="marca"><%= marca %></span><% } %>
+                      <span class="stock <%= p.stockMostrado === 0 ? 'agotado' : (p.stockMostrado <= 5 ? 'bajo' : '') %>">
+                        <%= p.stockMostrado === 0 ? 'Agotado' : (p.stockMostrado <= 5 ? 'Últimas unidades' : 'Disponible') %>
+                      </span>
+                      <span class="precio"><%= simboloCatalogo %> <%= Number(p.precio).toFixed(2) %></span>
+                    </div>
                   </div>
-                </div>
+                </a>
               <% }); %>
             </div>
           </section>
