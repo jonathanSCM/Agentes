@@ -152,6 +152,28 @@
         <input id="colorSecundario" name="colorSecundario" type="color" value="<%= config.colorSecundario || '#22c58b' %>" style="height:42px;padding:4px" />
       </div>
     </div>
+
+    <div style="margin-top:1rem">
+      <label style="display:block;margin-bottom:.5rem">Estilo del catálogo</label>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:.6rem">
+        <%
+          var plantillas = [
+            { valor: 'clasica', nombre: 'Clásica', desc: 'Grid con buscador' },
+            { valor: 'banner', nombre: 'Banner', desc: 'Portada grande' },
+            { valor: 'grid-denso', nombre: 'Denso', desc: 'Mosaico compacto' },
+            { valor: 'revista', nombre: 'Revista', desc: 'Editorial, con aire' },
+          ];
+          var plantillaActual = config.plantillaCatalogo || 'clasica';
+        %>
+        <% plantillas.forEach(function (p) { %>
+          <label style="border:2px solid <%= plantillaActual === p.valor ? 'var(--primary-2)' : 'var(--border)' %>;border-radius:10px;padding:.7rem;cursor:pointer;display:block">
+            <input type="radio" name="plantillaCatalogo" value="<%= p.valor %>" <%= plantillaActual === p.valor ? 'checked' : '' %> style="margin-right:.4rem" />
+            <strong style="font-size:.88rem"><%= p.nombre %></strong>
+            <div class="muted" style="font-size:.76rem;margin-top:.15rem"><%= p.desc %></div>
+          </label>
+        <% }); %>
+      </div>
+    </div>
   </div>
 
   <div class="form-actions">

@@ -214,6 +214,15 @@ app.get('/', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
+// Las 4 plantillas visuales del catalogo web (ver views/catalogo-*.ejs).
+// Lista blanca explicita: nunca se usa el valor de la config directo como
+// nombre de vista, para no depender de que ese campo este bien saneado.
+const PLANTILLAS_CATALOGO = ['clasica', 'banner', 'grid-denso', 'revista'];
+function vistaCatalogo(config) {
+  const elegida = config && config.plantillaCatalogo;
+  return PLANTILLAS_CATALOGO.includes(elegida) ? elegida : 'clasica';
+}
+
 // Catalogo publico de una empresa (sin login): el agente manda este link
 // cuando el cliente pide "el catálogo" en general, en vez de un producto
 // puntual. Reutiliza el slug de la empresa (el mismo que ya usa cada tenant).
@@ -279,7 +288,7 @@ app.get('/catalogo/:slug', async (req, res, next) => {
     // sin pedirle nada al cliente.
     const sesion = verificarTokenSesion(req.query.s);
 
-    res.render('catalogo', {
+    res.render(`catalogo-${vistaCatalogo(config)}`, {
       title: `Catálogo · ${empresa.marca || empresa.nombre}`,
       empresa, config, productos: productosAMostrar, categorias,
       simboloCatalogo: simboloMoneda(empresa.moneda),
@@ -1248,13 +1257,22 @@ app.get('/panel/categorias/:id', requireCliente, async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-app.post('/panel/categorias/:id', requireCliente, async (req, res, next) => {
+app.post('/panel/categorias/:id', requireCliente, upload.single('imagen'), async (req, res, next) => {
   try {
     const nombre = String(req.body.nombre || '').trim().slice(0, 120);
     if (!nombre) return res.redirect(`/panel/categorias/${req.params.id}?err=` + encodeURIComponent('El nombre es obligatorio.'));
+
+    const categoriaActual = await prisma.categoria.findFirst({ where: { id: Number(req.params.id), empresaId: req.session.empresaId } });
+    if (!categoriaActual) return res.redirect('/panel/categorias');
+
+    const nombresArchivoImagen = await convertirFotosAJpg(req.file ? [req.file] : []);
+    const imagenUrl = nombresArchivoImagen.length
+      ? urlPublicaDeArchivo(req, nombresArchivoImagen[0])
+      : (req.body.quitarImagen === '1' ? null : categoriaActual.imagenUrl);
+
     await prisma.categoria.updateMany({
       where: { id: Number(req.params.id), empresaId: req.session.empresaId },
-      data: { nombre },
+      data: { nombre, imagenUrl },
     });
     res.redirect(`/panel/categorias/${req.params.id}?ok=` + encodeURIComponent('Categoría actualizada.'));
   } catch (err) {
@@ -1810,7 +1828,7 @@ app.get('/panel/configuracion', requireCliente, async (req, res, next) => {
 const MONEDAS_CATALOGO = ['BOB', 'USD', 'PEN'];
 
 app.post('/panel/configuracion', requireCliente, upload.fields([{ name: 'qr', maxCount: 1 }, { name: 'logo', maxCount: 1 }]), async (req, res, next) => {
-  const { nombre, numeroWhatsapp, mensajeBienvenida, tono, estado, instrucciones, derivarAHumano, aceptaEfectivo, aceptaTarjeta, aceptaQr, quitarQr, moneda, direccionTienda, tiendaLat, tiendaLng, preguntasIniciales, colorPrimario, colorSecundario, quitarLogo } = req.body || {};
+  const { nombre, numeroWhatsapp, mensajeBienvenida, tono, estado, instrucciones, derivarAHumano, aceptaEfectivo, aceptaTarjeta, aceptaQr, quitarQr, moneda, direccionTienda, tiendaLat, tiendaLng, preguntasIniciales, colorPrimario, colorSecundario, quitarLogo, plantillaCatalogo } = req.body || {};
   try {
     const agente = await obtenerAgente(req.session.empresaId);
 
@@ -1866,6 +1884,7 @@ app.post('/panel/configuracion', requireCliente, upload.fields([{ name: 'qr', ma
         logoUrl,
         colorPrimario: hexValido(colorPrimario) ? colorPrimario.trim() : (agente.config?.colorPrimario || null),
         colorSecundario: hexValido(colorSecundario) ? colorSecundario.trim() : (agente.config?.colorSecundario || null),
+        plantillaCatalogo: PLANTILLAS_CATALOGO.includes(plantillaCatalogo) ? plantillaCatalogo : (agente.config?.plantillaCatalogo || 'clasica'),
         // Ubicacion real del local: si esta vacia, el bot directamente no
         // ofrece retiro en tienda (nunca inventa una direccion).
         // Lo que el bot pregunta antes de mostrar nada. Se guarda como lista

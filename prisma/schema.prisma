@@ -388,6 +388,10 @@ model AgenteConfig {
   logoUrl           String?
   colorPrimario     String?
   colorSecundario   String?
+  // Que layout usa /catalogo/:slug: "clasica" | "banner" | "grid-denso" |
+  // "revista" (ver views/catalogo-*.ejs). Los colores/logo de arriba se
+  // aplican encima de cualquiera que se elija.
+  plantillaCatalogo String   @default("clasica")
   updatedAt         DateTime @updatedAt
 
   @@map("agente_config")
@@ -530,6 +534,10 @@ model Categoria {
   productos Producto[]
   orden     Int                 @default(0)
   createdAt DateTime            @default(now())
+  // Foto real que carga el dueño para la tarjeta de categoria que manda el
+  // bot por WhatsApp (ver mostrar_tarjeta_categoria en agente.js). null = el
+  // bot manda esa tarjeta sin foto, nunca inventa una imagen.
+  imagenUrl String?
 
   @@unique([empresaId, nombre])
   @@index([empresaId, padreId])

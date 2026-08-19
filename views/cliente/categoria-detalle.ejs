@@ -26,13 +26,24 @@
   var inputStyle = 'background:transparent;border:1px solid rgba(255,255,255,.15);border-radius:8px;padding:.35rem .5rem;color:inherit;font:inherit;font-size:.85rem';
   var formCat = 'editar-categoria';
 %>
-<form method="POST" action="/panel/categorias/<%= categoria.id %>" id="<%= formCat %>" class="form-card" style="max-width:500px">
+<form method="POST" action="/panel/categorias/<%= categoria.id %>" id="<%= formCat %>" class="form-card" style="max-width:500px" enctype="multipart/form-data">
   <div class="field">
     <label for="nombre">Nombre</label>
     <input id="nombre" name="nombre" type="text" value="<%= categoria.nombre %>" style="<%= inputStyle %>" />
   </div>
+  <div class="field">
+    <label for="imagen">Foto de la categoría</label>
+    <p class="muted" style="font-size:.82rem;margin:0 0 .5rem">El agente la usa para la tarjeta que le manda al cliente cuando pregunta por "<%= categoria.nombre %>" (junto con cuántos modelos hay, desde qué precio, y un link para ver todo). Sin foto, manda el mismo mensaje pero sin imagen.</p>
+    <% if (categoria.imagenUrl) { %>
+      <div style="margin-bottom:8px;">
+        <img src="<%= categoria.imagenUrl %>" style="width:120px;height:80px;object-fit:cover;border-radius:8px" />
+      </div>
+      <label style="margin-bottom:.5rem;display:block"><input type="checkbox" name="quitarImagen" value="1" /> Quitar la foto actual</label>
+    <% } %>
+    <input id="imagen" name="imagen" type="file" accept="image/*" />
+  </div>
   <div class="form-actions">
-    <button class="btn btn-primary" type="submit">Guardar nombre</button>
+    <button class="btn btn-primary" type="submit">Guardar cambios</button>
   </div>
 </form>
 
