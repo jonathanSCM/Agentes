@@ -11,3 +11,12 @@ npm-debug.log*
 # de usarlos). Nunca se versionan: suelen llevar la cadena de conexion con
 # contraseña escrita a mano.
 temp_*.js
+
+# Fotos que suben los admins desde el panel (server.js: UPLOADS_DIR).
+# Son datos de clientes en produccion, no codigo: no se versionan.
+# Las imagenes de demo que YA estaban versionadas siguen estandolo
+# (.gitignore no afecta lo que git ya rastrea); quedan explicitas abajo
+# porque demo-data.json las referencia por nombre.
+public/uploads/*
+!public/uploads/demo-*
+!public/uploads/1785366732022-500849026.jpg
