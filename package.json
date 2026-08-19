@@ -10,6 +10,7 @@
     "seed": "node prisma/seed.js",
     "seed:ropa": "node scripts/seed-ropa-demo.js",
     "seed:el-y-ella": "node scripts/seed-el-y-ella.js",
+    "seed:catalogo": "node scripts/seed-catalogo-demo.js",
     "prueba": "node scripts/prueba-consumo.js",
     "simular": "node scripts/simular.js",
     "db:studio": "prisma studio",
