@@ -1,9 +1,17 @@
 <%- include('partials/inicio') %>
 
-<div class="page-head">
-  <h2>Conversaciones</h2>
-  <p>Chats que tu agente ha atendido por WhatsApp.</p>
+<div class="page-head page-head-row">
+  <div>
+    <h2>Conversaciones</h2>
+    <p>Chats que tu agente ha atendido por WhatsApp.</p>
+  </div>
+  <form method="POST" action="/panel/conversaciones/reiniciar-todas" class="inline-form"
+        onsubmit="return confirm('¿Reiniciar la memoria de TODOS los clientes? El agente va a tratar cada charla como nueva desde el próximo mensaje (categoría, presupuesto, favoritos, etc.). El historial de mensajes NO se borra. Esto afecta a todas las conversaciones, no se puede deshacer.');">
+    <button class="btn btn-ghost" type="submit" title="Herramienta temporal para pruebas: borra lo que el agente recuerda de TODOS los clientes, sin borrar el historial">↺ Reiniciar todas las conversaciones</button>
+  </form>
 </div>
+
+<% if (mensaje) { %><div class="alert-ok"><%= mensaje %></div><% } %>
 
 <div class="admin-stats">
   <div class="stat-card"><span class="stat-num"><%= stats.total %></span><span class="stat-label">Conversaciones</span></div>

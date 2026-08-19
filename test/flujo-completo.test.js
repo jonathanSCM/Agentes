@@ -122,6 +122,23 @@ async function reiniciarLead(datos = {}) {
   });
 }
 
+// confirmar_pedido/crear_pedido ya NO aceptan una lista de items del modelo
+// (bug real: el modelo mandaba solo lo ultimo que habia conversado y pisaba
+// el carrito real, perdiendo productos) - el carrito es la unica fuente de
+// verdad. Para probar el cierre hay que armar el carrito real primero, igual
+// que lo haria agregar_al_carrito.
+async function agregarAlCarrito(items) {
+  const cliente = await prisma.clienteFinal.findFirst({ where: { telefono: TELEFONO } });
+  const carritoItems = items.map((i) => ({
+    productoId: i.idProducto, varianteId: i.idVariante || null,
+    nombre: `Producto ${i.idProducto}`, precio: i.precio, cantidad: i.cantidad,
+  }));
+  await prisma.clienteFinal.update({
+    where: { id: cliente.id },
+    data: { contexto: { ...(cliente.contexto || {}), carrito: { conversacionId: null, items: carritoItems } } },
+  });
+}
+
 describe('gate real: primero entender, despues mostrar', () => {
   beforeEach(async () => { await reiniciarLead(); });
 
@@ -225,8 +242,9 @@ describe('cierre del pedido: confirmacion obligatoria', () => {
 
   test('crear_pedido SIN confirmar antes se rechaza y no crea nada', async () => {
     const variante = await prisma.variante.findFirst({ where: { productoId: productos[0].id } });
+    await agregarAlCarrito([{ idProducto: productos[0].id, idVariante: variante.id, cantidad: 1, precio: productos[0].precio }]);
     const { llamar, recibido } = iaFalsa([
-      { tool_calls: [tool('crear_pedido', { items: [{ idProducto: productos[0].id, idVariante: variante.id, cantidad: 1 }] })] },
+      { tool_calls: [tool('crear_pedido', {})] },
       { content: 'Te confirmo.' },
     ]);
     await generarRespuesta(agenteId, TELEFONO, [], 'dale, lo quiero', undefined, { llamarInyectado: llamar });
@@ -237,8 +255,9 @@ describe('cierre del pedido: confirmacion obligatoria', () => {
 
   test('confirmar_pedido arma el resumen real con precio y moneda de la base', async () => {
     const variante = await prisma.variante.findFirst({ where: { productoId: productos[0].id } });
+    await agregarAlCarrito([{ idProducto: productos[0].id, idVariante: variante.id, cantidad: 2, precio: productos[0].precio }]);
     const { llamar, recibido } = iaFalsa([
-      { tool_calls: [tool('confirmar_pedido', { items: [{ idProducto: productos[0].id, idVariante: variante.id, cantidad: 2 }] })] },
+      { tool_calls: [tool('confirmar_pedido', {})] },
       { content: '¿Confirmas?' },
     ]);
     await generarRespuesta(agenteId, TELEFONO, [], 'quiero 2', undefined, { llamarInyectado: llamar });
@@ -256,12 +275,12 @@ describe('cierre del pedido: confirmacion obligatoria', () => {
   test('despues de confirmar, crear_pedido SI crea y descuenta el stock de la variante', async () => {
     const variante = await prisma.variante.findFirst({ where: { productoId: productos[1].id }, orderBy: { id: 'asc' } });
     const stockAntes = variante.stock;
-    const items = [{ idProducto: productos[1].id, idVariante: variante.id, cantidad: 2 }];
+    await agregarAlCarrito([{ idProducto: productos[1].id, idVariante: variante.id, cantidad: 2, precio: productos[1].precio }]);
 
-    const paso1 = iaFalsa([{ tool_calls: [tool('confirmar_pedido', { items })] }, { content: '¿Esta todo bien?' }]);
+    const paso1 = iaFalsa([{ tool_calls: [tool('confirmar_pedido', {})] }, { content: '¿Esta todo bien?' }]);
     await generarRespuesta(agenteId, TELEFONO, [], 'quiero 2', undefined, { llamarInyectado: paso1.llamar });
 
-    const paso2 = iaFalsa([{ tool_calls: [tool('crear_pedido', { items })] }, { content: 'Listo, pedido tomado.' }]);
+    const paso2 = iaFalsa([{ tool_calls: [tool('crear_pedido', {})] }, { content: 'Listo, pedido tomado.' }]);
     await generarRespuesta(agenteId, TELEFONO, [], 'si, esta todo bien', undefined, { llamarInyectado: paso2.llamar });
 
     assert.match(paso2.recibido.toolResults[0], /TOOL_SUCCESS: pedido #\d+ creado/);
@@ -285,8 +304,9 @@ describe('cierre del pedido: confirmacion obligatoria', () => {
       formaPago: 'EFECTIVO', tipoEntrega: 'RECOJO',
     });
     const variante = await prisma.variante.findFirst({ where: { productoId: productos[2].id } });
+    await agregarAlCarrito([{ idProducto: productos[2].id, idVariante: variante.id, cantidad: 1, precio: productos[2].precio }]);
     const { llamar, recibido } = iaFalsa([
-      { tool_calls: [tool('confirmar_pedido', { items: [{ idProducto: productos[2].id, idVariante: variante.id, cantidad: 1 }] })] },
+      { tool_calls: [tool('confirmar_pedido', {})] },
       { content: 'Un momento.' },
     ]);
     await generarRespuesta(agenteId, TELEFONO, [], 'paso a buscarlo', undefined, { llamarInyectado: llamar });

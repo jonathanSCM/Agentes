@@ -223,6 +223,18 @@ function vistaCatalogo(config) {
   return PLANTILLAS_CATALOGO.includes(elegida) ? elegida : 'clasica';
 }
 
+// Acortador propio: el bot manda "/l/<codigo>" en vez del link largo con el
+// token de sesion (ver linkCatalogoWeb en agente.js). Redirect real (302),
+// nunca inventa un destino - si el codigo no existe, 404.
+app.get('/l/:codigo', async (req, res, next) => {
+  try {
+    const id = parseInt(req.params.codigo, 36);
+    const link = Number.isFinite(id) ? await prisma.linkCorto.findUnique({ where: { id } }) : null;
+    if (!link) return res.status(404).render('404', { title: 'Link no encontrado' });
+    res.redirect(link.destino);
+  } catch (err) { next(err); }
+});
+
 // Catalogo publico de una empresa (sin login): el agente manda este link
 // cuando el cliente pide "el catálogo" en general, en vez de un producto
 // puntual. Reutiliza el slug de la empresa (el mismo que ya usa cada tenant).
@@ -288,12 +300,21 @@ app.get('/catalogo/:slug', async (req, res, next) => {
     // sin pedirle nada al cliente.
     const sesion = verificarTokenSesion(req.query.s);
 
+    // Open Graph: para que WhatsApp (y cualquier otra app) arme una vista
+    // previa real cuando alguien comparte este link - complementa (no
+    // reemplaza) la tarjeta con foto real que ya manda el bot.
+    const ogTitle = hayFiltro ? `${filtro.categoria || 'Catálogo'} · ${empresa.marca || empresa.nombre}` : `Catálogo · ${empresa.marca || empresa.nombre}`;
+    const ogDescripcion = `${productosAMostrar.length} producto${productosAMostrar.length === 1 ? '' : 's'} disponible${productosAMostrar.length === 1 ? '' : 's'} en ${empresa.marca || empresa.nombre}`;
+    const ogImagen = (config && config.logoUrl) || (productosAMostrar.find((p) => p.fotos && p.fotos.length)?.fotos[0]) || null;
+    const ogUrl = `${req.protocol}://${req.get('host')}${req.originalUrl}`;
+
     res.render(`catalogo-${vistaCatalogo(config)}`, {
       title: `Catálogo · ${empresa.marca || empresa.nombre}`,
       empresa, config, productos: productosAMostrar, categorias,
       simboloCatalogo: simboloMoneda(empresa.moneda),
       numeroWhatsapp: agente ? agente.numeroWhatsapp : null,
       filtro, hayFiltro, tokenSesion: sesion ? req.query.s : null,
+      ogTitle, ogDescripcion, ogImagen, ogUrl,
     });
   } catch (err) { next(err); }
 });
@@ -320,6 +341,11 @@ app.get('/catalogo/:slug/producto/:id', async (req, res, next) => {
     const config = agente ? agente.config : null;
     const sesion = verificarTokenSesion(req.query.s);
 
+    const ogTitle = `${producto.nombre} · ${empresa.marca || empresa.nombre}`;
+    const ogDescripcion = producto.descripcion || `${simboloMoneda(empresa.moneda)} ${Number(producto.precio).toFixed(2)}`;
+    const ogImagen = (producto.fotos && producto.fotos[0]) || (config && config.logoUrl) || null;
+    const ogUrl = `${req.protocol}://${req.get('host')}${req.originalUrl}`;
+
     res.render('catalogo-producto', {
       title: `${producto.nombre} · ${empresa.marca || empresa.nombre}`,
       empresa, config, producto,
@@ -327,6 +353,7 @@ app.get('/catalogo/:slug/producto/:id', async (req, res, next) => {
       numeroWhatsapp: agente ? agente.numeroWhatsapp : null,
       tokenSesion: sesion ? req.query.s : null,
       agregado: req.query.agregado === '1',
+      ogTitle, ogDescripcion, ogImagen, ogUrl,
     });
   } catch (err) { next(err); }
 });
@@ -737,7 +764,7 @@ app.get('/panel/conversaciones', requireCliente, async (req, res, next) => {
     ]);
     res.render('cliente/conversaciones', {
       title: 'Conversaciones - Proshop', tituloPagina: 'Conversaciones', activo: 'conversaciones',
-      conversaciones, stats: { total, hoy: hoyCount, mensajes },
+      conversaciones, stats: { total, hoy: hoyCount, mensajes }, mensaje: req.query.ok || null,
     });
   } catch (err) { next(err); }
 });
@@ -804,6 +831,40 @@ app.post('/panel/conversaciones/:id/liberar', requireCliente, async (req, res, n
 // productos ya mostrados, etc.), sin tocar el consumo/facturacion ni borrar
 // el historial de mensajes. Util para pruebas, o cuando un cliente quiere
 // arrancar de cero una busqueda distinta.
+// Reinicia la memoria de TODOS los clientes de esta empresa de una sola vez
+// (mismo reset que el reinicio individual, aplicado a todos). Pensado como
+// herramienta temporal para pruebas - no borra mensajes ni pedidos.
+app.post('/panel/conversaciones/reiniciar-todas', requireCliente, async (req, res, next) => {
+  try {
+    const agenteIds = await agenteIdsDe(req.session.empresaId);
+
+    await prisma.clienteFinal.updateMany({
+      where: { empresaId: req.session.empresaId },
+      data: {
+        categoriaInteres: null,
+        presupuesto: null,
+        cantidad: null,
+        marca: null,
+        talla: null,
+        color: null,
+        observaciones: null,
+        productoFavoritoId: null,
+        productosDescartados: [],
+        productosMostrados: [],
+        estadoConversacion: 'EXPLORANDO',
+        estadoLead: 'NUEVO',
+        nivelInteres: 'FRIO',
+        contexto: {},
+      },
+    });
+    await prisma.conversacion.updateMany({
+      where: { agenteId: { in: agenteIds } },
+      data: { modo: 'IA', tomadaPorId: null },
+    });
+    res.redirect('/panel/conversaciones?ok=' + encodeURIComponent('Se reinició la memoria de todos los clientes: el agente los va a tratar como charlas nuevas desde el próximo mensaje.'));
+  } catch (err) { next(err); }
+});
+
 app.post('/panel/conversaciones/:id/reiniciar', requireCliente, async (req, res, next) => {
   try {
     const conversacion = await cargarConversacion(req);

@@ -4,6 +4,14 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title><%= title %></title>
+<meta property="og:type" content="product" />
+<meta property="og:title" content="<%= ogTitle %>" />
+<meta property="og:description" content="<%= ogDescripcion %>" />
+<% if (ogImagen) { %><meta property="og:image" content="<%= ogImagen %>" /><% } %>
+<meta property="og:url" content="<%= ogUrl %>" />
+<meta property="product:price:amount" content="<%= Number(producto.precio).toFixed(2) %>" />
+<meta property="product:price:currency" content="<%= empresa.moneda %>" />
+<meta name="twitter:card" content="<%= ogImagen ? 'summary_large_image' : 'summary' %>" />
 <link rel="icon" type="image/png" href="/img/logo-icon.png" />
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">

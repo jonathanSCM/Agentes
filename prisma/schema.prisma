@@ -834,3 +834,15 @@ model Notificacion {
   @@index([empresaId, leida])
   @@map("notificaciones")
 }
+
+// Acortador propio: el link real al catalogo web (con el token de sesion)
+// es largo, y por WhatsApp se ve feo/desconfia. El bot manda
+// "<dominio>/l/<id en base36>" y esta tabla guarda a donde apunta de
+// verdad. Ver linkCorto() en agente.js y GET /l/:codigo en server.js.
+model LinkCorto {
+  id        Int      @id @default(autoincrement())
+  destino   String
+  createdAt DateTime @default(now())
+
+  @@map("links_cortos")
+}
