@@ -1,0 +1,121 @@
+<!-- Recorrido guiado del panel: modal centrado, no depende de que el
+     sidebar este visible (en mobile arranca oculto), asi que no intenta
+     resaltar elementos del menu, solo explica con ejemplos. -->
+<div class="tour-overlay" id="tourOverlay" hidden>
+  <div class="tour-card" role="dialog" aria-modal="true" aria-labelledby="tourTitulo">
+    <button type="button" class="tour-cerrar" id="tourCerrar" aria-label="Saltar recorrido">✕</button>
+    <div class="tour-paso">
+      <h3 id="tourTitulo"></h3>
+      <p id="tourDesc"></p>
+      <div class="tour-ejemplo" id="tourEjemplo"></div>
+    </div>
+    <div class="tour-pie">
+      <div class="tour-puntos" id="tourPuntos"></div>
+      <div class="tour-botones">
+        <button type="button" class="btn btn-ghost" id="tourAtras">Atrás</button>
+        <button type="button" class="btn btn-primary" id="tourSiguiente">Siguiente</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+(function () {
+  var PASOS = [
+    {
+      titulo: 'Inicio',
+      desc: 'Tu resumen del día: pedidos nuevos, conversaciones recientes y el estado de tu plan, todo de un vistazo.',
+      ejemplo: 'Ej: "3 pedidos nuevos hoy" te lleva directo a revisarlos.'
+    },
+    {
+      titulo: 'Conversaciones',
+      desc: 'Cada chat que tu agente atendió por WhatsApp. Podés leerlo completo, tomar el control vos mismo, o reiniciar la memoria de un cliente.',
+      ejemplo: 'Ej: un cliente escribe "¿Tienen zapatillas talla 40?" y ves cómo tu agente le responde solo, en tiempo real.'
+    },
+    {
+      titulo: 'Pedidos',
+      desc: 'Los pedidos que se cerraron por WhatsApp. Entrá a cualquiera para ver el detalle: productos, entrega y forma de pago, con acciones para confirmar o marcar como entregado.',
+      ejemplo: 'Ej: un pedido de Bs 250 con entrega a domicilio te muestra el mapa de la dirección del cliente.'
+    },
+    {
+      titulo: 'Productos, Categorías e Inventario',
+      desc: 'Acá armás tu catálogo: qué vendés, en qué categorías, con qué variantes (talla, color) y cuánto stock tenés de cada una.',
+      ejemplo: 'Ej: agregás "Zapatilla Urbana" en la categoría Calzado, con variantes de talla 38 a 42.'
+    },
+    {
+      titulo: 'WhatsApp',
+      desc: 'Acá conectás el número de WhatsApp que va a atender tu agente. Con un solo campo alcanza para el flujo simple.',
+      ejemplo: 'Ej: cargás tu número y en unas horas tu agente ya está respondiendo ahí.'
+    },
+    {
+      titulo: 'Configuración',
+      desc: 'El nombre y personalidad de tu agente, qué formas de pago aceptás, y cómo se ve tu catálogo web (logo, colores, plantilla).',
+      ejemplo: 'Ej: cambiás el tono a "divertido y casual" y tu agente empieza a hablarles distinto a tus clientes.'
+    }
+  ];
+
+  var overlay = document.getElementById('tourOverlay');
+  var titulo = document.getElementById('tourTitulo');
+  var desc = document.getElementById('tourDesc');
+  var ejemplo = document.getElementById('tourEjemplo');
+  var puntosWrap = document.getElementById('tourPuntos');
+  var btnAtras = document.getElementById('tourAtras');
+  var btnSiguiente = document.getElementById('tourSiguiente');
+  var btnCerrar = document.getElementById('tourCerrar');
+  if (!overlay) return;
+
+  var pasoActual = 0;
+
+  PASOS.forEach(function (_, i) {
+    var punto = document.createElement('span');
+    punto.className = 'tour-punto';
+    punto.dataset.i = i;
+    puntosWrap.appendChild(punto);
+  });
+  var puntos = puntosWrap.querySelectorAll('.tour-punto');
+
+  function pintar() {
+    var p = PASOS[pasoActual];
+    titulo.textContent = p.titulo;
+    desc.textContent = p.desc;
+    ejemplo.textContent = p.ejemplo;
+    puntos.forEach(function (pt, i) { pt.classList.toggle('is-activo', i === pasoActual); });
+    btnAtras.style.visibility = pasoActual === 0 ? 'hidden' : 'visible';
+    btnSiguiente.textContent = pasoActual === PASOS.length - 1 ? 'Empezar' : 'Siguiente';
+  }
+
+  function abrir() {
+    pasoActual = 0;
+    pintar();
+    overlay.hidden = false;
+  }
+
+  function cerrar() {
+    overlay.hidden = true;
+  }
+
+  btnSiguiente.addEventListener('click', function () {
+    if (pasoActual === PASOS.length - 1) { cerrar(); return; }
+    pasoActual++;
+    pintar();
+  });
+  btnAtras.addEventListener('click', function () {
+    if (pasoActual === 0) return;
+    pasoActual--;
+    pintar();
+  });
+  btnCerrar.addEventListener('click', cerrar);
+  overlay.addEventListener('click', function (e) {
+    if (e.target === overlay) cerrar();
+  });
+
+  // Una vez por sesión de navegador (se limpia solo al cerrar la pestaña).
+  if (!sessionStorage.getItem('ps_tour_visto')) {
+    sessionStorage.setItem('ps_tour_visto', '1');
+    setTimeout(abrir, 600);
+  }
+
+  var btnAyuda = document.getElementById('tourAyudaBtn');
+  if (btnAyuda) btnAyuda.addEventListener('click', abrir);
+})();
+</script>

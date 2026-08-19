@@ -84,22 +84,45 @@
 
 <!-- ===== Configuración avanzada (manual, opcional) ===== -->
 <details class="aviso-box" style="margin-top:1.6rem">
-  <summary>Configuración avanzada (manual)</summary>
+  <summary>Conectar con mis propias credenciales de Meta (avanzado)</summary>
   <div style="padding:.5rem 0 1rem">
-    <p class="muted" style="font-size:.88rem;margin:0 0 1rem">
-      Si prefieres conectarlo tú mismo con tus credenciales de Meta, complétalas aquí.
-      Datos del webhook para pegar en Meta:
+    <p class="muted" style="font-size:.88rem;margin:0 0 1.2rem">
+      Esto es solo si ya tenés tu propia cuenta de WhatsApp Business API en Meta for Developers y preferís
+      conectarla vos mismo. Si no sabés qué es eso, no hace falta: usá "Conectar mi WhatsApp" arriba y nuestro
+      equipo se encarga.
     </p>
-    <div class="field">
-      <label>Callback URL</label>
-      <input type="text" readonly value="<%= callbackUrl %>" onclick="this.select()" />
-    </div>
-    <div class="field">
-      <label>Verify Token</label>
-      <input type="text" readonly value="<%= verifyToken %>" onclick="this.select()" />
-    </div>
 
-    <form method="POST" action="/panel/whatsapp" style="margin-top:.8rem">
+    <ol class="tour-pasos-wa">
+      <li>
+        <strong>1. Configurá el webhook en Meta.</strong> En tu app de Meta for Developers, sección WhatsApp →
+        Configuración, pegá estos dos datos:
+        <div class="field" style="margin-top:.6rem">
+          <label>Callback URL</label>
+          <div class="campo-copiable">
+            <input type="text" readonly value="<%= callbackUrl %>" onclick="this.select()" id="waCallbackUrl" />
+            <button type="button" class="btn btn-ghost btn-copiar" data-copiar="waCallbackUrl">Copiar</button>
+          </div>
+        </div>
+        <div class="field">
+          <label>Verify Token</label>
+          <div class="campo-copiable">
+            <input type="text" readonly value="<%= verifyToken %>" onclick="this.select()" id="waVerifyToken" />
+            <button type="button" class="btn btn-ghost btn-copiar" data-copiar="waVerifyToken">Copiar</button>
+          </div>
+        </div>
+      </li>
+      <li>
+        <strong>2. Traé tus datos desde Meta.</strong> En la misma sección vas a encontrar:
+        <ul class="muted" style="font-size:.85rem;margin:.4rem 0 0;padding-left:1.1rem;line-height:1.5">
+          <li><b>Phone Number ID</b>: el identificador del número de teléfono dentro de tu app de Meta (no es el número en sí).</li>
+          <li><b>WhatsApp Business Account ID</b>: identifica tu cuenta de negocio completa en Meta (opcional, no todos los flujos lo piden).</li>
+          <li><b>Token de acceso</b>: la clave que le da permiso a Proshop de enviar y recibir mensajes en tu nombre. Se guarda cifrado.</li>
+        </ul>
+      </li>
+      <li><strong>3. Pegalos acá abajo y guardá.</strong></li>
+    </ol>
+
+    <form method="POST" action="/panel/whatsapp" style="margin-top:1rem">
       <div class="field">
         <label for="phoneNumberId">Phone Number ID (de Meta)</label>
         <input id="phoneNumberId" name="phoneNumberId" type="text" maxlength="60"
@@ -121,5 +144,30 @@
     </form>
   </div>
 </details>
+
+<script>
+(function () {
+  document.querySelectorAll('.btn-copiar').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      var campo = document.getElementById(btn.dataset.copiar);
+      if (!campo) return;
+      var textoOriginal = btn.textContent;
+      function avisar() {
+        btn.textContent = 'Copiado ✓';
+        setTimeout(function () { btn.textContent = textoOriginal; }, 1500);
+      }
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(campo.value).then(avisar).catch(function () {
+          campo.focus();
+          campo.select();
+        });
+      } else {
+        campo.focus();
+        campo.select();
+      }
+    });
+  });
+})();
+</script>
 
 <%- include('partials/fin') %>

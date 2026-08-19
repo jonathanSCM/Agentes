@@ -8,40 +8,33 @@
 <% if (mensaje) { %><div class="alert-ok"><%= mensaje %></div><% } %>
 <% if (error) { %><div class="alert-err"><%= error %></div><% } %>
 
-<form method="POST" action="/panel/configuracion" class="form-card" enctype="multipart/form-data">
-  <div class="field">
-    <label for="nombre">Nombre del agente</label>
-    <input id="nombre" name="nombre" type="text" maxlength="60"
-           value="<%= agente.nombre || '' %>" placeholder="Ej: Asistente de Tienda Doña Rosa" />
-  </div>
+<nav class="config-nav">
+  <a href="#config-agente">Datos del agente</a>
+  <a href="#config-ventas">Cómo vende</a>
+  <a href="#config-pagos">Pagos y entrega</a>
+  <a href="#config-catalogo">Catálogo web y marca</a>
+</nav>
 
-  <div class="field">
-    <label for="numeroWhatsapp">Número de WhatsApp del agente</label>
-    <input id="numeroWhatsapp" name="numeroWhatsapp" type="tel" maxlength="20"
-           value="<%= agente.numeroWhatsapp || '' %>" placeholder="59171234567" />
-    <p class="muted" style="font-size:.82rem;margin:.4rem 0 0">
-      En formato internacional, sin el signo "+" ni espacios. Ej: Bolivia → <b>591</b> + número.
-    </p>
-  </div>
+<form method="POST" action="/panel/configuracion" enctype="multipart/form-data">
 
-  <div class="field">
-    <label for="mensajeBienvenida">Mensaje de bienvenida (opcional)</label>
-    <input id="mensajeBienvenida" name="mensajeBienvenida" type="text" maxlength="200"
-           value="<%= config.mensajeBienvenida || '' %>" placeholder="Ej: Bienvenido a Tienda Doña Rosa, tu tienda de ropa y calzado" />
-    <p class="muted" style="font-size:.82rem;margin:.4rem 0 0">
-      Si lo dejás vacío, el agente se presenta solo (su nombre, tu tienda y qué vendés) en vez de un saludo genérico — normalmente da mejor resultado dejarlo así.
-    </p>
-  </div>
+  <section class="dash-card config-seccion" id="config-agente">
+    <div class="dash-card-head"><h3>Datos del agente</h3></div>
 
-  <div class="field-row">
     <div class="field">
-      <label for="tono">Tono del agente</label>
-      <select id="tono" name="tono">
-        <% ['cordial y profesional','amigable y cercano','formal','divertido y casual'].forEach(function (t) { %>
-          <option value="<%= t %>" <%= config.tono === t ? 'selected' : '' %>><%= t %></option>
-        <% }); %>
-      </select>
+      <label for="nombre">Nombre del agente</label>
+      <input id="nombre" name="nombre" type="text" maxlength="60"
+             value="<%= agente.nombre || '' %>" placeholder="Ej: Asistente de Tienda Doña Rosa" />
     </div>
+
+    <div class="field">
+      <label for="numeroWhatsapp">Número de WhatsApp del agente</label>
+      <input id="numeroWhatsapp" name="numeroWhatsapp" type="tel" maxlength="20"
+             value="<%= agente.numeroWhatsapp || '' %>" placeholder="59171234567" />
+      <p class="muted" style="font-size:.82rem;margin:.4rem 0 0">
+        En formato internacional, sin el signo "+" ni espacios. Ej: Bolivia → <b>591</b> + número.
+      </p>
+    </div>
+
     <div class="field">
       <label for="estado">Estado del agente</label>
       <select id="estado" name="estado">
@@ -50,86 +43,122 @@
         <% }); %>
       </select>
     </div>
-  </div>
 
-  <div class="field">
-    <label for="instrucciones">Instrucciones extra (opcional)</label>
-    <input id="instrucciones" name="instrucciones" type="text" maxlength="200"
-           value="<%= config.instrucciones || '' %>" placeholder="Ej: Ofrece el envío gratis en compras mayores a Bs 200" />
-  </div>
-
-  <div class="field">
-    <label><input type="checkbox" name="derivarAHumano" value="1" <%= config.derivarAHumano ? 'checked' : '' %> /> Permitir que derive a una persona cuando sea necesario</label>
-  </div>
-
-  <div class="field">
-    <label for="preguntasIniciales">Qué pregunta el agente antes de mostrar nada</label>
-    <p class="muted" style="font-size:.82rem;margin:0 0 .5rem">
-      Datos que el agente pide <strong>al principio</strong>, antes incluso de mostrar las categorías: son filtros que aplican a todo tu catálogo.
-      Los pregunta de a uno y en este orden, ofreciéndole al cliente las opciones reales que existen.
-      Separalos por coma. Dejalo vacío para que arranque mostrando el menú.
-    </p>
-    <input id="preguntasIniciales" name="preguntasIniciales" type="text" maxlength="120"
-           value="<%= (config.preguntasIniciales || []).join(', ') %>" placeholder="Genero" />
-    <p class="muted" style="font-size:.8rem;margin:.35rem 0 0">
-      Sugerencia: <code>Genero</code> solo. Agregar <code>Talla</code> acá hace que la pregunte antes de saber si buscás calzado (42) o ropa (M),
-      que suele confundir — conviene dejar la talla configurada dentro de cada categoría.
-    </p>
-  </div>
-
-  <div class="field">
-    <label for="moneda">Moneda de tu catálogo</label>
-    <p class="muted" style="font-size:.82rem;margin:0 0 .5rem">Todos los precios que tenés cargados están en esta moneda. El agente la usa para escribir cualquier precio y nunca la convierte a otra.</p>
-    <select id="moneda" name="moneda">
-      <% monedas.forEach(function (m) { %>
-        <option value="<%= m %>" <%= (empresa && empresa.moneda) === m ? 'selected' : '' %>><%= m %></option>
-      <% }); %>
-    </select>
-  </div>
-
-  <div class="field">
-    <label for="direccionTienda">Dirección de tu local (para retiro en tienda)</label>
-    <p class="muted" style="font-size:.82rem;margin:0 0 .5rem">Si la dejás vacía, el agente solo ofrece entrega a domicilio: nunca inventa una dirección. Si la cargás, se la manda tal cual al cliente que elija pasar a retirar.</p>
-    <input id="direccionTienda" name="direccionTienda" type="text" maxlength="200"
-           value="<%= config.direccionTienda || '' %>" placeholder="Ej: Av. Ballivián 1234, entre 2do y 3er anillo" />
-  </div>
-
-  <div class="field-row">
-    <div class="field">
-      <label for="tiendaLat">Latitud (opcional)</label>
-      <input id="tiendaLat" name="tiendaLat" type="number" step="any"
-             value="<%= config.tiendaLat != null ? config.tiendaLat : '' %>" placeholder="-17.783" />
-    </div>
-    <div class="field">
-      <label for="tiendaLng">Longitud (opcional)</label>
-      <input id="tiendaLng" name="tiendaLng" type="number" step="any"
-             value="<%= config.tiendaLng != null ? config.tiendaLng : '' %>" placeholder="-63.182" />
-    </div>
-  </div>
-
-  <div class="field">
-    <label>Formas de pago que acepta esta tienda</label>
-    <p class="muted" style="font-size:.82rem;margin:0 0 .5rem">El agente SOLO le ofrece al cliente las formas de pago que marques acá.</p>
-    <label style="display:block;margin-bottom:.3rem"><input type="checkbox" name="aceptaEfectivo" value="1" <%= config.aceptaEfectivo !== false ? 'checked' : '' %> /> Efectivo</label>
-    <label style="display:block;margin-bottom:.3rem"><input type="checkbox" name="aceptaTarjeta" value="1" <%= config.aceptaTarjeta ? 'checked' : '' %> /> Tarjeta</label>
-    <label style="display:block;margin-bottom:.3rem"><input type="checkbox" id="aceptaQr" name="aceptaQr" value="1" <%= config.aceptaQr ? 'checked' : '' %> /> QR</label>
-  </div>
-
-  <div class="field" id="campo-qr" style="<%= config.aceptaQr ? '' : 'display:none' %>">
-    <label for="qr">Imagen del QR de cobro</label>
-    <p class="muted" style="font-size:.82rem;margin:0 0 .5rem">La misma imagen de QR que ya usás hoy para cobrar (banco, billetera, etc.). El bot la manda tal cual cuando el cliente elige pagar por QR.</p>
-    <% if (config.qrCobroUrl) { %>
-      <div style="margin-bottom:8px;">
-        <img src="<%= config.qrCobroUrl %>" style="width:120px;height:120px;object-fit:contain;border-radius:8px;background:#fff;padding:6px" />
+    <% if (!agente.numeroWhatsapp) { %>
+      <div class="alert-err" style="margin-top:.8rem">
+        Aún no has puesto tu número de WhatsApp.
       </div>
-      <label style="margin-bottom:.5rem;display:block"><input type="checkbox" name="quitarQr" value="1" /> Quitar el QR actual</label>
     <% } %>
-    <input id="qr" name="qr" type="file" accept="image/*" />
-  </div>
+    <p class="muted" style="font-size:.82rem;margin:.8rem 0 0">
+      Este número es solo un dato del agente. Para conectarlo de verdad a WhatsApp, andá a la sección
+      <a href="/panel/whatsapp">WhatsApp →</a>
+    </p>
+  </section>
 
-  <div class="field">
-    <label>Personalización del catálogo web</label>
-    <p class="muted" style="font-size:.82rem;margin:0 0 .5rem">Así se ve la página pública que el agente comparte cuando un cliente quiere ver fotos y precios con más detalle (<a href="/catalogo/<%= empresa.slug %>" target="_blank" rel="noopener">vista previa</a>).</p>
+  <section class="dash-card config-seccion" id="config-ventas">
+    <div class="dash-card-head"><h3>Cómo vende</h3></div>
+
+    <div class="field">
+      <label for="mensajeBienvenida">Mensaje de bienvenida (opcional)</label>
+      <input id="mensajeBienvenida" name="mensajeBienvenida" type="text" maxlength="200"
+             value="<%= config.mensajeBienvenida || '' %>" placeholder="Ej: Bienvenido a Tienda Doña Rosa, tu tienda de ropa y calzado" />
+      <p class="muted" style="font-size:.82rem;margin:.4rem 0 0">
+        Si lo dejás vacío, el agente se presenta solo (su nombre, tu tienda y qué vendés) en vez de un saludo genérico — normalmente da mejor resultado dejarlo así.
+      </p>
+    </div>
+
+    <div class="field">
+      <label for="tono">Tono del agente</label>
+      <select id="tono" name="tono">
+        <% ['cordial y profesional','amigable y cercano','formal','divertido y casual'].forEach(function (t) { %>
+          <option value="<%= t %>" <%= config.tono === t ? 'selected' : '' %>><%= t %></option>
+        <% }); %>
+      </select>
+    </div>
+
+    <div class="field">
+      <label for="instrucciones">Instrucciones extra (opcional)</label>
+      <input id="instrucciones" name="instrucciones" type="text" maxlength="200"
+             value="<%= config.instrucciones || '' %>" placeholder="Ej: Ofrece el envío gratis en compras mayores a Bs 200" />
+    </div>
+
+    <div class="field">
+      <label><input type="checkbox" name="derivarAHumano" value="1" <%= config.derivarAHumano ? 'checked' : '' %> /> Permitir que derive a una persona cuando sea necesario</label>
+    </div>
+
+    <div class="field">
+      <label for="preguntasIniciales">Qué pregunta el agente antes de mostrar nada</label>
+      <p class="muted" style="font-size:.82rem;margin:0 0 .5rem">
+        Datos que el agente pide <strong>al principio</strong>, antes incluso de mostrar las categorías: son filtros que aplican a todo tu catálogo.
+        Los pregunta de a uno y en este orden, ofreciéndole al cliente las opciones reales que existen.
+        Separalos por coma. Dejalo vacío para que arranque mostrando el menú.
+      </p>
+      <input id="preguntasIniciales" name="preguntasIniciales" type="text" maxlength="120"
+             value="<%= (config.preguntasIniciales || []).join(', ') %>" placeholder="Genero" />
+      <p class="muted" style="font-size:.8rem;margin:.35rem 0 0">
+        Sugerencia: <code>Genero</code> solo. Agregar <code>Talla</code> acá hace que la pregunte antes de saber si buscás calzado (42) o ropa (M),
+        que suele confundir — conviene dejar la talla configurada dentro de cada categoría.
+      </p>
+    </div>
+  </section>
+
+  <section class="dash-card config-seccion" id="config-pagos">
+    <div class="dash-card-head"><h3>Pagos y entrega</h3></div>
+
+    <div class="field">
+      <label for="moneda">Moneda de tu catálogo</label>
+      <p class="muted" style="font-size:.82rem;margin:0 0 .5rem">Todos los precios que tenés cargados están en esta moneda. El agente la usa para escribir cualquier precio y nunca la convierte a otra.</p>
+      <select id="moneda" name="moneda">
+        <% monedas.forEach(function (m) { %>
+          <option value="<%= m %>" <%= (empresa && empresa.moneda) === m ? 'selected' : '' %>><%= m %></option>
+        <% }); %>
+      </select>
+    </div>
+
+    <div class="field">
+      <label for="direccionTienda">Dirección de tu local (para retiro en tienda)</label>
+      <p class="muted" style="font-size:.82rem;margin:0 0 .5rem">Si la dejás vacía, el agente solo ofrece entrega a domicilio: nunca inventa una dirección. Si la cargás, se la manda tal cual al cliente que elija pasar a retirar.</p>
+      <input id="direccionTienda" name="direccionTienda" type="text" maxlength="200"
+             value="<%= config.direccionTienda || '' %>" placeholder="Ej: Av. Ballivián 1234, entre 2do y 3er anillo" />
+    </div>
+
+    <div class="field-row">
+      <div class="field">
+        <label for="tiendaLat">Latitud (opcional)</label>
+        <input id="tiendaLat" name="tiendaLat" type="number" step="any"
+               value="<%= config.tiendaLat != null ? config.tiendaLat : '' %>" placeholder="-17.783" />
+      </div>
+      <div class="field">
+        <label for="tiendaLng">Longitud (opcional)</label>
+        <input id="tiendaLng" name="tiendaLng" type="number" step="any"
+               value="<%= config.tiendaLng != null ? config.tiendaLng : '' %>" placeholder="-63.182" />
+      </div>
+    </div>
+
+    <div class="field">
+      <label>Formas de pago que acepta esta tienda</label>
+      <p class="muted" style="font-size:.82rem;margin:0 0 .5rem">El agente SOLO le ofrece al cliente las formas de pago que marques acá.</p>
+      <label style="display:block;margin-bottom:.3rem"><input type="checkbox" name="aceptaEfectivo" value="1" <%= config.aceptaEfectivo !== false ? 'checked' : '' %> /> Efectivo</label>
+      <label style="display:block;margin-bottom:.3rem"><input type="checkbox" name="aceptaTarjeta" value="1" <%= config.aceptaTarjeta ? 'checked' : '' %> /> Tarjeta</label>
+      <label style="display:block;margin-bottom:.3rem"><input type="checkbox" id="aceptaQr" name="aceptaQr" value="1" <%= config.aceptaQr ? 'checked' : '' %> /> QR</label>
+    </div>
+
+    <div class="field" id="campo-qr" style="<%= config.aceptaQr ? '' : 'display:none' %>">
+      <label for="qr">Imagen del QR de cobro</label>
+      <p class="muted" style="font-size:.82rem;margin:0 0 .5rem">La misma imagen de QR que ya usás hoy para cobrar (banco, billetera, etc.). El bot la manda tal cual cuando el cliente elige pagar por QR.</p>
+      <% if (config.qrCobroUrl) { %>
+        <div style="margin-bottom:8px;">
+          <img src="<%= config.qrCobroUrl %>" style="width:120px;height:120px;object-fit:contain;border-radius:8px;background:#fff;padding:6px" />
+        </div>
+        <label style="margin-bottom:.5rem;display:block"><input type="checkbox" name="quitarQr" value="1" /> Quitar el QR actual</label>
+      <% } %>
+      <input id="qr" name="qr" type="file" accept="image/*" />
+    </div>
+  </section>
+
+  <section class="dash-card config-seccion" id="config-catalogo">
+    <div class="dash-card-head"><h3>Catálogo web y marca</h3></div>
+    <p class="muted" style="font-size:.82rem;margin:0 0 1rem">Así se ve la página pública que el agente comparte cuando un cliente quiere ver fotos y precios con más detalle (<a href="/catalogo/<%= empresa.slug %>" target="_blank" rel="noopener">vista previa</a>).</p>
 
     <div style="margin-bottom:.8rem">
       <label for="logo" style="display:block;margin-bottom:.3rem">Logo de la tienda</label>
@@ -174,27 +203,12 @@
         <% }); %>
       </div>
     </div>
-  </div>
+  </section>
 
   <div class="form-actions">
     <button class="btn btn-primary" type="submit">Guardar configuración</button>
   </div>
 </form>
-
-<% if (!agente.numeroWhatsapp) { %>
-  <div class="alert-err" style="margin-top:1.4rem">
-    Aún no has puesto tu número de WhatsApp. Es necesario para conectar tu agente a WhatsApp real.
-  </div>
-<% } %>
-
-<div class="empty-state" style="margin-top:1.4rem;text-align:left;padding:1.6rem">
-  <h3 style="margin:0 0 .5rem">¿Cómo se conecta a WhatsApp real?</h3>
-  <p style="margin:0">
-    Guardar tu número aquí es el primer paso. La conexión con WhatsApp real requiere además una
-    <strong>cuenta de WhatsApp Business API (Meta)</strong> con verificación de empresa. Nuestro equipo de
-    Proshop te ayuda a completar ese enlace una vez que tu plan esté activo.
-  </p>
-</div>
 
 <script>
 (function () {

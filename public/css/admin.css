@@ -425,3 +425,65 @@ body.admin, body.admin-login {
 @keyframes wapulse { 0%,100%{opacity:1} 50%{opacity:.35} }
 .wa-actions { display: flex; gap: .6rem; flex-wrap: wrap; margin-top: 1.1rem; }
 .wa-actions form { margin: 0; }
+
+/* ---------- Botón "?" de ayuda (relanza el recorrido guiado) ---------- */
+.tour-ayuda {
+  background: none; border: 1px solid var(--border); border-radius: 50%;
+  width: 30px; height: 30px; color: var(--muted); cursor: pointer;
+  font-size: .85rem; font-weight: 700; line-height: 1; flex-shrink: 0;
+}
+.tour-ayuda:hover { color: var(--text); border-color: var(--primary-2); }
+
+/* ---------- Recorrido guiado (tour) ---------- */
+.tour-overlay {
+  position: fixed; inset: 0; z-index: 300;
+  background: rgba(10, 6, 17, .72); backdrop-filter: blur(3px);
+  padding: 1.2rem;
+}
+.tour-overlay[hidden] { display: none; }
+.tour-overlay:not([hidden]) { display: grid; place-items: center; }
+.tour-card {
+  position: relative; width: min(100%, 420px);
+  background: var(--surface); backdrop-filter: blur(10px);
+  border: 1px solid var(--border); border-radius: var(--radius);
+  padding: 1.8rem 1.6rem 1.4rem; box-shadow: var(--shadow);
+}
+.tour-cerrar {
+  position: absolute; top: .9rem; right: .9rem;
+  background: none; border: 0; color: var(--muted); cursor: pointer; font-size: 1rem;
+}
+.tour-cerrar:hover { color: var(--text); }
+.tour-paso h3 { margin: 0 0 .6rem; font-size: 1.2rem; }
+.tour-paso p { margin: 0 0 1rem; color: var(--text); font-size: .92rem; line-height: 1.45; }
+.tour-ejemplo {
+  background: var(--bg-2); border: 1px solid var(--border); border-radius: 10px;
+  padding: .7rem .9rem; font-size: .84rem; color: var(--muted); line-height: 1.4;
+}
+.tour-pie { display: flex; align-items: center; justify-content: space-between; margin-top: 1.4rem; gap: 1rem; }
+.tour-puntos { display: flex; gap: .35rem; }
+.tour-punto { width: 7px; height: 7px; border-radius: 50%; background: var(--border); }
+.tour-punto.is-activo { background: var(--primary-2); }
+.tour-botones { display: flex; gap: .6rem; }
+.tour-botones .btn { padding: .5rem 1rem; font-size: .86rem; }
+
+/* ---------- Guía numerada de conexión avanzada de WhatsApp ---------- */
+.tour-pasos-wa { list-style: none; margin: 0 0 1rem; padding-left: 0; display: grid; gap: 1rem; font-size: .9rem; }
+.campo-copiable { display: flex; gap: .5rem; align-items: stretch; }
+.campo-copiable input { flex: 1; }
+.campo-copiable .btn-copiar { flex-shrink: 0; padding: 0 .9rem; font-size: .82rem; }
+
+/* ---------- Nav de anclas de la página de Configuración ---------- */
+.config-nav {
+  position: sticky; top: 0; z-index: 5;
+  display: flex; gap: .5rem; flex-wrap: wrap;
+  background: var(--surface); backdrop-filter: blur(10px);
+  border: 1px solid var(--border); border-radius: var(--radius);
+  padding: .6rem; margin-bottom: 1.2rem;
+}
+.config-nav a {
+  padding: .4rem .8rem; border-radius: 8px; font-size: .85rem;
+  color: var(--muted); text-decoration: none;
+}
+.config-nav a:hover { color: var(--text); background: var(--bg-2); }
+.config-seccion { margin-bottom: 1.2rem; scroll-margin-top: 4.5rem; }
+.config-seccion .dash-card-head h3 { font-size: 1.05rem; }
