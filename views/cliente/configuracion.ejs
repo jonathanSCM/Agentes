@@ -122,18 +122,98 @@
              value="<%= config.direccionTienda || '' %>" placeholder="Ej: Av. Ballivián 1234, entre 2do y 3er anillo" />
     </div>
 
-    <div class="field-row">
-      <div class="field">
-        <label for="tiendaLat">Latitud (opcional)</label>
-        <input id="tiendaLat" name="tiendaLat" type="number" step="any"
-               value="<%= config.tiendaLat != null ? config.tiendaLat : '' %>" placeholder="-17.783" />
+    <div class="field">
+      <label>Ubicación del local en el mapa (opcional)</label>
+      <p class="muted" style="font-size:.82rem;margin:0 0 .6rem">Tocá el mapa para marcar dónde queda tu local, o usá tu ubicación actual. Esto es lo que ve el cliente cuando elige retirar en tienda.</p>
+      <div style="display:flex;gap:.5rem;margin-bottom:.6rem;flex-wrap:wrap">
+        <button type="button" class="btn btn-ghost" id="btnUbicacionActual" style="padding:.5rem 1rem;font-size:.85rem">📍 Usar mi ubicación</button>
+        <span class="muted" id="ubicacionTexto" style="font-size:.82rem;align-self:center">
+          <%= (config.tiendaLat != null && config.tiendaLng != null) ? `Marcada en ${Number(config.tiendaLat).toFixed(5)}, ${Number(config.tiendaLng).toFixed(5)}` : 'Todavía no marcaste ninguna ubicación.' %>
+        </span>
       </div>
-      <div class="field">
-        <label for="tiendaLng">Longitud (opcional)</label>
-        <input id="tiendaLng" name="tiendaLng" type="number" step="any"
-               value="<%= config.tiendaLng != null ? config.tiendaLng : '' %>" placeholder="-63.182" />
+      <div id="mapaTienda" style="height:280px;border-radius:12px;overflow:hidden;border:1px solid var(--border)"></div>
+      <div class="field-row" style="margin-top:.6rem">
+        <div class="field">
+          <label for="tiendaLat">Latitud</label>
+          <input id="tiendaLat" name="tiendaLat" type="number" step="any" readonly
+                 value="<%= config.tiendaLat != null ? config.tiendaLat : '' %>" placeholder="Tocá el mapa" />
+        </div>
+        <div class="field">
+          <label for="tiendaLng">Longitud</label>
+          <input id="tiendaLng" name="tiendaLng" type="number" step="any" readonly
+                 value="<%= config.tiendaLng != null ? config.tiendaLng : '' %>" placeholder="Tocá el mapa" />
+        </div>
       </div>
     </div>
+
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+    <script>
+    (function () {
+      var latInicial = <%- config.tiendaLat != null ? config.tiendaLat : 'null' %>;
+      var lngInicial = <%- config.tiendaLng != null ? config.tiendaLng : 'null' %>;
+      var centro = (latInicial != null && lngInicial != null) ? [latInicial, lngInicial] : [-16.5, -64.5];
+      var zoomInicial = (latInicial != null && lngInicial != null) ? 15 : 5;
+
+      var mapa = L.map('mapaTienda').setView(centro, zoomInicial);
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '© OpenStreetMap',
+        maxZoom: 19,
+      }).addTo(mapa);
+
+      var inputLat = document.getElementById('tiendaLat');
+      var inputLng = document.getElementById('tiendaLng');
+      var texto = document.getElementById('ubicacionTexto');
+      var marcador = (latInicial != null && lngInicial != null) ? L.marker(centro, { draggable: true }).addTo(mapa) : null;
+
+      function fijarUbicacion(lat, lng) {
+        lat = Number(lat.toFixed(6));
+        lng = Number(lng.toFixed(6));
+        if (marcador) {
+          marcador.setLatLng([lat, lng]);
+        } else {
+          marcador = L.marker([lat, lng], { draggable: true }).addTo(mapa);
+          marcador.on('dragend', function () {
+            var p = marcador.getLatLng();
+            fijarUbicacion(p.lat, p.lng);
+          });
+        }
+        inputLat.value = lat;
+        inputLng.value = lng;
+        texto.textContent = 'Marcada en ' + lat + ', ' + lng;
+      }
+
+      if (marcador) {
+        marcador.on('dragend', function () {
+          var p = marcador.getLatLng();
+          fijarUbicacion(p.lat, p.lng);
+        });
+      }
+
+      mapa.on('click', function (e) {
+        fijarUbicacion(e.latlng.lat, e.latlng.lng);
+        mapa.setView(e.latlng, Math.max(mapa.getZoom(), 15));
+      });
+
+      document.getElementById('btnUbicacionActual').addEventListener('click', function () {
+        if (!navigator.geolocation) {
+          texto.textContent = 'Tu navegador no permite compartir la ubicación.';
+          return;
+        }
+        texto.textContent = 'Buscando tu ubicación...';
+        navigator.geolocation.getCurrentPosition(
+          function (pos) {
+            var latlng = [pos.coords.latitude, pos.coords.longitude];
+            fijarUbicacion(latlng[0], latlng[1]);
+            mapa.setView(latlng, 16);
+          },
+          function () {
+            texto.textContent = 'No pudimos acceder a tu ubicación. Tocá el mapa para marcarla a mano.';
+          }
+        );
+      });
+    })();
+    </script>
 
     <div class="field">
       <label>Formas de pago que acepta esta tienda</label>

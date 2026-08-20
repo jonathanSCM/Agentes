@@ -32,14 +32,21 @@
   /* ---------- Galeria ---------- */
   .galeria{position:sticky;top:24px;}
   @media (max-width:860px){.galeria{position:static;}}
-  .galeria-principal{position:relative;border-radius:20px;overflow:hidden;background:#0b0d13;box-shadow:0 20px 50px -20px rgba(0,0,0,.55);}
-  .galeria-principal img{width:100%;display:block;aspect-ratio:1/1;object-fit:cover;transition:opacity .2s;}
-  .galeria .ph{width:100%;aspect-ratio:1/1;border-radius:20px;display:flex;align-items:center;justify-content:center;color:var(--tenue);background:linear-gradient(135deg,#141722,#1b1f2c);box-shadow:0 20px 50px -20px rgba(0,0,0,.55);}
-  .contador-fotos{position:absolute;right:14px;bottom:14px;background:rgba(10,12,18,.72);backdrop-filter:blur(6px);color:var(--tinta);font-size:.76rem;font-weight:600;padding:5px 11px;border-radius:999px;}
-  .miniaturas{display:flex;gap:10px;margin-top:12px;overflow-x:auto;padding-bottom:2px;}
-  .miniaturas img{width:68px;height:68px;border-radius:11px;object-fit:cover;cursor:pointer;border:2px solid transparent;flex:0 0 auto;opacity:.65;transition:opacity .15s,border-color .15s,transform .15s;}
-  .miniaturas img:hover{opacity:1;transform:translateY(-1px);}
-  .miniaturas img.activa{border-color:var(--acento);opacity:1;}
+  /* Fondo tipo "backdrop" claro y con relieve: la mayoria de las fotos de
+     catalogo tienen fondo blanco/gris de estudio - mostrarlas recortadas
+     borde a borde contra el tema oscuro se ve como un rectangulo roto.
+     Con este marco con relieve y la foto en "contain" (nunca recortada),
+     se ve como una foto de producto bien presentada, tenga el fondo que
+     tenga. */
+  .galeria-principal{position:relative;border-radius:22px;overflow:hidden;background:radial-gradient(120% 120% at 30% 15%,#f6f6f8,#e3e4e8);box-shadow:0 24px 55px -22px rgba(0,0,0,.6);padding:26px;}
+  .galeria-principal img{width:100%;display:block;aspect-ratio:1/1;object-fit:contain;transition:opacity .2s;}
+  .galeria .ph{width:100%;aspect-ratio:1/1;border-radius:22px;display:flex;align-items:center;justify-content:center;color:var(--tenue);background:linear-gradient(135deg,#141722,#1b1f2c);box-shadow:0 24px 55px -22px rgba(0,0,0,.6);}
+  .contador-fotos{position:absolute;right:16px;bottom:16px;background:rgba(10,12,18,.78);backdrop-filter:blur(6px);color:var(--tinta);font-size:.76rem;font-weight:600;padding:5px 11px;border-radius:999px;}
+  .miniaturas{display:flex;gap:10px;margin-top:14px;overflow-x:auto;padding-bottom:2px;}
+  .miniaturas button{padding:8px;border-radius:13px;border:2px solid transparent;background:linear-gradient(160deg,#f6f6f8,#e3e4e8);cursor:pointer;flex:0 0 auto;opacity:.6;transition:opacity .15s,border-color .15s,transform .15s;}
+  .miniaturas button img{width:52px;height:52px;border-radius:8px;object-fit:contain;display:block;}
+  .miniaturas button:hover{opacity:1;transform:translateY(-1px);}
+  .miniaturas button.activa{border-color:var(--acento);opacity:1;}
 
   .colores{margin-top:20px;}
   .colores-titulo{font-size:.8rem;color:var(--tenue);margin-bottom:9px;font-weight:600;}
@@ -88,7 +95,8 @@
   .relacionados-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:16px;}
   .rel-card{background:var(--panel);border:1px solid var(--borde);border-radius:16px;overflow:hidden;text-decoration:none;color:inherit;display:block;transition:transform .15s,border-color .15s;}
   .rel-card:hover{transform:translateY(-2px);border-color:#343b4d;}
-  .rel-card img{width:100%;aspect-ratio:1/1;object-fit:cover;display:block;background:#0b0d13;}
+  .rel-card .rel-foto{width:100%;aspect-ratio:1/1;background:linear-gradient(160deg,#f6f6f8,#e3e4e8);display:flex;align-items:center;justify-content:center;padding:14px;}
+  .rel-card img{max-width:100%;max-height:100%;object-fit:contain;display:block;}
   .rel-card .rel-ph{width:100%;aspect-ratio:1/1;display:flex;align-items:center;justify-content:center;color:var(--tenue);background:linear-gradient(135deg,#141722,#1b1f2c);font-size:.8rem;}
   .rel-card-body{padding:12px 14px;}
   .rel-card-nombre{font-size:.86rem;font-weight:650;margin-bottom:5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
@@ -124,8 +132,10 @@
           <% if (fotos.length > 1) { %>
             <div class="miniaturas">
               <% fotos.forEach(function (f, i) { %>
-                <img src="<%= f %>" class="<%= i === 0 ? 'activa' : '' %>"
-                     onclick="document.getElementById('foto-principal').src=this.src; document.querySelectorAll('.miniaturas img').forEach(function(m){m.classList.remove('activa')}); this.classList.add('activa'); var c=document.getElementById('contador-fotos'); if(c) c.textContent='<%= i + 1 %>/<%= fotos.length %>';" />
+                <button type="button" class="<%= i === 0 ? 'activa' : '' %>"
+                     onclick="document.getElementById('foto-principal').src='<%= f %>'; document.querySelectorAll('.miniaturas button').forEach(function(m){m.classList.remove('activa')}); this.classList.add('activa'); var c=document.getElementById('contador-fotos'); if(c) c.textContent='<%= i + 1 %>/<%= fotos.length %>';">
+                  <img src="<%= f %>" alt="" />
+                </button>
               <% }); %>
             </div>
           <% } %>
@@ -139,11 +149,11 @@
             <div class="colores-lista">
               <% colores.forEach(function (c) { %>
                 <% if (c.foto) { %>
-                  <span class="color-chip" onclick="document.getElementById('foto-principal').src='<%= c.foto %>'; document.querySelectorAll('.miniaturas img').forEach(function(m){m.classList.remove('activa')});">
-                    <img src="<%= c.foto %>" alt="<%= c.color %>" /> <%= c.color %>
+                  <span class="color-chip" onclick="document.getElementById('foto-principal').src='<%= c.foto %>'; document.querySelectorAll('.miniaturas button').forEach(function(m){m.classList.remove('activa')});">
+                    <img src="<%= c.foto %>" alt="<%= c.color %>" /> <%= c.color.charAt(0).toUpperCase() + c.color.slice(1).toLowerCase() %>
                   </span>
                 <% } else { %>
-                  <span class="color-chip solo-texto"><%= c.color %></span>
+                  <span class="color-chip solo-texto"><%= c.color.charAt(0).toUpperCase() + c.color.slice(1).toLowerCase() %></span>
                 <% } %>
               <% }); %>
             </div>
@@ -213,7 +223,7 @@
           <% relacionados.forEach(function (r) { %>
             <a class="rel-card" href="/catalogo/<%= empresa.slug %>/producto/<%= r.id %><%= tokenSesion ? '?s=' + encodeURIComponent(tokenSesion) : '' %>">
               <% if (r.fotos && r.fotos.length) { %>
-                <img src="<%= r.fotos[0] %>" alt="<%= r.nombre %>" />
+                <div class="rel-foto"><img src="<%= r.fotos[0] %>" alt="<%= r.nombre %>" /></div>
               <% } else { %>
                 <div class="rel-ph">Sin foto</div>
               <% } %>
