@@ -123,7 +123,20 @@
   </header>
 
   <main>
-    <a class="volver" href="/catalogo/<%= empresa.slug %><%= tokenSesion ? '?s=' + encodeURIComponent(tokenSesion) : '' %>">← Volver al catálogo</a>
+    <%
+      // Mismos parametros con los que llego el cliente (sesion + filtro
+      // activo, si vino de una vista filtrada) - "volver" tiene que
+      // devolverlo a ESA vista, no al catalogo entero.
+      var paramsVolver = [];
+      if (tokenSesion) paramsVolver.push('s=' + encodeURIComponent(tokenSesion));
+      if (hayFiltro) {
+        ['categoria', 'color', 'talla', 'marca'].forEach(function (k) {
+          if (filtro[k]) paramsVolver.push(k + '=' + encodeURIComponent(filtro[k]));
+        });
+      }
+      var qVolver = paramsVolver.length ? '?' + paramsVolver.join('&') : '';
+    %>
+    <a class="volver" href="/catalogo/<%= empresa.slug %><%= qVolver %>">← Volver al catálogo</a>
 
     <div class="layout">
       <div class="galeria">
@@ -191,6 +204,11 @@
           <% } else { %>
             <form method="POST" action="/catalogo/<%= empresa.slug %>/producto/<%= producto.id %>/carrito">
               <input type="hidden" name="s" value="<%= tokenSesion %>" />
+              <% if (hayFiltro) { %>
+                <% ['categoria', 'color', 'talla', 'marca'].forEach(function (k) { %>
+                  <% if (filtro[k]) { %><input type="hidden" name="<%= k %>" value="<%= filtro[k] %>" /><% } %>
+                <% }); %>
+              <% } %>
               <% if (variantes.length) { %><input type="hidden" name="idVariante" id="idVariante-input" value="<%= variantes.length === 1 ? variantes[0].id : '' %>" /><% } %>
               <button class="btn btn-primario" type="submit" id="btn-agregar" <%= (variantes.length > 1 || stockBase === 0) ? 'disabled' : '' %>>
                 <%= variantes.length > 1 ? 'Elegí una opción' : (stockBase === 0 ? 'Sin stock' : 'Agregar al carrito') %>

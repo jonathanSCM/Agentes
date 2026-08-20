@@ -62,6 +62,18 @@
   </header>
 
   <main>
+    <%
+      // Mismos parametros de sesion + filtro activo para que el detalle del
+      // producto sepa a que vista tiene que volver ("Volver al catalogo").
+      var paramsProducto = [];
+      if (tokenSesion) paramsProducto.push('s=' + encodeURIComponent(tokenSesion));
+      if (hayFiltro) {
+        ['categoria', 'color', 'talla', 'marca'].forEach(function (k) {
+          if (filtro[k]) paramsProducto.push(k + '=' + encodeURIComponent(filtro[k]));
+        });
+      }
+      var qProducto = paramsProducto.length ? '?' + paramsProducto.join('&') : '';
+    %>
     <% if (hayFiltro) { %>
       <div class="banner-filtro">
         <span>Mostrando solo: <%= [filtro.categoria, filtro.color, filtro.talla, filtro.marca].filter(Boolean).join(' · ') %></span>
@@ -84,7 +96,7 @@
                   var marca = p.atributos && p.atributos.Marca ? p.atributos.Marca : '';
                   var textoBusqueda = [p.nombre, c.nombre, marca].join(' ').toLowerCase();
                 %>
-                <a class="card-link" href="/catalogo/<%= empresa.slug %>/producto/<%= p.id %><%= tokenSesion ? '?s=' + encodeURIComponent(tokenSesion) : '' %>">
+                <a class="card-link" href="/catalogo/<%= empresa.slug %>/producto/<%= p.id %><%= qProducto %>">
                   <div class="card" data-buscar="<%= textoBusqueda %>">
                     <% if (p.fotos && p.fotos.length) { %>
                       <img src="<%= p.fotos[0] %>" alt="<%= p.nombre %>" loading="lazy" />

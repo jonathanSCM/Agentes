@@ -360,6 +360,18 @@ app.get('/catalogo/:slug/producto/:id', async (req, res, next) => {
     const colores = coloresConFotoDeVariantes(producto);
     const relacionados = await productosRelacionados(empresa.id, producto.id);
 
+    // Mismo filtro (categoria/color/talla/marca) que ya usa /catalogo/:slug:
+    // si el cliente llego aca desde una vista filtrada, "Volver al catalogo"
+    // tiene que devolverlo a ESA vista, no al catalogo entero (bug real
+    // reportado: se perdia el filtro al entrar al detalle de un producto).
+    const filtro = {
+      categoria: (req.query.categoria || '').trim(),
+      color: (req.query.color || '').trim(),
+      talla: (req.query.talla || '').trim(),
+      marca: (req.query.marca || '').trim(),
+    };
+    const hayFiltro = Boolean(filtro.categoria || filtro.color || filtro.talla || filtro.marca);
+
     // El link "volver a WhatsApp" lleva un mensaje ya armado: si el cliente
     // recien agrego esto al carrito, el mensaje refleja EXACTAMENTE que
     // eligio (variante y cantidad reales, no lo que dijo el modelo) - asi
@@ -382,6 +394,7 @@ app.get('/catalogo/:slug/producto/:id', async (req, res, next) => {
       tokenSesion: sesion ? req.query.s : null,
       agregado,
       mensajeWhatsapp,
+      filtro, hayFiltro,
       ogTitle, ogDescripcion, ogImagen, ogUrl,
     });
   } catch (err) { next(err); }
@@ -471,6 +484,12 @@ app.post('/catalogo/:slug/producto/:id/carrito', limiteCarritoWeb, async (req, r
 
     const paramsVuelta = new URLSearchParams({ s: req.body.s || req.query.s, agregado: '1', cantidad: String(cantidad) });
     if (variante) paramsVuelta.set('idVariante', String(variante.id));
+    // El filtro (categoria/color/talla/marca) viaja en campos ocultos del
+    // form: sin esto, agregar al carrito perdia el filtro con el que el
+    // cliente habia llegado (mismo bug que "Volver al catalogo").
+    for (const campo of ['categoria', 'color', 'talla', 'marca']) {
+      if (req.body[campo]) paramsVuelta.set(campo, req.body[campo]);
+    }
     res.redirect(`/catalogo/${req.params.slug}/producto/${req.params.id}?${paramsVuelta.toString()}`);
   } catch (err) { next(err); }
 });
