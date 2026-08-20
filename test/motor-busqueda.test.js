@@ -13,6 +13,7 @@ const {
   resolverSeleccionMenu,
   seccionProductos,
   construirSystem,
+  partesDelSystem,
   fichaProducto,
   limpiezaPorCambioDeCategoria,
   datosDeActualizacionDeLead,
@@ -374,6 +375,42 @@ describe('construirSystem - "que vendes" no debe listar 1 sola categoria como me
     const system = construirSystem(empresa, productos, {}, {}, false, false, 'Raul');
     assert.doesNotMatch(system, /mostrar_catalogo/);
     assert.match(system, /PROHIBIDO mandarle un link/);
+  });
+});
+
+describe('partesDelSystem - el bloque fijo es cacheable de verdad (prompt caching)', () => {
+  // Este test protege la optimizacion de costo: si alguien mete sin querer
+  // algo que cambia por turno (memoria del lead, resultados del catalogo)
+  // dentro de "fijo", el prompt caching de OpenAI/Anthropic deja de servir
+  // para ese contenido y el ahorro desaparece en silencio.
+  const empresa = { nombre: 'Tienda Demo', marca: 'Tienda Demo', moneda: 'BOB' };
+  const productos = [
+    producto({ id: 1, categoria: 'Zapatillas', nombre: 'Runner' }),
+    producto({ id: 2, categoria: 'Zapatillas', nombre: 'Trail' }),
+  ];
+
+  test('mismo turno1/config, leads y catalogo distintos -> "fijo" es byte a byte identico', () => {
+    const a = partesDelSystem(empresa, productos, {}, { categoriaInteres: 'Zapatillas', talla: '40' }, false, false, 'Raul');
+    const b = partesDelSystem(empresa, productos, {}, { categoriaInteres: 'Zapatillas', color: 'negro', productoFavoritoId: 1 }, false, false, 'Raul');
+    assert.equal(a.fijo, b.fijo);
+  });
+
+  test('"fijo" nunca incluye datos del lead ni resultados del catalogo (esos van en "variable")', () => {
+    const { fijo, variable } = partesDelSystem(empresa, productos, {}, { talla: '42', color: 'rojo furioso' }, false, false, 'Raul');
+    assert.doesNotMatch(fijo, /rojo furioso/);
+    assert.match(variable, /rojo furioso|42/);
+  });
+
+  test('construirSystem (wrapper) sigue devolviendo el mismo contenido que fijo + variable concatenados', () => {
+    const partes = partesDelSystem(empresa, productos, {}, { talla: '40' }, false, false, 'Raul');
+    const completo = construirSystem(empresa, productos, {}, { talla: '40' }, false, false, 'Raul');
+    assert.equal(completo, `${partes.fijo}\n\n${partes.variable}`);
+  });
+
+  test('distintas empresas nunca comparten el bloque fijo (cada una tiene su marca en el texto)', () => {
+    const a = partesDelSystem({ nombre: 'Tienda A', marca: 'Tienda A' }, productos, {}, {}, false, false, '');
+    const b = partesDelSystem({ nombre: 'Tienda B', marca: 'Tienda B' }, productos, {}, {}, false, false, '');
+    assert.notEqual(a.fijo, b.fijo);
   });
 });
 
