@@ -57,7 +57,7 @@ const { iniciarJobFacturacion } = require('./lib/jobs/facturacion');
 const { initSocket, emitMensaje, emitConversacion } = require('./lib/services/realtime');
 const { detectarPais } = require('./lib/services/geo');
 const { precioPlanParaPais, precioPaqueteParaPais, simboloMoneda } = require('./lib/services/precios');
-const { buscarProductosFiltrados, fotoParaMostrar, coloresConFotoDeVariantes } = require('./lib/services/catalogo');
+const { buscarProductosFiltrados, fotoParaMostrar, coloresConFotoDeVariantes, mensajeWhatsappProducto } = require('./lib/services/catalogo');
 const { productosRelacionados } = require('./lib/services/recomendaciones');
 const { guardarEmbeddingDeProducto } = require('./lib/services/embeddings');
 
@@ -360,13 +360,28 @@ app.get('/catalogo/:slug/producto/:id', async (req, res, next) => {
     const colores = coloresConFotoDeVariantes(producto);
     const relacionados = await productosRelacionados(empresa.id, producto.id);
 
+    // El link "volver a WhatsApp" lleva un mensaje ya armado: si el cliente
+    // recien agrego esto al carrito, el mensaje refleja EXACTAMENTE que
+    // eligio (variante y cantidad reales, no lo que dijo el modelo) - asi
+    // llega a la conversacion real diciendo lo mismo que ya confirmo aca.
+    const agregado = req.query.agregado === '1';
+    const varianteAgregada = agregado && req.query.idVariante
+      ? producto.variantes.find((v) => v.id === Number(req.query.idVariante))
+      : null;
+    const mensajeWhatsapp = mensajeWhatsappProducto(producto, {
+      variante: varianteAgregada,
+      cantidad: agregado ? Math.max(1, Number(req.query.cantidad) || 1) : null,
+      accion: agregado ? 'Quiero' : 'Estoy viendo',
+    });
+
     res.render('catalogo-producto', {
       title: `${producto.nombre} · ${empresa.marca || empresa.nombre}`,
       empresa, config, producto, colores, relacionados,
       simboloCatalogo: simboloMoneda(empresa.moneda),
       numeroWhatsapp: agente ? agente.numeroWhatsapp : null,
       tokenSesion: sesion ? req.query.s : null,
-      agregado: req.query.agregado === '1',
+      agregado,
+      mensajeWhatsapp,
       ogTitle, ogDescripcion, ogImagen, ogUrl,
     });
   } catch (err) { next(err); }
@@ -454,7 +469,9 @@ app.post('/catalogo/:slug/producto/:id/carrito', limiteCarritoWeb, async (req, r
       },
     });
 
-    res.redirect(`/catalogo/${req.params.slug}/producto/${req.params.id}?s=${encodeURIComponent(req.body.s || req.query.s)}&agregado=1`);
+    const paramsVuelta = new URLSearchParams({ s: req.body.s || req.query.s, agregado: '1', cantidad: String(cantidad) });
+    if (variante) paramsVuelta.set('idVariante', String(variante.id));
+    res.redirect(`/catalogo/${req.params.slug}/producto/${req.params.id}?${paramsVuelta.toString()}`);
   } catch (err) { next(err); }
 });
 

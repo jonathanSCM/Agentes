@@ -19,7 +19,7 @@ const {
   datosDeActualizacionDeLead,
   resumenPedidosPrevios,
 } = require('../lib/services/agente');
-const { coincideAtributosLead, buscarConFallback, buscarPorNombre, coloresConFotoDeVariantes } = require('../lib/services/catalogo');
+const { coincideAtributosLead, buscarConFallback, buscarPorNombre, coloresConFotoDeVariantes, mensajeWhatsappProducto } = require('../lib/services/catalogo');
 
 // Categoria ahora es una relacion ({id, nombre}), no texto libre. Los tests
 // de este archivo siguen pasando `categoria: 'Zapatillas'` como string por
@@ -545,6 +545,34 @@ describe('coloresConFotoDeVariantes - "tambien disponible en" del catalogo web',
 
   test('sin variantes, devuelve vacio (no revienta)', () => {
     assert.deepEqual(coloresConFotoDeVariantes({}), []);
+  });
+});
+
+describe('mensajeWhatsappProducto - mensaje prellenado del boton "volver a WhatsApp"', () => {
+  const producto = { nombre: 'Zapatillas Park St 2.0' };
+
+  test('sin variante ni cantidad: solo el nombre, con la accion por defecto', () => {
+    assert.equal(mensajeWhatsappProducto(producto), 'Estoy viendo *Zapatillas Park St 2.0*');
+  });
+
+  test('con variante: agrega el detalle real entre parentesis', () => {
+    const variante = { atributos: { Talla: '42', Color: 'Negro' } };
+    const r = mensajeWhatsappProducto(producto, { variante, accion: 'Quiero' });
+    assert.equal(r, 'Quiero *Zapatillas Park St 2.0* (Talla: 42, Color: Negro)');
+  });
+
+  test('con cantidad mayor a 1: antepone "Nx" al nombre', () => {
+    const r = mensajeWhatsappProducto(producto, { cantidad: 3, accion: 'Quiero' });
+    assert.equal(r, 'Quiero *3x Zapatillas Park St 2.0*');
+  });
+
+  test('cantidad 1 no antepone nada (no es distinto de no mandar cantidad)', () => {
+    assert.equal(mensajeWhatsappProducto(producto, { cantidad: 1 }), mensajeWhatsappProducto(producto));
+  });
+
+  test('variante sin atributos no rompe ni agrega parentesis vacios', () => {
+    const r = mensajeWhatsappProducto(producto, { variante: { atributos: {} } });
+    assert.equal(r, 'Estoy viendo *Zapatillas Park St 2.0*');
   });
 });
 

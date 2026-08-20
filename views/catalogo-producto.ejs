@@ -94,8 +94,6 @@
   .btn-whatsapp:hover{transform:translateY(-1px);}
 
   .aviso-sesion{background:rgba(255,180,60,.12);border:1px solid rgba(255,180,60,.35);color:#ffc36b;border-radius:11px;padding:13px 15px;font-size:.85rem;margin-bottom:16px;line-height:1.5;}
-  .aviso-ok{background:rgba(34,197,139,.12);border:1px solid rgba(34,197,139,.4);color:var(--acento);border-radius:14px;padding:18px 20px;margin-bottom:22px;}
-  .aviso-ok h2{font-size:1.05rem;margin-bottom:6px;}
 
   /* ---------- Tambien te puede interesar ---------- */
   .relacionados{margin-top:56px;}
@@ -121,13 +119,6 @@
 
   <main>
     <a class="volver" href="/catalogo/<%= empresa.slug %><%= tokenSesion ? '?s=' + encodeURIComponent(tokenSesion) : '' %>">← Volver al catálogo</a>
-
-    <% if (agregado) { %>
-      <div class="aviso-ok">
-        <h2>✅ ¡Listo, lo agregamos a tu carrito!</h2>
-        <p>Volvé a WhatsApp para seguir con tu pedido — ya lo tenemos guardado.</p>
-      </div>
-    <% } %>
 
     <div class="layout">
       <div class="galeria">
@@ -194,7 +185,7 @@
           <% if (!tokenSesion) { %>
             <div class="aviso-sesion">Para agregar al carrito, pedile este producto a tu asesor por WhatsApp — te va a mandar un link que ya te reconoce.</div>
             <% if (numeroWhatsapp) { %>
-              <a class="btn btn-whatsapp" href="https://wa.me/<%= numeroWhatsapp %>?text=<%= encodeURIComponent('Estoy viendo ' + producto.nombre) %>" target="_blank" rel="noopener">Consultar por WhatsApp</a>
+              <a class="btn btn-whatsapp" href="https://wa.me/<%= numeroWhatsapp %>?text=<%= encodeURIComponent(mensajeWhatsapp) %>" target="_blank" rel="noopener">Consultar por WhatsApp</a>
             <% } %>
           <% } else { %>
             <form method="POST" action="/catalogo/<%= empresa.slug %>/producto/<%= producto.id %>/carrito">
@@ -218,7 +209,7 @@
               </button>
             </form>
             <% if (numeroWhatsapp) { %>
-              <a class="btn btn-whatsapp" href="https://wa.me/<%= numeroWhatsapp %>?text=<%= encodeURIComponent('Estoy viendo ' + producto.nombre) %>" target="_blank" rel="noopener">Volver a WhatsApp</a>
+              <a class="btn btn-whatsapp" href="https://wa.me/<%= numeroWhatsapp %>?text=<%= encodeURIComponent(mensajeWhatsapp) %>" target="_blank" rel="noopener">Volver a WhatsApp</a>
             <% } %>
           <% } %>
         </div>
