@@ -23,23 +23,8 @@
   header .brand{display:inline-flex;align-items:center;gap:.6rem;margin-bottom:18px;}
   header img{width:34px;height:34px;border-radius:50%;object-fit:cover;}
   header .brand strong{font-family:'Fraunces',serif;font-size:1.1rem;letter-spacing:.03em;text-transform:uppercase;}
-  header h1{font-family:'Fraunces',serif;font-weight:600;font-size:clamp(2rem,4.5vw,3rem);letter-spacing:-.01em;}
-  header p{color:var(--tenue);margin-top:10px;font-size:.95rem;font-style:italic;}
-
-  .buscador-wrap{padding:26px 0 8px;}
-  .buscador{position:relative;max-width:420px;margin:0 auto;}
-  .buscador svg{position:absolute;left:14px;top:50%;transform:translateY(-50%);color:var(--tenue);pointer-events:none;}
-  .buscador input{width:100%;background:var(--panel);border:1px solid var(--borde);border-radius:2px;padding:13px 14px 13px 42px;color:var(--tinta);font-size:.92rem;font-family:inherit;outline:none;text-align:center;}
-  .buscador input:focus{border-color:var(--acento);}
-
-  .pills{display:flex;gap:0;justify-content:center;flex-wrap:wrap;padding:22px 0 10px;border-bottom:1px solid var(--borde);margin-bottom:8px;}
-  .pill{background:transparent;border:none;color:var(--tenue);padding:8px 16px;font-size:.82rem;font-weight:600;cursor:pointer;letter-spacing:.03em;text-transform:uppercase;border-bottom:2px solid transparent;transition:.15s;}
-  .pill:hover{color:var(--tinta);}
-  .pill.activa{color:var(--acento);border-bottom-color:var(--acento);}
-
-  .banner-filtro{background:var(--panel);border:1px solid var(--borde);padding:12px 18px;margin:18px 0;display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;font-size:.85rem;}
+  .banner-filtro{background:var(--panel);border:1px solid var(--borde);padding:12px 18px;margin:18px 0;display:flex;align-items:center;gap:10px;flex-wrap:wrap;font-size:.85rem;}
   .banner-filtro span{color:var(--tenue);}
-  .banner-filtro a{color:var(--acento);text-decoration:none;font-weight:700;}
 
   .categoria-seccion{margin-top:56px;}
   .categoria-titulo{text-align:center;margin-bottom:26px;}
@@ -71,34 +56,18 @@
       <% if (config && config.logoUrl) { %><img src="<%= config.logoUrl %>" alt="" /><% } %>
       <strong><%= empresa.marca || empresa.nombre %></strong>
     </div>
-    <h1>La colección completa</h1>
-    <p><%= productos.length %> pieza<%= productos.length === 1 ? '' : 's' %> disponible<%= productos.length === 1 ? '' : 's' %> ahora</p>
   </header>
 
   <main>
     <% if (hayFiltro) { %>
       <div class="banner-filtro">
         <span>Mostrando solo lo que pediste: <%= [filtro.categoria, filtro.color, filtro.talla, filtro.marca].filter(Boolean).join(' · ') %></span>
-        <a href="/catalogo/<%= empresa.slug %><%= tokenSesion ? '?s=' + encodeURIComponent(tokenSesion) : '' %>">Ver toda la colección</a>
       </div>
     <% } %>
 
     <% if (productos.length === 0) { %>
       <div class="vacio"><h2>😕</h2><p>Todavía no hay productos cargados.</p></div>
     <% } else { %>
-      <div class="buscador-wrap">
-        <div class="buscador">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
-          <input id="buscador-input" type="text" placeholder="Buscar pieza..." autocomplete="off" />
-        </div>
-      </div>
-      <div class="pills" id="pills">
-        <button class="pill activa" data-categoria="todos">Todo</button>
-        <% categorias.forEach(function (c) { %>
-          <button class="pill" data-categoria="<%= c.nombre %>"><%= c.nombre %></button>
-        <% }); %>
-      </div>
-
       <div id="secciones">
         <% categorias.forEach(function (c) { %>
           <section class="categoria-seccion" data-categoria="<%= c.nombre %>">
@@ -134,11 +103,6 @@
           </section>
         <% }); %>
       </div>
-
-      <div class="vacio" id="vacio-busqueda" style="display:none">
-        <h2>🔍</h2>
-        <p>No encontramos nada con esa búsqueda.</p>
-      </div>
     <% } %>
   </main>
 
@@ -147,45 +111,5 @@
       <svg viewBox="0 0 32 32" width="26" height="26" fill="currentColor"><path d="M16 3C9.4 3 4 8.4 4 15c0 2.1.6 4.2 1.6 6L4 29l8.2-1.6c1.8.9 3.7 1.4 5.8 1.4 6.6 0 12-5.4 12-12S22.6 3 16 3zm0 21.8c-1.8 0-3.5-.5-5-1.4l-.4-.2-4.9 1 1-4.8-.3-.4A9.7 9.7 0 0 1 6.2 15c0-5.4 4.4-9.8 9.8-9.8s9.8 4.4 9.8 9.8-4.4 9.8-9.8 9.8zm5.4-7.3c-.3-.1-1.8-.9-2-1s-.5-.1-.7.1c-.2.3-.8 1-1 1.2-.2.2-.4.2-.7.1-1.8-.9-3-1.6-4.2-3.6-.3-.5.3-.5.9-1.6.1-.2 0-.4 0-.5s-.7-1.7-1-2.3c-.2-.6-.5-.5-.7-.5h-.6c-.2 0-.5.1-.8.4-.3.3-1 1-1 2.5s1.1 2.9 1.2 3.1c.2.2 2.1 3.3 5.2 4.6 2 .8 2.7.9 3.7.8.6-.1 1.8-.7 2-1.5.3-.7.3-1.4.2-1.5-.1-.2-.3-.2-.6-.4z"/></svg>
     </a>
   <% } %>
-
-  <script>
-  (function () {
-    var input = document.getElementById('buscador-input');
-    var pills = document.querySelectorAll('.pill');
-    var secciones = document.querySelectorAll('.categoria-seccion');
-    var vacio = document.getElementById('vacio-busqueda');
-    if (!input) return;
-    var categoriaActiva = 'todos';
-
-    function aplicarFiltro() {
-      var q = input.value.trim().toLowerCase();
-      var totalVisibles = 0;
-      secciones.forEach(function (sec) {
-        var cat = sec.getAttribute('data-categoria');
-        var mostrarSeccion = categoriaActiva === 'todos' || cat === categoriaActiva;
-        var visiblesEnSeccion = 0;
-        sec.querySelectorAll('.card').forEach(function (card) {
-          var texto = card.getAttribute('data-buscar') || '';
-          var visible = mostrarSeccion && (!q || texto.indexOf(q) !== -1);
-          card.parentElement.style.display = visible ? '' : 'none';
-          if (visible) visiblesEnSeccion++;
-        });
-        sec.style.display = visiblesEnSeccion ? '' : 'none';
-        totalVisibles += visiblesEnSeccion;
-      });
-      vacio.style.display = totalVisibles ? 'none' : 'flex';
-    }
-
-    input.addEventListener('input', aplicarFiltro);
-    pills.forEach(function (pill) {
-      pill.addEventListener('click', function () {
-        pills.forEach(function (p) { p.classList.remove('activa'); });
-        pill.classList.add('activa');
-        categoriaActiva = pill.getAttribute('data-categoria');
-        aplicarFiltro();
-      });
-    });
-  })();
-  </script>
 </body>
 </html>

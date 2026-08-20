@@ -237,6 +237,7 @@ describe('cierre del pedido: confirmacion obligatoria', () => {
       atributosLead: { Genero: 'Hombre' },
       nombre: 'Cesar Prueba', formaPago: 'EFECTIVO',
       tipoEntrega: 'DOMICILIO', direccionEntrega: 'Av Siempre Viva 123',
+      ubicacionLat: -17.767619, ubicacionLng: -63.181035,
     });
   });
 
@@ -296,6 +297,47 @@ describe('cierre del pedido: confirmacion obligatoria', () => {
 
     const lead = await prisma.clienteFinal.findFirst({ where: { telefono: TELEFONO } });
     assert.equal(lead.estadoConversacion, 'PEDIDO_COMPLETADO', 'usa un estado del enum nuevo');
+  });
+
+  test('una direccion escrita a mano (sin ubicacion real) NO deja avanzar: pide ubicacion o link de Maps', async () => {
+    await reiniciarLead({
+      atributosLead: { Genero: 'Hombre' }, nombre: 'Cesar Prueba', formaPago: 'EFECTIVO',
+      tipoEntrega: 'DOMICILIO', direccionEntrega: 'Av Ballivian 1234, casi esquina con el mercado',
+      // Ojo: sin ubicacionLat/Lng - una direccion escrita sola, como pego el
+      // cliente del transcript real, nunca debe alcanzar para cerrar.
+    });
+    const variante = await prisma.variante.findFirst({ where: { productoId: productos[0].id } });
+    await agregarAlCarrito([{ idProducto: productos[0].id, idVariante: variante.id, cantidad: 1, precio: productos[0].precio }]);
+    const antes = await prisma.pedido.count({ where: { empresaId } });
+    const { llamar, recibido } = iaFalsa([
+      { tool_calls: [tool('confirmar_pedido', {})] },
+      { content: 'Un momento.' },
+    ]);
+    await generarRespuesta(agenteId, TELEFONO, [], 'dale', undefined, { llamarInyectado: llamar });
+
+    assert.match(recibido.toolResults[0], /no es una ubicacion real/);
+    assert.match(recibido.toolResults[0], /comparta su UBICACION/);
+    assert.equal(await prisma.pedido.count({ where: { empresaId } }), antes, 'no se creo ningun pedido nuevo');
+  });
+
+  test('un link de Google Maps pegado como texto SI resuelve a coordenadas y deja avanzar', async () => {
+    await reiniciarLead({
+      atributosLead: { Genero: 'Hombre' }, nombre: 'Cesar Prueba', formaPago: 'EFECTIVO',
+      tipoEntrega: 'DOMICILIO', direccionEntrega: 'Mi ubicacion: https://www.google.com/maps/@-17.767619,-63.181035,15z',
+    });
+    const variante = await prisma.variante.findFirst({ where: { productoId: productos[0].id } });
+    await agregarAlCarrito([{ idProducto: productos[0].id, idVariante: variante.id, cantidad: 1, precio: productos[0].precio }]);
+    const { llamar, recibido } = iaFalsa([
+      { tool_calls: [tool('confirmar_pedido', {})] },
+      { content: 'Un momento.' },
+    ]);
+    await generarRespuesta(agenteId, TELEFONO, [], 'dale', undefined, { llamarInyectado: llamar });
+
+    assert.match(recibido.toolResults[0], /TOOL_SUCCESS/);
+    assert.match(recibido.toolResults[0], /Resumen REAL del pedido/);
+
+    const lead = await prisma.clienteFinal.findFirst({ where: { telefono: TELEFONO } });
+    assert.ok(lead.ubicacionLat, 'el link se resolvio y quedo guardado para la proxima');
   });
 
   test('si pide retiro en tienda y el negocio no cargo su direccion, no se crea nada', async () => {
@@ -576,18 +618,25 @@ describe('recorrido de venta acordado con el negocio', () => {
     await generarRespuesta(agenteId, TELEFONO, [], 'me interesa la primera', conv.id, { llamarInyectado: a.llamar });
     assert.match(a.recibido.toolResults[0], /agregado al carrito/);
     assert.match(a.recibido.toolResults[0], /DESEA VER ALGO MAS/);
+    assert.match(a.recibido.toolResults[0], /Tambien hay stock de esto/, 'antes de entrar en cierre, si sugiere relacionados');
 
     // 2) dice que si y agrega otro (con su variante: el cliente la vio en la tarjeta)
+    // Ojo: el primer agregado ya dejo estadoConversacion en INTENCION_DE_COMPRA
+    // (etapa de cierre) - de aca en mas NO debe sugerir mas cross-sell.
     const variante2 = await prisma.variante.findFirst({ where: { productoId: productos[1].id }, orderBy: { id: 'asc' } });
     const b = iaFalsa([{ tool_calls: [tool('agregar_al_carrito', { idProducto: productos[1].id, idVariante: variante2.id, cantidad: 2 })] }, { content: 'Listo.' }]);
     await generarRespuesta(agenteId, TELEFONO, [], 'agregame tambien la otra', conv.id, { llamarInyectado: b.llamar });
     assert.match(b.recibido.toolResults[0], /Zapatilla 1/, 'el primero sigue en el carrito');
     assert.match(b.recibido.toolResults[0], /Zapatilla 2/);
+    assert.doesNotMatch(b.recibido.toolResults[0], /Tambien hay stock de esto/, 'ya esta cerrando: no sugiere mas productos fuera de contexto');
 
     // 3) cierra
     await prisma.clienteFinal.updateMany({
       where: { telefono: TELEFONO },
-      data: { nombre: 'Juan Perez', tipoEntrega: 'DOMICILIO', direccionEntrega: 'Av 123', formaPago: 'EFECTIVO' },
+      data: {
+        nombre: 'Juan Perez', tipoEntrega: 'DOMICILIO', direccionEntrega: 'Av 123', formaPago: 'EFECTIVO',
+        ubicacionLat: -17.767619, ubicacionLng: -63.181035,
+      },
     });
     const c = iaFalsa([{ tool_calls: [tool('confirmar_pedido', {})] }, { content: '¿Esta todo bien?' }]);
     await generarRespuesta(agenteId, TELEFONO, [], 'no, eso es todo', conv.id, { llamarInyectado: c.llamar });
@@ -604,7 +653,10 @@ describe('recorrido de venta acordado con el negocio', () => {
   });
 
   test('no se puede confirmar con el carrito vacio', async () => {
-    await reiniciarLead({ atributosLead: { Genero: 'Hombre' }, nombre: 'Juan', tipoEntrega: 'DOMICILIO', direccionEntrega: 'Av 1', formaPago: 'EFECTIVO' });
+    await reiniciarLead({
+      atributosLead: { Genero: 'Hombre' }, nombre: 'Juan', tipoEntrega: 'DOMICILIO', direccionEntrega: 'Av 1', formaPago: 'EFECTIVO',
+      ubicacionLat: -17.767619, ubicacionLng: -63.181035,
+    });
     const { llamar, recibido } = iaFalsa([{ tool_calls: [tool('confirmar_pedido', {})] }, { content: 'ok' }]);
     await generarRespuesta(agenteId, TELEFONO, [], 'cerra el pedido', undefined, { llamarInyectado: llamar });
     assert.match(recibido.toolResults[0], /carrito esta vacio/);
@@ -693,5 +745,39 @@ describe('no se cierra sin saber que se lleva el cliente', () => {
     const salida = await generarRespuesta(agenteId, TELEFONO, [], 'dale', undefined, { llamarInyectado: cierre.llamar });
 
     assert.match(salida.respuesta, /domicilio/i, 'ya sabe que se lleva: el cierre tiene que avanzar');
+  });
+});
+
+// "Que recuerde los pedidos, tallas y todo que ha usado el cliente" - memoria
+// de compras reales anteriores inyectada en el prompt (con DB real: el
+// pedido tiene que existir de verdad, nunca se inventa).
+describe('memoria de compras anteriores del cliente (con DB real)', () => {
+  test('con un pedido real anterior, el prompt del turno actual incluye ese resumen', async () => {
+    await reiniciarLead({ atributosLead: { Genero: 'Hombre' } });
+    const cliente = await prisma.clienteFinal.findFirst({ where: { telefono: TELEFONO } });
+    const variante = await prisma.variante.findFirst({ where: { productoId: productos[0].id }, orderBy: { id: 'asc' } });
+
+    await prisma.pedido.create({
+      data: {
+        empresaId, clienteId: cliente.id, total: productos[0].precio, estado: 'ENTREGADO',
+        items: { create: [{ productoId: productos[0].id, varianteId: variante.id, nombre: productos[0].nombre, precio: productos[0].precio, cantidad: 1 }] },
+      },
+    });
+
+    const { llamar, recibido } = iaFalsa([{ content: 'Hola de nuevo!' }]);
+    await generarRespuesta(agenteId, TELEFONO, [], 'hola', undefined, { llamarInyectado: llamar });
+
+    assert.match(recibido.systems[0], /Compras reales anteriores/);
+    assert.match(recibido.systems[0], new RegExp(productos[0].nombre));
+
+    await prisma.pedido.deleteMany({ where: { empresaId, clienteId: cliente.id } });
+  });
+
+  test('un cliente nuevo sin pedidos anteriores no ve ninguna mencion inventada', async () => {
+    await reiniciarLead({ atributosLead: { Genero: 'Hombre' } });
+    const { llamar, recibido } = iaFalsa([{ content: 'Hola!' }]);
+    await generarRespuesta(agenteId, TELEFONO, [], 'hola', undefined, { llamarInyectado: llamar });
+
+    assert.doesNotMatch(recibido.systems[0], /Compras reales anteriores/);
   });
 });

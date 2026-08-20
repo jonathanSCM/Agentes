@@ -54,4 +54,30 @@ describe('resumenCategoria', () => {
     assert.equal(r.cantidad, 2);
     assert.deepEqual(r.destacados, ['Sin variantes, poco', 'Con variantes, mucho']);
   });
+
+  describe('fotoDestacada - para la tarjeta de categoria cuando la tienda no cargo una foto propia', () => {
+    test('usa la foto del producto mas barato si la tiene', () => {
+      const productos = [
+        producto({ id: 1, categoriaId: 1, nombre: 'Barata', precio: 100, stock: 5, fotos: ['barata.jpg'] }),
+        producto({ id: 2, categoriaId: 1, nombre: 'Cara', precio: 500, stock: 5, fotos: ['cara.jpg'] }),
+      ];
+      const r = resumenCategoria(productos, 1);
+      assert.equal(r.fotoDestacada, 'barata.jpg');
+    });
+
+    test('si el mas barato no tiene foto, usa la del de mas stock', () => {
+      const productos = [
+        producto({ id: 1, categoriaId: 1, nombre: 'Barata sin foto', precio: 100, stock: 1, fotos: [] }),
+        producto({ id: 2, categoriaId: 1, nombre: 'Con mas stock', precio: 500, stock: 50, fotos: ['stock.jpg'] }),
+      ];
+      const r = resumenCategoria(productos, 1);
+      assert.equal(r.fotoDestacada, 'stock.jpg');
+    });
+
+    test('si ningun destacado tiene foto, devuelve null (nunca inventa una URL)', () => {
+      const productos = [producto({ id: 1, categoriaId: 1, nombre: 'Sin fotos', precio: 100, stock: 5, fotos: [] })];
+      const r = resumenCategoria(productos, 1);
+      assert.equal(r.fotoDestacada, null);
+    });
+  });
 });

@@ -23,23 +23,10 @@
   header strong{font-size:.95rem;letter-spacing:.02em;text-transform:uppercase;}
   header .tag{margin-left:auto;font-size:.72rem;background:var(--acento);color:#fff;padding:3px 10px;border-radius:999px;font-weight:700;}
 
-  main{max-width:1300px;margin:0 auto;padding:0 14px 60px;}
-  .toolbar{position:sticky;top:50px;z-index:7;background:var(--fondo);padding:12px 0 8px;}
-  .buscador{position:relative;margin-bottom:8px;}
-  .buscador svg{position:absolute;left:12px;top:50%;transform:translateY(-50%);color:var(--tenue);pointer-events:none;}
-  .buscador input{width:100%;background:var(--panel);border:1px solid var(--borde);border-radius:8px;padding:10px 12px 10px 36px;color:var(--tinta);font-size:.88rem;font-family:inherit;outline:none;}
-  .buscador input:focus{border-color:var(--acento);}
-  .pills{display:flex;gap:6px;overflow-x:auto;padding:2px 0 10px;scrollbar-width:thin;}
-  .pill{flex:0 0 auto;background:var(--panel);border:1px solid var(--borde);color:var(--tenue);border-radius:6px;padding:6px 11px;font-size:.76rem;font-weight:700;cursor:pointer;white-space:nowrap;text-transform:uppercase;letter-spacing:.02em;}
-  .pill:hover{border-color:var(--acento);}
-  .pill.activa{background:var(--acento);border-color:var(--acento);color:#fff;}
+  main{max-width:1300px;margin:0 auto;padding:16px 14px 60px;}
 
-  .banner-filtro{background:var(--panel);border:1px solid var(--borde);border-radius:8px;padding:9px 12px;margin-bottom:12px;display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;font-size:.8rem;}
+  .banner-filtro{background:var(--panel);border:1px solid var(--borde);border-radius:8px;padding:9px 12px;margin-bottom:12px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:.8rem;}
   .banner-filtro span{color:var(--tenue);}
-  .banner-filtro a{color:var(--acento);text-decoration:none;font-weight:700;}
-
-  h1{font-size:1.15rem;font-weight:800;margin:14px 0 2px;}
-  .sub{color:var(--tenue);font-size:.8rem;margin-bottom:10px;}
 
   .categoria-seccion{margin-top:22px;}
   .categoria-titulo{display:flex;align-items:baseline;gap:8px;margin-bottom:8px;border-bottom:2px solid var(--acento-2);padding-bottom:5px;}
@@ -76,30 +63,14 @@
 
   <main>
     <% if (hayFiltro) { %>
-      <div class="banner-filtro" style="margin-top:12px">
+      <div class="banner-filtro">
         <span>Mostrando solo: <%= [filtro.categoria, filtro.color, filtro.talla, filtro.marca].filter(Boolean).join(' · ') %></span>
-        <a href="/catalogo/<%= empresa.slug %><%= tokenSesion ? '?s=' + encodeURIComponent(tokenSesion) : '' %>">Ver todo</a>
       </div>
     <% } %>
-    <h1>Todo el stock, de un vistazo</h1>
-    <p class="sub"><%= productos.length %> producto<%= productos.length === 1 ? '' : 's' %></p>
 
     <% if (productos.length === 0) { %>
       <div class="vacio"><h2>😕</h2><p>Todavía no hay productos cargados.</p></div>
     <% } else { %>
-      <div class="toolbar">
-        <div class="buscador">
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
-          <input id="buscador-input" type="text" placeholder="Buscar..." autocomplete="off" />
-        </div>
-        <div class="pills" id="pills">
-          <button class="pill activa" data-categoria="todos">Todos</button>
-          <% categorias.forEach(function (c) { %>
-            <button class="pill" data-categoria="<%= c.nombre %>"><%= c.nombre %></button>
-          <% }); %>
-        </div>
-      </div>
-
       <div id="secciones">
         <% categorias.forEach(function (c) { %>
           <section class="categoria-seccion" data-categoria="<%= c.nombre %>">
@@ -134,11 +105,6 @@
           </section>
         <% }); %>
       </div>
-
-      <div class="vacio" id="vacio-busqueda" style="display:none">
-        <h2>🔍</h2>
-        <p>No encontramos nada con esa búsqueda.</p>
-      </div>
     <% } %>
   </main>
 
@@ -147,45 +113,5 @@
       <svg viewBox="0 0 32 32" width="24" height="24" fill="currentColor"><path d="M16 3C9.4 3 4 8.4 4 15c0 2.1.6 4.2 1.6 6L4 29l8.2-1.6c1.8.9 3.7 1.4 5.8 1.4 6.6 0 12-5.4 12-12S22.6 3 16 3zm0 21.8c-1.8 0-3.5-.5-5-1.4l-.4-.2-4.9 1 1-4.8-.3-.4A9.7 9.7 0 0 1 6.2 15c0-5.4 4.4-9.8 9.8-9.8s9.8 4.4 9.8 9.8-4.4 9.8-9.8 9.8zm5.4-7.3c-.3-.1-1.8-.9-2-1s-.5-.1-.7.1c-.2.3-.8 1-1 1.2-.2.2-.4.2-.7.1-1.8-.9-3-1.6-4.2-3.6-.3-.5.3-.5.9-1.6.1-.2 0-.4 0-.5s-.7-1.7-1-2.3c-.2-.6-.5-.5-.7-.5h-.6c-.2 0-.5.1-.8.4-.3.3-1 1-1 2.5s1.1 2.9 1.2 3.1c.2.2 2.1 3.3 5.2 4.6 2 .8 2.7.9 3.7.8.6-.1 1.8-.7 2-1.5.3-.7.3-1.4.2-1.5-.1-.2-.3-.2-.6-.4z"/></svg>
     </a>
   <% } %>
-
-  <script>
-  (function () {
-    var input = document.getElementById('buscador-input');
-    var pills = document.querySelectorAll('.pill');
-    var secciones = document.querySelectorAll('.categoria-seccion');
-    var vacio = document.getElementById('vacio-busqueda');
-    if (!input) return;
-    var categoriaActiva = 'todos';
-
-    function aplicarFiltro() {
-      var q = input.value.trim().toLowerCase();
-      var totalVisibles = 0;
-      secciones.forEach(function (sec) {
-        var cat = sec.getAttribute('data-categoria');
-        var mostrarSeccion = categoriaActiva === 'todos' || cat === categoriaActiva;
-        var visiblesEnSeccion = 0;
-        sec.querySelectorAll('.card').forEach(function (card) {
-          var texto = card.getAttribute('data-buscar') || '';
-          var visible = mostrarSeccion && (!q || texto.indexOf(q) !== -1);
-          card.parentElement.style.display = visible ? '' : 'none';
-          if (visible) visiblesEnSeccion++;
-        });
-        sec.style.display = visiblesEnSeccion ? '' : 'none';
-        totalVisibles += visiblesEnSeccion;
-      });
-      vacio.style.display = totalVisibles ? 'none' : 'flex';
-    }
-
-    input.addEventListener('input', aplicarFiltro);
-    pills.forEach(function (pill) {
-      pill.addEventListener('click', function () {
-        pills.forEach(function (p) { p.classList.remove('activa'); });
-        pill.classList.add('activa');
-        categoriaActiva = pill.getAttribute('data-categoria');
-        aplicarFiltro();
-      });
-    });
-  })();
-  </script>
 </body>
 </html>

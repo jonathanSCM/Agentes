@@ -17,6 +17,7 @@ const {
   fichaProducto,
   limpiezaPorCambioDeCategoria,
   datosDeActualizacionDeLead,
+  resumenPedidosPrevios,
 } = require('../lib/services/agente');
 const { coincideAtributosLead, buscarConFallback, buscarPorNombre, coloresConFotoDeVariantes } = require('../lib/services/catalogo');
 
@@ -375,6 +376,81 @@ describe('construirSystem - "que vendes" no debe listar 1 sola categoria como me
     const system = construirSystem(empresa, productos, {}, {}, false, false, 'Raul');
     assert.doesNotMatch(system, /mostrar_catalogo/);
     assert.match(system, /PROHIBIDO mandarle un link/);
+  });
+});
+
+describe('construirSystem - primer mensaje: menos vueltas si ya se detecto interes', () => {
+  const empresa = { nombre: 'Tienda Demo', marca: 'Tienda Demo' };
+  const productos = [producto({ id: 1, categoria: 'Zapatillas' })];
+
+  test('primer mensaje SIN interes detectado: fuerza la bienvenida generica', () => {
+    const system = construirSystem(empresa, productos, {}, {}, false, true, 'Raul');
+    assert.match(system, /TOMA LA INICIATIVA/);
+    assert.doesNotMatch(system, /YA DIJO QUE ANDA BUSCANDO/);
+  });
+
+  test('primer mensaje CON categoria ya detectada en ese mismo mensaje: se salta la bienvenida generica', () => {
+    const lead = { categoriaInteres: 'Zapatillas' };
+    const system = construirSystem(empresa, productos, {}, lead, false, true, 'Raul');
+    assert.match(system, /YA DIJO QUE ANDA BUSCANDO/);
+    assert.doesNotMatch(system, /TOMA LA INICIATIVA/);
+  });
+
+  test('primer mensaje CON producto favorito ya detectado: tambien se salta la bienvenida generica', () => {
+    const lead = { productoFavoritoId: 1 };
+    const system = construirSystem(empresa, productos, {}, lead, false, true, 'Raul');
+    assert.match(system, /YA DIJO QUE ANDA BUSCANDO/);
+  });
+
+  test('si NO es el primer mensaje, el interes detectado no cambia nada (esa rama ni se evalua)', () => {
+    const lead = { categoriaInteres: 'Zapatillas' };
+    const system = construirSystem(empresa, productos, {}, lead, false, false, 'Raul');
+    assert.match(system, /COMO ARRANCA LA CONVERSACION/);
+    assert.doesNotMatch(system, /YA DIJO QUE ANDA BUSCANDO/);
+  });
+});
+
+describe('resumenPedidosPrevios - memoria de compras reales (nunca inventa)', () => {
+  test('sin pedidos previos, devuelve vacio', () => {
+    assert.equal(resumenPedidosPrevios([]), '');
+    assert.equal(resumenPedidosPrevios(), '');
+  });
+
+  test('arma un resumen corto con fecha, cantidad, nombre, talla y categoria reales', () => {
+    const pedidos = [
+      {
+        createdAt: new Date('2026-08-15T10:00:00Z'),
+        items: [
+          { cantidad: 1, nombre: 'Zapatillas Park St 2.0', variante: { atributos: { Talla: '42' } }, producto: { categoria: { nombre: 'Zapatillas' } } },
+        ],
+      },
+    ];
+    const r = resumenPedidosPrevios(pedidos);
+    assert.match(r, /2026-08-15/);
+    assert.match(r, /1x Zapatillas Park St 2\.0/);
+    assert.match(r, /talla 42/);
+    assert.match(r, /categoria: Zapatillas/);
+  });
+
+  test('sin variante ni producto (dato viejo o borrado), no inventa talla ni categoria', () => {
+    const pedidos = [{ createdAt: new Date('2026-08-15T10:00:00Z'), items: [{ cantidad: 2, nombre: 'Producto sin variante', variante: null, producto: null }] }];
+    const r = resumenPedidosPrevios(pedidos);
+    assert.match(r, /2x Producto sin variante/);
+    assert.doesNotMatch(r, /talla/);
+    assert.doesNotMatch(r, /categoria/);
+  });
+
+  test('construirSystem inyecta el resumen solo si hay pedidos previos, y nunca inventa si no hay', () => {
+    const empresa = { nombre: 'Tienda Demo', marca: 'Tienda Demo' };
+    const productos = [producto({ id: 1, categoria: 'Zapatillas' })];
+    const pedidos = [{ createdAt: new Date('2026-08-15T10:00:00Z'), items: [{ cantidad: 1, nombre: 'Jean Slim Azul Indigo', variante: null, producto: null }] }];
+
+    const conHistorial = partesDelSystem(empresa, productos, {}, {}, false, false, 'Raul', false, pedidos);
+    assert.match(conHistorial.variable, /Compras reales anteriores/);
+    assert.match(conHistorial.variable, /Jean Slim Azul Indigo/);
+
+    const sinHistorial = partesDelSystem(empresa, productos, {}, {}, false, false, 'Raul', false, []);
+    assert.doesNotMatch(sinHistorial.variable, /Compras reales anteriores/);
   });
 });
 
