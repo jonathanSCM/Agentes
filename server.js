@@ -59,6 +59,15 @@ const { detectarPais } = require('./lib/services/geo');
 const { precioPlanParaPais, precioPaqueteParaPais, simboloMoneda } = require('./lib/services/precios');
 const { buscarProductosFiltrados, fotoParaMostrar, coloresConFotoDeVariantes } = require('./lib/services/catalogo');
 const { productosRelacionados } = require('./lib/services/recomendaciones');
+const { guardarEmbeddingDeProducto } = require('./lib/services/embeddings');
+
+// Texto fuente para el embedding de busqueda semantica: todo lo que describe
+// que ES el producto, sin datos operativos (precio/stock no ayudan a
+// encontrarlo por significado).
+function textoParaEmbedding(p) {
+  const atributos = Object.entries(p.atributos || {}).map(([k, v]) => `${k}: ${v}`).join(', ');
+  return [p.nombre, p.descripcion, atributos, (p.caracteristicas || []).join(', ')].filter(Boolean).join('. ');
+}
 const { generarTokenSesion, verificarTokenSesion } = require('./lib/services/sesionWeb');
 const { resolverCoordenadas, extraerUrlDeMaps } = require('./lib/services/ubicacion');
 const { carritoDe, guardarCarrito, agregarItem } = require('./lib/services/carrito');
@@ -1797,7 +1806,7 @@ app.post('/panel/productos', requireCliente, upload.array('fotos', 8), async (re
     }
     const nombresArchivos = await convertirFotosAJpg(req.files);
     const fotos = nombresArchivos.map((n) => urlPublicaDeArchivo(req, n));
-    await prisma.producto.create({
+    const nuevoProducto = await prisma.producto.create({
       data: {
         empresaId: req.session.empresaId,
         nombre: String(nombre).trim().slice(0, 120),
@@ -1809,6 +1818,10 @@ app.post('/panel/productos', requireCliente, upload.array('fotos', 8), async (re
         ...datosCatalogo,
       },
     });
+    // No se espera (no bloquea el guardado ni tarda la respuesta): si falla
+    // (sin API key, red caida), el producto queda igual guardado, solo sin
+    // busqueda semantica hasta el proximo backfill.
+    guardarEmbeddingDeProducto(nuevoProducto.id, textoParaEmbedding(nuevoProducto)).catch(() => {});
     res.redirect('/panel/productos?ok=' + encodeURIComponent('Producto agregado.'));
   } catch (err) { next(err); }
 });
@@ -1946,18 +1959,22 @@ app.post('/panel/productos/:id', requireCliente, upload.array('fotos', 8), async
     const fotos = [...fotosExistentes, ...fotosNuevas];
 
     // updateMany con empresaId evita editar productos de otra empresa
+    const datosActualizados = {
+      nombre: String(nombre).trim().slice(0, 120),
+      descripcion: descripcion ? String(descripcion).trim().slice(0, 200) : null,
+      precio: Number(precio) || 0,
+      stock: parseInt(stock, 10) || 0,
+      activo: activo === '1',
+      fotos,
+      ...datosCatalogo,
+    };
     await prisma.producto.updateMany({
       where: { id: Number(req.params.id), empresaId: req.session.empresaId },
-      data: {
-        nombre: String(nombre).trim().slice(0, 120),
-        descripcion: descripcion ? String(descripcion).trim().slice(0, 200) : null,
-        precio: Number(precio) || 0,
-        stock: parseInt(stock, 10) || 0,
-        activo: activo === '1',
-        fotos,
-        ...datosCatalogo,
-      },
+      data: datosActualizados,
     });
+    // Se re-genera porque nombre/descripcion/atributos pudieron cambiar; no
+    // se espera, mismo motivo que al crear.
+    guardarEmbeddingDeProducto(Number(req.params.id), textoParaEmbedding({ ...producto, ...datosActualizados })).catch(() => {});
     res.redirect('/panel/productos?ok=' + encodeURIComponent('Producto actualizado.'));
   } catch (err) { next(err); }
 });

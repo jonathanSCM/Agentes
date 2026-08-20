@@ -19,60 +19,80 @@
   :root{--fondo:#0f1117;--panel:#181b24;--panel-2:#1f2330;--tinta:#eef0f6;--tenue:#9aa1b5;--acento:<%= (config && config.colorPrimario) || '#22c58b' %>;--acento-2:<%= (config && config.colorSecundario) || '#22c58b' %>;--borde:#262b38;}
   *{margin:0;padding:0;box-sizing:border-box;}
   body{background:var(--fondo);color:var(--tinta);font-family:'Inter',system-ui,sans-serif;min-height:100vh;}
-  header{display:flex;align-items:center;gap:.7rem;padding:18px 20px;max-width:900px;margin:0 auto;}
-  header img{width:32px;height:32px;border-radius:50%;object-fit:cover;}
-  header strong{font-size:1.1rem;}
-  main{max-width:900px;margin:0 auto;padding:0 20px 60px;}
-  .volver{color:var(--tenue);text-decoration:none;font-size:.85rem;display:inline-block;margin-bottom:16px;}
+  header{display:flex;align-items:center;gap:.7rem;padding:20px 24px;max-width:1080px;margin:0 auto;}
+  header img{width:34px;height:34px;border-radius:50%;object-fit:cover;}
+  header strong{font-size:1.12rem;letter-spacing:-.01em;}
+  main{max-width:1080px;margin:0 auto;padding:4px 24px 70px;}
+  .volver{color:var(--tenue);text-decoration:none;font-size:.85rem;display:inline-flex;align-items:center;gap:5px;margin-bottom:22px;transition:color .15s;}
   .volver:hover{color:var(--tinta);}
 
-  .layout{display:grid;grid-template-columns:1fr 1fr;gap:28px;}
-  @media (max-width:720px){.layout{grid-template-columns:1fr;}}
+  .layout{display:grid;grid-template-columns:1.15fr 1fr;gap:44px;align-items:start;}
+  @media (max-width:860px){.layout{grid-template-columns:1fr;gap:28px;}}
 
-  .galeria img{width:100%;border-radius:14px;aspect-ratio:1/1;object-fit:cover;background:#0b0d13;}
-  .galeria .ph{width:100%;aspect-ratio:1/1;border-radius:14px;display:flex;align-items:center;justify-content:center;color:var(--tenue);background:linear-gradient(135deg,#141722,#1b1f2c);}
-  .miniaturas{display:flex;gap:8px;margin-top:10px;overflow-x:auto;}
-  .miniaturas img{width:64px;height:64px;border-radius:8px;object-fit:cover;cursor:pointer;border:2px solid transparent;flex:0 0 auto;}
-  .miniaturas img.activa{border-color:var(--acento);}
+  /* ---------- Galeria ---------- */
+  .galeria{position:sticky;top:24px;}
+  @media (max-width:860px){.galeria{position:static;}}
+  .galeria-principal{position:relative;border-radius:20px;overflow:hidden;background:#0b0d13;box-shadow:0 20px 50px -20px rgba(0,0,0,.55);}
+  .galeria-principal img{width:100%;display:block;aspect-ratio:1/1;object-fit:cover;transition:opacity .2s;}
+  .galeria .ph{width:100%;aspect-ratio:1/1;border-radius:20px;display:flex;align-items:center;justify-content:center;color:var(--tenue);background:linear-gradient(135deg,#141722,#1b1f2c);box-shadow:0 20px 50px -20px rgba(0,0,0,.55);}
+  .contador-fotos{position:absolute;right:14px;bottom:14px;background:rgba(10,12,18,.72);backdrop-filter:blur(6px);color:var(--tinta);font-size:.76rem;font-weight:600;padding:5px 11px;border-radius:999px;}
+  .miniaturas{display:flex;gap:10px;margin-top:12px;overflow-x:auto;padding-bottom:2px;}
+  .miniaturas img{width:68px;height:68px;border-radius:11px;object-fit:cover;cursor:pointer;border:2px solid transparent;flex:0 0 auto;opacity:.65;transition:opacity .15s,border-color .15s,transform .15s;}
+  .miniaturas img:hover{opacity:1;transform:translateY(-1px);}
+  .miniaturas img.activa{border-color:var(--acento);opacity:1;}
 
-  .colores{margin-top:14px;}
-  .colores-titulo{font-size:.8rem;color:var(--tenue);margin-bottom:8px;}
-  .colores-lista{display:flex;gap:8px;flex-wrap:wrap;}
-  .color-chip{display:flex;align-items:center;gap:6px;padding:4px 10px 4px 4px;border-radius:999px;background:var(--panel);border:1px solid var(--borde);cursor:pointer;font-size:.82rem;color:var(--tinta);}
-  .color-chip img{width:26px;height:26px;border-radius:50%;object-fit:cover;}
-  .color-chip .sin-foto{width:26px;height:26px;border-radius:50%;background:var(--panel-2);}
-  .color-chip.solo-texto{cursor:default;padding:6px 12px;}
+  .colores{margin-top:20px;}
+  .colores-titulo{font-size:.8rem;color:var(--tenue);margin-bottom:9px;font-weight:600;}
+  .colores-lista{display:flex;gap:9px;flex-wrap:wrap;}
+  .color-chip{display:flex;align-items:center;gap:7px;padding:5px 13px 5px 5px;border-radius:999px;background:var(--panel);border:1px solid var(--borde);cursor:pointer;font-size:.83rem;color:var(--tinta);transition:border-color .15s,transform .15s;}
+  .color-chip:hover{border-color:var(--acento);transform:translateY(-1px);}
+  .color-chip img{width:28px;height:28px;border-radius:50%;object-fit:cover;}
+  .color-chip .sin-foto{width:28px;height:28px;border-radius:50%;background:var(--panel-2);}
+  .color-chip.solo-texto{cursor:default;padding:7px 13px;}
+  .color-chip.solo-texto:hover{border-color:var(--borde);transform:none;}
 
-  .relacionados{margin-top:48px;}
-  .relacionados h2{font-size:1.15rem;margin-bottom:16px;}
-  .relacionados-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:14px;}
-  .rel-card{background:var(--panel);border:1px solid var(--borde);border-radius:14px;overflow:hidden;text-decoration:none;color:inherit;display:block;}
-  .rel-card img{width:100%;aspect-ratio:1/1;object-fit:cover;display:block;background:#0b0d13;}
-  .rel-card .rel-ph{width:100%;aspect-ratio:1/1;display:flex;align-items:center;justify-content:center;color:var(--tenue);background:linear-gradient(135deg,#141722,#1b1f2c);font-size:.8rem;}
-  .rel-card-body{padding:10px 12px;}
-  .rel-card-nombre{font-size:.85rem;font-weight:600;margin-bottom:4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-  .rel-card-precio{color:var(--acento);font-weight:700;font-size:.9rem;}
-
-  h1{font-size:1.5rem;font-weight:800;margin-bottom:6px;}
-  .marca{color:var(--tenue);font-size:.88rem;margin-bottom:10px;}
-  .precio{color:var(--acento);font-weight:800;font-size:1.6rem;margin:10px 0;}
-  .stock{font-size:.8rem;padding:3px 10px;border-radius:999px;background:rgba(255,255,255,.06);color:var(--tenue);display:inline-block;width:fit-content;margin-bottom:14px;}
+  /* ---------- Info del producto ---------- */
+  .marca-badge{display:inline-block;font-size:.76rem;font-weight:700;letter-spacing:.03em;text-transform:uppercase;color:var(--tenue);background:var(--panel);border:1px solid var(--borde);padding:4px 11px;border-radius:999px;margin-bottom:12px;}
+  h1{font-size:1.9rem;font-weight:800;letter-spacing:-.02em;line-height:1.15;margin-bottom:14px;}
+  .stock{font-size:.8rem;padding:4px 12px;border-radius:999px;background:rgba(255,255,255,.06);color:var(--tenue);display:inline-block;width:fit-content;font-weight:600;}
   .stock.bajo{background:rgba(255,180,60,.16);color:#ffc36b;}
   .stock.agotado{background:rgba(255,90,90,.16);color:#ff9a9a;}
-  .descripcion{color:var(--tenue);line-height:1.6;margin-bottom:20px;font-size:.92rem;}
+
+  .seccion-descripcion{margin-top:22px;}
+  .seccion-descripcion h3{font-size:.82rem;font-weight:700;color:var(--tenue);text-transform:uppercase;letter-spacing:.03em;margin-bottom:8px;}
+  .descripcion{color:var(--tinta);opacity:.85;line-height:1.65;font-size:.94rem;}
+
+  /* ---------- Tarjeta de compra ---------- */
+  .compra-card{margin-top:26px;background:var(--panel);border:1px solid var(--borde);border-radius:18px;padding:22px;box-shadow:0 16px 40px -22px rgba(0,0,0,.6);}
+  .precio{color:var(--acento);font-weight:800;font-size:1.9rem;letter-spacing:-.02em;margin-bottom:16px;}
 
   .campo{margin-bottom:16px;}
-  .campo label{display:block;font-size:.82rem;color:var(--tenue);margin-bottom:6px;}
-  select{width:100%;background:var(--panel);border:1px solid var(--borde);border-radius:10px;padding:11px 12px;color:var(--tinta);font-size:.92rem;font-family:inherit;}
+  .campo label{display:block;font-size:.82rem;color:var(--tenue);margin-bottom:7px;font-weight:600;}
+  select{width:100%;background:var(--panel-2);border:1px solid var(--borde);border-radius:11px;padding:12px 13px;color:var(--tinta);font-size:.92rem;font-family:inherit;cursor:pointer;}
+  select:focus{outline:none;border-color:var(--acento);}
 
-  .btn{display:block;width:100%;text-align:center;border:none;border-radius:12px;padding:14px;font-size:.95rem;font-weight:700;cursor:pointer;text-decoration:none;}
-  .btn-primario{background:var(--acento);color:#08251a;}
-  .btn-primario:disabled{opacity:.5;cursor:not-allowed;}
-  .btn-whatsapp{background:#25d366;color:#fff;margin-top:12px;}
+  .btn{display:block;width:100%;text-align:center;border:none;border-radius:13px;padding:15px;font-size:.95rem;font-weight:700;cursor:pointer;text-decoration:none;transition:transform .15s,box-shadow .15s,opacity .15s;}
+  .btn-primario{background:var(--acento);color:#08251a;box-shadow:0 10px 24px -10px color-mix(in srgb, var(--acento) 70%, transparent);}
+  .btn-primario:hover:not(:disabled){transform:translateY(-1px);}
+  .btn-primario:disabled{opacity:.5;cursor:not-allowed;box-shadow:none;}
+  .btn-whatsapp{background:#25d366;color:#fff;margin-top:10px;box-shadow:0 10px 24px -10px rgba(37,211,102,.55);}
+  .btn-whatsapp:hover{transform:translateY(-1px);}
 
-  .aviso-sesion{background:rgba(255,180,60,.12);border:1px solid rgba(255,180,60,.35);color:#ffc36b;border-radius:10px;padding:12px 14px;font-size:.85rem;margin-bottom:16px;}
-  .aviso-ok{background:rgba(34,197,139,.12);border:1px solid rgba(34,197,139,.4);color:var(--acento);border-radius:10px;padding:16px;margin-bottom:18px;}
+  .aviso-sesion{background:rgba(255,180,60,.12);border:1px solid rgba(255,180,60,.35);color:#ffc36b;border-radius:11px;padding:13px 15px;font-size:.85rem;margin-bottom:16px;line-height:1.5;}
+  .aviso-ok{background:rgba(34,197,139,.12);border:1px solid rgba(34,197,139,.4);color:var(--acento);border-radius:14px;padding:18px 20px;margin-bottom:22px;}
   .aviso-ok h2{font-size:1.05rem;margin-bottom:6px;}
+
+  /* ---------- Tambien te puede interesar ---------- */
+  .relacionados{margin-top:56px;}
+  .relacionados h2{font-size:1.2rem;font-weight:800;letter-spacing:-.01em;margin-bottom:18px;}
+  .relacionados-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:16px;}
+  .rel-card{background:var(--panel);border:1px solid var(--borde);border-radius:16px;overflow:hidden;text-decoration:none;color:inherit;display:block;transition:transform .15s,border-color .15s;}
+  .rel-card:hover{transform:translateY(-2px);border-color:#343b4d;}
+  .rel-card img{width:100%;aspect-ratio:1/1;object-fit:cover;display:block;background:#0b0d13;}
+  .rel-card .rel-ph{width:100%;aspect-ratio:1/1;display:flex;align-items:center;justify-content:center;color:var(--tenue);background:linear-gradient(135deg,#141722,#1b1f2c);font-size:.8rem;}
+  .rel-card-body{padding:12px 14px;}
+  .rel-card-nombre{font-size:.86rem;font-weight:650;margin-bottom:5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .rel-card-precio{color:var(--acento);font-weight:700;font-size:.92rem;}
 </style>
 </head>
 <body>
@@ -97,11 +117,15 @@
       <div class="galeria">
         <% var fotos = (producto.fotos && producto.fotos.length) ? producto.fotos : []; %>
         <% if (fotos.length) { %>
-          <img id="foto-principal" src="<%= fotos[0] %>" alt="<%= producto.nombre %>" />
+          <div class="galeria-principal">
+            <img id="foto-principal" src="<%= fotos[0] %>" alt="<%= producto.nombre %>" />
+            <% if (fotos.length > 1) { %><span class="contador-fotos" id="contador-fotos">1/<%= fotos.length %></span><% } %>
+          </div>
           <% if (fotos.length > 1) { %>
             <div class="miniaturas">
               <% fotos.forEach(function (f, i) { %>
-                <img src="<%= f %>" class="<%= i === 0 ? 'activa' : '' %>" onclick="document.getElementById('foto-principal').src=this.src; document.querySelectorAll('.miniaturas img').forEach(function(m){m.classList.remove('activa')}); this.classList.add('activa');" />
+                <img src="<%= f %>" class="<%= i === 0 ? 'activa' : '' %>"
+                     onclick="document.getElementById('foto-principal').src=this.src; document.querySelectorAll('.miniaturas img').forEach(function(m){m.classList.remove('activa')}); this.classList.add('activa'); var c=document.getElementById('contador-fotos'); if(c) c.textContent='<%= i + 1 %>/<%= fotos.length %>';" />
               <% }); %>
             </div>
           <% } %>
@@ -111,7 +135,7 @@
 
         <% if (colores && colores.length > 1) { %>
           <div class="colores">
-            <p class="colores-titulo">También disponible en:</p>
+            <p class="colores-titulo">También disponible en</p>
             <div class="colores-lista">
               <% colores.forEach(function (c) { %>
                 <% if (c.foto) { %>
@@ -128,49 +152,57 @@
       </div>
 
       <div>
-        <h1><%= producto.nombre %></h1>
         <% var marca = producto.atributos && producto.atributos.Marca ? producto.atributos.Marca : ''; %>
-        <% if (marca) { %><p class="marca"><%= marca %></p><% } %>
+        <% if (marca) { %><span class="marca-badge"><%= marca %></span><% } %>
+        <h1><%= producto.nombre %></h1>
 
         <% var variantes = producto.variantes || []; %>
         <% var stockBase = variantes.length ? variantes.reduce(function(s,v){return s+v.stock}, 0) : producto.stock; %>
         <span class="stock <%= stockBase === 0 ? 'agotado' : (stockBase <= 5 ? 'bajo' : '') %>">
           <%= stockBase === 0 ? 'Agotado' : (stockBase <= 5 ? 'Últimas unidades' : 'Disponible') %>
         </span>
-        <p class="precio"><%= simboloCatalogo %> <%= Number(producto.precio).toFixed(2) %></p>
 
-        <% if (producto.descripcion) { %><p class="descripcion"><%= producto.descripcion %></p><% } %>
-
-        <% if (!tokenSesion) { %>
-          <div class="aviso-sesion">Para agregar al carrito, pedile este producto a tu asesor por WhatsApp — te va a mandar un link que ya te reconoce.</div>
-          <% if (numeroWhatsapp) { %>
-            <a class="btn btn-whatsapp" href="https://wa.me/<%= numeroWhatsapp %>?text=<%= encodeURIComponent('Estoy viendo ' + producto.nombre) %>" target="_blank" rel="noopener">Consultar por WhatsApp</a>
-          <% } %>
-        <% } else { %>
-          <form method="POST" action="/catalogo/<%= empresa.slug %>/producto/<%= producto.id %>/carrito">
-            <input type="hidden" name="s" value="<%= tokenSesion %>" />
-            <% if (variantes.length) { %>
-              <div class="campo">
-                <label for="idVariante">Elegí talla / color</label>
-                <select name="idVariante" id="idVariante" required>
-                  <option value="">Seleccioná una opción</option>
-                  <% variantes.forEach(function (v) { %>
-                    <option value="<%= v.id %>" <%= v.stock <= 0 ? 'disabled' : '' %>>
-                      <%= Object.entries(v.atributos || {}).map(function(e){return e[0]+': '+e[1]}).join(' · ') %>
-                      <%= v.stock <= 0 ? '(sin stock)' : '' %>
-                    </option>
-                  <% }); %>
-                </select>
-              </div>
-            <% } %>
-            <button class="btn btn-primario" type="submit" <%= stockBase === 0 ? 'disabled' : '' %>>
-              <%= stockBase === 0 ? 'Sin stock' : 'Agregar al carrito' %>
-            </button>
-          </form>
-          <% if (numeroWhatsapp) { %>
-            <a class="btn btn-whatsapp" href="https://wa.me/<%= numeroWhatsapp %>?text=<%= encodeURIComponent('Estoy viendo ' + producto.nombre) %>" target="_blank" rel="noopener">Volver a WhatsApp</a>
-          <% } %>
+        <% if (producto.descripcion) { %>
+          <div class="seccion-descripcion">
+            <h3>Descripción</h3>
+            <p class="descripcion"><%= producto.descripcion %></p>
+          </div>
         <% } %>
+
+        <div class="compra-card">
+          <p class="precio"><%= simboloCatalogo %> <%= Number(producto.precio).toFixed(2) %></p>
+
+          <% if (!tokenSesion) { %>
+            <div class="aviso-sesion">Para agregar al carrito, pedile este producto a tu asesor por WhatsApp — te va a mandar un link que ya te reconoce.</div>
+            <% if (numeroWhatsapp) { %>
+              <a class="btn btn-whatsapp" href="https://wa.me/<%= numeroWhatsapp %>?text=<%= encodeURIComponent('Estoy viendo ' + producto.nombre) %>" target="_blank" rel="noopener">Consultar por WhatsApp</a>
+            <% } %>
+          <% } else { %>
+            <form method="POST" action="/catalogo/<%= empresa.slug %>/producto/<%= producto.id %>/carrito">
+              <input type="hidden" name="s" value="<%= tokenSesion %>" />
+              <% if (variantes.length) { %>
+                <div class="campo">
+                  <label for="idVariante">Elegí talla / color</label>
+                  <select name="idVariante" id="idVariante" required>
+                    <option value="">Seleccioná una opción</option>
+                    <% variantes.forEach(function (v) { %>
+                      <option value="<%= v.id %>" <%= v.stock <= 0 ? 'disabled' : '' %>>
+                        <%= Object.entries(v.atributos || {}).map(function(e){return e[0]+': '+e[1]}).join(' · ') %>
+                        <%= v.stock <= 0 ? '(sin stock)' : '' %>
+                      </option>
+                    <% }); %>
+                  </select>
+                </div>
+              <% } %>
+              <button class="btn btn-primario" type="submit" <%= stockBase === 0 ? 'disabled' : '' %>>
+                <%= stockBase === 0 ? 'Sin stock' : 'Agregar al carrito' %>
+              </button>
+            </form>
+            <% if (numeroWhatsapp) { %>
+              <a class="btn btn-whatsapp" href="https://wa.me/<%= numeroWhatsapp %>?text=<%= encodeURIComponent('Estoy viendo ' + producto.nombre) %>" target="_blank" rel="noopener">Volver a WhatsApp</a>
+            <% } %>
+          <% } %>
+        </div>
       </div>
     </div>
 

@@ -502,6 +502,13 @@ model Producto {
   // Variante.atributos: cada negocio define lo que le sirve a su rubro.
   atributos       Json     @default("{}")
   createdAt       DateTime @default(now())
+  // Vector de texto->significado (nombre+descripcion+atributos), para busqueda
+  // semantica cuando el matching literal no encuentra nada (ver
+  // lib/services/embeddings.js). Array simple, no pgvector: el catalogo de
+  // una tienda es chico, calcular similitud coseno en JS alcanza. Vacio
+  // hasta que se genera (al crear/editar el producto, o via el script de
+  // backfill scripts/generar-embeddings.js).
+  embedding       Float[]  @default([])
 
   pedidoItems PedidoItem[]
   variantes   Variante[]
