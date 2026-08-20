@@ -35,6 +35,24 @@
   .miniaturas img{width:64px;height:64px;border-radius:8px;object-fit:cover;cursor:pointer;border:2px solid transparent;flex:0 0 auto;}
   .miniaturas img.activa{border-color:var(--acento);}
 
+  .colores{margin-top:14px;}
+  .colores-titulo{font-size:.8rem;color:var(--tenue);margin-bottom:8px;}
+  .colores-lista{display:flex;gap:8px;flex-wrap:wrap;}
+  .color-chip{display:flex;align-items:center;gap:6px;padding:4px 10px 4px 4px;border-radius:999px;background:var(--panel);border:1px solid var(--borde);cursor:pointer;font-size:.82rem;color:var(--tinta);}
+  .color-chip img{width:26px;height:26px;border-radius:50%;object-fit:cover;}
+  .color-chip .sin-foto{width:26px;height:26px;border-radius:50%;background:var(--panel-2);}
+  .color-chip.solo-texto{cursor:default;padding:6px 12px;}
+
+  .relacionados{margin-top:48px;}
+  .relacionados h2{font-size:1.15rem;margin-bottom:16px;}
+  .relacionados-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:14px;}
+  .rel-card{background:var(--panel);border:1px solid var(--borde);border-radius:14px;overflow:hidden;text-decoration:none;color:inherit;display:block;}
+  .rel-card img{width:100%;aspect-ratio:1/1;object-fit:cover;display:block;background:#0b0d13;}
+  .rel-card .rel-ph{width:100%;aspect-ratio:1/1;display:flex;align-items:center;justify-content:center;color:var(--tenue);background:linear-gradient(135deg,#141722,#1b1f2c);font-size:.8rem;}
+  .rel-card-body{padding:10px 12px;}
+  .rel-card-nombre{font-size:.85rem;font-weight:600;margin-bottom:4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .rel-card-precio{color:var(--acento);font-weight:700;font-size:.9rem;}
+
   h1{font-size:1.5rem;font-weight:800;margin-bottom:6px;}
   .marca{color:var(--tenue);font-size:.88rem;margin-bottom:10px;}
   .precio{color:var(--acento);font-weight:800;font-size:1.6rem;margin:10px 0;}
@@ -90,6 +108,23 @@
         <% } else { %>
           <div class="ph">Sin foto</div>
         <% } %>
+
+        <% if (colores && colores.length > 1) { %>
+          <div class="colores">
+            <p class="colores-titulo">También disponible en:</p>
+            <div class="colores-lista">
+              <% colores.forEach(function (c) { %>
+                <% if (c.foto) { %>
+                  <span class="color-chip" onclick="document.getElementById('foto-principal').src='<%= c.foto %>'; document.querySelectorAll('.miniaturas img').forEach(function(m){m.classList.remove('activa')});">
+                    <img src="<%= c.foto %>" alt="<%= c.color %>" /> <%= c.color %>
+                  </span>
+                <% } else { %>
+                  <span class="color-chip solo-texto"><%= c.color %></span>
+                <% } %>
+              <% }); %>
+            </div>
+          </div>
+        <% } %>
       </div>
 
       <div>
@@ -138,6 +173,27 @@
         <% } %>
       </div>
     </div>
+
+    <% if (relacionados && relacionados.length) { %>
+      <div class="relacionados">
+        <h2>También te puede interesar</h2>
+        <div class="relacionados-grid">
+          <% relacionados.forEach(function (r) { %>
+            <a class="rel-card" href="/catalogo/<%= empresa.slug %>/producto/<%= r.id %><%= tokenSesion ? '?s=' + encodeURIComponent(tokenSesion) : '' %>">
+              <% if (r.fotos && r.fotos.length) { %>
+                <img src="<%= r.fotos[0] %>" alt="<%= r.nombre %>" />
+              <% } else { %>
+                <div class="rel-ph">Sin foto</div>
+              <% } %>
+              <div class="rel-card-body">
+                <div class="rel-card-nombre"><%= r.nombre %></div>
+                <div class="rel-card-precio"><%= simboloCatalogo %> <%= Number(r.precio).toFixed(2) %></div>
+              </div>
+            </a>
+          <% }); %>
+        </div>
+      </div>
+    <% } %>
   </main>
 </body>
 </html>

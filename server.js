@@ -57,7 +57,8 @@ const { iniciarJobFacturacion } = require('./lib/jobs/facturacion');
 const { initSocket, emitMensaje, emitConversacion } = require('./lib/services/realtime');
 const { detectarPais } = require('./lib/services/geo');
 const { precioPlanParaPais, precioPaqueteParaPais, simboloMoneda } = require('./lib/services/precios');
-const { buscarProductosFiltrados, fotoParaMostrar } = require('./lib/services/catalogo');
+const { buscarProductosFiltrados, fotoParaMostrar, coloresConFotoDeVariantes } = require('./lib/services/catalogo');
+const { productosRelacionados } = require('./lib/services/recomendaciones');
 const { generarTokenSesion, verificarTokenSesion } = require('./lib/services/sesionWeb');
 const { resolverCoordenadas, extraerUrlDeMaps } = require('./lib/services/ubicacion');
 const { carritoDe, guardarCarrito, agregarItem } = require('./lib/services/carrito');
@@ -347,9 +348,12 @@ app.get('/catalogo/:slug/producto/:id', async (req, res, next) => {
     const ogImagen = (producto.fotos && producto.fotos[0]) || (config && config.logoUrl) || null;
     const ogUrl = `${req.protocol}://${req.get('host')}${req.originalUrl}`;
 
+    const colores = coloresConFotoDeVariantes(producto);
+    const relacionados = await productosRelacionados(empresa.id, producto.id);
+
     res.render('catalogo-producto', {
       title: `${producto.nombre} · ${empresa.marca || empresa.nombre}`,
-      empresa, config, producto,
+      empresa, config, producto, colores, relacionados,
       simboloCatalogo: simboloMoneda(empresa.moneda),
       numeroWhatsapp: agente ? agente.numeroWhatsapp : null,
       tokenSesion: sesion ? req.query.s : null,

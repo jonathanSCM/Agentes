@@ -18,7 +18,7 @@ const {
   limpiezaPorCambioDeCategoria,
   datosDeActualizacionDeLead,
 } = require('../lib/services/agente');
-const { coincideAtributosLead, buscarConFallback, buscarPorNombre } = require('../lib/services/catalogo');
+const { coincideAtributosLead, buscarConFallback, buscarPorNombre, coloresConFotoDeVariantes } = require('../lib/services/catalogo');
 
 // Categoria ahora es una relacion ({id, nombre}), no texto libre. Los tests
 // de este archivo siguen pasando `categoria: 'Zapatillas'` como string por
@@ -411,6 +411,64 @@ describe('partesDelSystem - el bloque fijo es cacheable de verdad (prompt cachin
     const a = partesDelSystem({ nombre: 'Tienda A', marca: 'Tienda A' }, productos, {}, {}, false, false, '');
     const b = partesDelSystem({ nombre: 'Tienda B', marca: 'Tienda B' }, productos, {}, {}, false, false, '');
     assert.notEqual(a.fijo, b.fijo);
+  });
+});
+
+describe('faltantes de categoria dejan de pedirse una vez que el cliente ya eligio/esta cerrando', () => {
+  // Bug real con capturas: el bot le pregunto "genero" a mitad del cierre
+  // (ya habia dado nombre, ubicacion y forma de pago QR) porque faltantes se
+  // recalculaba SIEMPRE por categoria, sin mirar que el cliente ya tenia un
+  // producto favorito y estaba en INTENCION_DE_COMPRA.
+  const empresa = { nombre: 'Tienda Demo', marca: 'Tienda Demo' };
+  const jeans = { id: 1, nombre: 'Jeans', atributos: [{ nombre: 'Genero', nivel: 'OBLIGATORIO' }] };
+  const productos = [{ id: 10, nombre: 'Jean Slim', categoria: jeans, variantes: [] }];
+
+  test('sin favorito ni cierre: SI pide el atributo obligatorio (comportamiento normal)', () => {
+    const system = construirSystem(empresa, productos, {}, { categoriaInteres: 'Jeans', categoriaId: 1 }, false, false, '');
+    assert.match(system, /LO UNICO QUE TE FALTA.*Genero/s);
+  });
+
+  test('con productoFavoritoId ya seteado: NUNCA vuelve a pedir el atributo', () => {
+    const system = construirSystem(empresa, productos, {}, { categoriaInteres: 'Jeans', categoriaId: 1, productoFavoritoId: 10 }, false, false, '');
+    assert.doesNotMatch(system, /LO UNICO QUE TE FALTA/);
+  });
+
+  test('con estadoConversacion en cualquier etapa de cierre: NUNCA vuelve a pedir el atributo', () => {
+    for (const estado of ['INTENCION_DE_COMPRA', 'LISTO_PARA_COMPRAR', 'DATOS_DE_PEDIDO', 'ENTREGA', 'PEDIDO_COMPLETADO']) {
+      const system = construirSystem(empresa, productos, {}, { categoriaInteres: 'Jeans', categoriaId: 1, estadoConversacion: estado }, false, false, '');
+      assert.doesNotMatch(system, /LO UNICO QUE TE FALTA/, `no deberia pedirlo en estado ${estado}`);
+    }
+  });
+});
+
+describe('coloresConFotoDeVariantes - "tambien disponible en" del catalogo web', () => {
+  test('un color con foto en alguna variante trae esa foto', () => {
+    const p = {
+      variantes: [
+        { activa: true, atributos: { Color: 'Negro', Talla: '40' }, fotos: ['negro.jpg'] },
+        { activa: true, atributos: { Color: 'Negro', Talla: '41' }, fotos: [] },
+      ],
+    };
+    assert.deepEqual(coloresConFotoDeVariantes(p), [{ color: 'Negro', foto: 'negro.jpg' }]);
+  });
+
+  test('un color sin ninguna foto en ninguna variante trae foto: null', () => {
+    const p = { variantes: [{ activa: true, atributos: { Color: 'Rojo' }, fotos: [] }] };
+    assert.deepEqual(coloresConFotoDeVariantes(p), [{ color: 'Rojo', foto: null }]);
+  });
+
+  test('variantes inactivas o sin color no cuentan', () => {
+    const p = {
+      variantes: [
+        { activa: false, atributos: { Color: 'Azul' }, fotos: ['azul.jpg'] },
+        { activa: true, atributos: {}, fotos: ['x.jpg'] },
+      ],
+    };
+    assert.deepEqual(coloresConFotoDeVariantes(p), []);
+  });
+
+  test('sin variantes, devuelve vacio (no revienta)', () => {
+    assert.deepEqual(coloresConFotoDeVariantes({}), []);
   });
 });
 

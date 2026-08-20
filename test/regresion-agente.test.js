@@ -102,3 +102,27 @@ describe('generarRespuesta - la IA puede mostrar productos reales via tool_calls
     assert.match(salida.respuesta, /zapatilla/i);
   });
 });
+
+describe('generarRespuesta - nunca afirma "ya esta en tu carrito" si el carrito sigue vacio', () => {
+  // Bug real con capturas: el cliente dijo "estoy viendo la Park St 2.0"
+  // (solo mirando, sin talla/color) y el bot respondio "ya la tienes en tu
+  // carrito" en el mismo mensaje en el que recien preguntaba la talla -
+  // agregar_al_carrito nunca se habia llamado con exito. Este test simula un
+  // modelo que insiste con la afirmacion falsa en TODAS las vueltas (peor
+  // caso) y confirma que el sistema nunca la deja pasar tal cual.
+  test('si el modelo insiste con la afirmacion falsa, el sistema la corrige antes de mandarla', async () => {
+    const llamarInyectado = async () => ({
+      content: 'Ya la tienes en tu carrito. ¿Te gustaría ver algo más?',
+      tool_calls: [],
+    });
+
+    const salida = await generarRespuesta(agenteId, TELEFONO, [], 'Estoy viendo la Zapatilla de test', undefined, { llamarInyectado });
+
+    assert.equal(salida.ok, true);
+    assert.doesNotMatch(salida.respuesta, /ya (la|lo|los|las) tien[e]?s? en tu carrito/i);
+
+    const cliente = await prisma.clienteFinal.findFirst({ where: { empresaId, telefono: TELEFONO } });
+    const carrito = (cliente.contexto && cliente.contexto.carrito && cliente.contexto.carrito.items) || [];
+    assert.equal(carrito.length, 0, 'el carrito real nunca debio tener nada: la afirmacion era falsa');
+  });
+});
