@@ -56,15 +56,6 @@
   .miniaturas button:hover{opacity:1;transform:translateY(-1px);}
   .miniaturas button.activa{border-color:var(--acento);opacity:1;}
 
-  .colores{margin-top:20px;}
-  .colores-titulo{font-size:.8rem;color:var(--tenue);margin-bottom:9px;font-weight:600;}
-  .colores-lista{display:flex;gap:9px;flex-wrap:wrap;}
-  .color-chip{display:flex;align-items:center;gap:7px;padding:5px 13px 5px 5px;border-radius:999px;background:var(--panel);border:1px solid var(--borde);cursor:pointer;font-size:.83rem;color:var(--tinta);transition:border-color .15s,transform .15s;}
-  .color-chip:hover{border-color:var(--acento);transform:translateY(-1px);}
-  .color-chip img{width:28px;height:28px;border-radius:50%;object-fit:cover;}
-  .color-chip .sin-foto{width:28px;height:28px;border-radius:50%;background:var(--panel-2);}
-  .color-chip.solo-texto{cursor:default;padding:7px 13px;}
-  .color-chip.solo-texto:hover{border-color:var(--borde);transform:none;}
 
   /* ---------- Info del producto ---------- */
   .marca-badge{display:inline-block;font-size:.76rem;font-weight:700;letter-spacing:.03em;text-transform:uppercase;color:var(--tenue);background:var(--panel);border:1px solid var(--borde);padding:4px 11px;border-radius:999px;margin-bottom:12px;}
@@ -81,10 +72,24 @@
   .compra-card{margin-top:26px;background:var(--panel);border:1px solid var(--borde);border-radius:18px;padding:22px;box-shadow:0 16px 40px -22px rgba(0,0,0,.6);}
   .precio{color:var(--acento);font-weight:800;font-size:1.9rem;letter-spacing:-.02em;margin-bottom:16px;}
 
-  .campo{margin-bottom:16px;}
-  .campo label{display:block;font-size:.82rem;color:var(--tenue);margin-bottom:7px;font-weight:600;}
-  select{width:100%;background:var(--panel-2);border:1px solid var(--borde);border-radius:11px;padding:12px 13px;color:var(--tinta);font-size:.92rem;font-family:inherit;cursor:pointer;}
-  select:focus{outline:none;border-color:var(--acento);}
+  .campo{margin-bottom:18px;}
+  .campo label{display:block;font-size:.82rem;color:var(--tenue);margin-bottom:9px;font-weight:600;}
+
+  /* ---------- Swatches de color y pills de talla (reemplazan el combo box) ---------- */
+  .swatches{display:flex;gap:10px;flex-wrap:wrap;}
+  .swatch{width:46px;height:46px;border-radius:50%;padding:2px;border:2px solid transparent;background:var(--panel-2);cursor:pointer;transition:border-color .15s,transform .15s;position:relative;flex:0 0 auto;}
+  .swatch:hover{transform:translateY(-1px);}
+  .swatch.activo{border-color:var(--acento);}
+  .swatch img{width:100%;height:100%;border-radius:50%;object-fit:cover;display:block;}
+  .swatch-sin-foto{display:block;width:100%;height:100%;border-radius:50%;background:linear-gradient(135deg,#2a2f3d,#1b1f2c);}
+  .swatch.agotado{opacity:.35;cursor:not-allowed;}
+  .swatch.agotado::after{content:'';position:absolute;left:6px;right:6px;top:50%;height:2px;background:var(--tenue);transform:rotate(-40deg);}
+
+  .pills{display:flex;gap:9px;flex-wrap:wrap;}
+  .pill{background:var(--panel-2);border:1px solid var(--borde);color:var(--tinta);border-radius:10px;padding:9px 15px;font-size:.86rem;font-weight:600;cursor:pointer;transition:border-color .15s,background .15s,transform .15s;font-family:inherit;}
+  .pill:hover:not(:disabled){transform:translateY(-1px);border-color:var(--acento);}
+  .pill.activo{background:var(--acento);border-color:var(--acento);color:#08251a;}
+  .pill:disabled{opacity:.4;cursor:not-allowed;text-decoration:line-through;}
 
   .btn{display:block;width:100%;text-align:center;border:none;border-radius:13px;padding:15px;font-size:.95rem;font-weight:700;cursor:pointer;text-decoration:none;transition:transform .15s,box-shadow .15s,opacity .15s;}
   .btn-primario{background:var(--acento);color:#08251a;box-shadow:0 10px 24px -10px color-mix(in srgb, var(--acento) 70%, transparent);}
@@ -142,23 +147,6 @@
         <% } else { %>
           <div class="ph">Sin foto</div>
         <% } %>
-
-        <% if (colores && colores.length > 1) { %>
-          <div class="colores">
-            <p class="colores-titulo">También disponible en</p>
-            <div class="colores-lista">
-              <% colores.forEach(function (c) { %>
-                <% if (c.foto) { %>
-                  <span class="color-chip" onclick="document.getElementById('foto-principal').src='<%= c.foto %>'; document.querySelectorAll('.miniaturas button').forEach(function(m){m.classList.remove('activa')});">
-                    <img src="<%= c.foto %>" alt="<%= c.color %>" /> <%= c.color.charAt(0).toUpperCase() + c.color.slice(1).toLowerCase() %>
-                  </span>
-                <% } else { %>
-                  <span class="color-chip solo-texto"><%= c.color.charAt(0).toUpperCase() + c.color.slice(1).toLowerCase() %></span>
-                <% } %>
-              <% }); %>
-            </div>
-          </div>
-        <% } %>
       </div>
 
       <div>
@@ -180,7 +168,20 @@
         <% } %>
 
         <div class="compra-card">
-          <p class="precio"><%= simboloCatalogo %> <%= Number(producto.precio).toFixed(2) %></p>
+          <p class="precio" id="precio-mostrado"><%= simboloCatalogo %> <%= Number(producto.precio).toFixed(2) %></p>
+
+          <% if (variantes.length > 1 && colores && colores.length > 1) { %>
+            <div class="campo">
+              <label id="label-color">Color</label>
+              <div class="swatches" id="swatches-color"></div>
+            </div>
+          <% } %>
+          <% if (variantes.length > 1) { %>
+            <div class="campo" id="campo-opciones">
+              <label id="label-opciones">Talla</label>
+              <div class="pills" id="pills-opciones"></div>
+            </div>
+          <% } %>
 
           <% if (!tokenSesion) { %>
             <div class="aviso-sesion">Para agregar al carrito, pedile este producto a tu asesor por WhatsApp — te va a mandar un link que ya te reconoce.</div>
@@ -190,22 +191,9 @@
           <% } else { %>
             <form method="POST" action="/catalogo/<%= empresa.slug %>/producto/<%= producto.id %>/carrito">
               <input type="hidden" name="s" value="<%= tokenSesion %>" />
-              <% if (variantes.length) { %>
-                <div class="campo">
-                  <label for="idVariante">Elegí talla / color</label>
-                  <select name="idVariante" id="idVariante" required>
-                    <option value="">Seleccioná una opción</option>
-                    <% variantes.forEach(function (v) { %>
-                      <option value="<%= v.id %>" <%= v.stock <= 0 ? 'disabled' : '' %>>
-                        <%= Object.entries(v.atributos || {}).map(function(e){return e[0]+': '+e[1]}).join(' · ') %>
-                        <%= v.stock <= 0 ? '(sin stock)' : '' %>
-                      </option>
-                    <% }); %>
-                  </select>
-                </div>
-              <% } %>
-              <button class="btn btn-primario" type="submit" <%= stockBase === 0 ? 'disabled' : '' %>>
-                <%= stockBase === 0 ? 'Sin stock' : 'Agregar al carrito' %>
+              <% if (variantes.length) { %><input type="hidden" name="idVariante" id="idVariante-input" value="<%= variantes.length === 1 ? variantes[0].id : '' %>" /><% } %>
+              <button class="btn btn-primario" type="submit" id="btn-agregar" <%= (variantes.length > 1 || stockBase === 0) ? 'disabled' : '' %>>
+                <%= variantes.length > 1 ? 'Elegí una opción' : (stockBase === 0 ? 'Sin stock' : 'Agregar al carrito') %>
               </button>
             </form>
             <% if (numeroWhatsapp) { %>
@@ -255,5 +243,149 @@
       document.getElementById('lightbox').classList.remove('abierto');
     }
   </script>
+
+  <% if (variantes.length > 1) { %>
+  <script>
+    // Selector de color (swatches con foto real) + talla (pills), en vez del
+    // combo box de siempre. Todo el armado corre del lado del cliente con lo
+    // que ya trajo el servidor (variantes reales) - nunca inventa una
+    // combinacion que no exista, y el hidden idVariante siempre queda con un
+    // ID real o vacio (el boton se deshabilita hasta que hay uno valido).
+    // Con una sola variante no hace falta nada de esto: el servidor ya dejo
+    // el hidden precargado con su ID.
+    (function () {
+      var variantes = <%- JSON.stringify(variantes.map(function (v) {
+        return {
+          id: v.id,
+          color: (v.atributos && v.atributos.Color) || null,
+          talla: (v.atributos && v.atributos.Talla) || null,
+          etiqueta: Object.entries(v.atributos || {}).map(function (e) { return e[0] + ': ' + e[1]; }).join(' · '),
+          stock: v.stock,
+          precio: v.precio != null ? Number(v.precio) : null,
+        };
+      })) %>;
+      var colores = <%- JSON.stringify((colores || []).map(function (c) { return { color: c.color, foto: c.foto }; })) %>;
+      var precioBase = <%= Number(producto.precio) %>;
+      var simbolo = '<%= simboloCatalogo %>';
+
+      var tieneColor = variantes.some(function (v) { return v.color; });
+      var tieneTalla = variantes.some(function (v) { return v.talla; });
+
+      var swatchesEl = document.getElementById('swatches-color');
+      var pillsEl = document.getElementById('pills-opciones');
+      var labelOpciones = document.getElementById('label-opciones');
+      var inputIdVariante = document.getElementById('idVariante-input');
+      var btnAgregar = document.getElementById('btn-agregar');
+      var precioEl = document.getElementById('precio-mostrado');
+
+      var colorSeleccionado = colores.length === 1 ? colores[0].color : null;
+      var tallaSeleccionada = null;
+
+      function capitalizar(t) { return t ? t.charAt(0).toUpperCase() + t.slice(1).toLowerCase() : t; }
+      function formatearPrecio(n) { return simbolo + ' ' + Number(n).toFixed(2); }
+      function variantesDeColor(color) { return variantes.filter(function (v) { return !color || v.color === color; }); }
+
+      function pintarSwatches() {
+        if (!swatchesEl) return;
+        swatchesEl.innerHTML = '';
+        colores.forEach(function (c) {
+          var stockColor = variantesDeColor(c.color).reduce(function (s, v) { return s + v.stock; }, 0);
+          var btn = document.createElement('button');
+          btn.type = 'button';
+          btn.className = 'swatch' + (c.color === colorSeleccionado ? ' activo' : '') + (stockColor <= 0 ? ' agotado' : '');
+          btn.title = capitalizar(c.color) + (stockColor <= 0 ? ' (sin stock)' : '');
+          btn.innerHTML = c.foto ? '<img src="' + c.foto + '" alt="' + c.color + '" />' : '<span class="swatch-sin-foto"></span>';
+          btn.addEventListener('click', function () { elegirColor(c.color, c.foto); });
+          swatchesEl.appendChild(btn);
+        });
+      }
+
+      function pintarPills() {
+        if (!pillsEl) return;
+        pillsEl.innerHTML = '';
+        var candidatos = tieneColor ? variantesDeColor(colorSeleccionado) : variantes;
+
+        if (!tieneTalla) {
+          // Variantes con atributos que no son Color/Talla (u otra
+          // categoria): un pill directo por cada combinacion real.
+          if (labelOpciones) labelOpciones.textContent = 'Opciones';
+          candidatos.forEach(function (v) {
+            var pill = document.createElement('button');
+            pill.type = 'button';
+            pill.className = 'pill' + (inputIdVariante && Number(inputIdVariante.value) === v.id ? ' activo' : '');
+            pill.textContent = (v.etiqueta || 'Única opción') + (v.stock <= 0 ? ' (sin stock)' : '');
+            pill.disabled = v.stock <= 0;
+            pill.addEventListener('click', function () { elegirVariante(v); });
+            pillsEl.appendChild(pill);
+          });
+          return;
+        }
+
+        if (labelOpciones) labelOpciones.textContent = 'Talla';
+        var tallas = [];
+        candidatos.forEach(function (v) { if (v.talla && tallas.indexOf(v.talla) === -1) tallas.push(v.talla); });
+        tallas.forEach(function (talla) {
+          var v = candidatos.filter(function (x) { return x.talla === talla; }).sort(function (a, b) { return b.stock - a.stock; })[0];
+          var pill = document.createElement('button');
+          pill.type = 'button';
+          pill.className = 'pill' + (talla === tallaSeleccionada ? ' activo' : '');
+          pill.textContent = talla + (v.stock <= 0 ? ' (sin stock)' : '');
+          pill.disabled = v.stock <= 0;
+          pill.addEventListener('click', function () { elegirTalla(talla); });
+          pillsEl.appendChild(pill);
+        });
+      }
+
+      function aplicarVariante(v) {
+        if (inputIdVariante) inputIdVariante.value = v ? v.id : '';
+        if (btnAgregar) {
+          if (!v) { btnAgregar.disabled = true; btnAgregar.textContent = 'Elegí una opción'; }
+          else if (v.stock <= 0) { btnAgregar.disabled = true; btnAgregar.textContent = 'Sin stock en esa combinación'; }
+          else { btnAgregar.disabled = false; btnAgregar.textContent = 'Agregar al carrito'; }
+        }
+        if (precioEl) precioEl.textContent = formatearPrecio(v && v.precio != null ? v.precio : precioBase);
+      }
+
+      function resolverVariante() {
+        if (tieneColor && tieneTalla) {
+          return (colorSeleccionado && tallaSeleccionada)
+            ? variantes.find(function (v) { return v.color === colorSeleccionado && v.talla === tallaSeleccionada; })
+            : null;
+        }
+        if (tieneColor) return colorSeleccionado ? variantes.find(function (v) { return v.color === colorSeleccionado; }) : null;
+        if (tieneTalla) return tallaSeleccionada ? variantes.find(function (v) { return v.talla === tallaSeleccionada; }) : null;
+        return null; // sin Color/Talla: se resuelve directo con elegirVariante()
+      }
+
+      function elegirColor(color, foto) {
+        colorSeleccionado = color;
+        tallaSeleccionada = null;
+        if (foto) {
+          var principal = document.getElementById('foto-principal');
+          if (principal) principal.src = foto;
+          document.querySelectorAll('.miniaturas button').forEach(function (m) { m.classList.remove('activa'); });
+        }
+        pintarSwatches();
+        pintarPills();
+        aplicarVariante(resolverVariante());
+      }
+
+      function elegirTalla(talla) {
+        tallaSeleccionada = talla;
+        pintarPills();
+        aplicarVariante(resolverVariante());
+      }
+
+      function elegirVariante(v) {
+        pintarPills();
+        aplicarVariante(v);
+      }
+
+      pintarSwatches();
+      pintarPills();
+      aplicarVariante(tieneColor || tieneTalla ? resolverVariante() : null);
+    })();
+  </script>
+  <% } %>
 </body>
 </html>
