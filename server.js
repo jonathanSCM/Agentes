@@ -52,14 +52,14 @@ const { registrarCliente, autenticar } = require('./lib/services/auth');
 const { procesarMensajeEntrante, atenderMensaje, generarYRegistrarRespuesta } = require('./lib/services/conversaciones');
 const { encolarRespuesta } = require('./lib/services/bufferMensajes');
 const wa = require('./lib/services/whatsapp');
-const { analizarImagenProducto, transcribirAudio } = require('./lib/services/agente');
+const { analizarImagenProducto, transcribirAudio, fichaProducto } = require('./lib/services/agente');
 const { iniciarJobFacturacion } = require('./lib/jobs/facturacion');
 const { initSocket, emitMensaje, emitConversacion } = require('./lib/services/realtime');
 const { detectarPais } = require('./lib/services/geo');
 const { precioPlanParaPais, precioPaqueteParaPais, simboloMoneda } = require('./lib/services/precios');
 const { buscarProductosFiltrados, fotoParaMostrar } = require('./lib/services/catalogo');
 const { generarTokenSesion, verificarTokenSesion } = require('./lib/services/sesionWeb');
-const { resolverCoordenadas } = require('./lib/services/ubicacion');
+const { resolverCoordenadas, extraerUrlDeMaps } = require('./lib/services/ubicacion');
 const { carritoDe, guardarCarrito, agregarItem } = require('./lib/services/carrito');
 const { transicionValida, requiereRestock, dentroDeVentana24h } = require('./lib/services/pedidos');
 
@@ -792,10 +792,14 @@ app.get('/panel/conversaciones/:id', requireCliente, async (req, res, next) => {
     const cliente = await prisma.clienteFinal.findFirst({
       where: { empresaId: req.session.empresaId, telefono: conversacion.telefonoCliente },
     });
+    // Si la direccion es un link pegado por el cliente (lo mas comun en la
+    // practica), se muestra como link corto en vez de la URL cruda - evita
+    // el desborde de la tarjeta y es mas util igual.
+    const direccionLink = cliente && cliente.direccionEntrega ? extraerUrlDeMaps(cliente.direccionEntrega) : null;
 
     res.render('cliente/conversacion-detalle', {
       title: 'Conversación - Proshop', tituloPagina: 'Conversación', activo: 'conversaciones',
-      conversacion, cliente, mensaje: req.query.ok || null, error: req.query.err || null,
+      conversacion, cliente, direccionLink, mensaje: req.query.ok || null, error: req.query.err || null,
     });
   } catch (err) { next(err); }
 });
@@ -947,6 +951,82 @@ app.post('/panel/conversaciones/:id/mensaje', requireCliente, async (req, res, n
     emitMensaje(req.session.empresaId, {
       conversacionId: conversacion.id, rol: 'AGENTE', contenido: texto, createdAt: new Date(),
       usuarioNombre: req.session.clienteNombre,
+    });
+
+    res.redirect(`/panel/conversaciones/${conversacion.id}`);
+  } catch (err) { next(err); }
+});
+
+// Buscador de productos para mandar una tarjeta manual (solo devuelve lo
+// minimo para la lista: el backend decide y filtra, nunca se manda el
+// catalogo completo al navegador).
+app.get('/panel/conversaciones/:id/productos-buscar', requireCliente, async (req, res, next) => {
+  try {
+    const conversacion = await cargarConversacion(req);
+    if (!conversacion) return res.status(404).json([]);
+    const q = String(req.query.q || '').trim();
+
+    const productos = await prisma.producto.findMany({
+      where: {
+        empresaId: req.session.empresaId,
+        activo: true,
+        ...(q ? { nombre: { contains: q, mode: 'insensitive' } } : {}),
+      },
+      orderBy: { nombre: 'asc' },
+      take: 20,
+      select: { id: true, nombre: true, precio: true, fotos: true },
+    });
+
+    res.json(productos.map((p) => ({ id: p.id, nombre: p.nombre, precio: p.precio, foto: p.fotos?.[0] || null })));
+  } catch (err) { next(err); }
+});
+
+// Manda una tarjeta de producto real (imagen + ficha), reusando exactamente
+// el mismo mecanismo que usa el agente IA (fichaProducto + fotoParaMostrar +
+// wa.enviarImagen), solo que disparado a mano por un humano con el control
+// tomado.
+app.post('/panel/conversaciones/:id/producto', requireCliente, async (req, res, next) => {
+  try {
+    const conversacion = await cargarConversacion(req);
+    if (!conversacion) return res.redirect('/panel/conversaciones');
+    if (conversacion.modo !== 'HUMANO') {
+      return res.redirect(`/panel/conversaciones/${conversacion.id}?err=` + encodeURIComponent('Primero tenés que tomar el control de este chat.'));
+    }
+    const productoId = Number((req.body || {}).productoId);
+    const producto = await prisma.producto.findFirst({
+      where: { id: productoId, empresaId: req.session.empresaId },
+      include: { variantes: { where: { activa: true }, orderBy: { id: 'asc' } } },
+    });
+    if (!producto) return res.redirect(`/panel/conversaciones/${conversacion.id}?err=` + encodeURIComponent('Ese producto ya no existe.'));
+
+    const empresa = await prisma.empresa.findUnique({ where: { id: req.session.empresaId } });
+    const caption = fichaProducto(producto, {}, empresa.moneda || 'BOB');
+    const foto = fotoParaMostrar(producto, {});
+    const mediaUrl = foto.url || null;
+
+    const conexion = conversacion.agente.conexion;
+    let envioOk = true;
+    if (conexion && conexion.estado === 'CONECTADO' && mediaUrl) {
+      const envio = await wa.enviarImagen(conexion, conversacion.telefonoCliente, mediaUrl, caption);
+      envioOk = envio.ok;
+    } else if (conexion && conexion.estado === 'CONECTADO') {
+      const envio = await wa.enviarTexto(conexion, conversacion.telefonoCliente, caption);
+      envioOk = envio.ok;
+    }
+    if (!envioOk) {
+      return res.redirect(`/panel/conversaciones/${conversacion.id}?err=` + encodeURIComponent('No se pudo enviar el producto por WhatsApp.'));
+    }
+
+    const mensajeGuardado = await prisma.mensaje.create({
+      data: {
+        conversacionId: conversacion.id, rol: 'AGENTE', contenido: caption,
+        mediaUrl, mediaTipo: mediaUrl ? 'imagen' : null, usuarioId: req.session.clienteId,
+      },
+    });
+    await prisma.conversacion.update({ where: { id: conversacion.id }, data: { ultimoMensajeAt: new Date() } });
+    emitMensaje(req.session.empresaId, {
+      conversacionId: conversacion.id, rol: 'AGENTE', contenido: caption, mediaUrl,
+      mediaTipo: mensajeGuardado.mediaTipo, createdAt: mensajeGuardado.createdAt, usuarioNombre: req.session.clienteNombre,
     });
 
     res.redirect(`/panel/conversaciones/${conversacion.id}`);

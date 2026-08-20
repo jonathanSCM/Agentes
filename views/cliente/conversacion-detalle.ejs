@@ -37,59 +37,103 @@
 <% if (error) { %><div class="alert-err"><%= error %></div><% } %>
 
 <% if (cliente) { %>
-<div class="admin-stats">
-  <div class="stat-card"><span class="stat-num" style="font-size:1.1rem"><%= cliente.categoriaInteres || '-' %></span><span class="stat-label">Interés</span></div>
-  <div class="stat-card"><span class="stat-num" style="font-size:1.1rem"><%= cliente.presupuesto || '-' %></span><span class="stat-label">Presupuesto</span></div>
-  <div class="stat-card"><span class="stat-num" style="font-size:1.1rem"><%= cliente.direccionEntrega || '-' %></span><span class="stat-label">Dirección de entrega</span></div>
-  <div class="stat-card"><span class="badge badge-done" style="font-size:.85rem"><%= cliente.estadoLead.replace(/_/g,' ').toLowerCase() %></span><span class="stat-label">Estado</span></div>
+<div class="dash-card conv-cliente-card">
+  <div class="dash-card-head"><h3>Cliente</h3></div>
+  <ul class="dash-list">
+    <li><span>Interés</span><span><%= cliente.categoriaInteres || '-' %></span></li>
+    <li><span>Presupuesto</span><span><%= cliente.presupuesto || '-' %></span></li>
+    <li>
+      <span>Dirección de entrega</span>
+      <span>
+        <% if (direccionLink) { %>
+          <a href="<%= direccionLink %>" target="_blank" rel="noopener" class="conv-direccion-link">📍 Ver ubicación</a>
+        <% } else { %>
+          <%= cliente.direccionEntrega || '-' %>
+        <% } %>
+      </span>
+    </li>
+    <li><span>Estado</span><span class="badge badge-done" style="font-size:.8rem"><%= cliente.estadoLead.replace(/_/g,' ').toLowerCase() %></span></li>
+  </ul>
 </div>
 <% } %>
 
-<div class="chat-window" style="max-width:640px" data-conversacion-id="<%= conversacion.id %>">
-  <div class="chat-head">
-    <span class="chat-avatar"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="4" y="7" width="16" height="12" rx="3"/><path d="M12 7V3M9 12h.01M15 12h.01"/></svg></span>
+<div class="conv-shell" style="max-width:640px" data-conversacion-id="<%= conversacion.id %>">
+  <div class="conv-head">
+    <span class="conv-avatar"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="4" y="7" width="16" height="12" rx="3"/><path d="M12 7V3M9 12h.01M15 12h.01"/></svg></span>
     <div>
       <strong><%= conversacion.agente.nombre %></strong>
-      <span class="chat-status" id="chatStatus"><%= conversacion.mensajes.length %> mensajes</span>
+      <span id="chatStatus"><%= conversacion.mensajes.length %> mensajes</span>
     </div>
   </div>
-  <div class="chat-body" id="chatMensajes" style="max-height:60vh;overflow-y:auto">
+  <div class="conv-body" id="chatMensajes">
     <% if (conversacion.mensajes.length === 0) { %>
       <p class="dash-empty" id="chatVacio">Todavía no hay mensajes en esta conversación.</p>
     <% } %>
+    <%
+      function claseDe(m) {
+        if (m.rol === 'CLIENTE') return 'cliente';
+        return m.usuario ? 'humano' : 'bot';
+      }
+      function quienDe(m) {
+        if (m.rol === 'CLIENTE') return null;
+        return m.usuario ? ('✋ ' + m.usuario.nombre) : '🤖 Agente IA';
+      }
+    %>
     <% conversacion.mensajes.forEach(function (m) { %>
+      <% var clase = claseDe(m); var quien = quienDe(m); %>
       <% if (m.mediaTipo === 'imagen' && m.mediaUrl) { %>
-        <div class="msg <%= m.rol === 'CLIENTE' ? 'in' : 'out' %> msg-foto" style="animation:none">
+        <div class="conv-msg foto <%= clase %>">
           <img src="<%= m.mediaUrl %>" alt="" />
-          <% if (m.contenido) { %><div class="msg-foto-caption"><%= m.contenido %></div><% } %>
+          <% if (quien || m.contenido) { %>
+            <div class="conv-msg-foto-caption">
+              <% if (quien) { %><div class="conv-msg-quien"><%= quien %></div><% } %>
+              <%= m.contenido %>
+            </div>
+          <% } %>
         </div>
       <% } else if (m.mediaTipo === 'audio' && m.mediaUrl) { %>
-        <div class="msg <%= m.rol === 'CLIENTE' ? 'in' : 'out' %>" style="animation:none">
-          <audio controls src="<%= m.mediaUrl %>" style="max-width:100%"></audio>
+        <div class="conv-msg <%= clase %>">
+          <% if (quien) { %><div class="conv-msg-quien"><%= quien %></div><% } %>
+          <audio controls src="<%= m.mediaUrl %>"></audio>
           <% if (m.contenido) { %><div style="margin-top:.4rem;font-size:.82rem"><%= m.contenido %></div><% } %>
         </div>
       <% } else { %>
-        <div class="msg <%= m.rol === 'CLIENTE' ? 'in' : 'out' %>" style="white-space:pre-line;animation:none">
-          <% if (m.usuario) { %><div style="font-size:.72rem;opacity:.75;margin-bottom:.2rem">✋ <%= m.usuario.nombre %></div><% } %>
+        <div class="conv-msg <%= clase %>">
+          <% if (quien) { %><div class="conv-msg-quien"><%= quien %></div><% } %>
           <%= m.contenido %>
         </div>
       <% } %>
-      <div class="muted" style="font-size:.7rem;margin:-.4rem 0 .55rem;text-align:<%= m.rol === 'CLIENTE' ? 'left' : 'right' %>">
+      <div class="conv-msg-hora <%= clase %>">
         <%= new Date(m.createdAt).toLocaleString('es-BO', { dateStyle: 'short', timeStyle: 'short' }) %>
       </div>
     <% }); %>
   </div>
 
   <% if (conversacion.modo === 'HUMANO') { %>
-    <form method="POST" action="/panel/conversaciones/<%= conversacion.id %>/mensaje" id="formMensajeHumano" style="display:flex; gap:.5rem; padding:.8rem; border-top:1px solid var(--border)">
-      <input type="text" name="texto" autocomplete="off" placeholder="Escribe tu respuesta..."
-             style="flex:1; padding:.6rem .8rem; border-radius:10px; border:1px solid var(--border); background:var(--bg-2); color:var(--text); font:inherit" />
+    <form method="POST" action="/panel/conversaciones/<%= conversacion.id %>/mensaje" id="formMensajeHumano" class="conv-foot">
+      <input type="text" name="texto" autocomplete="off" placeholder="Escribe tu respuesta..." />
+      <button class="btn btn-ghost" type="button" id="btnAbrirProducto">📦 Producto</button>
       <button class="btn btn-primary" type="submit">Enviar</button>
     </form>
   <% } else { %>
-    <p class="muted" style="padding:.8rem;text-align:center;font-size:.85rem;border-top:1px solid var(--border)">Tomá el control del chat para poder escribirle directo al cliente.</p>
+    <p class="conv-foot-sin-control">Tomá el control del chat para poder escribirle directo al cliente.</p>
   <% } %>
 </div>
+
+<% if (conversacion.modo === 'HUMANO') { %>
+<div class="prod-overlay" id="prodOverlay" hidden>
+  <div class="prod-card">
+    <button type="button" class="prod-cerrar" id="prodCerrar" aria-label="Cerrar">✕</button>
+    <h3>Enviar producto</h3>
+    <input type="text" class="prod-buscar" id="prodBuscar" placeholder="Buscar por nombre..." autocomplete="off" />
+    <div class="prod-lista" id="prodLista"></div>
+  </div>
+</div>
+
+<form method="POST" action="/panel/conversaciones/<%= conversacion.id %>/producto" id="formEnviarProducto" style="display:none">
+  <input type="hidden" name="productoId" id="prodIdSeleccionado" />
+</form>
+<% } %>
 
 <script src="/socket.io/socket.io.js"></script>
 <script>
@@ -104,27 +148,48 @@
       return d.toLocaleString('es-BO', { dateStyle: 'short', timeStyle: 'short' });
     }
 
+    function claseDe(m) {
+      if (m.rol === 'CLIENTE') return 'cliente';
+      return m.usuarioNombre ? 'humano' : 'bot';
+    }
+    function quienDe(m) {
+      if (m.rol === 'CLIENTE') return null;
+      return m.usuarioNombre ? ('✋ ' + m.usuarioNombre) : '🤖 Agente IA';
+    }
+
     function agregarBurbuja(m) {
       document.getElementById('chatVacio')?.remove();
+      var clase = claseDe(m);
+      var quien = quienDe(m);
       var wrap = document.createElement('div');
-      wrap.className = 'msg ' + (m.rol === 'CLIENTE' ? 'in' : 'out') + (m.mediaTipo === 'imagen' && m.mediaUrl ? ' msg-foto' : '');
-      wrap.style.animation = 'none';
+      wrap.className = 'conv-msg ' + clase + (m.mediaTipo === 'imagen' && m.mediaUrl ? ' foto' : '');
 
       if (m.mediaTipo === 'imagen' && m.mediaUrl) {
         var img = document.createElement('img');
         img.src = m.mediaUrl;
         wrap.appendChild(img);
-        if (m.contenido) {
+        if (quien || m.contenido) {
           var caption = document.createElement('div');
-          caption.className = 'msg-foto-caption';
-          caption.textContent = m.contenido;
+          caption.className = 'conv-msg-foto-caption';
+          if (quien) {
+            var q1 = document.createElement('div');
+            q1.className = 'conv-msg-quien';
+            q1.textContent = quien;
+            caption.appendChild(q1);
+          }
+          caption.appendChild(document.createTextNode(m.contenido || ''));
           wrap.appendChild(caption);
         }
       } else if (m.mediaTipo === 'audio' && m.mediaUrl) {
+        if (quien) {
+          var q2 = document.createElement('div');
+          q2.className = 'conv-msg-quien';
+          q2.textContent = quien;
+          wrap.appendChild(q2);
+        }
         var audio = document.createElement('audio');
         audio.controls = true;
         audio.src = m.mediaUrl;
-        audio.style.maxWidth = '100%';
         wrap.appendChild(audio);
         if (m.contenido) {
           var notaAudio = document.createElement('div');
@@ -133,20 +198,18 @@
           wrap.appendChild(notaAudio);
         }
       } else {
-        wrap.style.whiteSpace = 'pre-line';
-        if (m.usuarioNombre) {
-          var quien = document.createElement('div');
-          quien.style.cssText = 'font-size:.72rem;opacity:.75;margin-bottom:.2rem';
-          quien.textContent = '✋ ' + m.usuarioNombre;
-          wrap.appendChild(quien);
+        if (quien) {
+          var q3 = document.createElement('div');
+          q3.className = 'conv-msg-quien';
+          q3.textContent = quien;
+          wrap.appendChild(q3);
         }
         wrap.appendChild(document.createTextNode(m.contenido));
       }
       body.appendChild(wrap);
 
       var hora = document.createElement('div');
-      hora.className = 'muted';
-      hora.style.cssText = 'font-size:.7rem;margin:-.4rem 0 .55rem;text-align:' + (m.rol === 'CLIENTE' ? 'left' : 'right');
+      hora.className = 'conv-msg-hora ' + clase;
       hora.textContent = fmtFecha(m.createdAt);
       body.appendChild(hora);
 
@@ -164,6 +227,65 @@
       // mientras lo tenias abierto: recargamos para mostrar el estado real
       // (evita que dos personas escriban a la vez sin saberlo).
       if (payload.conversacionId === CONV_ID) location.reload();
+    });
+
+    // ---- Modal de "enviar producto" ----
+    var btnAbrir = document.getElementById('btnAbrirProducto');
+    var overlay = document.getElementById('prodOverlay');
+    if (!btnAbrir || !overlay) return;
+    var btnCerrar = document.getElementById('prodCerrar');
+    var buscar = document.getElementById('prodBuscar');
+    var lista = document.getElementById('prodLista');
+    var form = document.getElementById('formEnviarProducto');
+    var inputId = document.getElementById('prodIdSeleccionado');
+    var debounce = null;
+
+    function abrir() {
+      overlay.hidden = false;
+      buscar.value = '';
+      buscar.focus();
+      cargar('');
+    }
+    function cerrar() { overlay.hidden = true; }
+
+    function cargar(q) {
+      lista.innerHTML = '<p class="prod-vacio">Buscando...</p>';
+      fetch('/panel/conversaciones/<%= conversacion.id %>/productos-buscar?q=' + encodeURIComponent(q))
+        .then(function (r) { return r.json(); })
+        .then(function (productos) {
+          if (!productos.length) {
+            lista.innerHTML = '<p class="prod-vacio">Sin resultados.</p>';
+            return;
+          }
+          lista.innerHTML = '';
+          productos.forEach(function (p) {
+            var btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = 'prod-item';
+            var miniatura = p.foto
+              ? '<img src="' + p.foto + '" alt="" />'
+              : '<div class="prod-item-sin-foto">📦</div>';
+            btn.innerHTML = miniatura +
+              '<div><div class="prod-item-nombre"></div><div class="prod-item-precio"></div></div>';
+            btn.querySelector('.prod-item-nombre').textContent = p.nombre;
+            btn.querySelector('.prod-item-precio').textContent = 'Bs ' + Number(p.precio).toFixed(2);
+            btn.addEventListener('click', function () {
+              inputId.value = p.id;
+              form.submit();
+            });
+            lista.appendChild(btn);
+          });
+        })
+        .catch(function () { lista.innerHTML = '<p class="prod-vacio">No se pudo buscar. Intenta de nuevo.</p>'; });
+    }
+
+    btnAbrir.addEventListener('click', abrir);
+    btnCerrar.addEventListener('click', cerrar);
+    overlay.addEventListener('click', function (e) { if (e.target === overlay) cerrar(); });
+    buscar.addEventListener('input', function () {
+      clearTimeout(debounce);
+      var valor = buscar.value;
+      debounce = setTimeout(function () { cargar(valor); }, 300);
     });
   })();
 </script>

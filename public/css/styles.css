@@ -236,6 +236,19 @@ h1, h2, h3, h4 { font-family: var(--display); line-height: 1.15; letter-spacing:
   background-color: #241246;
   color: var(--text);
 }
+/* optgroup (rubros que agrupan subcategorias) no heredaba ningun estilo:
+   quedaba con la franja gris por defecto del navegador, rompiendo el tema
+   oscuro. El resaltado azul al pasar el mouse sobre una opcion es del
+   sistema operativo y no se puede sobreescribir por CSS en la mayoria de
+   los navegadores - esto es lo maximo que se puede controlar. */
+.field select optgroup,
+.aviso-form select optgroup,
+.calc-step-body select optgroup {
+  background-color: #1b0f30;
+  color: var(--muted);
+  font-style: normal;
+  font-weight: 700;
+}
 .field select option:checked,
 .field select option:hover,
 .aviso-form select option:checked,
@@ -311,6 +324,7 @@ h1, h2, h3, h4 { font-family: var(--display); line-height: 1.15; letter-spacing:
 .msg {
   max-width: 82%; padding: .55rem .8rem; border-radius: 14px;
   font-size: .88rem; line-height: 1.45; animation: msgIn .4s ease both;
+  overflow-wrap: anywhere; word-break: break-word;
 }
 .msg.in { align-self: flex-start; background: rgba(255,255,255,.10); border-bottom-left-radius: 4px; }
 .msg.out { align-self: flex-end; background: rgba(47,227,166,.18); border: 1px solid rgba(47,227,166,.3); border-bottom-right-radius: 4px; }

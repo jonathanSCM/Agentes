@@ -487,3 +487,91 @@ body.admin, body.admin-login {
 .config-nav a:hover { color: var(--text); background: var(--bg-2); }
 .config-seccion { margin-bottom: 1.2rem; scroll-margin-top: 4.5rem; }
 .config-seccion .dash-card-head h3 { font-size: 1.05rem; }
+
+/* ---------- Panel de conversacion: chat propio (no el de la landing) ---------- */
+.conv-shell {
+  background: var(--surface); backdrop-filter: blur(10px);
+  border: 1px solid var(--border); border-radius: var(--radius);
+  box-shadow: var(--shadow); overflow: hidden;
+}
+.conv-head {
+  display: flex; align-items: center; gap: .7rem;
+  padding: .85rem 1.1rem; background: rgba(0,0,0,.18); border-bottom: 1px solid var(--border);
+}
+.conv-avatar {
+  width: 36px; height: 36px; flex-shrink: 0; display: grid; place-items: center;
+  border-radius: 50%; background: linear-gradient(135deg, var(--primary), var(--primary-2)); color: #fff;
+}
+.conv-head strong { display: block; font-size: .95rem; }
+.conv-head span { font-size: .78rem; color: var(--muted); }
+
+.conv-body {
+  padding: 1.1rem; display: flex; flex-direction: column; gap: .35rem;
+  min-height: 250px; max-height: 60vh; overflow-y: auto; overflow-x: hidden;
+}
+.conv-msg {
+  max-width: 78%; padding: .6rem .85rem; border-radius: 16px;
+  font-size: .88rem; line-height: 1.5; overflow-wrap: anywhere; word-break: break-word;
+  white-space: pre-line; margin-bottom: .4rem;
+}
+.conv-msg.cliente { align-self: flex-start; background: var(--bg-2); border: 1px solid var(--border); border-bottom-left-radius: 4px; }
+.conv-msg.bot { align-self: flex-end; background: rgba(47,227,166,.16); border: 1px solid rgba(47,227,166,.3); border-bottom-right-radius: 4px; }
+.conv-msg.humano { align-self: flex-end; background: rgba(139,124,246,.18); border: 1px solid rgba(139,124,246,.4); border-bottom-right-radius: 4px; }
+.conv-msg-quien { font-size: .72rem; opacity: .8; margin-bottom: .25rem; font-weight: 600; }
+.conv-msg-hora { font-size: .68rem; color: var(--muted); margin: -.25rem 0 .5rem; }
+.conv-msg-hora.cliente { align-self: flex-start; }
+.conv-msg-hora.bot, .conv-msg-hora.humano { align-self: flex-end; }
+
+.conv-msg.foto { padding: 0; overflow: hidden; }
+.conv-msg.foto img { width: 100%; max-height: 260px; object-fit: cover; display: block; }
+.conv-msg-foto-caption { padding: .6rem .85rem; white-space: pre-line; overflow-wrap: anywhere; word-break: break-word; }
+.conv-msg audio { max-width: 100%; display: block; }
+
+.conv-foot {
+  display: flex; gap: .5rem; padding: .8rem; border-top: 1px solid var(--border);
+}
+.conv-foot input[type="text"] {
+  flex: 1; padding: .6rem .8rem; border-radius: 10px; border: 1px solid var(--border);
+  background: var(--bg-2); color: var(--text); font: inherit;
+}
+.conv-foot-sin-control {
+  padding: .8rem; text-align: center; font-size: .85rem; color: var(--muted); border-top: 1px solid var(--border);
+}
+
+/* ---------- Cabecera de datos del cliente (reemplaza los stat-card sueltos) ---------- */
+.conv-cliente-card { margin-bottom: 1.1rem; }
+.conv-direccion-link { color: var(--primary-2); text-decoration: none; }
+.conv-direccion-link:hover { text-decoration: underline; }
+
+/* ---------- Modal de "enviar producto" (mismo lenguaje visual que el tour) ---------- */
+.prod-overlay {
+  position: fixed; inset: 0; z-index: 300;
+  background: rgba(10, 6, 17, .72); backdrop-filter: blur(3px);
+  padding: 1.2rem;
+}
+.prod-overlay[hidden] { display: none; }
+.prod-overlay:not([hidden]) { display: grid; place-items: center; }
+.prod-card {
+  position: relative; width: min(100%, 460px); max-height: 80vh; display: flex; flex-direction: column;
+  background: var(--surface); backdrop-filter: blur(10px);
+  border: 1px solid var(--border); border-radius: var(--radius);
+  padding: 1.4rem; box-shadow: var(--shadow);
+}
+.prod-card h3 { margin: 0 0 .9rem; font-size: 1.1rem; }
+.prod-cerrar { position: absolute; top: .9rem; right: .9rem; background: none; border: 0; color: var(--muted); cursor: pointer; font-size: 1rem; }
+.prod-cerrar:hover { color: var(--text); }
+.prod-buscar {
+  width: 100%; padding: .6rem .8rem; border-radius: 10px; border: 1px solid var(--border);
+  background: var(--bg-2); color: var(--text); font: inherit; margin-bottom: .8rem;
+}
+.prod-lista { overflow-y: auto; display: flex; flex-direction: column; gap: .4rem; }
+.prod-item {
+  display: flex; align-items: center; gap: .7rem; padding: .5rem; border-radius: 10px;
+  border: 1px solid transparent; background: none; cursor: pointer; text-align: left; width: 100%; font: inherit; color: var(--text);
+}
+.prod-item:hover { background: var(--bg-2); border-color: var(--border); }
+.prod-item img { width: 42px; height: 42px; border-radius: 8px; object-fit: cover; background: var(--bg-2); flex-shrink: 0; }
+.prod-item-sin-foto { width: 42px; height: 42px; border-radius: 8px; background: var(--bg-2); flex-shrink: 0; display: grid; place-items: center; font-size: .8rem; color: var(--muted); }
+.prod-item-nombre { font-size: .88rem; font-weight: 600; }
+.prod-item-precio { font-size: .8rem; color: var(--muted); }
+.prod-vacio { text-align: center; color: var(--muted); font-size: .85rem; padding: 1.2rem 0; }
