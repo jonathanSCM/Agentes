@@ -392,6 +392,10 @@ model AgenteConfig {
   // "revista" (ver views/catalogo-*.ejs). Los colores/logo de arriba se
   // aplican encima de cualquiera que se elija.
   plantillaCatalogo String   @default("clasica")
+  // Tema visual de /catalogo/:slug/producto/:id: "oscuro" | "claro". Solo
+  // afecta la pagina de detalle de producto (el resto del catalogo web
+  // sigue con su propio esquema por plantilla).
+  temaProducto      String   @default("oscuro")
   updatedAt         DateTime @updatedAt
 
   @@map("agente_config")

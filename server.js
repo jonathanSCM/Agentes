@@ -234,6 +234,10 @@ function vistaCatalogo(config) {
   return PLANTILLAS_CATALOGO.includes(elegida) ? elegida : 'clasica';
 }
 
+// Tema de la pagina de detalle de producto (independiente de la plantilla
+// del listado, que ya tiene su propio esquema por diseño).
+const TEMAS_PRODUCTO = ['oscuro', 'claro'];
+
 // Acortador propio: el bot manda "/l/<codigo>" en vez del link largo con el
 // token de sesion (ver linkCatalogoWeb en agente.js). Redirect real (302),
 // nunca inventa un destino - si el codigo no existe, 404.
@@ -2064,7 +2068,7 @@ app.get('/panel/configuracion', requireCliente, async (req, res, next) => {
 const MONEDAS_CATALOGO = ['BOB', 'USD', 'PEN'];
 
 app.post('/panel/configuracion', requireCliente, upload.fields([{ name: 'qr', maxCount: 1 }, { name: 'logo', maxCount: 1 }]), async (req, res, next) => {
-  const { nombre, numeroWhatsapp, mensajeBienvenida, tono, estado, instrucciones, derivarAHumano, aceptaEfectivo, aceptaTarjeta, aceptaQr, quitarQr, moneda, direccionTienda, tiendaLat, tiendaLng, preguntasIniciales, colorPrimario, colorSecundario, quitarLogo, plantillaCatalogo } = req.body || {};
+  const { nombre, numeroWhatsapp, mensajeBienvenida, tono, estado, instrucciones, derivarAHumano, aceptaEfectivo, aceptaTarjeta, aceptaQr, quitarQr, moneda, direccionTienda, tiendaLat, tiendaLng, preguntasIniciales, colorPrimario, colorSecundario, quitarLogo, plantillaCatalogo, temaProducto } = req.body || {};
   try {
     const agente = await obtenerAgente(req.session.empresaId);
 
@@ -2121,6 +2125,7 @@ app.post('/panel/configuracion', requireCliente, upload.fields([{ name: 'qr', ma
         colorPrimario: hexValido(colorPrimario) ? colorPrimario.trim() : (agente.config?.colorPrimario || null),
         colorSecundario: hexValido(colorSecundario) ? colorSecundario.trim() : (agente.config?.colorSecundario || null),
         plantillaCatalogo: PLANTILLAS_CATALOGO.includes(plantillaCatalogo) ? plantillaCatalogo : (agente.config?.plantillaCatalogo || 'clasica'),
+        temaProducto: TEMAS_PRODUCTO.includes(temaProducto) ? temaProducto : (agente.config?.temaProducto || 'oscuro'),
         // Ubicacion real del local: si esta vacia, el bot directamente no
         // ofrece retiro en tienda (nunca inventa una direccion).
         // Lo que el bot pregunta antes de mostrar nada. Se guarda como lista

@@ -283,6 +283,26 @@
         <% }); %>
       </div>
     </div>
+
+    <div style="margin-top:1rem">
+      <label style="display:block;margin-bottom:.5rem">Tema de la página de producto</label>
+      <p class="muted" style="font-size:.78rem;margin:0 0 .5rem">Solo afecta la página de detalle de un producto (cuando el cliente entra a ver fotos, tallas y precio) — el resto del catálogo sigue con el estilo de la plantilla elegida arriba.</p>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:.6rem">
+        <%
+          var temas = [
+            { valor: 'oscuro', nombre: 'Oscuro' },
+            { valor: 'claro', nombre: 'Claro' },
+          ];
+          var temaActual = config.temaProducto || 'oscuro';
+        %>
+        <% temas.forEach(function (t) { %>
+          <label style="border:2px solid <%= temaActual === t.valor ? 'var(--primary-2)' : 'var(--border)' %>;border-radius:10px;padding:.7rem;cursor:pointer;display:block">
+            <input type="radio" name="temaProducto" value="<%= t.valor %>" <%= temaActual === t.valor ? 'checked' : '' %> style="margin-right:.4rem" />
+            <strong style="font-size:.88rem"><%= t.nombre %></strong>
+          </label>
+        <% }); %>
+      </div>
+    </div>
   </section>
 
   <div class="form-actions">

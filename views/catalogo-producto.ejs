@@ -16,7 +16,25 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <style>
-  :root{--fondo:#0f1117;--panel:#181b24;--panel-2:#1f2330;--tinta:#eef0f6;--tenue:#9aa1b5;--acento:<%= (config && config.colorPrimario) || '#22c58b' %>;--acento-2:<%= (config && config.colorSecundario) || '#22c58b' %>;--borde:#262b38;}
+  /* Tema oscuro (por defecto) - se puede elegir "claro" desde el panel de
+     la tienda (Catálogo web y marca -> Tema de la página de producto). Todo
+     el color de la pagina sale de estas variables, asi que el toggle es
+     solo redefinirlas una vez, nada mas se toca por vista. */
+  :root{
+    --fondo:#0f1117;--panel:#181b24;--panel-2:#1f2330;--tinta:#eef0f6;--tenue:#9aa1b5;--borde:#262b38;
+    --acento:<%= (config && config.colorPrimario) || '#22c58b' %>;--acento-2:<%= (config && config.colorSecundario) || '#22c58b' %>;
+    --stock-bg:rgba(255,255,255,.06);
+    --stock-bajo-bg:rgba(255,180,60,.16);--stock-bajo-color:#ffc36b;
+    --stock-agotado-bg:rgba(255,90,90,.16);--stock-agotado-color:#ff9a9a;
+    --ph-grad-a:#141722;--ph-grad-b:#1b1f2c;
+  }
+  body.tema-claro{
+    --fondo:#f5f6f8;--panel:#ffffff;--panel-2:#eef0f3;--tinta:#181a20;--tenue:#68707d;--borde:#e1e4ea;
+    --stock-bg:rgba(0,0,0,.05);
+    --stock-bajo-bg:#fdf1de;--stock-bajo-color:#9a5b00;
+    --stock-agotado-bg:#fbe3e3;--stock-agotado-color:#c92a2a;
+    --ph-grad-a:#eef0f3;--ph-grad-b:#e1e4ea;
+  }
   *{margin:0;padding:0;box-sizing:border-box;}
   body{background:var(--fondo);color:var(--tinta);font-family:'Inter',system-ui,sans-serif;min-height:100vh;}
   header{display:flex;align-items:center;gap:.7rem;padding:20px 24px;max-width:1080px;margin:0 auto;}
@@ -40,7 +58,7 @@
      tenga. */
   .galeria-principal{position:relative;border-radius:22px;overflow:hidden;background:radial-gradient(120% 120% at 30% 15%,#f6f6f8,#e3e4e8);box-shadow:0 24px 55px -22px rgba(0,0,0,.6);padding:26px;cursor:zoom-in;}
   .galeria-principal img{width:100%;display:block;aspect-ratio:1/1;object-fit:contain;transition:opacity .2s;}
-  .galeria .ph{width:100%;aspect-ratio:1/1;border-radius:22px;display:flex;align-items:center;justify-content:center;color:var(--tenue);background:linear-gradient(135deg,#141722,#1b1f2c);box-shadow:0 24px 55px -22px rgba(0,0,0,.6);}
+  .galeria .ph{width:100%;aspect-ratio:1/1;border-radius:22px;display:flex;align-items:center;justify-content:center;color:var(--tenue);background:linear-gradient(135deg,var(--ph-grad-a),var(--ph-grad-b));box-shadow:0 24px 55px -22px rgba(0,0,0,.6);}
   .contador-fotos{position:absolute;right:16px;bottom:16px;background:rgba(10,12,18,.78);backdrop-filter:blur(6px);color:var(--tinta);font-size:.76rem;font-weight:600;padding:5px 11px;border-radius:999px;}
   .zoom-hint{position:absolute;left:16px;bottom:16px;background:rgba(10,12,18,.78);backdrop-filter:blur(6px);color:var(--tinta);font-size:.72rem;font-weight:600;padding:5px 11px;border-radius:999px;display:flex;align-items:center;gap:5px;}
 
@@ -50,6 +68,11 @@
   .lightbox img{max-width:100%;max-height:100%;object-fit:contain;touch-action:pinch-zoom;border-radius:8px;}
   .lightbox-cerrar{position:absolute;top:18px;right:20px;width:42px;height:42px;border-radius:50%;border:none;background:rgba(255,255,255,.1);color:#fff;font-size:1.3rem;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:background .15s;}
   .lightbox-cerrar:hover{background:rgba(255,255,255,.2);}
+  .lightbox-flecha{position:absolute;top:50%;transform:translateY(-50%);width:48px;height:48px;border-radius:50%;border:none;background:rgba(255,255,255,.1);color:#fff;font-size:1.5rem;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:background .15s;}
+  .lightbox-flecha:hover{background:rgba(255,255,255,.2);}
+  .lightbox-flecha.anterior{left:16px;}
+  .lightbox-flecha.siguiente{right:16px;}
+  @media (max-width:600px){.lightbox-flecha{width:40px;height:40px;font-size:1.25rem;}}
   .miniaturas{display:flex;gap:10px;margin-top:14px;overflow-x:auto;padding-bottom:2px;}
   .miniaturas button{padding:8px;border-radius:13px;border:2px solid transparent;background:linear-gradient(160deg,#f6f6f8,#e3e4e8);cursor:pointer;flex:0 0 auto;opacity:.6;transition:opacity .15s,border-color .15s,transform .15s;}
   .miniaturas button img{width:52px;height:52px;border-radius:8px;object-fit:contain;display:block;}
@@ -60,9 +83,9 @@
   /* ---------- Info del producto ---------- */
   .marca-badge{display:inline-block;font-size:.76rem;font-weight:700;letter-spacing:.03em;text-transform:uppercase;color:var(--tenue);background:var(--panel);border:1px solid var(--borde);padding:4px 11px;border-radius:999px;margin-bottom:12px;}
   h1{font-size:1.9rem;font-weight:800;letter-spacing:-.02em;line-height:1.15;margin-bottom:14px;}
-  .stock{font-size:.8rem;padding:4px 12px;border-radius:999px;background:rgba(255,255,255,.06);color:var(--tenue);display:inline-block;width:fit-content;font-weight:600;}
-  .stock.bajo{background:rgba(255,180,60,.16);color:#ffc36b;}
-  .stock.agotado{background:rgba(255,90,90,.16);color:#ff9a9a;}
+  .stock{font-size:.8rem;padding:4px 12px;border-radius:999px;background:var(--stock-bg);color:var(--tenue);display:inline-block;width:fit-content;font-weight:600;}
+  .stock.bajo{background:var(--stock-bajo-bg);color:var(--stock-bajo-color);}
+  .stock.agotado{background:var(--stock-agotado-bg);color:var(--stock-agotado-color);}
 
   .seccion-descripcion{margin-top:22px;}
   .seccion-descripcion h3{font-size:.82rem;font-weight:700;color:var(--tenue);text-transform:uppercase;letter-spacing:.03em;margin-bottom:8px;}
@@ -81,7 +104,7 @@
   .swatch:hover{transform:translateY(-1px);}
   .swatch.activo{border-color:var(--acento);}
   .swatch img{width:100%;height:100%;border-radius:50%;object-fit:cover;display:block;}
-  .swatch-sin-foto{display:block;width:100%;height:100%;border-radius:50%;background:linear-gradient(135deg,#2a2f3d,#1b1f2c);}
+  .swatch-sin-foto{display:block;width:100%;height:100%;border-radius:50%;background:linear-gradient(135deg,var(--ph-grad-a),var(--ph-grad-b));}
   .swatch.agotado{opacity:.35;cursor:not-allowed;}
   .swatch.agotado::after{content:'';position:absolute;left:6px;right:6px;top:50%;height:2px;background:var(--tenue);transform:rotate(-40deg);}
 
@@ -98,23 +121,23 @@
   .btn-whatsapp{background:#25d366;color:#fff;margin-top:10px;box-shadow:0 10px 24px -10px rgba(37,211,102,.55);}
   .btn-whatsapp:hover{transform:translateY(-1px);}
 
-  .aviso-sesion{background:rgba(255,180,60,.12);border:1px solid rgba(255,180,60,.35);color:#ffc36b;border-radius:11px;padding:13px 15px;font-size:.85rem;margin-bottom:16px;line-height:1.5;}
+  .aviso-sesion{background:var(--stock-bajo-bg);border:1px solid color-mix(in srgb, var(--stock-bajo-color) 35%, transparent);color:var(--stock-bajo-color);border-radius:11px;padding:13px 15px;font-size:.85rem;margin-bottom:16px;line-height:1.5;}
 
   /* ---------- Tambien te puede interesar ---------- */
   .relacionados{margin-top:56px;}
   .relacionados h2{font-size:1.2rem;font-weight:800;letter-spacing:-.01em;margin-bottom:18px;}
   .relacionados-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:16px;}
   .rel-card{background:var(--panel);border:1px solid var(--borde);border-radius:16px;overflow:hidden;text-decoration:none;color:inherit;display:block;transition:transform .15s,border-color .15s;}
-  .rel-card:hover{transform:translateY(-2px);border-color:#343b4d;}
+  .rel-card:hover{transform:translateY(-2px);border-color:var(--tenue);}
   .rel-card .rel-foto{width:100%;aspect-ratio:1/1;background:linear-gradient(160deg,#f6f6f8,#e3e4e8);display:flex;align-items:center;justify-content:center;padding:14px;}
   .rel-card img{max-width:100%;max-height:100%;object-fit:contain;display:block;}
-  .rel-card .rel-ph{width:100%;aspect-ratio:1/1;display:flex;align-items:center;justify-content:center;color:var(--tenue);background:linear-gradient(135deg,#141722,#1b1f2c);font-size:.8rem;}
+  .rel-card .rel-ph{width:100%;aspect-ratio:1/1;display:flex;align-items:center;justify-content:center;color:var(--tenue);background:linear-gradient(135deg,var(--ph-grad-a),var(--ph-grad-b));font-size:.8rem;}
   .rel-card-body{padding:12px 14px;}
   .rel-card-nombre{font-size:.86rem;font-weight:650;margin-bottom:5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
   .rel-card-precio{color:var(--acento);font-weight:700;font-size:.92rem;}
 </style>
 </head>
-<body>
+<body class="<%= (config && config.temaProducto === 'claro') ? 'tema-claro' : '' %>">
   <header>
     <% if (config && config.logoUrl) { %>
       <img src="<%= config.logoUrl %>" alt="" />
@@ -150,8 +173,7 @@
           <% if (fotos.length > 1) { %>
             <div class="miniaturas">
               <% fotos.forEach(function (f, i) { %>
-                <button type="button" class="<%= i === 0 ? 'activa' : '' %>"
-                     onclick="document.getElementById('foto-principal').src='<%= f %>'; document.querySelectorAll('.miniaturas button').forEach(function(m){m.classList.remove('activa')}); this.classList.add('activa'); var c=document.getElementById('contador-fotos'); if(c) c.textContent='<%= i + 1 %>/<%= fotos.length %>';">
+                <button type="button" class="<%= i === 0 ? 'activa' : '' %>" onclick="mostrarFoto(<%= i %>)">
                   <img src="<%= f %>" alt="" />
                 </button>
               <% }); %>
@@ -246,13 +268,41 @@
 
   <div class="lightbox" id="lightbox" onclick="cerrarZoom(event)">
     <button type="button" class="lightbox-cerrar" onclick="cerrarZoom(event)" aria-label="Cerrar">✕</button>
+    <% if (fotos.length > 1) { %>
+      <button type="button" class="lightbox-flecha anterior" onclick="event.stopPropagation(); moverFoto(-1);" aria-label="Foto anterior">‹</button>
+      <button type="button" class="lightbox-flecha siguiente" onclick="event.stopPropagation(); moverFoto(1);" aria-label="Foto siguiente">›</button>
+    <% } %>
     <img id="lightbox-img" src="" alt="<%= producto.nombre %>" />
   </div>
 
   <script>
+    var fotosGaleria = <%- JSON.stringify(fotos) %>;
+    var indiceFotoActual = 0;
+
+    // Punto unico que actualiza la foto principal, la miniatura activa, el
+    // contador y (si esta abierto) el lightbox - asi todo queda sincronizado
+    // sin importar si el cambio vino de una miniatura, del zoom o del
+    // teclado.
+    function mostrarFoto(i) {
+      if (!fotosGaleria.length) return;
+      var idx = ((i % fotosGaleria.length) + fotosGaleria.length) % fotosGaleria.length;
+      indiceFotoActual = idx;
+      var src = fotosGaleria[idx];
+      var principal = document.getElementById('foto-principal');
+      if (principal) principal.src = src;
+      var lbImg = document.getElementById('lightbox-img');
+      if (lbImg && document.getElementById('lightbox').classList.contains('abierto')) lbImg.src = src;
+      document.querySelectorAll('.miniaturas button').forEach(function (m, mi) { m.classList.toggle('activa', mi === idx); });
+      var c = document.getElementById('contador-fotos');
+      if (c) c.textContent = (idx + 1) + '/' + fotosGaleria.length;
+    }
+    function moverFoto(delta) { mostrarFoto(indiceFotoActual + delta); }
+
     function abrirZoom() {
       var principal = document.getElementById('foto-principal');
       if (!principal || !principal.src) return;
+      var idx = fotosGaleria.indexOf(principal.src);
+      if (idx !== -1) indiceFotoActual = idx;
       document.getElementById('lightbox-img').src = principal.src;
       document.getElementById('lightbox').classList.add('abierto');
     }
@@ -260,6 +310,15 @@
       if (e && e.target && e.target.id === 'lightbox-img') return;
       document.getElementById('lightbox').classList.remove('abierto');
     }
+    // Flechas del teclado mientras el zoom esta abierto (ademas de los
+    // botones, para quien navega con teclado o en desktop).
+    document.addEventListener('keydown', function (e) {
+      var lb = document.getElementById('lightbox');
+      if (!lb || !lb.classList.contains('abierto')) return;
+      if (e.key === 'ArrowLeft') moverFoto(-1);
+      else if (e.key === 'ArrowRight') moverFoto(1);
+      else if (e.key === 'Escape') lb.classList.remove('abierto');
+    });
   </script>
 
   <% if (variantes.length > 1) { %>
