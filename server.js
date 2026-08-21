@@ -492,6 +492,7 @@ app.post('/catalogo/:slug/producto/:id/carrito', limiteCarritoWeb, async (req, r
     const itemsActuales = carritoDe(clienteFinal.contexto || {}, sesion.conversacionId);
     const itemsNuevos = agregarItem(itemsActuales, {
       productoId: producto.id, varianteId: variante ? variante.id : null, nombre: nombreItem, precio: precioUnitario, cantidad,
+      agregadoEn: new Date().toISOString(),
     });
 
     await prisma.clienteFinal.update({

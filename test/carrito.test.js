@@ -58,7 +58,12 @@ describe('carrito de la conversacion', () => {
 
   test('se traduce al formato que espera crear_pedido', () => {
     const items = [item({ varianteId: 5, cantidad: 2 })];
-    assert.deepEqual(itemsParaPedido(items), [{ idProducto: 1, idVariante: 5, cantidad: 2 }]);
+    assert.deepEqual(itemsParaPedido(items), [{ idProducto: 1, idVariante: 5, cantidad: 2, agregadoEn: null }]);
+  });
+
+  test('cuando el item trae agregadoEn, se conserva (para detectar items viejos al confirmar)', () => {
+    const items = [item({ varianteId: 5, cantidad: 2, agregadoEn: '2026-01-01T00:00:00.000Z' })];
+    assert.deepEqual(itemsParaPedido(items), [{ idProducto: 1, idVariante: 5, cantidad: 2, agregadoEn: '2026-01-01T00:00:00.000Z' }]);
   });
 
   test('despues de comprar, el carrito queda vacio', () => {

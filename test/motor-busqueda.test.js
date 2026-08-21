@@ -18,6 +18,7 @@ const {
   limpiezaPorCambioDeCategoria,
   datosDeActualizacionDeLead,
   resumenPedidosPrevios,
+  primeraPreguntaDeCierre,
 } = require('../lib/services/agente');
 const { coincideAtributosLead, buscarConFallback, buscarPorNombre, coloresConFotoDeVariantes, mensajeWhatsappProducto } = require('../lib/services/catalogo');
 
@@ -514,6 +515,60 @@ describe('faltantes de categoria dejan de pedirse una vez que el cliente ya elig
       const system = construirSystem(empresa, productos, {}, { categoriaInteres: 'Jeans', categoriaId: 1, estadoConversacion: estado }, false, false, '');
       assert.doesNotMatch(system, /LO UNICO QUE TE FALTA/, `no deberia pedirlo en estado ${estado}`);
     }
+  });
+
+  // Bug real de la transcripcion: el cliente cambio de categoria a mitad
+  // del cierre (nombro un color de una prenda nueva), eso limpia
+  // productoFavoritoId (ver limpiezaPorCambioDeCategoria) - pero
+  // estadoConversacion sigue en cierre. seccionProductos tiene sus PROPIOS
+  // gates (independientes de "LO UNICO QUE TE FALTA" de arriba) que antes
+  // no miraban esto y volvian a pedir el atributo obligatorio con el
+  // carrito lleno.
+  test('sin favorito (se limpio) pero con estadoConversacion en cierre: seccionProductos tampoco vuelve a pedir el atributo', () => {
+    for (const estado of ['INTENCION_DE_COMPRA', 'LISTO_PARA_COMPRAR', 'DATOS_DE_PEDIDO', 'ENTREGA', 'PEDIDO_COMPLETADO']) {
+      const system = construirSystem(empresa, productos, {}, { categoriaInteres: 'Jeans', categoriaId: 1, estadoConversacion: estado }, false, false, '');
+      assert.doesNotMatch(system, /TODAVIA NO PODES MOSTRAR PRODUCTOS/, `seccionProductos no deberia bloquear en estado ${estado}`);
+      assert.match(system, /NO le muestres productos nuevos ni le preguntes atributos/, `deberia usar el texto de cierre en estado ${estado}`);
+    }
+  });
+
+  test('sin favorito y SIN estar en cierre: seccionProductos sigue pidiendo el atributo normalmente', () => {
+    const system = construirSystem(empresa, productos, {}, { categoriaInteres: 'Jeans', categoriaId: 1 }, false, false, '');
+    assert.match(system, /TODAVIA NO PODES MOSTRAR PRODUCTOS.*falta saber Genero/s);
+  });
+});
+
+describe('primeraPreguntaDeCierre - la unica cosa que falta para cerrar, nunca inventada', () => {
+  test('sin nombre: pide el nombre', () => {
+    assert.match(primeraPreguntaDeCierre({}, {}), /nombre/i);
+  });
+
+  test('con nombre pero sin tipoEntrega: pregunta como quiere recibirlo', () => {
+    const r = primeraPreguntaDeCierre({ nombre: 'Ron Valdez' }, {});
+    assert.match(r, /domicilio/i);
+  });
+
+  test('domicilio sin ubicacion real (sin ubicacionLat): pide la ubicacion, no "la direccion"', () => {
+    const r = primeraPreguntaDeCierre({ nombre: 'Ron Valdez', tipoEntrega: 'DOMICILIO', direccionEntrega: 'Av Ballivian 123' }, {});
+    assert.match(r, /ubicaci[oó]n/i);
+    assert.doesNotMatch(r, /direcci[oó]n/i);
+  });
+
+  test('domicilio con ubicacionLat real: no pide ubicacion, pasa a forma de pago', () => {
+    const r = primeraPreguntaDeCierre({ nombre: 'Ron Valdez', tipoEntrega: 'DOMICILIO', direccionEntrega: 'x', ubicacionLat: -17.7 }, {});
+    assert.match(r, /pagar/i);
+  });
+
+  test('con todo salvo forma de pago: pregunta como quiere pagar', () => {
+    const r = primeraPreguntaDeCierre({ nombre: 'Ron Valdez', tipoEntrega: 'RECOJO' }, { direccionTienda: 'Av Principal 1' });
+    assert.match(r, /pagar/i);
+  });
+
+  test('con todos los datos completos: devuelve null (no falta nada, hay que confirmar el resumen)', () => {
+    const r = primeraPreguntaDeCierre({
+      nombre: 'Ron Valdez', tipoEntrega: 'DOMICILIO', direccionEntrega: 'x', ubicacionLat: -17.7, formaPago: 'QR',
+    }, {});
+    assert.equal(r, null);
   });
 });
 

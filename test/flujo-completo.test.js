@@ -132,6 +132,7 @@ async function agregarAlCarrito(items) {
   const carritoItems = items.map((i) => ({
     productoId: i.idProducto, varianteId: i.idVariante || null,
     nombre: `Producto ${i.idProducto}`, precio: i.precio, cantidad: i.cantidad,
+    agregadoEn: i.agregadoEn || undefined,
   }));
   await prisma.clienteFinal.update({
     where: { id: cliente.id },
@@ -271,6 +272,26 @@ describe('cierre del pedido: confirmacion obligatoria', () => {
     assert.match(r, /Av Siempre Viva 123/);
     assert.match(r, /NO llames a crear_pedido en este turno/);
     assert.equal(await prisma.pedido.count({ where: { empresaId } }), 0, 'confirmar no crea todavia');
+  });
+
+  // "Sigue sumando productos" - el resumen tiene que avisar cuando un item
+  // viene de una sesion vieja que no se llego a cerrar, para que el cliente
+  // nunca se sorprenda con algo que ya se habia olvidado.
+  test('un item agregado hace mas de 2 horas se marca en el resumen; uno recien agregado no', async () => {
+    const variante = await prisma.variante.findFirst({ where: { productoId: productos[0].id } });
+    const variante2 = await prisma.variante.findFirst({ where: { productoId: productos[1].id }, orderBy: { id: 'asc' } });
+    const hace3Horas = new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString();
+    await agregarAlCarrito([
+      { idProducto: productos[0].id, idVariante: variante.id, cantidad: 1, precio: productos[0].precio, agregadoEn: hace3Horas },
+      { idProducto: productos[1].id, idVariante: variante2.id, cantidad: 1, precio: productos[1].precio, agregadoEn: new Date().toISOString() },
+    ]);
+    const { llamar, recibido } = iaFalsa([{ tool_calls: [tool('confirmar_pedido', {})] }, { content: '¿Confirmas?' }]);
+    await generarRespuesta(agenteId, TELEFONO, [], 'cerremos', undefined, { llamarInyectado: llamar });
+
+    const r = recibido.toolResults[0];
+    assert.match(r, /Zapatilla 1.*\(ya lo tenia en el carrito de antes\)/);
+    assert.doesNotMatch(r, /Zapatilla 2.*\(ya lo tenia en el carrito de antes\)/);
+    assert.match(r, /Los items marcados.*mencionaselo con naturalidad/);
   });
 
   test('despues de confirmar, crear_pedido SI crea y descuenta el stock de la variante', async () => {
@@ -745,6 +766,39 @@ describe('no se cierra sin saber que se lleva el cliente', () => {
     const salida = await generarRespuesta(agenteId, TELEFONO, [], 'dale', undefined, { llamarInyectado: cierre.llamar });
 
     assert.match(salida.respuesta, /domicilio/i, 'ya sabe que se lleva: el cierre tiene que avanzar');
+  });
+});
+
+// Bug real reportado en produccion: el ciclo de venta nunca cerraba - el bot
+// volvia a mandar tarjetas de producto una y otra vez despues de que el
+// cliente ya tenia cosas en el carrito y estaba en pleno cierre. La causa
+// real era el "rescate de ultima vuelta": si el modelo respondia con texto
+// vago (ej. "voy a revisar eso") y no quedaban mas vueltas, el codigo
+// forzaba el mismo un llamado a mostrar_productos sin mirar si el cliente
+// ya estaba cerrando.
+describe('BUG - durante el cierre, el rescate de ultima vuelta no debe reabrir el catalogo', () => {
+  test('con carrito activo y estadoConversacion en cierre, pregunta datos de cierre en vez de mostrar productos', async () => {
+    // estadoConversacion en cierre pero SIN productoFavoritoId: exactamente
+    // el estado real cuando el favorito se limpio por un cambio de
+    // categoria a mitad del cierre (limpiezaPorCambioDeCategoria).
+    await reiniciarLead({ atributosLead: { Genero: 'Hombre' }, estadoConversacion: 'DATOS_DE_PEDIDO' });
+    await agregarAlCarrito([{ idProducto: productos[0].id, idVariante: productos[0].variantes[0].id, cantidad: 1, precio: productos[0].precio }]);
+
+    // El modelo insiste con texto vago (dispara pareceAnuncioDeBusqueda) en
+    // las 3 vueltas - se agota el MAX_VUELTAS y entra el rescate forzado.
+    const { llamar, recibido } = iaFalsa([{ content: 'Voy a revisar eso para vos.' }]);
+    const salida = await generarRespuesta(agenteId, TELEFONO, [], 'y que mas tenes', undefined, { llamarInyectado: llamar });
+
+    assert.doesNotMatch(salida.respuesta, /Estas son las opciones|¿Alguna te interesa|opciones que tenemos/i, 'no debe reabrir el catalogo durante el cierre');
+    assert.doesNotMatch(recibido.systems.at(-1) || '', /TODAVIA NO PODES MOSTRAR PRODUCTOS/, 'seccionProductos no deberia bloquear durante el cierre');
+  });
+
+  test('sin estar en cierre (explorando), el mismo texto vago SI fuerza mostrar_productos como antes', async () => {
+    await reiniciarLead({ atributosLead: { Genero: 'Hombre' } });
+    const { llamar } = iaFalsa([{ content: 'Voy a revisar eso para vos.' }]);
+    const salida = await generarRespuesta(agenteId, TELEFONO, [], 'mostrame zapatillas', undefined, { llamarInyectado: llamar });
+
+    assert.match(salida.respuesta, /opciones que tenemos|Alguna te interesa/i, 'fuera de cierre, sigue mostrando el catalogo como rescate');
   });
 });
 
