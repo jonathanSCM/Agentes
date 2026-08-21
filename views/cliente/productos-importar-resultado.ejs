@@ -1,0 +1,42 @@
+<%- include('partials/inicio') %>
+
+<div class="page-head">
+  <h2>
+    <a href="/panel/productos" style="color:var(--tenue);font-size:.85rem;font-weight:400">← Mis productos</a>
+    <br />Resultado de la importación
+  </h2>
+</div>
+
+<div class="admin-stats">
+  <div class="stat-card stat-new"><span class="stat-num"><%= reporte.productosCreados %></span><span class="stat-label">Productos creados</span></div>
+  <div class="stat-card"><span class="stat-num"><%= reporte.productosActualizados %></span><span class="stat-label">Productos actualizados</span></div>
+  <div class="stat-card stat-new"><span class="stat-num"><%= reporte.variantesCreadas %></span><span class="stat-label">Variantes creadas</span></div>
+  <div class="stat-card"><span class="stat-num"><%= reporte.variantesActualizadas %></span><span class="stat-label">Variantes actualizadas</span></div>
+  <div class="stat-card"><span class="stat-num"><%= reporte.categoriasCreadas %></span><span class="stat-label">Categorías creadas</span></div>
+  <div class="stat-card <%= (reporte.saltados.length + reporte.erroresDeFormato.length) ? 'stat-off' : '' %>">
+    <span class="stat-num"><%= reporte.saltados.length + reporte.erroresDeFormato.length %></span><span class="stat-label">Filas con problemas</span>
+  </div>
+</div>
+
+<% if (reporte.erroresDeFormato.length || reporte.saltados.length) { %>
+  <div class="table-wrap" style="margin-top:1.2rem">
+    <h3 style="font-size:.95rem;margin:0 0 .6rem">Filas que no se pudieron cargar</h3>
+    <table class="leads-table">
+      <thead><tr><th>Hoja</th><th>Fila</th><th>Motivo</th></tr></thead>
+      <tbody>
+        <% reporte.erroresDeFormato.concat(reporte.saltados).forEach(function (e) { %>
+          <tr><td><%= e.hoja %></td><td class="num"><%= e.fila %></td><td><%= e.motivo %></td></tr>
+        <% }); %>
+      </tbody>
+    </table>
+  </div>
+<% } else { %>
+  <div class="alert-ok" style="margin-top:1.2rem">Se importó todo el archivo sin errores.</div>
+<% } %>
+
+<div class="form-actions" style="margin-top:1.4rem">
+  <a class="btn btn-primary" href="/panel/productos">Ver mis productos</a>
+  <a class="btn btn-ghost" href="/panel/productos/importar/plantilla">Descargar plantilla de nuevo</a>
+</div>
+
+<%- include('partials/fin') %>

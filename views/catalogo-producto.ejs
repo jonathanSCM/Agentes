@@ -249,7 +249,7 @@
         <h2>También te puede interesar</h2>
         <div class="relacionados-grid">
           <% relacionados.forEach(function (r) { %>
-            <a class="rel-card" href="/catalogo/<%= empresa.slug %>/producto/<%= r.id %><%= tokenSesion ? '?s=' + encodeURIComponent(tokenSesion) : '' %>">
+            <a class="rel-card" href="/catalogo/<%= empresa.slug %>/producto/<%= r.id %><%= qVolver %>">
               <% if (r.fotos && r.fotos.length) { %>
                 <div class="rel-foto"><img src="<%= r.fotos[0] %>" alt="<%= r.nombre %>" /></div>
               <% } else { %>

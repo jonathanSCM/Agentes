@@ -71,6 +71,7 @@ function textoParaEmbedding(p) {
 const { generarTokenSesion, verificarTokenSesion } = require('./lib/services/sesionWeb');
 const { resolverCoordenadas, extraerUrlDeMaps } = require('./lib/services/ubicacion');
 const { carritoDe, guardarCarrito, agregarItem } = require('./lib/services/carrito');
+const { generarPlantillaExcel, parsearFilasExcel, importarCatalogo } = require('./lib/services/catalogoExcel');
 const { transicionValida, requiereRestock, dentroDeVentana24h } = require('./lib/services/pedidos');
 
 const app = express();
@@ -125,6 +126,29 @@ async function convertirFotosAJpg(files) {
     nombres.push(nombreJpg);
   }
   return nombres;
+}
+
+// Mismo tratamiento que convertirFotosAJpg, pero partiendo de una URL en vez
+// de un archivo subido (para el import de catalogo desde Excel: el dueno
+// pega links de fotos, no puede adjuntar archivos por fila). Nunca revienta
+// el import si una URL falla o no es una imagen real - devuelve null y esa
+// foto puntual se salta (se reporta aparte, ver server.js ruta de import).
+async function descargarYConvertirFotoDesdeUrl(req, url) {
+  if (!/^https?:\/\//i.test(String(url || ''))) return null;
+  const controlador = new AbortController();
+  const timeout = setTimeout(() => controlador.abort(), 8000);
+  try {
+    const resp = await fetch(url, { signal: controlador.signal });
+    if (!resp.ok) return null;
+    const buffer = Buffer.from(await resp.arrayBuffer());
+    const nombreJpg = `${Date.now()}-${Math.round(Math.random() * 1e9)}.jpg`;
+    await sharp(buffer).rotate().jpeg({ quality: 85 }).toFile(path.join(UPLOADS_DIR, nombreJpg));
+    return urlPublicaDeArchivo(req, nombreJpg);
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(timeout);
+  }
 }
 
 // ---- Middlewares ----
@@ -1863,6 +1887,61 @@ app.post('/panel/productos', requireCliente, upload.array('fotos', 8), async (re
     // busqueda semantica hasta el proximo backfill.
     guardarEmbeddingDeProducto(nuevoProducto.id, textoParaEmbedding(nuevoProducto)).catch(() => {});
     res.redirect('/panel/productos?ok=' + encodeURIComponent('Producto agregado.'));
+  } catch (err) { next(err); }
+});
+
+// ---- Importar catalogo desde Excel ----
+// Primera subida de un archivo que NO es una foto: multer aparte, en
+// memoria (el .xlsx se procesa y se descarta, nunca se guarda en disco).
+const uploadExcel = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 5 * 1024 * 1024 },
+  fileFilter: (_req, file, cb) => {
+    const esXlsx = /\.xlsx$/i.test(file.originalname)
+      || file.mimetype === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+    cb(esXlsx ? null : new Error('El archivo tiene que ser un Excel (.xlsx).'), esXlsx);
+  },
+});
+
+app.get('/panel/productos/importar/plantilla', requireCliente, async (req, res, next) => {
+  try {
+    const empresa = await prisma.empresa.findUnique({ where: { id: req.session.empresaId } });
+    const categorias = await prisma.categoria.findMany({
+      where: { empresaId: req.session.empresaId },
+      select: { nombre: true },
+      orderBy: { nombre: 'asc' },
+    });
+    const buffer = await generarPlantillaExcel(empresa, categorias);
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', 'attachment; filename="plantilla-catalogo.xlsx"');
+    res.send(buffer);
+  } catch (err) { next(err); }
+});
+
+app.post('/panel/productos/importar', requireCliente, (req, res, next) => {
+  uploadExcel.single('archivo')(req, res, (err) => {
+    if (err) return res.redirect('/panel/productos?ok=' + encodeURIComponent(err.message || 'No se pudo leer el archivo.'));
+    next();
+  });
+}, async (req, res, next) => {
+  try {
+    if (!req.file) return res.redirect('/panel/productos?ok=' + encodeURIComponent('Subí un archivo .xlsx.'));
+
+    const { productos, variantes, erroresDeFormato } = await parsearFilasExcel(req.file.buffer);
+    const plan = await planDeEmpresa(req.session.empresaId);
+    const reporte = await importarCatalogo(prisma, req.session.empresaId, { productos, variantes }, {
+      maxProductos: plan ? plan.maxProductos : 10,
+      descargarFoto: (url) => descargarYConvertirFotoDesdeUrl(req, url),
+      onProductoGuardado: (producto) => {
+        guardarEmbeddingDeProducto(producto.id, textoParaEmbedding(producto)).catch(() => {});
+      },
+    });
+    reporte.erroresDeFormato = erroresDeFormato;
+
+    res.render('cliente/productos-importar-resultado', {
+      title: 'Importar catálogo - Proshop', tituloPagina: 'Mis productos', activo: 'productos',
+      reporte,
+    });
   } catch (err) { next(err); }
 });
 
