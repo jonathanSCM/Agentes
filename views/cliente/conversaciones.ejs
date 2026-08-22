@@ -34,7 +34,10 @@
       <tbody>
         <% conversaciones.forEach(function (c) { %>
           <tr class="row-link" onclick="window.location='/panel/conversaciones/<%= c.id %>'" style="cursor:pointer">
-            <td><strong><%= c.telefonoCliente %></strong></td>
+            <td>
+              <strong><%= c.nombreCliente || c.telefonoCliente %></strong>
+              <% if (c.nombreCliente) { %><div class="muted" style="font-size:.78rem"><%= c.telefonoCliente %></div><% } %>
+            </td>
             <td><span class="badge <%= c.modo === 'HUMANO' ? 'badge-done' : 'badge-new' %>"><%= c.modo === 'HUMANO' ? 'Humano' : 'IA' %></span></td>
             <td class="num"><%= c._count.mensajes %></td>
             <td><span class="badge <%= c.origen === 'INCLUIDA' ? 'badge-new' : 'badge-done' %>"><%= c.origen === 'INCLUIDA' ? 'Plan' : 'Paquete' %></span></td>

@@ -468,6 +468,24 @@ describe('menu de categorias en dos niveles', () => {
     assert.match(salida.fotos[0].caption, /Bota alta/);
   });
 
+  test('si el cliente pide ver todo el catalogo, mostrar_categorias sale del rubro actual', async () => {
+    // Bug real: con categoriaInteres ya fijado en un rubro con subcategorias
+    // ("Calzado"), el cliente pregunto "que mas venden?" y el bot siguio
+    // devolviendo solo los tipos de calzado en vez del catalogo completo.
+    await reiniciarLead({ categoriaInteres: 'Calzado', categoriaId: rubro.id });
+    const { llamar, recibido } = iaFalsa([
+      { tool_calls: [tool('mostrar_categorias', {})] },
+      { content: '¿Cual te interesa?' },
+    ]);
+    await generarRespuesta(agenteId, TELEFONO, [], 'que mas venden?', undefined, { llamarInyectado: llamar });
+
+    const r = recibido.toolResults[0];
+    assert.match(r, /TOOL_SUCCESS/);
+    assert.match(r, /Calzado/, 'tiene que listar los rubros, no los tipos');
+    assert.doesNotMatch(r, /Dentro de "Calzado"/, 'no debe quedarse en el drill-down del rubro anterior');
+    assert.doesNotMatch(r, /Botas/, 'las subcategorias son del segundo nivel, no de este');
+  });
+
   test('un rubro SIN subcategorias muestra sus productos directamente', async () => {
     // "Zapatillas" del fixture principal no se subdivide.
     await reiniciarLead({ atributosLead: { Genero: 'Hombre' } });
@@ -639,11 +657,9 @@ describe('recorrido de venta acordado con el negocio', () => {
     await generarRespuesta(agenteId, TELEFONO, [], 'me interesa la primera', conv.id, { llamarInyectado: a.llamar });
     assert.match(a.recibido.toolResults[0], /agregado al carrito/);
     assert.match(a.recibido.toolResults[0], /DESEA VER ALGO MAS/);
-    assert.match(a.recibido.toolResults[0], /Tambien hay stock de esto/, 'antes de entrar en cierre, si sugiere relacionados');
+    assert.doesNotMatch(a.recibido.toolResults[0], /Tambien hay stock de esto/, 'cross-sell eliminado: nunca sugiere relacionados');
 
     // 2) dice que si y agrega otro (con su variante: el cliente la vio en la tarjeta)
-    // Ojo: el primer agregado ya dejo estadoConversacion en INTENCION_DE_COMPRA
-    // (etapa de cierre) - de aca en mas NO debe sugerir mas cross-sell.
     const variante2 = await prisma.variante.findFirst({ where: { productoId: productos[1].id }, orderBy: { id: 'asc' } });
     const b = iaFalsa([{ tool_calls: [tool('agregar_al_carrito', { idProducto: productos[1].id, idVariante: variante2.id, cantidad: 2 })] }, { content: 'Listo.' }]);
     await generarRespuesta(agenteId, TELEFONO, [], 'agregame tambien la otra', conv.id, { llamarInyectado: b.llamar });
@@ -799,6 +815,36 @@ describe('BUG - durante el cierre, el rescate de ultima vuelta no debe reabrir e
     const salida = await generarRespuesta(agenteId, TELEFONO, [], 'mostrame zapatillas', undefined, { llamarInyectado: llamar });
 
     assert.match(salida.respuesta, /opciones que tenemos|Alguna te interesa/i, 'fuera de cierre, sigue mostrando el catalogo como rescate');
+  });
+});
+
+// El cross-sell se elimino por completo (causaba que el bot insistiera con
+// productos fuera de contexto): ni al agregar al carrito por chat, ni al
+// agregar desde el catalogo web, se sugiere nada mas.
+describe('BUG - cross-sell eliminado por completo', () => {
+  test('el aviso de "agregaste algo desde la web" ya no sugiere productos relacionados', async () => {
+    await reiniciarLead({ atributosLead: { Genero: 'Hombre' } });
+    const cliente = await prisma.clienteFinal.findFirst({ where: { telefono: TELEFONO } });
+    await prisma.clienteFinal.update({
+      where: { id: cliente.id },
+      data: {
+        contexto: {
+          ...(cliente.contexto || {}),
+          carritoWebPendiente: { productoId: productos[0].id, varianteId: null, agregadoEn: new Date().toISOString() },
+        },
+      },
+    });
+
+    let mensajesRecibidos = null;
+    const llamar = async ({ mensajes }) => {
+      if (!mensajesRecibidos) mensajesRecibidos = mensajes;
+      return { content: '¡Buena elección!', tool_calls: [] };
+    };
+    await generarRespuesta(agenteId, TELEFONO, [], 'hola', undefined, { llamarInyectado: llamar });
+
+    const avisoWeb = mensajesRecibidos.find((m) => m.role === 'user' && /ACABA de agregar/.test(m.content));
+    assert.ok(avisoWeb, 'deberia inyectar el aviso de carrito web');
+    assert.doesNotMatch(avisoWeb.content, /Tambien hay stock de esto/);
   });
 });
 

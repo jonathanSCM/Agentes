@@ -841,9 +841,23 @@ app.get('/panel/conversaciones', requireCliente, async (req, res, next) => {
       prisma.conversacion.count({ where: { agenteId: { in: agenteIds }, createdAt: { gte: hoy } } }),
       prisma.mensaje.count({ where: { conversacion: { agenteId: { in: agenteIds } } } }),
     ]);
+
+    // El nombre del cliente (si ya lo dio) se muestra en vez del telefono en
+    // la lista - el telefono sigue guardado tal cual, solo cambia que se ve
+    // primero. Una sola consulta extra, batch por telefono.
+    const telefonos = [...new Set(conversaciones.map((c) => c.telefonoCliente))];
+    const clientesFinales = telefonos.length
+      ? await prisma.clienteFinal.findMany({
+          where: { empresaId: req.session.empresaId, telefono: { in: telefonos } },
+          select: { telefono: true, nombre: true },
+        })
+      : [];
+    const nombrePorTelefono = new Map(clientesFinales.map((c) => [c.telefono, c.nombre]));
+    const conversacionesConNombre = conversaciones.map((c) => ({ ...c, nombreCliente: nombrePorTelefono.get(c.telefonoCliente) || null }));
+
     res.render('cliente/conversaciones', {
       title: 'Conversaciones - Proshop', tituloPagina: 'Conversaciones', activo: 'conversaciones',
-      conversaciones, stats: { total, hoy: hoyCount, mensajes }, mensaje: req.query.ok || null,
+      conversaciones: conversacionesConNombre, stats: { total, hoy: hoyCount, mensajes }, mensaje: req.query.ok || null,
     });
   } catch (err) { next(err); }
 });
@@ -1479,7 +1493,22 @@ app.post('/panel/categorias', requireCliente, async (req, res, next) => {
   try {
     const nombre = String(req.body.nombre || '').trim().slice(0, 120);
     if (!nombre) return res.redirect('/panel/categorias?err=' + encodeURIComponent('El nombre es obligatorio.'));
-    const categoria = await prisma.categoria.create({ data: { empresaId: req.session.empresaId, nombre } });
+
+    // Si se eligio un rubro padre, se crea directo como subcategoria (mismo
+    // criterio que /panel/categorias/:id/subcategorias). Antes esta ruta
+    // SIEMPRE creaba un rubro de primer nivel: si alguien cargaba un subtipo
+    // ("Jeans", "Cuello V") desde aca en vez de "agregar subcategoria" dentro
+    // del rubro, quedaba huerfano - causa real de un bug reportado (el menu
+    // de categorias del bot mezclaba niveles y mostraba listas incoherentes).
+    const empresaId = req.session.empresaId;
+    let padreId = null;
+    const padreIdSolicitado = Number(req.body.padreId);
+    if (req.body.padreId && Number.isInteger(padreIdSolicitado)) {
+      const padre = await prisma.categoria.findFirst({ where: { id: padreIdSolicitado, empresaId, padreId: null } });
+      if (padre) padreId = padre.id;
+    }
+
+    const categoria = await prisma.categoria.create({ data: { empresaId, nombre, padreId } });
     // Directo a su pagina de detalle: ahi es donde se cargan los atributos.
     res.redirect(`/panel/categorias/${categoria.id}?ok=` + encodeURIComponent('Categoría agregada. Ahora cargá sus atributos.'));
   } catch (err) {

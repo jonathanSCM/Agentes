@@ -778,3 +778,55 @@ describe('mostrar primero, afinar despues', () => {
     assert.match(texto, /mostraselos PRIMERO/);
   });
 });
+
+// Bug real reportado: el bot dijo "no tenemos zapatillas en stock" en el
+// mismo tramo de la charla donde mostro tarjetas reales de zapatillas.
+describe('afirmaFaltaDeStockSinRespaldo', () => {
+  const { afirmaFaltaDeStockSinRespaldo } = require('../lib/services/agente');
+
+  test('detecta afirmaciones de falta de stock', () => {
+    assert.equal(afirmaFaltaDeStockSinRespaldo('Actualmente no tenemos zapatillas disponibles en stock.'), true);
+    assert.equal(afirmaFaltaDeStockSinRespaldo('No hay stock de ese producto en este momento.'), true);
+    assert.equal(afirmaFaltaDeStockSinRespaldo('Lo siento, no contamos con disponibilidad de eso.'), true);
+  });
+
+  test('no dispara con texto normal', () => {
+    assert.equal(afirmaFaltaDeStockSinRespaldo('¿Que color prefieres?'), false);
+    assert.equal(afirmaFaltaDeStockSinRespaldo('Estas son las opciones que tenemos.'), false);
+    assert.equal(afirmaFaltaDeStockSinRespaldo(''), false);
+  });
+
+  // Encontrado en revision de codigo: la ventana de busqueda cruzaba comas y
+  // confundia una afirmacion de stock con una negacion.
+  test('no confunde una afirmacion de stock con una negacion', () => {
+    assert.equal(afirmaFaltaDeStockSinRespaldo('No hay problema, tenemos disponible ese producto ahora mismo'), false);
+  });
+});
+
+// Bug real reportado: con categoriaInteres="Zapatillas" ya fijado, el
+// cliente pregunto "¿que mas venden?" varias veces y el bot siguio pegado a
+// esa categoria.
+describe('pareceQuererCatalogoCompleto', () => {
+  const { pareceQuererCatalogoCompleto } = require('../lib/services/agente');
+
+  test('detecta cuando el cliente quiere salir de la categoria actual', () => {
+    assert.equal(pareceQuererCatalogoCompleto('¿Que mas venden?'), true);
+    assert.equal(pareceQuererCatalogoCompleto('¿Solo vendes zapatillas?'), true);
+    assert.equal(pareceQuererCatalogoCompleto('¿Que cosas venden aparte de zapatillas?'), true);
+    assert.equal(pareceQuererCatalogoCompleto('Quiero ver todo lo que tienen'), true);
+  });
+
+  test('no dispara con mensajes normales dentro de una categoria', () => {
+    assert.equal(pareceQuererCatalogoCompleto('Quiero ver zapatillas'), false);
+    assert.equal(pareceQuererCatalogoCompleto('La primera opcion'), false);
+    assert.equal(pareceQuererCatalogoCompleto('Talla 42, color negro'), false);
+    assert.equal(pareceQuererCatalogoCompleto(''), false);
+  });
+
+  // Encontrado en revision de codigo: "aparte de"/"ademas de" sueltos no
+  // tienen nada que ver con pedir el catalogo completo.
+  test('"aparte de"/"ademas de" sueltos no disparan si no piden ver mas', () => {
+    assert.equal(pareceQuererCatalogoCompleto('Aparte de esto, ¿tiene descuento por pago en efectivo?'), false);
+    assert.equal(pareceQuererCatalogoCompleto('Además de la talla 42, ¿tienen la 43?'), false);
+  });
+});

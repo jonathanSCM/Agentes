@@ -59,11 +59,20 @@
 </form>
 
 <form method="POST" action="/panel/categorias" class="form-card" style="max-width:500px;margin-top:1.4rem">
-  <h3 style="margin:0 0 1rem;font-size:.95rem">+ Agregar rubro nuevo</h3>
-  <p class="muted" style="font-size:.85rem;margin:0 0 .8rem">Un rubro es una opción del menú principal (Calzado, Abrigos). Si lo que querés agregar es un tipo dentro de uno existente, entrá a ese rubro.</p>
+  <h3 style="margin:0 0 1rem;font-size:.95rem">+ Agregar categoría nueva</h3>
+  <p class="muted" style="font-size:.85rem;margin:0 0 .8rem">Un rubro es una opción del menú principal (Calzado, Abrigos). Si lo que querés agregar es un tipo DENTRO de un rubro (Botas dentro de Calzado), elegí ese rubro abajo — si lo dejás así queda como rubro nuevo, y eso puede confundir el menú del bot.</p>
   <div class="field">
     <label for="nombre">Nombre *</label>
-    <input id="nombre" name="nombre" type="text" required maxlength="120" placeholder="Ej: Calzado" />
+    <input id="nombre" name="nombre" type="text" required maxlength="120" placeholder="Ej: Calzado, o Botas" />
+  </div>
+  <div class="field">
+    <label for="padreId">¿Es un tipo dentro de un rubro existente?</label>
+    <select id="padreId" name="padreId">
+      <option value="">No, es un rubro nuevo</option>
+      <% categorias.forEach(function (cat) { %>
+        <option value="<%= cat.id %>">Va dentro de "<%= cat.nombre %>"</option>
+      <% }); %>
+    </select>
   </div>
   <div class="form-actions">
     <button class="btn btn-primary" type="submit">Agregar y configurar</button>

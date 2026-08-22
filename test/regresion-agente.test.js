@@ -103,6 +103,29 @@ describe('generarRespuesta - la IA puede mostrar productos reales via tool_calls
   });
 });
 
+describe('generarRespuesta - nunca dice "no hay stock" si la busqueda real SI encontro algo', () => {
+  // Bug real reportado: el bot dijo "no tenemos zapatillas en stock" en el
+  // mismo tramo de la conversacion en que si mostro tarjetas reales.
+  test('si el modelo afirma falta de stock sin respaldo, el sistema lo corrige antes de mandarlo', async () => {
+    let vuelta = 0;
+    const llamarInyectado = async () => {
+      vuelta += 1;
+      if (vuelta === 1) {
+        return { content: 'Actualmente no tenemos zapatillas disponibles en stock.', tool_calls: [] };
+      }
+      if (vuelta === 2) {
+        return { content: '', tool_calls: [{ id: 'call_1', name: 'mostrar_productos', arguments: { idsProductos: [productoId] } }] };
+      }
+      return { content: 'Aca tenes lo que encontramos.', tool_calls: [] };
+    };
+
+    const salida = await generarRespuesta(agenteId, TELEFONO, [], 'Que tienen en calzado?', undefined, { llamarInyectado });
+
+    assert.equal(salida.ok, true);
+    assert.doesNotMatch(salida.respuesta.toLowerCase(), /no (tenemos|hay|contamos con)[^.?!]{0,40}(stock|disponible)/, 'la afirmacion falsa nunca debio llegar al cliente');
+  });
+});
+
 describe('generarRespuesta - nunca afirma "ya esta en tu carrito" si el carrito sigue vacio', () => {
   // Bug real con capturas: el cliente dijo "estoy viendo la Park St 2.0"
   // (solo mirando, sin talla/color) y el bot respondio "ya la tienes en tu

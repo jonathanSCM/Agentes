@@ -489,6 +489,7 @@ body.admin, body.admin-login {
 .config-seccion .dash-card-head h3 { font-size: 1.05rem; }
 
 /* ---------- Panel de conversacion: chat propio (no el de la landing) ---------- */
+.conv-layout { display: grid; grid-template-columns: 1fr 300px; gap: 1.1rem; align-items: start; }
 .conv-shell {
   background: var(--surface); backdrop-filter: blur(10px);
   border: 1px solid var(--border); border-radius: var(--radius);
@@ -507,7 +508,7 @@ body.admin, body.admin-login {
 
 .conv-body {
   padding: 1.1rem; display: flex; flex-direction: column; gap: .35rem;
-  min-height: 250px; max-height: 60vh; overflow-y: auto; overflow-x: hidden;
+  min-height: 250px; max-height: 70vh; overflow-y: auto; overflow-x: hidden;
 }
 .conv-msg {
   max-width: 78%; padding: .6rem .85rem; border-radius: 16px;
@@ -542,6 +543,14 @@ body.admin, body.admin-login {
 .conv-cliente-card { margin-bottom: 1.1rem; }
 .conv-direccion-link { color: var(--primary-2); text-decoration: none; }
 .conv-direccion-link:hover { text-decoration: underline; }
+
+/* Va DESPUES de las reglas base de .conv-* a proposito: con la misma
+   especificidad, si este bloque quedara antes en el archivo la regla base
+   (sin @media) lo pisaria igual aunque el media query matchee. */
+@media (max-width: 900px) {
+  .conv-layout { grid-template-columns: 1fr; }
+  .conv-body { max-height: 55vh; }
+}
 
 /* ---------- Modal de "enviar producto" (mismo lenguaje visual que el tour) ---------- */
 .prod-overlay {

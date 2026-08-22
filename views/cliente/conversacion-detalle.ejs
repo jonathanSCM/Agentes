@@ -36,87 +36,89 @@
 <% if (mensaje) { %><div class="alert-ok"><%= mensaje %></div><% } %>
 <% if (error) { %><div class="alert-err"><%= error %></div><% } %>
 
-<% if (cliente) { %>
-<div class="dash-card conv-cliente-card">
-  <div class="dash-card-head"><h3>Cliente</h3></div>
-  <ul class="dash-list">
-    <li><span>Interés</span><span><%= cliente.categoriaInteres || '-' %></span></li>
-    <li><span>Presupuesto</span><span><%= cliente.presupuesto || '-' %></span></li>
-    <li>
-      <span>Dirección de entrega</span>
-      <span>
-        <% if (direccionLink) { %>
-          <a href="<%= direccionLink %>" target="_blank" rel="noopener" class="conv-direccion-link">📍 Ver ubicación</a>
-        <% } else { %>
-          <%= cliente.direccionEntrega || '-' %>
-        <% } %>
-      </span>
-    </li>
-    <li><span>Estado</span><span class="badge badge-done" style="font-size:.8rem"><%= cliente.estadoLead.replace(/_/g,' ').toLowerCase() %></span></li>
-  </ul>
-</div>
-<% } %>
-
-<div class="conv-shell" style="max-width:640px" data-conversacion-id="<%= conversacion.id %>">
-  <div class="conv-head">
-    <span class="conv-avatar"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="4" y="7" width="16" height="12" rx="3"/><path d="M12 7V3M9 12h.01M15 12h.01"/></svg></span>
-    <div>
-      <strong><%= conversacion.agente.nombre %></strong>
-      <span id="chatStatus"><%= conversacion.mensajes.length %> mensajes</span>
-    </div>
-  </div>
-  <div class="conv-body" id="chatMensajes">
-    <% if (conversacion.mensajes.length === 0) { %>
-      <p class="dash-empty" id="chatVacio">Todavía no hay mensajes en esta conversación.</p>
-    <% } %>
-    <%
-      function claseDe(m) {
-        if (m.rol === 'CLIENTE') return 'cliente';
-        return m.usuario ? 'humano' : 'bot';
-      }
-      function quienDe(m) {
-        if (m.rol === 'CLIENTE') return null;
-        return m.usuario ? ('✋ ' + m.usuario.nombre) : '🤖 Agente IA';
-      }
-    %>
-    <% conversacion.mensajes.forEach(function (m) { %>
-      <% var clase = claseDe(m); var quien = quienDe(m); %>
-      <% if (m.mediaTipo === 'imagen' && m.mediaUrl) { %>
-        <div class="conv-msg foto <%= clase %>">
-          <img src="<%= m.mediaUrl %>" alt="" />
-          <% if (quien || m.contenido) { %>
-            <div class="conv-msg-foto-caption">
-              <% if (quien) { %><div class="conv-msg-quien"><%= quien %></div><% } %>
-              <%= m.contenido %>
-            </div>
-          <% } %>
-        </div>
-      <% } else if (m.mediaTipo === 'audio' && m.mediaUrl) { %>
-        <div class="conv-msg <%= clase %>">
-          <% if (quien) { %><div class="conv-msg-quien"><%= quien %></div><% } %>
-          <audio controls src="<%= m.mediaUrl %>"></audio>
-          <% if (m.contenido) { %><div style="margin-top:.4rem;font-size:.82rem"><%= m.contenido %></div><% } %>
-        </div>
-      <% } else { %>
-        <div class="conv-msg <%= clase %>">
-          <% if (quien) { %><div class="conv-msg-quien"><%= quien %></div><% } %>
-          <%= m.contenido %>
-        </div>
-      <% } %>
-      <div class="conv-msg-hora <%= clase %>">
-        <%= new Date(m.createdAt).toLocaleString('es-BO', { dateStyle: 'short', timeStyle: 'short' }) %>
+<div class="conv-layout">
+  <div class="conv-shell" data-conversacion-id="<%= conversacion.id %>">
+    <div class="conv-head">
+      <span class="conv-avatar"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="4" y="7" width="16" height="12" rx="3"/><path d="M12 7V3M9 12h.01M15 12h.01"/></svg></span>
+      <div>
+        <strong><%= conversacion.agente.nombre %></strong>
+        <span id="chatStatus"><%= conversacion.mensajes.length %> mensajes</span>
       </div>
-    <% }); %>
+    </div>
+    <div class="conv-body" id="chatMensajes">
+      <% if (conversacion.mensajes.length === 0) { %>
+        <p class="dash-empty" id="chatVacio">Todavía no hay mensajes en esta conversación.</p>
+      <% } %>
+      <%
+        function claseDe(m) {
+          if (m.rol === 'CLIENTE') return 'cliente';
+          return m.usuario ? 'humano' : 'bot';
+        }
+        function quienDe(m) {
+          if (m.rol === 'CLIENTE') return null;
+          return m.usuario ? ('✋ ' + m.usuario.nombre) : '🤖 Agente IA';
+        }
+      %>
+      <% conversacion.mensajes.forEach(function (m) { %>
+        <% var clase = claseDe(m); var quien = quienDe(m); %>
+        <% if (m.mediaTipo === 'imagen' && m.mediaUrl) { %>
+          <div class="conv-msg foto <%= clase %>">
+            <img src="<%= m.mediaUrl %>" alt="" />
+            <% if (quien || m.contenido) { %>
+              <div class="conv-msg-foto-caption">
+                <% if (quien) { %><div class="conv-msg-quien"><%= quien %></div><% } %>
+                <%= m.contenido %>
+              </div>
+            <% } %>
+          </div>
+        <% } else if (m.mediaTipo === 'audio' && m.mediaUrl) { %>
+          <div class="conv-msg <%= clase %>">
+            <% if (quien) { %><div class="conv-msg-quien"><%= quien %></div><% } %>
+            <audio controls src="<%= m.mediaUrl %>"></audio>
+            <% if (m.contenido) { %><div style="margin-top:.4rem;font-size:.82rem"><%= m.contenido %></div><% } %>
+          </div>
+        <% } else { %>
+          <div class="conv-msg <%= clase %>">
+            <% if (quien) { %><div class="conv-msg-quien"><%= quien %></div><% } %>
+            <%= m.contenido %>
+          </div>
+        <% } %>
+        <div class="conv-msg-hora <%= clase %>">
+          <%= new Date(m.createdAt).toLocaleString('es-BO', { dateStyle: 'short', timeStyle: 'short' }) %>
+        </div>
+      <% }); %>
+    </div>
+
+    <% if (conversacion.modo === 'HUMANO') { %>
+      <form method="POST" action="/panel/conversaciones/<%= conversacion.id %>/mensaje" id="formMensajeHumano" class="conv-foot">
+        <input type="text" name="texto" autocomplete="off" placeholder="Escribe tu respuesta..." />
+        <button class="btn btn-ghost" type="button" id="btnAbrirProducto">📦 Producto</button>
+        <button class="btn btn-primary" type="submit">Enviar</button>
+      </form>
+    <% } else { %>
+      <p class="conv-foot-sin-control">Tomá el control del chat para poder escribirle directo al cliente.</p>
+    <% } %>
   </div>
 
-  <% if (conversacion.modo === 'HUMANO') { %>
-    <form method="POST" action="/panel/conversaciones/<%= conversacion.id %>/mensaje" id="formMensajeHumano" class="conv-foot">
-      <input type="text" name="texto" autocomplete="off" placeholder="Escribe tu respuesta..." />
-      <button class="btn btn-ghost" type="button" id="btnAbrirProducto">📦 Producto</button>
-      <button class="btn btn-primary" type="submit">Enviar</button>
-    </form>
-  <% } else { %>
-    <p class="conv-foot-sin-control">Tomá el control del chat para poder escribirle directo al cliente.</p>
+  <% if (cliente) { %>
+  <aside class="dash-card conv-cliente-card">
+    <div class="dash-card-head"><h3>Cliente</h3></div>
+    <ul class="dash-list">
+      <li><span>Interés</span><span><%= cliente.categoriaInteres || '-' %></span></li>
+      <li><span>Presupuesto</span><span><%= cliente.presupuesto || '-' %></span></li>
+      <li>
+        <span>Dirección de entrega</span>
+        <span>
+          <% if (direccionLink) { %>
+            <a href="<%= direccionLink %>" target="_blank" rel="noopener" class="conv-direccion-link">📍 Ver ubicación</a>
+          <% } else { %>
+            <%= cliente.direccionEntrega || '-' %>
+          <% } %>
+        </span>
+      </li>
+      <li><span>Estado</span><span class="badge badge-done" style="font-size:.8rem"><%= cliente.estadoLead.replace(/_/g,' ').toLowerCase() %></span></li>
+    </ul>
+  </aside>
   <% } %>
 </div>
 
@@ -142,6 +144,11 @@
     var body = document.getElementById('chatMensajes');
     var status = document.getElementById('chatStatus');
     var total = <%- conversacion.mensajes.length %>;
+
+    // Al abrir la conversacion se ve el ULTIMO mensaje, no el primero: sin
+    // esto, en una charla larga el dueño entraba y veia el inicio de la
+    // charla en vez de lo mas reciente que dijo el cliente.
+    body.scrollTop = body.scrollHeight;
 
     function fmtFecha(iso) {
       var d = new Date(iso);
