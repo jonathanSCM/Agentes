@@ -45,19 +45,6 @@
   </div>
 <% } %>
 
-<form method="POST" action="/panel/categorias/plantilla" class="form-card" style="max-width:500px;margin-top:1.4rem">
-  <input type="hidden" name="plantilla" value="ropa" />
-  <h3 style="margin:0 0 .6rem;font-size:.95rem">Cargar estructura de tienda de ropa</h3>
-  <p class="muted" style="font-size:.85rem;margin:0 0 .9rem">
-    Crea de una vez los rubros típicos con sus tipos adentro: Calzado (zapatillas, botas, zapatos...),
-    Prendas de arriba, Prendas de abajo, Abrigos, Vestidos, Ropa deportiva, Ropa de baño y Accesorios.
-    <strong>No toca lo que ya tenés</strong> ni crea productos: solo arma las carpetas para que cargues los tuyos.
-  </p>
-  <div class="form-actions">
-    <button class="btn btn-ghost" type="submit">Cargar estructura sugerida</button>
-  </div>
-</form>
-
 <form method="POST" action="/panel/categorias" class="form-card" style="max-width:500px;margin-top:1.4rem">
   <h3 style="margin:0 0 1rem;font-size:.95rem">+ Agregar categoría nueva</h3>
   <p class="muted" style="font-size:.85rem;margin:0 0 .8rem">Un rubro es una opción del menú principal (Calzado, Abrigos). Si lo que querés agregar es un tipo DENTRO de un rubro (Botas dentro de Calzado), elegí ese rubro abajo — si lo dejás así queda como rubro nuevo, y eso puede confundir el menú del bot.</p>
@@ -76,6 +63,22 @@
   </div>
   <div class="form-actions">
     <button class="btn btn-primary" type="submit">Agregar y configurar</button>
+  </div>
+</form>
+
+<!-- Al fondo a proposito: es una herramienta de uso puntual (cargar de una
+     toda la estructura sugerida), no algo que se use seguido como el form
+     de arriba - no debe competir por atencion con el alta normal. -->
+<form method="POST" action="/panel/categorias/plantilla" class="form-card" style="max-width:500px;margin-top:1.4rem">
+  <input type="hidden" name="plantilla" value="ropa" />
+  <h3 style="margin:0 0 .6rem;font-size:.95rem">Cargar estructura de tienda de ropa</h3>
+  <p class="muted" style="font-size:.85rem;margin:0 0 .9rem">
+    Crea de una vez los rubros típicos con sus tipos adentro: Calzado (zapatillas, botas, zapatos...),
+    Prendas de arriba, Prendas de abajo, Abrigos, Vestidos, Ropa deportiva, Ropa de baño y Accesorios.
+    <strong>No toca lo que ya tenés</strong> ni crea productos: solo arma las carpetas para que cargues los tuyos.
+  </p>
+  <div class="form-actions">
+    <button class="btn btn-ghost" type="submit">Cargar estructura sugerida</button>
   </div>
 </form>
 
