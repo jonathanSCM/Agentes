@@ -8,6 +8,11 @@
   </p>
 </div>
 
+<nav class="subnav-tabs">
+  <a href="/panel/inteligencia" class="<%= subvista === 'resumen' ? 'is-active' : '' %>">Resumen y riesgo</a>
+  <a href="/panel/inteligencia/comentarios" class="<%= subvista === 'comentarios' ? 'is-active' : '' %>">Buscador de comentarios</a>
+</nav>
+
 <div class="admin-stats">
   <div class="stat-card stat-alerta">
     <span class="stat-num"><%= kpis.tasaDevolucion.valor %>%</span>
@@ -23,6 +28,20 @@
     <span class="stat-num"><%= kpis.aov.variacion > 0 ? '+' : '' %><%= kpis.aov.variacion %>%</span>
     <span class="stat-label">Variación del ticket promedio</span>
     <div class="muted" style="font-size:.78rem;margin-top:.3rem">Bs <%= kpis.aov.anterior %> → Bs <%= kpis.aov.actual %></div>
+  </div>
+</div>
+
+<div class="dash-card" style="margin-bottom:1.6rem">
+  <div class="dash-card-head"><h3>Tendencia del ticket promedio (últimos 6 meses)</h3></div>
+  <div class="mini-chart">
+    <% var maxAov = Math.max.apply(null, aovSerie); %>
+    <% var minAov = Math.min.apply(null, aovSerie); %>
+    <% aovSerie.forEach(function (v, i) { %>
+      <div class="mini-bar-wrap">
+        <div class="mini-bar" style="height:<%= Math.round(((v - minAov + 5) / (maxAov - minAov + 5)) * 100) %>%" title="Bs <%= v %>"></div>
+        <span class="mini-lbl">Bs <%= v %></span>
+      </div>
+    <% }); %>
   </div>
 </div>
 
@@ -50,23 +69,38 @@
   <div class="dash-card-head">
     <h3>Clientes en riesgo de dejar de comprarte</h3>
   </div>
+
+  <div class="filtro-chips" id="filtrosRiesgo">
+    <button type="button" class="filtro-chip is-active" data-riesgo="TODOS">Todos</button>
+    <button type="button" class="filtro-chip" data-riesgo="HIGH">Alto</button>
+    <button type="button" class="filtro-chip" data-riesgo="MEDIUM">Medio</button>
+    <button type="button" class="filtro-chip" data-riesgo="LOW">Bajo</button>
+  </div>
+
   <div class="table-wrap">
     <table class="leads-table">
       <thead>
         <tr><th>Cliente</th><th class="num">Días sin comprar</th><th>Riesgo</th><th>Motivo</th><th>Acción sugerida</th><th></th></tr>
       </thead>
-      <tbody>
-        <% clientesEnRiesgo.forEach(function (c) { %>
+      <tbody id="tablaRiesgo">
+        <% clientesEnRiesgo.forEach(function (c, i) { %>
           <% var badge = c.riesgo === 'HIGH' ? 'badge-alerta' : c.riesgo === 'MEDIUM' ? 'badge-star' : 'badge-off'; %>
           <% var etiqueta = c.riesgo === 'HIGH' ? 'Alto' : c.riesgo === 'MEDIUM' ? 'Medio' : 'Bajo'; %>
-          <tr>
-            <td><strong><%= c.nombre %></strong><div class="muted" style="font-size:.78rem"><%= c.telefono %></div></td>
+          <% var iniciales = c.nombre.split(' ').map(function (p) { return p[0]; }).slice(0, 2).join('').toUpperCase(); %>
+          <tr data-riesgo="<%= c.riesgo %>">
+            <td>
+              <div class="cliente-riesgo-cell">
+                <span class="avatar-mini"><%= iniciales %></span>
+                <div><strong><%= c.nombre %></strong><div class="muted" style="font-size:.78rem"><%= c.telefono %></div></div>
+              </div>
+            </td>
             <td class="num"><%= c.diasSinComprar %></td>
             <td><span class="badge <%= badge %>"><%= etiqueta %></span></td>
             <td class="muted" style="font-size:.86rem"><%= c.motivo %></td>
             <td class="msg-cell"><%= c.accion %></td>
             <td class="actions-cell">
-              <button class="btn btn-ghost" style="padding:.4rem .8rem;font-size:.85rem" type="button" disabled title="Todavía no está conectado: por ahora es solo una vista previa">Enviar mensaje</button>
+              <button class="btn btn-ghost btn-enviar-mensaje" style="padding:.4rem .8rem;font-size:.85rem" type="button"
+                      data-nombre="<%= c.nombre %>" data-accion="<%= c.accion %>">Enviar mensaje</button>
             </td>
           </tr>
         <% }); %>
@@ -74,5 +108,52 @@
     </table>
   </div>
 </div>
+
+<div class="prod-overlay" id="mensajeOverlay" hidden>
+  <div class="prod-card">
+    <button type="button" class="prod-cerrar" id="mensajeCerrar" aria-label="Cerrar">✕</button>
+    <h3>Enviar mensaje a <span id="mensajeCliente"></span></h3>
+    <textarea id="mensajeTexto" rows="5" style="width:100%;padding:.7rem;border-radius:10px;border:1px solid var(--border);background:var(--bg-2);color:var(--text);font:inherit;resize:vertical"></textarea>
+    <p class="muted" style="font-size:.82rem;margin:.7rem 0 0">⚠ Vista previa: esto todavía no está conectado a WhatsApp. Se va a poder mandar de verdad cuando el Churn Risk use clientes reales.</p>
+    <div class="form-actions" style="border-top:none;padding-top:.9rem">
+      <button class="btn btn-primary" type="button" disabled title="Todavía no conectado">Enviar</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  (function () {
+    // Filtro de severidad: puro cliente, sin recargar - los datos siguen
+    // siendo de ejemplo, esto solo demuestra la interaccion real.
+    var chips = document.querySelectorAll('#filtrosRiesgo .filtro-chip');
+    var filas = document.querySelectorAll('#tablaRiesgo tr');
+    chips.forEach(function (chip) {
+      chip.addEventListener('click', function () {
+        chips.forEach(function (c) { c.classList.remove('is-active'); });
+        chip.classList.add('is-active');
+        var filtro = chip.getAttribute('data-riesgo');
+        filas.forEach(function (fila) {
+          fila.hidden = filtro !== 'TODOS' && fila.getAttribute('data-riesgo') !== filtro;
+        });
+      });
+    });
+
+    // Modal de "enviar mensaje": precarga la accion sugerida, editable.
+    // Nunca envia de verdad - el boton queda deshabilitado a proposito.
+    var overlay = document.getElementById('mensajeOverlay');
+    var cerrar = document.getElementById('mensajeCerrar');
+    var tituloCliente = document.getElementById('mensajeCliente');
+    var texto = document.getElementById('mensajeTexto');
+    document.querySelectorAll('.btn-enviar-mensaje').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        tituloCliente.textContent = btn.getAttribute('data-nombre');
+        texto.value = btn.getAttribute('data-accion');
+        overlay.hidden = false;
+      });
+    });
+    cerrar.addEventListener('click', function () { overlay.hidden = true; });
+    overlay.addEventListener('click', function (e) { if (e.target === overlay) overlay.hidden = true; });
+  })();
+</script>
 
 <%- include('partials/fin') %>

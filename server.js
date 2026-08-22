@@ -1418,17 +1418,23 @@ app.get('/panel/inteligencia', requireCliente, async (req, res, next) => {
       'Investigar si las devoluciones recientes tienen un motivo en común (talla, color, calidad).',
     ];
 
+    const ordenRiesgo = { HIGH: 0, MEDIUM: 1, LOW: 2 };
     const clientesEnRiesgo = [
       { nombre: 'Marcelo Rojas', telefono: '+591 700-11223', diasSinComprar: 63, riesgo: 'HIGH', motivo: 'Sin comprar hace más de 2 meses', accion: 'Ofrecerle un descuento basado en sus compras anteriores.' },
       { nombre: 'Daniela Vargas', telefono: '+591 700-44556', diasSinComprar: 55, riesgo: 'MEDIUM', motivo: 'Tuvo una devolución reciente', accion: 'Preguntarle si quedó conforme y ofrecerle ayuda.' },
       { nombre: 'Gonzalo Peña', telefono: '+591 700-77889', diasSinComprar: 45, riesgo: 'MEDIUM', motivo: 'Antes compraba cada 2-3 semanas', accion: 'Enviarle novedades o un recordatorio amable.' },
       { nombre: 'Fabiola Ríos', telefono: '+591 700-99001', diasSinComprar: 38, riesgo: 'MEDIUM', motivo: 'Bajó su frecuencia de compra', accion: 'Ofrecerle una recompensa de fidelización.' },
       { nombre: 'Ivan Salazar', telefono: '+591 700-22334', diasSinComprar: 21, riesgo: 'LOW', motivo: 'Actividad normal, sin señales de alarma', accion: 'Nada urgente por ahora.' },
-    ];
+    ].sort((a, b) => ordenRiesgo[a.riesgo] - ordenRiesgo[b.riesgo]);
+
+    // Serie inventada de los ultimos meses para el mini-grafico de tendencia
+    // del ticket promedio (mismo espiritu que kpis.aov, solo mas puntos para
+    // que se vea la tendencia en vez de un antes/despues seco).
+    const aovSerie = [268, 261, 257, 252, 249, 245];
 
     res.render('cliente/inteligencia', {
-      title: 'Inteligencia de negocio - Proshop', tituloPagina: 'Inteligencia de negocio', activo: 'inteligencia',
-      kpis, riesgos, acciones, clientesEnRiesgo,
+      title: 'Inteligencia de negocio - Proshop', tituloPagina: 'Inteligencia de negocio', activo: 'inteligencia', subvista: 'resumen',
+      kpis, riesgos, acciones, clientesEnRiesgo, aovSerie,
     });
   } catch (err) { next(err); }
 });
@@ -1473,8 +1479,8 @@ app.get('/panel/inteligencia/comentarios', requireCliente, async (req, res, next
     }).sort((a, b) => b.porcentaje - a.porcentaje);
 
     res.render('cliente/inteligencia-comentarios', {
-      title: 'Buscador de comentarios - Proshop', tituloPagina: 'Buscador de comentarios', activo: 'inteligencia',
-      q, resultados,
+      title: 'Buscador de comentarios - Proshop', tituloPagina: 'Buscador de comentarios', activo: 'inteligencia', subvista: 'comentarios',
+      q, palabras, resultados,
     });
   } catch (err) { next(err); }
 });

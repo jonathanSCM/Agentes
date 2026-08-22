@@ -8,6 +8,11 @@
   </p>
 </div>
 
+<nav class="subnav-tabs">
+  <a href="/panel/inteligencia" class="<%= subvista === 'resumen' ? 'is-active' : '' %>">Resumen y riesgo</a>
+  <a href="/panel/inteligencia/comentarios" class="<%= subvista === 'comentarios' ? 'is-active' : '' %>">Buscador de comentarios</a>
+</nav>
+
 <form method="GET" action="/panel/inteligencia/comentarios" class="form-card" style="max-width:640px;margin-bottom:1.4rem">
   <div class="field">
     <label for="q">¿Qué querés buscar?</label>
@@ -18,22 +23,52 @@
   </div>
 </form>
 
-<div style="margin-bottom:1.4rem">
-  <% ['mal empacado', 'rayones', 'cajas rotas', 'envío pésimo'].forEach(function (etiqueta) { %>
-    <a href="/panel/inteligencia/comentarios?q=<%= encodeURIComponent(etiqueta) %>" class="badge badge-alerta" style="margin-right:.5rem;text-decoration:none">#<%= etiqueta %></a>
+<%
+  var ETIQUETAS = ['mal empacado', 'rayones', 'cajas rotas', 'envío pésimo'];
+  function normalizarSimpleVista(t) {
+    return String(t || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+  }
+  var qNormalizada = normalizarSimpleVista(q);
+%>
+<div style="margin-bottom:1rem">
+  <% ETIQUETAS.forEach(function (etiqueta) { %>
+    <% var activa = qNormalizada === normalizarSimpleVista(etiqueta); %>
+    <a href="/panel/inteligencia/comentarios?q=<%= encodeURIComponent(etiqueta) %>"
+       class="badge <%= activa ? 'badge-alerta' : 'badge-off' %>" style="margin-right:.5rem;text-decoration:none">#<%= etiqueta %></a>
   <% }); %>
 </div>
+
+<p class="muted" style="font-size:.86rem;margin:0 0 1rem">
+  <%= resultados.length %> comentarios analizados para "<%= q %>" · <%= resultados.filter(function (r) { return r.porcentaje >= 70; }).length %> con alta coincidencia
+</p>
 
 <div class="table-wrap">
   <table class="leads-table">
     <thead><tr><th>Producto</th><th>Estrellas</th><th>Comentario</th><th class="num">Coincidencia</th></tr></thead>
     <tbody>
       <% resultados.forEach(function (r) { %>
+        <%
+          var comentarioResaltado = r.comentario;
+          palabras.forEach(function (p) {
+            // Raiz de la palabra (sin los ultimos 2 caracteres si es larga) +
+            // \w* para que singular/plural igual se resalten (la busqueda
+            // "rayones" tiene que poder resaltar "rayon" en el comentario,
+            // aunque no sean la misma palabra exacta).
+            var base = p.length > 5 ? p.slice(0, p.length - 2) : p;
+            var re = new RegExp('\\b(' + base.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\w*)', 'gi');
+            comentarioResaltado = comentarioResaltado.replace(re, '<mark>$1</mark>');
+          });
+        %>
         <tr>
           <td><strong><%= r.producto %></strong></td>
           <td class="nowrap"><%= '★'.repeat(r.estrellas) %><span class="muted"><%= '★'.repeat(5 - r.estrellas) %></span></td>
-          <td class="msg-cell"><%= r.comentario %></td>
-          <td class="num"><span class="badge <%= r.porcentaje >= 70 ? 'badge-alerta' : 'badge-off' %>"><%= r.porcentaje %>% match</span></td>
+          <td class="msg-cell comentario-resaltado"><%- comentarioResaltado %></td>
+          <td class="num">
+            <div class="match-bar-wrap">
+              <div class="bar"><span style="width:<%= r.porcentaje %>%<% if (r.porcentaje < 70) { %>;background:var(--muted)<% } %>"></span></div>
+              <span class="match-bar-num"><%= r.porcentaje %>%</span>
+            </div>
+          </td>
         </tr>
       <% }); %>
     </tbody>

@@ -1,121 +1,162 @@
-<!-- Recorrido guiado del panel: modal centrado, no depende de que el
-     sidebar este visible (en mobile arranca oculto), asi que no intenta
-     resaltar elementos del menu, solo explica con ejemplos. -->
-<div class="tour-overlay" id="tourOverlay" hidden>
-  <div class="tour-card" role="dialog" aria-modal="true" aria-labelledby="tourTitulo">
-    <button type="button" class="tour-cerrar" id="tourCerrar" aria-label="Saltar recorrido">✕</button>
-    <div class="tour-paso">
-      <h3 id="tourTitulo"></h3>
-      <p id="tourDesc"></p>
-      <div class="tour-ejemplo" id="tourEjemplo"></div>
-    </div>
-    <div class="tour-pie">
-      <div class="tour-puntos" id="tourPuntos"></div>
-      <div class="tour-botones">
-        <button type="button" class="btn btn-ghost" id="tourAtras">Atrás</button>
-        <button type="button" class="btn btn-primary" id="tourSiguiente">Siguiente</button>
-      </div>
-    </div>
-  </div>
-</div>
+<!-- Recorrido guiado real: Driver.js resalta el elemento de verdad de cada
+     pantalla (oscurece el resto) y explica que hace. Como esta app no es una
+     SPA, cada paso que cambia de seccion navega de pagina de verdad - el
+     paso actual se guarda en sessionStorage antes de navegar, y se retoma
+     solo al cargar la pagina siguiente. Ver el plan "recorrido guiado real"
+     para el detalle completo del diseño. -->
+<link rel="stylesheet" href="https://unpkg.com/driver.js@1.8.0/dist/driver.css" />
+<script src="https://unpkg.com/driver.js@1.8.0/dist/driver.js.iife.js"></script>
 
 <script>
 (function () {
+  if (typeof window.driver === 'undefined') return;
+  var driver = window.driver.js.driver;
+
+  // Un solo paso por pagina: cada "Siguiente" navega a la pagina siguiente
+  // (o avanza en la misma si algun dia agregamos mas de un paso por pagina).
   var PASOS = [
     {
-      titulo: 'Inicio',
-      desc: 'Tu resumen del día: pedidos nuevos, conversaciones recientes y el estado de tu plan, todo de un vistazo.',
-      ejemplo: 'Ej: "3 pedidos nuevos hoy" te lleva directo a revisarlos.'
+      activo: 'inicio', selector: '.admin-stats', titulo: 'Inicio',
+      desc: 'Tu resumen del día: pedidos nuevos, conversaciones recientes y el estado de tu plan, todo de un vistazo. Ej: "3 pedidos nuevos hoy" te lleva directo a revisarlos.',
     },
     {
-      titulo: 'Conversaciones',
-      desc: 'Cada chat que tu agente atendió por WhatsApp. Podés leerlo completo, tomar el control vos mismo, o reiniciar la memoria de un cliente.',
-      ejemplo: 'Ej: un cliente escribe "¿Tienen zapatillas talla 40?" y ves cómo tu agente le responde solo, en tiempo real.'
+      activo: 'conversaciones', selector: '.admin-stats', titulo: 'Conversaciones',
+      desc: 'Cada chat que tu agente atendió por WhatsApp. Podés leerlo completo, tomar el control vos mismo, o reiniciar la memoria de un cliente. Ej: un cliente escribe "¿Tienen zapatillas talla 40?" y acá ves cómo tu agente le responde solo, en tiempo real.',
     },
     {
-      titulo: 'Pedidos',
+      activo: 'pedidos', selector: '.admin-stats', titulo: 'Pedidos',
       desc: 'Los pedidos que se cerraron por WhatsApp. Entrá a cualquiera para ver el detalle: productos, entrega y forma de pago, con acciones para confirmar o marcar como entregado.',
-      ejemplo: 'Ej: un pedido de Bs 250 con entrega a domicilio te muestra el mapa de la dirección del cliente.'
     },
     {
-      titulo: 'Productos, Categorías e Inventario',
-      desc: 'Acá armás tu catálogo: qué vendés, en qué categorías, con qué variantes (talla, color) y cuánto stock tenés de cada una.',
-      ejemplo: 'Ej: agregás "Zapatilla Urbana" en la categoría Calzado, con variantes de talla 38 a 42.'
+      activo: 'productos', selector: '.admin-stats', titulo: 'Productos',
+      desc: 'Acá armás tu catálogo: qué vendés, con qué variantes (talla, color) y a qué precio. Ej: cargás "Zapatilla Urbana" con variantes de talla 38 a 42.',
     },
     {
-      titulo: 'WhatsApp',
+      activo: 'categorias', selector: '.empty-state, .table-wrap', titulo: 'Categorías',
+      desc: 'Los rubros y tipos que le ofrece tu agente al cliente cuando pregunta qué vendés (Calzado → Botas, Zapatillas...). El cliente elige primero el rubro y después el tipo, así no recibe todo de golpe.',
+    },
+    {
+      activo: 'inventario', selector: '.admin-stats', titulo: 'Inventario',
+      desc: 'Cuánto stock tenés de cada variante, para saber qué reponer antes de que se agote.',
+    },
+    {
+      activo: 'whatsapp', selector: '.wa-status', titulo: 'WhatsApp',
       desc: 'Acá conectás el número de WhatsApp que va a atender tu agente. Con un solo campo alcanza para el flujo simple.',
-      ejemplo: 'Ej: cargás tu número y en unas horas tu agente ya está respondiendo ahí.'
     },
     {
-      titulo: 'Configuración',
-      desc: 'El nombre y personalidad de tu agente, qué formas de pago aceptás, y cómo se ve tu catálogo web (logo, colores, plantilla).',
-      ejemplo: 'Ej: cambiás el tono a "divertido y casual" y tu agente empieza a hablarles distinto a tus clientes.'
-    }
+      activo: 'configuracion', selector: '.config-nav', titulo: 'Configuración',
+      desc: 'El nombre y personalidad de tu agente, qué formas de pago aceptás, y cómo se ve tu catálogo web (logo, colores, plantilla). Ej: cambiás el tono a "divertido y casual" y tu agente empieza a hablarles distinto a tus clientes.',
+    },
+    {
+      activo: 'inteligencia', selector: '.admin-stats', titulo: 'Inteligencia de negocio',
+      desc: 'Un resumen gerencial de cómo va tu negocio, qué clientes podrían dejar de comprarte, y un buscador de comentarios de clientes. Todavía es una vista previa con datos de ejemplo.',
+    },
   ];
 
-  var overlay = document.getElementById('tourOverlay');
-  var titulo = document.getElementById('tourTitulo');
-  var desc = document.getElementById('tourDesc');
-  var ejemplo = document.getElementById('tourEjemplo');
-  var puntosWrap = document.getElementById('tourPuntos');
-  var btnAtras = document.getElementById('tourAtras');
-  var btnSiguiente = document.getElementById('tourSiguiente');
-  var btnCerrar = document.getElementById('tourCerrar');
-  if (!overlay) return;
+  var RUTAS = {
+    inicio: '/panel', conversaciones: '/panel/conversaciones', pedidos: '/panel/pedidos',
+    productos: '/panel/productos', categorias: '/panel/categorias', inventario: '/panel/inventario',
+    whatsapp: '/panel/whatsapp', configuracion: '/panel/configuracion', inteligencia: '/panel/inteligencia',
+  };
 
-  var pasoActual = 0;
+  var PANEL_ACTIVO = <%- JSON.stringify(typeof activo !== 'undefined' ? activo : '') %>;
+  var CLAVE_INDICE = 'ps_tour_indice';
 
-  PASOS.forEach(function (_, i) {
-    var punto = document.createElement('span');
-    punto.className = 'tour-punto';
-    punto.dataset.i = i;
-    puntosWrap.appendChild(punto);
-  });
-  var puntos = puntosWrap.querySelectorAll('.tour-punto');
-
-  function pintar() {
-    var p = PASOS[pasoActual];
-    titulo.textContent = p.titulo;
-    desc.textContent = p.desc;
-    ejemplo.textContent = p.ejemplo;
-    puntos.forEach(function (pt, i) { pt.classList.toggle('is-activo', i === pasoActual); });
-    btnAtras.style.visibility = pasoActual === 0 ? 'hidden' : 'visible';
-    btnSiguiente.textContent = pasoActual === PASOS.length - 1 ? 'Empezar' : 'Siguiente';
+  function terminarTour() {
+    sessionStorage.removeItem(CLAVE_INDICE);
   }
 
-  function abrir() {
-    pasoActual = 0;
-    pintar();
-    overlay.hidden = false;
+  function irAIndice(indice) {
+    if (indice < 0) return;
+    if (indice >= PASOS.length) { terminarTour(); return; }
+    sessionStorage.setItem(CLAVE_INDICE, String(indice));
+    var paso = PASOS[indice];
+    if (paso.activo === PANEL_ACTIVO) {
+      arrancarEnPagina(indice);
+    } else if (RUTAS[paso.activo]) {
+      location.href = RUTAS[paso.activo];
+    } else {
+      terminarTour();
+    }
   }
 
-  function cerrar() {
-    overlay.hidden = true;
+  function arrancarEnPagina(indice) {
+    var paso = PASOS[indice];
+    var esPrimero = indice === 0;
+    var esUltimo = indice === PASOS.length - 1;
+    var elementoExiste = document.querySelector(paso.selector);
+
+    var driverObj = driver({
+      allowClose: true,
+      overlayOpacity: 0.65,
+      stagePadding: 6,
+      steps: [{
+        element: elementoExiste ? paso.selector : undefined,
+        popover: {
+          title: paso.titulo,
+          description: paso.desc,
+          showButtons: esPrimero ? ['next', 'close'] : ['next', 'previous', 'close'],
+          nextBtnText: esUltimo ? 'Listo' : 'Siguiente',
+          prevBtnText: 'Atrás',
+          onNextClick: function () {
+            if (esUltimo) { terminarTour(); driverObj.destroy(); return; }
+            irAIndice(indice + 1);
+          },
+          onPrevClick: function () {
+            if (esPrimero) return;
+            irAIndice(indice - 1);
+          },
+          onCloseClick: function () {
+            terminarTour();
+            driverObj.destroy();
+          },
+        },
+      }],
+    });
+    driverObj.drive();
+
+    // Cada pagina arma su propio mini-tour de UN solo paso (asi es como
+    // navegamos de verdad entre paginas) - pero eso hace que Driver.js
+    // piense que ese paso es SIEMPRE el primero de su propio array y
+    // deshabilite el boton "Atras" por su cuenta, aunque en el recorrido
+    // completo si haya un paso anterior. Se corrige a mano justo despues
+    // de abrir.
+    if (!esPrimero) {
+      setTimeout(function () {
+        var btnAtras = document.querySelector('.driver-popover-prev-btn');
+        if (btnAtras) {
+          btnAtras.disabled = false;
+          btnAtras.classList.remove('driver-popover-btn-disabled');
+        }
+      }, 0);
+    }
   }
 
-  btnSiguiente.addEventListener('click', function () {
-    if (pasoActual === PASOS.length - 1) { cerrar(); return; }
-    pasoActual++;
-    pintar();
-  });
-  btnAtras.addEventListener('click', function () {
-    if (pasoActual === 0) return;
-    pasoActual--;
-    pintar();
-  });
-  btnCerrar.addEventListener('click', cerrar);
-  overlay.addEventListener('click', function (e) {
-    if (e.target === overlay) cerrar();
-  });
+  function abrirDesdeElPrincipio() {
+    irAIndice(0);
+  }
 
-  // Una vez por sesión de navegador (se limpia solo al cerrar la pestaña).
-  if (!sessionStorage.getItem('ps_tour_visto')) {
+  // Retoma un tour ya en curso (venia de otra pagina) si el paso guardado
+  // pertenece a esta pagina.
+  var indiceGuardado = sessionStorage.getItem(CLAVE_INDICE);
+  if (indiceGuardado !== null) {
+    var i = Number(indiceGuardado);
+    if (PASOS[i] && PASOS[i].activo === PANEL_ACTIVO) {
+      setTimeout(function () { arrancarEnPagina(i); }, 300);
+    }
+  } else if (!sessionStorage.getItem('ps_tour_visto') && PANEL_ACTIVO === 'inicio') {
+    // Una sola vez por sesion de navegador, y solo arranca solo si el
+    // primer paso (Inicio) es la pagina en la que ya estas.
     sessionStorage.setItem('ps_tour_visto', '1');
-    setTimeout(abrir, 600);
+    setTimeout(abrirDesdeElPrincipio, 600);
   }
 
   var btnAyuda = document.getElementById('tourAyudaBtn');
-  if (btnAyuda) btnAyuda.addEventListener('click', abrir);
+  if (btnAyuda) {
+    btnAyuda.addEventListener('click', function () {
+      sessionStorage.setItem('ps_tour_visto', '1');
+      abrirDesdeElPrincipio();
+    });
+  }
 })();
 </script>
