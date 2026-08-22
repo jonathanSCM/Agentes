@@ -495,6 +495,21 @@ body.admin, body.admin-login {
 .driver-popover-arrow-side-left.driver-popover-arrow { border-left-color: var(--surface) !important; }
 .driver-popover-arrow-side-right.driver-popover-arrow { border-right-color: var(--surface) !important; }
 
+.tour-progreso { display: flex; gap: .3rem; margin-top: .9rem; }
+.tour-progreso-punto { width: 6px; height: 6px; border-radius: 50%; background: rgba(255,255,255,.16); transition: background .2s, transform .2s; }
+.tour-progreso-punto.is-visto { background: var(--primary-2); }
+.tour-progreso-punto.is-activo { background: var(--primary-2); transform: scale(1.4); }
+
+.tour-celebracion {
+  position: fixed; left: 50%; bottom: 2rem; transform: translateX(-50%);
+  background: var(--surface); backdrop-filter: blur(10px); border: 1px solid rgba(47,227,166,.4);
+  border-radius: 999px; padding: .8rem 1.4rem; font-size: .9rem; font-weight: 600; color: var(--text);
+  box-shadow: var(--shadow); z-index: 1000000001; animation: tour-celebracion-entra .35s ease-out;
+}
+.tour-celebracion.is-saliendo { animation: tour-celebracion-sale .5s ease-in forwards; }
+@keyframes tour-celebracion-entra { from { opacity: 0; transform: translate(-50%, 14px); } to { opacity: 1; transform: translate(-50%, 0); } }
+@keyframes tour-celebracion-sale { to { opacity: 0; transform: translate(-50%, 14px); } }
+
 /* ---------- Guía numerada de conexión avanzada de WhatsApp ---------- */
 .tour-pasos-wa { list-style: none; margin: 0 0 1rem; padding-left: 0; display: grid; gap: 1rem; font-size: .9rem; }
 .campo-copiable { display: flex; gap: .5rem; align-items: stretch; }

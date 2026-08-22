@@ -16,40 +16,40 @@
   // (o avanza en la misma si algun dia agregamos mas de un paso por pagina).
   var PASOS = [
     {
-      activo: 'inicio', selector: '.admin-stats', titulo: 'Inicio',
-      desc: 'Tu resumen del día: pedidos nuevos, conversaciones recientes y el estado de tu plan, todo de un vistazo. Ej: "3 pedidos nuevos hoy" te lleva directo a revisarlos.',
+      activo: 'inicio', selector: '.admin-stats', emoji: '👋', titulo: 'Inicio',
+      desc: '¡Bienvenido! Este es tu resumen del día: pedidos nuevos, conversaciones recientes y el estado de tu plan, todo de un vistazo. Ej: "3 pedidos nuevos hoy" te lleva directo a revisarlos.',
     },
     {
-      activo: 'conversaciones', selector: '.admin-stats', titulo: 'Conversaciones',
+      activo: 'conversaciones', selector: '.admin-stats', emoji: '💬', titulo: 'Conversaciones',
       desc: 'Cada chat que tu agente atendió por WhatsApp. Podés leerlo completo, tomar el control vos mismo, o reiniciar la memoria de un cliente. Ej: un cliente escribe "¿Tienen zapatillas talla 40?" y acá ves cómo tu agente le responde solo, en tiempo real.',
     },
     {
-      activo: 'pedidos', selector: '.admin-stats', titulo: 'Pedidos',
+      activo: 'pedidos', selector: '.admin-stats', emoji: '📦', titulo: 'Pedidos',
       desc: 'Los pedidos que se cerraron por WhatsApp. Entrá a cualquiera para ver el detalle: productos, entrega y forma de pago, con acciones para confirmar o marcar como entregado.',
     },
     {
-      activo: 'productos', selector: '.admin-stats', titulo: 'Productos',
+      activo: 'productos', selector: '.admin-stats', emoji: '🛍️', titulo: 'Productos',
       desc: 'Acá armás tu catálogo: qué vendés, con qué variantes (talla, color) y a qué precio. Ej: cargás "Zapatilla Urbana" con variantes de talla 38 a 42.',
     },
     {
-      activo: 'categorias', selector: '.empty-state, .table-wrap', titulo: 'Categorías',
+      activo: 'categorias', selector: '.empty-state, .table-wrap', emoji: '🗂️', titulo: 'Categorías',
       desc: 'Los rubros y tipos que le ofrece tu agente al cliente cuando pregunta qué vendés (Calzado → Botas, Zapatillas...). El cliente elige primero el rubro y después el tipo, así no recibe todo de golpe.',
     },
     {
-      activo: 'inventario', selector: '.admin-stats', titulo: 'Inventario',
+      activo: 'inventario', selector: '.admin-stats', emoji: '📊', titulo: 'Inventario',
       desc: 'Cuánto stock tenés de cada variante, para saber qué reponer antes de que se agote.',
     },
     {
-      activo: 'whatsapp', selector: '.wa-status', titulo: 'WhatsApp',
+      activo: 'whatsapp', selector: '.wa-status', emoji: '📱', titulo: 'WhatsApp',
       desc: 'Acá conectás el número de WhatsApp que va a atender tu agente. Con un solo campo alcanza para el flujo simple.',
     },
     {
-      activo: 'configuracion', selector: '.config-nav', titulo: 'Configuración',
+      activo: 'configuracion', selector: '.config-nav', emoji: '⚙️', titulo: 'Configuración',
       desc: 'El nombre y personalidad de tu agente, qué formas de pago aceptás, y cómo se ve tu catálogo web (logo, colores, plantilla). Ej: cambiás el tono a "divertido y casual" y tu agente empieza a hablarles distinto a tus clientes.',
     },
     {
-      activo: 'inteligencia', selector: '.admin-stats', titulo: 'Inteligencia de negocio',
-      desc: 'Un resumen gerencial de cómo va tu negocio, qué clientes podrían dejar de comprarte, y un buscador de comentarios de clientes. Todavía es una vista previa con datos de ejemplo.',
+      activo: 'inteligencia', selector: '.admin-stats', emoji: '🧠', titulo: 'Inteligencia de negocio',
+      desc: 'Un resumen gerencial de cómo va tu negocio, qué clientes podrían dejar de comprarte, y un buscador de comentarios de clientes. Todavía es una vista previa con datos de ejemplo. ¡Y con esto ya conocés todo el panel! 🎉',
     },
   ];
 
@@ -80,7 +80,15 @@
     }
   }
 
+  // Instancia activa (si hay una). Sin esto, si el recorrido ya se estaba
+  // retomando solo al cargar la pagina Y ademas se toca el boton "?" en esa
+  // misma ventana, quedaban dos tours abiertos a la vez (bug real,
+  // encontrado probando en el navegador: puntos de progreso duplicados).
+  var driverActual = null;
+
   function arrancarEnPagina(indice) {
+    if (driverActual) { driverActual.destroy(); driverActual = null; }
+
     var paso = PASOS[indice];
     var esPrimero = indice === 0;
     var esUltimo = indice === PASOS.length - 1;
@@ -88,18 +96,54 @@
 
     var driverObj = driver({
       allowClose: true,
-      overlayOpacity: 0.65,
-      stagePadding: 6,
+      animate: true,
+      smoothScroll: true,
+      overlayOpacity: 0.72,
+      overlayColor: '#0a0611',
+      stagePadding: 8,
+      stageRadius: 12,
       steps: [{
         element: elementoExiste ? paso.selector : undefined,
         popover: {
-          title: paso.titulo,
+          title: paso.emoji + ' ' + paso.titulo,
           description: paso.desc,
           showButtons: esPrimero ? ['next', 'close'] : ['next', 'previous', 'close'],
-          nextBtnText: esUltimo ? 'Listo' : 'Siguiente',
+          nextBtnText: esUltimo ? '¡Listo! 🎉' : 'Siguiente',
           prevBtnText: 'Atrás',
+          // Puntos de progreso REALES del recorrido completo (9 pasos), no
+          // el "1 de 1" que daria Driver.js si mostraramos su progreso
+          // nativo - cada pagina arma su propio mini-tour de un solo paso.
+          // Tambien corrige aca (con la referencia real del boton, no un
+          // querySelector aparte) que Driver.js deshabilita "Atras" por su
+          // cuenta al pensar que este paso solitario es siempre el primero.
+          onPopoverRender: function (popoverDOM) {
+            // Driver.js puede llamar a este hook mas de una vez por apertura
+            // (ej. al reposicionar el popover) - sin este chequeo, quedaban
+            // puntos de progreso duplicados.
+            var yaExiste = popoverDOM.wrapper.querySelector('.tour-progreso');
+            if (yaExiste) yaExiste.remove();
+            var puntos = document.createElement('div');
+            puntos.className = 'tour-progreso';
+            PASOS.forEach(function (_, i) {
+              var punto = document.createElement('span');
+              punto.className = 'tour-progreso-punto' + (i === indice ? ' is-activo' : i < indice ? ' is-visto' : '');
+              puntos.appendChild(punto);
+            });
+            popoverDOM.wrapper.insertBefore(puntos, popoverDOM.footer);
+
+            if (!esPrimero) {
+              popoverDOM.previousButton.disabled = false;
+              popoverDOM.previousButton.classList.remove('driver-popover-btn-disabled');
+            }
+          },
           onNextClick: function () {
-            if (esUltimo) { terminarTour(); driverObj.destroy(); return; }
+            if (esUltimo) {
+              terminarTour();
+              driverObj.destroy();
+              driverActual = null;
+              mostrarCelebracion();
+              return;
+            }
             irAIndice(indice + 1);
           },
           onPrevClick: function () {
@@ -109,27 +153,24 @@
           onCloseClick: function () {
             terminarTour();
             driverObj.destroy();
+            driverActual = null;
           },
         },
       }],
     });
+    driverActual = driverObj;
     driverObj.drive();
+  }
 
-    // Cada pagina arma su propio mini-tour de UN solo paso (asi es como
-    // navegamos de verdad entre paginas) - pero eso hace que Driver.js
-    // piense que ese paso es SIEMPRE el primero de su propio array y
-    // deshabilite el boton "Atras" por su cuenta, aunque en el recorrido
-    // completo si haya un paso anterior. Se corrige a mano justo despues
-    // de abrir.
-    if (!esPrimero) {
-      setTimeout(function () {
-        var btnAtras = document.querySelector('.driver-popover-prev-btn');
-        if (btnAtras) {
-          btnAtras.disabled = false;
-          btnAtras.classList.remove('driver-popover-btn-disabled');
-        }
-      }, 0);
-    }
+  // Mensajito de cierre al terminar el recorrido completo - nada de
+  // librerias de confetti, un toast simple con una animacion CSS.
+  function mostrarCelebracion() {
+    var toast = document.createElement('div');
+    toast.className = 'tour-celebracion';
+    toast.textContent = '🎉 ¡Listo! Ya conocés todo el panel.';
+    document.body.appendChild(toast);
+    setTimeout(function () { toast.classList.add('is-saliendo'); }, 2600);
+    setTimeout(function () { toast.remove(); }, 3200);
   }
 
   function abrirDesdeElPrincipio() {
