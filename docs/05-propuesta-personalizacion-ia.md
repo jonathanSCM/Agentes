@@ -11,7 +11,7 @@ Una red neuronal entrenada desde cero necesita muchísimos más datos de los que
 ## Opción A — Memoria de clientes más profunda (personalización real)
 
 ### Qué ya existe hoy
-`ClienteFinal` ya guarda, por (empresa, teléfono): `categoriaInteres`/`categoriaId`, `marca`, `talla`, `color`, `presupuesto`, `atributosLead` (Género, Uso, etc. por categoría), `productoFavoritoId`, `productosMostrados`/`productosDescartados`, `estadoConversacion`. Esto ya es una forma de "aprendizaje" ligero: el bot no repite preguntas ya respondidas **dentro de la misma conversación/ventana de 24h**.
+`ClienteFinal` ya guarda, por (empresa, teléfono): `categoriaInteres`/`categoriaId`, `marca`, `talla`, `color`, `presupuesto`, `atributosLead` (Género, Uso, etc. por categoría), `productoFavoritoId`, `productosMostrados`/`productosDescartados`, `estadoConversacion`. Esto ya es una forma de "aprendizaje" ligero: el bot no repite preguntas ya respondidas **dentro de la misma conversación/ventana de agrupación (default 6h)**.
 
 ### La brecha real
 Esa memoria vive por conversación — cuando el cliente vuelve semanas después, `productosMostrados`/`productosDescartados`/`contexto` se resetean (a propósito, ver comentario en `lib/services/conversaciones.js`), y la relación `ClienteFinal.pedidos` (que ya existe en el schema) **nunca se consulta** para nada. O sea: el bot no sabe si este cliente ya compró antes, qué compró, ni cuándo.

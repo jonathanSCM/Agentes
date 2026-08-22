@@ -44,7 +44,7 @@ Fuente de verdad real: `prisma/schema.prisma`.
 
 **Clientes finales y conversaciones**
 - `ClienteFinal` — memoria persistente por (empresa, teléfono): `categoriaInteres`/`categoriaId`, `marca`/`talla`/`color`/`presupuesto`(+`presupuestoMin`/`Max` ya interpretados), `direccionEntrega`, `formaPago`, `tipoEntrega`, `atributosLead` (Json — Género, Uso, etc., filtran de verdad), `estadoConversacion` (`EXPLORANDO`→...→`PEDIDO_COMPLETADO`), `productosMostrados`/`productosDescartados`/`productoFavoritoId`/`varianteFavoritaId`, `contexto` (Json — carrito, fotos ya enviadas, marcas de turno, etc.).
-- `Conversacion` — agrupa mensajes por ventana de 24h; `modo` (`IA`/`HUMANO` — un asesor puede tomar control); `anuncioId`/`Titulo`/`ImagenUrl` (atribución a Click-to-WhatsApp de Meta, gratis desde el webhook).
+- `Conversacion` — agrupa mensajes por ventana configurable (`CONVERSATION_WINDOW_HOURS`, default 6h); `modo` (`IA`/`HUMANO` — un asesor puede tomar control); `anuncioId`/`Titulo`/`ImagenUrl` (atribución a Click-to-WhatsApp de Meta, gratis desde el webhook).
 - `Mensaje` — `rol` (`CLIENTE`/`AGENTE`/`SISTEMA`).
 
 **Pedidos**
@@ -60,7 +60,7 @@ Separados a propósito: `catalogo.js` es puro y determinista (filtros, fallback,
 
 ### Flujo de un mensaje
 
-`server.js` (`POST /webhooks/whatsapp`) → matchea por `phoneNumberId` a un `Agente`/`Empresa` → `lib/services/conversaciones.js` (`procesarMensajeEntrante`: agrupa en la misma conversación si cae dentro de la ventana de 24h, cobra 1 conversación solo si abre una nueva) → `generarRespuesta()` en `agente.js`.
+`server.js` (`POST /webhooks/whatsapp`) → matchea por `phoneNumberId` a un `Agente`/`Empresa` → `lib/services/conversaciones.js` (`procesarMensajeEntrante`: agrupa en la misma conversación si cae dentro de la ventana configurable (default 6h), cobra 1 conversación solo si abre una nueva) → `generarRespuesta()` en `agente.js`.
 
 `generarRespuesta()`, paso a paso:
 1. Carga agente + config + catálogo activo (hasta 200 productos, con variantes y atributos de categoría).

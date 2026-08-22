@@ -1,14 +1,14 @@
 // Test de regresion CRITICO: al abrirse una conversacion nueva (paso la
-// ventana de 24h desde el ultimo mensaje) NO se debe borrar todo
+// ventana de agrupacion desde el ultimo mensaje) NO se debe borrar todo
 // ClienteFinal.contexto. Un bug real hacia exactamente eso (`contexto: {}`),
 // lo que en un caso real se llevo puesto un carrito con un producto ya
 // agregado. Usa la base de datos local real, con datos propios que se
 // limpian al final (mismo patron que test/regresion-agente.test.js).
-const { test, describe, before, after } = require('node:test');
+const { test, describe, before, after, beforeEach } = require('node:test');
 const assert = require('node:assert/strict');
 
 const { prisma } = require('../lib/db');
-const { procesarMensajeEntrante } = require('../lib/services/conversaciones');
+const { procesarMensajeEntrante, VENTANA_HORAS } = require('../lib/services/conversaciones');
 
 const SLUG = 'test-conversaciones-reset-contexto';
 const TELEFONO = '000-test-reset-contexto';
@@ -93,8 +93,9 @@ describe('procesarMensajeEntrante - el reset de conversacion nueva NO borra todo
     });
 
     // 3) Fuerza que la conversacion 1 haya quedado fuera de la ventana de
-    // 24h, para que el proximo mensaje dispare la rama de "conversacion
-    // nueva" (la que hace el upsert con reset).
+    // agrupacion (25h, muy por encima de cualquier valor razonable de la
+    // ventana), para que el proximo mensaje dispare la rama de
+    // "conversacion nueva" (la que hace el upsert con reset).
     await prisma.conversacion.update({
       where: { id: conv1Id },
       data: { ultimoMensajeAt: new Date(Date.now() - 25 * 60 * 60 * 1000) },
@@ -121,5 +122,46 @@ describe('procesarMensajeEntrante - el reset de conversacion nueva NO borra todo
     assert.deepEqual(clienteFinal.contexto.fotosEnviadas, []);
     assert.deepEqual(clienteFinal.contexto.tarjetasCategoriaMostradas, []);
     assert.deepEqual(clienteFinal.productosMostrados, []);
+  });
+});
+
+// Bajamos la ventana de agrupacion de 24h a 6h: un cliente que escribe a la
+// manana y vuelve a la tarde (mas de 6h despues, pero menos de 24h) ahora
+// cuenta como una conversacion nueva y se cobra - antes seguia siendo la
+// misma conversacion todo ese dia.
+describe('VENTANA_HORAS - ventana de agrupacion de conversaciones cobrables', () => {
+  // Cada test arranca sin ninguna conversacion previa de este telefono, para
+  // que el primer procesarMensajeEntrante SIEMPRE abra una (y cobre) de cero.
+  beforeEach(async () => {
+    await prisma.conversacion.deleteMany({ where: { agenteId, telefonoCliente: TELEFONO } });
+    await prisma.clienteFinal.deleteMany({ where: { empresaId, telefono: TELEFONO } });
+  });
+
+  test('el default es 6 horas (sin CONVERSATION_WINDOW_HOURS en el entorno)', () => {
+    if (!process.env.CONVERSATION_WINDOW_HOURS) assert.equal(VENTANA_HORAS, 6);
+  });
+
+  test('un mensaje 5h despues del ultimo NO cobra: sigue siendo la misma conversacion', async () => {
+    const r1 = await procesarMensajeEntrante({ agenteId, telefonoCliente: TELEFONO, contenido: 'Hola' });
+    await prisma.conversacion.update({
+      where: { id: r1.conversacionId },
+      data: { ultimoMensajeAt: new Date(Date.now() - 5 * 60 * 60 * 1000) },
+    });
+
+    const r2 = await procesarMensajeEntrante({ agenteId, telefonoCliente: TELEFONO, contenido: 'Sigo ahi' });
+    assert.equal(r2.cobrada, false, 'menos de 6h: no deberia cobrar de nuevo');
+    assert.equal(r2.conversacionId, r1.conversacionId, 'sigue siendo la misma conversacion');
+  });
+
+  test('un mensaje 7h despues del ultimo SI cobra: cuenta como conversacion nueva', async () => {
+    const r1 = await procesarMensajeEntrante({ agenteId, telefonoCliente: TELEFONO, contenido: 'Hola' });
+    await prisma.conversacion.update({
+      where: { id: r1.conversacionId },
+      data: { ultimoMensajeAt: new Date(Date.now() - 7 * 60 * 60 * 1000) },
+    });
+
+    const r2 = await procesarMensajeEntrante({ agenteId, telefonoCliente: TELEFONO, contenido: 'Volvi' });
+    assert.equal(r2.cobrada, true, 'mas de 6h: cuenta como conversacion nueva y cobra');
+    assert.notEqual(r2.conversacionId, r1.conversacionId);
   });
 });

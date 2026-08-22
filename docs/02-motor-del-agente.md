@@ -9,7 +9,7 @@ Están separados a propósito:
 
 ## Flujo de un mensaje
 
-`server.js` (webhook de WhatsApp) → `lib/services/conversaciones.js` (`procesarMensajeEntrante`: agrupa mensajes en la misma conversación si llegan dentro de una ventana de 24h, cobra 1 conversación solo si abre una nueva — ver `docs/01-modelo-de-datos.md`) → `generarRespuesta()` en `agente.js`.
+`server.js` (webhook de WhatsApp) → `lib/services/conversaciones.js` (`procesarMensajeEntrante`: agrupa mensajes en la misma conversación si llegan dentro de una ventana configurable (`CONVERSATION_WINDOW_HOURS`, default 6h), cobra 1 conversación solo si abre una nueva — ver `docs/01-modelo-de-datos.md`) → `generarRespuesta()` en `agente.js`.
 
 `generarRespuesta()`:
 1. Carga el agente + config + catálogo activo de la empresa (hasta 200 productos, con `variantes` y `categoria.atributos` incluidos).
