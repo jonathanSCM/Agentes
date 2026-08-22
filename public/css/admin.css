@@ -125,6 +125,7 @@ body.admin, body.admin-login {
 .stat-label { color: var(--muted); font-size: .82rem; }
 .stat-new .stat-num { color: var(--primary-2); }
 .stat-done .stat-num { color: var(--accent); }
+.stat-alerta .stat-num { color: #fda4af; }
 
 /* ---------- Empty state ---------- */
 .empty-state {
@@ -171,6 +172,17 @@ body.admin, body.admin-login {
 .badge-done { background: rgba(192, 132, 252, .16); color: #e9d5ff; border: 1px solid rgba(192, 132, 252, .4); }
 .badge-off { background: rgba(255, 255, 255, .07); color: var(--muted); border: 1px solid var(--border); }
 .badge-star { background: rgba(250, 204, 21, .16); color: #fde68a; border: 1px solid rgba(250, 204, 21, .4); }
+.badge-alerta { background: rgba(251, 113, 133, .16); color: #fecdd3; border: 1px solid rgba(251, 113, 133, .4); }
+
+/* ---------- Inteligencia de negocio ---------- */
+.preview-pill {
+  display: inline-flex; align-items: center; gap: .35rem; font-size: .78rem; font-weight: 600;
+  padding: .25rem .7rem; border-radius: 999px; background: rgba(250, 204, 21, .12); color: #fde68a;
+  border: 1px solid rgba(250, 204, 21, .35); margin-left: .6rem; vertical-align: middle;
+}
+.inteligencia-narrativa p { margin: 0 0 .7rem; line-height: 1.6; }
+.inteligencia-narrativa ul { margin: 0 0 .7rem; padding-left: 1.2rem; line-height: 1.6; }
+.inteligencia-narrativa h4 { font-size: .88rem; margin: 0 0 .5rem; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
 
 /* ---------- Botones de accion ---------- */
 .actions-cell { white-space: nowrap; }

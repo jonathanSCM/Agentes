@@ -1390,6 +1390,95 @@ app.get('/panel/reportes', requireCliente, async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
+// ===== Inteligencia de negocio (vista previa) =====
+// TODO: esto todavia es una MAQUETA con datos inventados, a proposito (pedido
+// explicito del dueño: "que se vea bien y completo" antes de conectar los
+// numeros reales). Cuando se calculen de verdad, van a salir de Pedido/
+// PedidoItem/ClienteFinal via Prisma (agregacion pura, sin IA) - ver el plan
+// "Dashboard inteligente" ya escrito. Por ahora, NADA de esto debe leerse
+// como un dato real: por eso la vista muestra el aviso de "vista previa".
+app.get('/panel/inteligencia', requireCliente, async (req, res, next) => {
+  try {
+    const kpis = {
+      tasaDevolucion: { valor: 8.3, detalle: '14 de 168 pedidos entregados' },
+      categoriaTop: { nombre: 'Calzado', porcentaje: 34 },
+      aov: { actual: 245, anterior: 268, variacion: -8.6 },
+    };
+
+    const riesgos = [
+      'Las ventas de este mes vienen por debajo del mes anterior.',
+      'El ticket promedio bajó casi un 9%: los clientes están comprando menos por pedido.',
+      'La categoría de Calzado concentra un tercio de los ingresos — cualquier problema de stock ahí pega fuerte en las ventas totales.',
+      'Hay varios clientes frecuentes que no compran hace más de un mes.',
+    ];
+    const acciones = [
+      'Armar una promoción puntual para reactivar a los clientes que dejaron de comprar (ver la lista de abajo).',
+      'Revisar precios y combos en Calzado, tu categoría más fuerte, para sostener el ticket promedio.',
+      'Reforzar marketing para atraer clientes nuevos este mes.',
+      'Investigar si las devoluciones recientes tienen un motivo en común (talla, color, calidad).',
+    ];
+
+    const clientesEnRiesgo = [
+      { nombre: 'Marcelo Rojas', telefono: '+591 700-11223', diasSinComprar: 63, riesgo: 'HIGH', motivo: 'Sin comprar hace más de 2 meses', accion: 'Ofrecerle un descuento basado en sus compras anteriores.' },
+      { nombre: 'Daniela Vargas', telefono: '+591 700-44556', diasSinComprar: 55, riesgo: 'MEDIUM', motivo: 'Tuvo una devolución reciente', accion: 'Preguntarle si quedó conforme y ofrecerle ayuda.' },
+      { nombre: 'Gonzalo Peña', telefono: '+591 700-77889', diasSinComprar: 45, riesgo: 'MEDIUM', motivo: 'Antes compraba cada 2-3 semanas', accion: 'Enviarle novedades o un recordatorio amable.' },
+      { nombre: 'Fabiola Ríos', telefono: '+591 700-99001', diasSinComprar: 38, riesgo: 'MEDIUM', motivo: 'Bajó su frecuencia de compra', accion: 'Ofrecerle una recompensa de fidelización.' },
+      { nombre: 'Ivan Salazar', telefono: '+591 700-22334', diasSinComprar: 21, riesgo: 'LOW', motivo: 'Actividad normal, sin señales de alarma', accion: 'Nada urgente por ahora.' },
+    ];
+
+    res.render('cliente/inteligencia', {
+      title: 'Inteligencia de negocio - Proshop', tituloPagina: 'Inteligencia de negocio', activo: 'inteligencia',
+      kpis, riesgos, acciones, clientesEnRiesgo,
+    });
+  } catch (err) { next(err); }
+});
+
+// ===== Buscador de comentarios (vista previa) =====
+// TODO: igual que /panel/inteligencia, esto es una MAQUETA. Ni los comentarios
+// ni el % de coincidencia son reales - Proshop no tiene reseñas de producto
+// hoy (solo mensajes de WhatsApp), asi que de donde sale este dato de verdad
+// es una decision pendiente (ver plan "Dashboard inteligente"). El % de
+// coincidencia que se ve aca es un heuristico de palabras compartidas, NO una
+// busqueda semantica real con embeddings - alcanza para mostrar como se
+// veria la pantalla, no para prometer precision.
+const COMENTARIOS_EJEMPLO = [
+  { producto: 'Zapatillas urbanas', estrellas: 2, comentario: 'Llegaron con la caja totalmente aplastada, una pena porque el par en si esta bien.', temas: 'embalaje caja aplastada mala manipulacion' },
+  { producto: 'Chaqueta de cuero', estrellas: 3, comentario: 'El pedido vino mal empacado, la bolsa estaba rota cuando abri el paquete.', temas: 'embalaje mal empacado bolsa rota' },
+  { producto: 'Mochila urbana', estrellas: 2, comentario: 'Un rayon grande en el costado, parece que se golpeo en el transporte.', temas: 'rayones mala manipulacion transporte' },
+  { producto: 'Botines de cuero', estrellas: 2, comentario: 'La caja del producto llego aplastada, por suerte los botines no se dañaron.', temas: 'embalaje caja aplastada' },
+  { producto: 'Pantalón jean', estrellas: 1, comentario: 'Pésimo envío, la caja llegó mojada y la prenda con olor a humedad.', temas: 'envio pesimo embalaje caja mojada' },
+  { producto: 'Camisa manga corta', estrellas: 4, comentario: 'Buena calidad de tela, pero tardó más de lo esperado en llegar.', temas: 'demora entrega tardanza' },
+  { producto: 'Short deportivo', estrellas: 3, comentario: 'El pedido demoró varios días más de lo prometido en la entrega.', temas: 'demora entrega tardanza' },
+  { producto: 'Gorra deportiva', estrellas: 5, comentario: 'Todo perfecto, llegó rápido y bien empacada.', temas: 'embalaje bueno rapido' },
+];
+
+function normalizarBusqueda(t) {
+  return String(t || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9\s]/g, ' ');
+}
+
+app.get('/panel/inteligencia/comentarios', requireCliente, async (req, res, next) => {
+  try {
+    const q = req.query.q || 'mal embalaje';
+    const palabras = normalizarBusqueda(q).split(/\s+/).filter((w) => w.length > 2);
+
+    const resultados = COMENTARIOS_EJEMPLO.map((c) => {
+      const textoComentario = normalizarBusqueda(`${c.temas} ${c.comentario}`);
+      const coincidencias = palabras.filter((p) => textoComentario.includes(p)).length;
+      // Piso de 35% para que igual aparezca algo "medio relacionado" (asi se
+      // ve el mismo comportamiento que describe el documento: la busqueda es
+      // amplia y a veces mezcla resultados menos directos, como los de
+      // demora de entrega junto con los de embalaje).
+      const porcentaje = palabras.length ? Math.min(96, 35 + Math.round((coincidencias / palabras.length) * 60)) : 35;
+      return { ...c, porcentaje };
+    }).sort((a, b) => b.porcentaje - a.porcentaje);
+
+    res.render('cliente/inteligencia-comentarios', {
+      title: 'Buscador de comentarios - Proshop', tituloPagina: 'Buscador de comentarios', activo: 'inteligencia',
+      q, resultados,
+    });
+  } catch (err) { next(err); }
+});
+
 app.get('/panel/paquetes', requireCliente, requireRol('OWNER'), async (req, res, next) => {
   try {
     const [resumen, paquetesDb] = await Promise.all([

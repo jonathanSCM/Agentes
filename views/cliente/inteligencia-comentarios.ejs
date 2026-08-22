@@ -1,0 +1,43 @@
+<%- include('partials/inicio') %>
+
+<div class="page-head">
+  <h2>Buscador de comentarios <span class="preview-pill">⚠ Vista previa</span></h2>
+  <p>Buscá por tema (ej. "mal embalaje", "talla chica") y encontrá los comentarios de clientes relacionados, aunque no usen las mismas palabras.</p>
+  <p class="muted" style="font-size:.9rem;margin:.3rem 0 0">
+    <strong>Esto todavía es una maqueta</strong>: los comentarios de abajo son inventados (Proshop hoy no junta reseñas de producto, solo mensajes de WhatsApp) y el % de coincidencia es un cálculo simple de palabras compartidas, no una búsqueda semántica real todavía. Sirve para ver cómo va a quedar la pantalla.
+  </p>
+</div>
+
+<form method="GET" action="/panel/inteligencia/comentarios" class="form-card" style="max-width:640px;margin-bottom:1.4rem">
+  <div class="field">
+    <label for="q">¿Qué querés buscar?</label>
+    <input id="q" name="q" type="text" value="<%= q %>" placeholder='Ej: "mal embalaje"' autocomplete="off" />
+  </div>
+  <div class="form-actions" style="justify-content:flex-start;border-top:none;padding-top:0;margin-top:.8rem">
+    <button class="btn btn-primary" type="submit">Buscar</button>
+  </div>
+</form>
+
+<div style="margin-bottom:1.4rem">
+  <% ['mal empacado', 'rayones', 'cajas rotas', 'envío pésimo'].forEach(function (etiqueta) { %>
+    <a href="/panel/inteligencia/comentarios?q=<%= encodeURIComponent(etiqueta) %>" class="badge badge-alerta" style="margin-right:.5rem;text-decoration:none">#<%= etiqueta %></a>
+  <% }); %>
+</div>
+
+<div class="table-wrap">
+  <table class="leads-table">
+    <thead><tr><th>Producto</th><th>Estrellas</th><th>Comentario</th><th class="num">Coincidencia</th></tr></thead>
+    <tbody>
+      <% resultados.forEach(function (r) { %>
+        <tr>
+          <td><strong><%= r.producto %></strong></td>
+          <td class="nowrap"><%= '★'.repeat(r.estrellas) %><span class="muted"><%= '★'.repeat(5 - r.estrellas) %></span></td>
+          <td class="msg-cell"><%= r.comentario %></td>
+          <td class="num"><span class="badge <%= r.porcentaje >= 70 ? 'badge-alerta' : 'badge-off' %>"><%= r.porcentaje %>% match</span></td>
+        </tr>
+      <% }); %>
+    </tbody>
+  </table>
+</div>
+
+<%- include('partials/fin') %>

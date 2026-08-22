@@ -1,0 +1,78 @@
+<%- include('partials/inicio') %>
+
+<div class="page-head">
+  <h2>Inteligencia de negocio <span class="preview-pill">⚠ Vista previa</span></h2>
+  <p>Un resumen gerencial de cómo va tu negocio, riesgos a vigilar y qué clientes podrían estar por dejar de comprarte.</p>
+  <p class="muted" style="font-size:.9rem;margin:.3rem 0 0">
+    <strong>Estos números todavía son de ejemplo</strong>, no salen de tus pedidos reales — es una maqueta para que veas cómo va a quedar la pantalla. Los vamos a conectar a tus datos reales en el siguiente paso.
+  </p>
+</div>
+
+<div class="admin-stats">
+  <div class="stat-card stat-alerta">
+    <span class="stat-num"><%= kpis.tasaDevolucion.valor %>%</span>
+    <span class="stat-label">Tasa de devolución</span>
+    <div class="muted" style="font-size:.78rem;margin-top:.3rem"><%= kpis.tasaDevolucion.detalle %></div>
+  </div>
+  <div class="stat-card stat-new">
+    <span class="stat-num"><%= kpis.categoriaTop.nombre %></span>
+    <span class="stat-label">Categoría más importante</span>
+    <div class="muted" style="font-size:.78rem;margin-top:.3rem">Genera el <%= kpis.categoriaTop.porcentaje %>% de tus ingresos</div>
+  </div>
+  <div class="stat-card <%= kpis.aov.variacion < 0 ? 'stat-alerta' : 'stat-done' %>">
+    <span class="stat-num"><%= kpis.aov.variacion > 0 ? '+' : '' %><%= kpis.aov.variacion %>%</span>
+    <span class="stat-label">Variación del ticket promedio</span>
+    <div class="muted" style="font-size:.78rem;margin-top:.3rem">Bs <%= kpis.aov.anterior %> → Bs <%= kpis.aov.actual %></div>
+  </div>
+</div>
+
+<div class="dash-card inteligencia-narrativa" style="margin-bottom:1.6rem">
+  <div class="dash-card-head"><h3>Resumen del negocio</h3></div>
+  <h4>Riesgos a vigilar</h4>
+  <ul>
+    <% riesgos.forEach(function (r) { %><li><%= r %></li><% }); %>
+  </ul>
+  <h4>Acciones recomendadas</h4>
+  <ul>
+    <% acciones.forEach(function (a) { %><li><%= a %></li><% }); %>
+  </ul>
+</div>
+
+<div class="dash-card" style="margin-bottom:1.6rem">
+  <div class="dash-card-head">
+    <h3>Buscador de comentarios</h3>
+    <a href="/panel/inteligencia/comentarios">Abrir →</a>
+  </div>
+  <p class="muted" style="margin:0">Buscá por tema ("mal embalaje", "talla chica") y encontrá los comentarios de clientes relacionados, aunque no usen las mismas palabras.</p>
+</div>
+
+<div class="dash-card">
+  <div class="dash-card-head">
+    <h3>Clientes en riesgo de dejar de comprarte</h3>
+  </div>
+  <div class="table-wrap">
+    <table class="leads-table">
+      <thead>
+        <tr><th>Cliente</th><th class="num">Días sin comprar</th><th>Riesgo</th><th>Motivo</th><th>Acción sugerida</th><th></th></tr>
+      </thead>
+      <tbody>
+        <% clientesEnRiesgo.forEach(function (c) { %>
+          <% var badge = c.riesgo === 'HIGH' ? 'badge-alerta' : c.riesgo === 'MEDIUM' ? 'badge-star' : 'badge-off'; %>
+          <% var etiqueta = c.riesgo === 'HIGH' ? 'Alto' : c.riesgo === 'MEDIUM' ? 'Medio' : 'Bajo'; %>
+          <tr>
+            <td><strong><%= c.nombre %></strong><div class="muted" style="font-size:.78rem"><%= c.telefono %></div></td>
+            <td class="num"><%= c.diasSinComprar %></td>
+            <td><span class="badge <%= badge %>"><%= etiqueta %></span></td>
+            <td class="muted" style="font-size:.86rem"><%= c.motivo %></td>
+            <td class="msg-cell"><%= c.accion %></td>
+            <td class="actions-cell">
+              <button class="btn btn-ghost" style="padding:.4rem .8rem;font-size:.85rem" type="button" disabled title="Todavía no está conectado: por ahora es solo una vista previa">Enviar mensaje</button>
+            </td>
+          </tr>
+        <% }); %>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<%- include('partials/fin') %>
