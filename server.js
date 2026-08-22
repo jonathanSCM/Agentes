@@ -687,9 +687,11 @@ function requireCliente(req, res, next) {
   return res.redirect('/ingresar');
 }
 
-// Solo el dueño (OWNER) administra el equipo y la facturación. ADMIN/STAFF
-// pueden operar el dia a dia (conversaciones, pedidos, productos) pero no
-// invitar/quitar gente ni tocar planes y pagos.
+// Solo el dueño (OWNER) administra el equipo y ve/toca plata (consumo,
+// compra de paquetes, historial de compras). OWNER y ADMIN pueden configurar
+// el agente y el negocio (Agente IA, Configuración); STAFF no. Todos los
+// roles logueados pueden operar el dia a dia (conversaciones, pedidos,
+// productos, categorias, clientes, inventario, WhatsApp, reportes).
 function requireRol(...rolesPermitidos) {
   return (req, res, next) => {
     if (req.session && rolesPermitidos.includes(req.session.clienteRol)) return next();
@@ -814,7 +816,9 @@ app.get('/panel', requireCliente, async (req, res, next) => {
 });
 
 // ===== Mi consumo (movido a Plan y facturación) =====
-app.get('/panel/consumo', requireCliente, async (req, res, next) => {
+// Plan y facturacion es solo del OWNER: STAFF y ADMIN operan el dia a dia
+// pero no ven ni tocan plata (consumo, compra de paquetes, historial de compras).
+app.get('/panel/consumo', requireCliente, requireRol('OWNER'), async (req, res, next) => {
   try {
     const resumen = await obtenerResumenEmpresa(req.session.empresaId);
     if (!resumen) return res.redirect('/ingresar');
@@ -1386,7 +1390,7 @@ app.get('/panel/reportes', requireCliente, async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-app.get('/panel/paquetes', requireCliente, async (req, res, next) => {
+app.get('/panel/paquetes', requireCliente, requireRol('OWNER'), async (req, res, next) => {
   try {
     const [resumen, paquetesDb] = await Promise.all([
       obtenerResumenEmpresa(req.session.empresaId),
@@ -1402,7 +1406,7 @@ app.get('/panel/paquetes', requireCliente, async (req, res, next) => {
 });
 
 // Compra de un paquete: registra la compra + el pago, y acredita el saldo.
-app.post('/panel/paquetes/:id/comprar', requireCliente, async (req, res, next) => {
+app.post('/panel/paquetes/:id/comprar', requireCliente, requireRol('OWNER'), async (req, res, next) => {
   try {
     const paquete = await prisma.paquete.findUnique({ where: { id: Number(req.params.id) }, include: { preciosPais: true } });
     if (!paquete || !paquete.activo) {
@@ -1452,7 +1456,7 @@ app.post('/panel/paquetes/:id/comprar', requireCliente, async (req, res, next) =
   } catch (err) { next(err); }
 });
 
-app.get('/panel/compras', requireCliente, async (req, res, next) => {
+app.get('/panel/compras', requireCliente, requireRol('OWNER'), async (req, res, next) => {
   try {
     const compras = await prisma.compraPaquete.findMany({
       where: { empresaId: req.session.empresaId },
@@ -2160,7 +2164,8 @@ async function obtenerAgente(empresaId) {
   return agente;
 }
 
-app.get('/panel/configuracion', requireCliente, async (req, res, next) => {
+// Configuracion y Agente IA: OWNER y ADMIN operan el negocio de verdad, STAFF no las toca.
+app.get('/panel/configuracion', requireCliente, requireRol('OWNER', 'ADMIN'), async (req, res, next) => {
   try {
     const agente = await obtenerAgente(req.session.empresaId);
     const empresa = await prisma.empresa.findUnique({ where: { id: req.session.empresaId } });
@@ -2176,7 +2181,7 @@ app.get('/panel/configuracion', requireCliente, async (req, res, next) => {
 // escribe los precios con la que este elegida aca y nunca convierte a otra.
 const MONEDAS_CATALOGO = ['BOB', 'USD', 'PEN'];
 
-app.post('/panel/configuracion', requireCliente, upload.fields([{ name: 'qr', maxCount: 1 }, { name: 'logo', maxCount: 1 }]), async (req, res, next) => {
+app.post('/panel/configuracion', requireCliente, requireRol('OWNER', 'ADMIN'), upload.fields([{ name: 'qr', maxCount: 1 }, { name: 'logo', maxCount: 1 }]), async (req, res, next) => {
   const { nombre, numeroWhatsapp, mensajeBienvenida, tono, estado, instrucciones, derivarAHumano, aceptaEfectivo, aceptaTarjeta, aceptaQr, quitarQr, moneda, direccionTienda, tiendaLat, tiendaLng, preguntasIniciales, colorPrimario, colorSecundario, quitarLogo, plantillaCatalogo, temaProducto } = req.body || {};
   try {
     const agente = await obtenerAgente(req.session.empresaId);
@@ -2475,7 +2480,7 @@ app.post('/panel/whatsapp/eliminar', requireCliente, async (req, res, next) => {
 });
 
 // -------- Probar el agente (chat de prueba) --------
-app.get('/panel/agente', requireCliente, async (req, res, next) => {
+app.get('/panel/agente', requireCliente, requireRol('OWNER', 'ADMIN'), async (req, res, next) => {
   try {
     const productos = await prisma.producto.count({
       where: { empresaId: req.session.empresaId, activo: true },
@@ -2488,7 +2493,7 @@ app.get('/panel/agente', requireCliente, async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-app.post('/panel/agente/mensaje', requireCliente, async (req, res, next) => {
+app.post('/panel/agente/mensaje', requireCliente, requireRol('OWNER', 'ADMIN'), async (req, res, next) => {
   const { telefono, mensaje } = req.body || {};
   try {
     if (!mensaje || !String(mensaje).trim()) {
