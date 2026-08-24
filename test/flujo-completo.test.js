@@ -523,6 +523,46 @@ describe('menu de categorias en dos niveles', () => {
   });
 });
 
+// Bug real reportado con capturas de WhatsApp: el cliente contesto el genero
+// que le pidio la tienda pero TODAVIA no habia elegido ninguna categoria. El
+// modelo igual intento mostrar_productos, el redirect de "solo tarjeta de
+// categoria" (Fix B) lo mando a mostrar_tarjeta_categoria - pero sin
+// categoria elegida esa tool no tiene de que categoria ser, fallaba, y el
+// cliente terminaba con "Perdon, no pude traerte las opciones" sin haber
+// visto ni el menu de rubros.
+describe('BUG - sin categoria elegida todavia, no se rompe intentando la tarjeta', () => {
+  // Nota: con atributosLead Genero=Hombre, el fixture principal queda con UN
+  // SOLO rubro visible ("Zapatillas" - "Calzado" es todo de Mujer), asi que
+  // el camino real es menu_rubro_unico_auto (tambien arreglado: usa
+  // mostrar_tarjeta_categoria) en vez del menu de varios rubros. Lo que se
+  // verifica es lo que de verdad importa: NUNCA "no pude traerte las
+  // opciones" sin haber mostrado nada, sea cual sea el camino.
+  test('mostrar_productos sin categoria elegida no termina en "no pude traerte las opciones"', async () => {
+    await reiniciarLead({ categoriaInteres: null, categoriaId: null, atributosLead: { Genero: 'Hombre' } });
+    const { llamar, recibido } = iaFalsa([
+      { tool_calls: [tool('mostrar_productos', { idsProductos: [productos[0].id] })] },
+      { content: 'Aca tenes las opciones.' },
+    ]);
+    const salida = await generarRespuesta(agenteId, TELEFONO, [], 'Soy hombre', undefined, { llamarInyectado: llamar });
+
+    assert.match(recibido.toolResults[0], /TOOL_SUCCESS/);
+    assert.doesNotMatch(salida.respuesta, /no pude traerte las opciones/i);
+    assert.ok(salida.fotos.length > 0, 'algo real se le tiene que haber mostrado');
+  });
+
+  test('si el modelo insiste con texto vago sin categoria, el rescate de ultima vuelta tambien resuelve algo real', async () => {
+    await reiniciarLead({ categoriaInteres: null, categoriaId: null, atributosLead: { Genero: 'Hombre' } });
+    const { llamar } = iaFalsa([
+      { tool_calls: [tool('mostrar_productos', { idsProductos: [productos[0].id] })] },
+      { content: 'Aca tenes las opciones.' },
+      { content: 'Dejame mostrarte lo que tenemos.' },
+    ]);
+    const salida = await generarRespuesta(agenteId, TELEFONO, [], 'Soy hombre', undefined, { llamarInyectado: llamar });
+
+    assert.doesNotMatch(salida.respuesta, /no pude traerte las opciones/i);
+  });
+});
+
 describe('preguntas iniciales: nada se muestra hasta responderlas', () => {
   before(async () => {
     // Esta tienda pide saber el genero antes de cualquier cosa.
