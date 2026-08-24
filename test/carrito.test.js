@@ -24,6 +24,31 @@ describe('carrito de la conversacion', () => {
     assert.equal(carritoDe(ctx, 99).length, 0, 'en una conversacion nueva arranca vacio');
   });
 
+  // Pedido real del dueño: no quiere miles de carritos abandonados quedando
+  // "abiertos" para siempre (ej. alguien agrego algo desde la web del
+  // catalogo y nunca confirmo). Mismo plazo que ya dura el link del catalogo.
+  describe('un carrito abandonado mas de 24h se trata como vacio', () => {
+    const ahora = Date.parse('2026-08-24T12:00:00Z');
+    const hace23h = ahora - 23 * 60 * 60 * 1000;
+    const hace25h = ahora - 25 * 60 * 60 * 1000;
+
+    test('dentro de las 24h sigue vivo', () => {
+      const ctx = guardarCarrito({}, 10, [item({})], hace23h);
+      assert.equal(carritoDe(ctx, 10, ahora).length, 1);
+    });
+
+    test('pasadas las 24h se trata como vacio, sin necesidad de borrar nada aparte', () => {
+      const ctx = guardarCarrito({}, 10, [item({})], hace25h);
+      assert.deepEqual(carritoDe(ctx, 10, ahora), []);
+    });
+
+    test('agregar algo nuevo renueva el plazo (un carrito activo no expira solo)', () => {
+      let ctx = guardarCarrito({}, 10, [item({})], hace23h);
+      ctx = guardarCarrito(ctx, 10, agregarItem(carritoDe(ctx, 10, hace23h), item({ productoId: 2 })), ahora);
+      assert.equal(carritoDe(ctx, 10, ahora + 23 * 60 * 60 * 1000).length, 2, 'renovado, todavia no pasaron 24h desde el ultimo toque');
+    });
+  });
+
   test('agregar el MISMO producto y variante suma cantidad', () => {
     let items = agregarItem([], item({ varianteId: 5 }));
     items = agregarItem(items, item({ varianteId: 5, cantidad: 2 }));
