@@ -132,6 +132,38 @@ describe('TEST 1 - No mostrar antes de preguntar el genero', () => {
   });
 });
 
+// Bug real reportado: "quiero ver zapatillas" (rubro con subcategorias Y un
+// atributo obligatorio propio, Genero) devolvia una pregunta generica y
+// abierta en vez de preguntar Genero. Causa: el gate de subcategorias se
+// evaluaba ANTES que el de atributos obligatorios, asi que la lista de tipos
+// salia siempre primero, sin filtrar por ese dato. Se invirtio el orden.
+describe('BUG - rubro con subcategorias Y atributo obligatorio propio: se pregunta el atributo ANTES de listar tipos', () => {
+  const zapatillasRubro = { id: idDeCategoria('Zapatillas'), nombre: 'Zapatillas', padreId: null, atributos: [{ nombre: 'Genero', nivel: 'OBLIGATORIO', esDeVariante: false, orden: 0 }] };
+  const urbanas = { id: idDeCategoria('Zapatillas urbanas'), nombre: 'Zapatillas urbanas', padreId: zapatillasRubro.id, padre: zapatillasRubro, atributos: [] };
+  const deportivas = { id: idDeCategoria('Zapatillas deportivas 2'), nombre: 'Zapatillas para correr', padreId: zapatillasRubro.id, padre: zapatillasRubro, atributos: [] };
+  const productos = [
+    producto({ id: 1, nombre: 'Sneaker urbana', categoria: urbanas, atributos: { Genero: 'Hombre' } }),
+    producto({ id: 2, nombre: 'Sneaker running', categoria: deportivas, atributos: { Genero: 'Hombre' } }),
+  ];
+
+  test('sin el genero contestado: pregunta Genero, NUNCA la lista de tipos', () => {
+    const lead = { categoriaInteres: 'Zapatillas', categoriaId: zapatillasRubro.id, atributosLead: {}, contexto: {} };
+    const texto = seccionProductos(productos, lead, zapatillasRubro);
+    assert.match(texto, /falta saber Genero/);
+    assert.doesNotMatch(texto, /se divide en estos tipos/, 'no puede listar los tipos antes de saber el genero');
+    assert.doesNotMatch(texto, /Zapatillas urbanas/);
+  });
+
+  test('con el genero ya contestado: recien ahi lista los tipos, ya filtrados por ese genero', () => {
+    const lead = { categoriaInteres: 'Zapatillas', categoriaId: zapatillasRubro.id, atributosLead: { Genero: 'Hombre' }, contexto: {} };
+    const texto = seccionProductos(productos, lead, zapatillasRubro);
+    assert.doesNotMatch(texto, /falta saber Genero/);
+    assert.match(texto, /se divide en estos tipos/);
+    assert.match(texto, /Zapatillas urbanas/);
+    assert.match(texto, /Zapatillas para correr/);
+  });
+});
+
 describe('TEST 2 - Mantener filtros (o decir cual se flexibilizo)', () => {
   const productos = [
     producto({ id: 1, nombre: 'Nike negra 42', categoria: 'Zapatillas', precio: 480, atributos: { Marca: 'Nike', Genero: 'Hombre' }, variantes: [{ activa: true, atributos: { Talla: '42', Color: 'Negro' }, stock: 2 }] }),

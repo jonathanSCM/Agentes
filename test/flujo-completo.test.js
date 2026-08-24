@@ -472,6 +472,29 @@ describe('menu de categorias en dos niveles', () => {
     assert.match(r, /2\. Sandalias/);
   });
 
+  // Bug real reportado: si el rubro tiene un atributo obligatorio propio
+  // (ej. Genero) ademas de subcategorias, este handler listaba los tipos
+  // directo, sin preguntar el atributo antes - mismo bug que el de
+  // seccionProductos, pero en el camino de mostrar_categorias.
+  test('si el rubro tiene un atributo obligatorio propio, se pregunta ANTES de listar los tipos', async () => {
+    await prisma.categoriaAtributo.create({ data: { categoriaId: rubro.id, nombre: 'Genero', nivel: 'OBLIGATORIO', esDeVariante: false, orden: 0 } });
+    try {
+      await reiniciarLead({ categoriaInteres: 'Calzado', categoriaId: rubro.id, atributosLead: {} });
+      const { llamar, recibido } = iaFalsa([
+        { tool_calls: [tool('mostrar_categorias', {})] },
+        { content: '¿Para hombre o para mujer?' },
+      ]);
+      await generarRespuesta(agenteId, TELEFONO, [], 'que tipos tenes', undefined, { llamarInyectado: llamar });
+
+      const r = recibido.toolResults[0];
+      assert.match(r, /falta saber Genero/);
+      assert.doesNotMatch(r, /Dentro de "Calzado"/, 'no puede listar los tipos antes de saber el genero');
+      assert.doesNotMatch(r, /Botas/);
+    } finally {
+      await prisma.categoriaAtributo.deleteMany({ where: { categoriaId: rubro.id, nombre: 'Genero' } });
+    }
+  });
+
   test('elegida la subcategoria por primera vez, sale la tarjeta de esa subcategoria (regla del negocio: backend, no la IA)', async () => {
     await reiniciarLead({ categoriaInteres: null, categoriaId: null });
     const salida = await generarRespuesta(agenteId, TELEFONO, [], 'botas', undefined, { llamarInyectado: async () => { throw new Error('no deberia llamarse a la IA'); } });
