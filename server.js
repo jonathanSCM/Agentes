@@ -866,21 +866,49 @@ app.get('/panel/conversaciones', requireCliente, async (req, res, next) => {
         })
       : [];
     const nombrePorTelefono = new Map(clientesFinales.map((c) => [c.telefono, c.nombre]));
-    const conversacionesConNombre = conversaciones.map((c) => ({ ...c, nombreCliente: nombrePorTelefono.get(c.telefonoCliente) || null }));
+
+    // Un mismo cliente que vuelve a escribir despues de la ventana de
+    // agrupacion (6h) genera una Conversacion nueva (se cobra aparte) - se
+    // agrupan por telefono para la lista, para que se vea una fila por
+    // cliente en vez de una por cada regreso. Como la query ya viene
+    // ordenada por ultimoMensajeAt desc, la primera aparicion de cada
+    // telefono ya es la sesion mas reciente (no hace falta comparar fechas).
+    const porTelefono = new Map();
+    for (const c of conversaciones) {
+      if (!porTelefono.has(c.telefonoCliente)) {
+        porTelefono.set(c.telefonoCliente, {
+          telefonoCliente: c.telefonoCliente,
+          nombreCliente: nombrePorTelefono.get(c.telefonoCliente) || null,
+          modo: c.modo,
+          ultimoMensajeAt: c.ultimoMensajeAt,
+          sesiones: 0,
+          mensajes: 0,
+        });
+      }
+      const g = porTelefono.get(c.telefonoCliente);
+      g.sesiones += 1;
+      g.mensajes += c._count.mensajes;
+    }
+    const clientesAgrupados = [...porTelefono.values()];
 
     res.render('cliente/conversaciones', {
       title: 'Conversaciones - Proshop', tituloPagina: 'Conversaciones', activo: 'conversaciones',
-      conversaciones: conversacionesConNombre, stats: { total, hoy: hoyCount, mensajes }, mensaje: req.query.ok || null,
+      clientes: clientesAgrupados, stats: { total, hoy: hoyCount, mensajes }, mensaje: req.query.ok || null,
     });
   } catch (err) { next(err); }
 });
 
-// Detalle de una conversacion: el transcript completo, para que puedas leer
-// que le dijo el cliente y como respondio el agente.
-async function cargarConversacion(req) {
+// Todas las sesiones (Conversacion) de un mismo telefono, no solo una: un
+// cliente que vuelve a escribir despues de la ventana de agrupacion (6h)
+// genera una Conversacion nueva (se cobra aparte), pero en el panel se ven
+// todas juntas como un solo historial continuo. Ordenadas de la mas vieja a
+// la mas nueva para poder mostrarlas en orden cronologico real.
+async function cargarConversacionesDelCliente(req) {
   const agenteIds = await agenteIdsDe(req.session.empresaId);
-  return prisma.conversacion.findFirst({
-    where: { id: Number(req.params.id), agenteId: { in: agenteIds } },
+  const telefono = decodeURIComponent(req.params.telefono);
+  return prisma.conversacion.findMany({
+    where: { telefonoCliente: telefono, agenteId: { in: agenteIds } },
+    orderBy: { createdAt: 'asc' },
     include: {
       mensajes: { orderBy: { createdAt: 'asc' }, include: { usuario: true } },
       agente: { include: { conexion: true } },
@@ -889,51 +917,66 @@ async function cargarConversacion(req) {
   });
 }
 
-app.get('/panel/conversaciones/:id', requireCliente, async (req, res, next) => {
+app.get('/panel/conversaciones/:telefono', requireCliente, async (req, res, next) => {
   try {
-    const conversacion = await cargarConversacion(req);
-    if (!conversacion) return res.redirect('/panel/conversaciones');
+    const conversaciones = await cargarConversacionesDelCliente(req);
+    if (!conversaciones.length) return res.redirect('/panel/conversaciones');
+    const ultimaConversacion = conversaciones[conversaciones.length - 1];
 
     const cliente = await prisma.clienteFinal.findFirst({
-      where: { empresaId: req.session.empresaId, telefono: conversacion.telefonoCliente },
+      where: { empresaId: req.session.empresaId, telefono: ultimaConversacion.telefonoCliente },
     });
     // Si la direccion es un link pegado por el cliente (lo mas comun en la
     // practica), se muestra como link corto en vez de la URL cruda - evita
     // el desborde de la tarjeta y es mas util igual.
     const direccionLink = cliente && cliente.direccionEntrega ? extraerUrlDeMaps(cliente.direccionEntrega) : null;
 
+    // Todos los mensajes de TODAS las sesiones, en un solo hilo cronologico,
+    // con un divisor antes de los mensajes de cada sesion para que se vea
+    // donde termino una conversacion cobrada y empezo la siguiente.
+    const itemsUnificados = [];
+    conversaciones.forEach((conv, i) => {
+      itemsUnificados.push({ tipo: 'divisor', numero: i + 1, esPrimera: i === 0, createdAt: conv.createdAt, origen: conv.origen });
+      conv.mensajes.forEach((m) => itemsUnificados.push({ tipo: 'mensaje', mensaje: m }));
+    });
+    const totalMensajes = conversaciones.reduce((n, c) => n + c.mensajes.length, 0);
+
     res.render('cliente/conversacion-detalle', {
       title: 'Conversación - Proshop', tituloPagina: 'Conversación', activo: 'conversaciones',
-      conversacion, cliente, direccionLink, mensaje: req.query.ok || null, error: req.query.err || null,
+      conversaciones, ultimaConversacion, itemsUnificados, totalMensajes, cliente, direccionLink,
+      mensaje: req.query.ok || null, error: req.query.err || null,
     });
   } catch (err) { next(err); }
 });
 
 // Tomar el control: la IA deja de responder este chat puntual hasta que
-// alguien del equipo lo devuelva manualmente.
-app.post('/panel/conversaciones/:id/control', requireCliente, async (req, res, next) => {
+// alguien del equipo lo devuelva manualmente. Actua sobre la sesion mas
+// reciente del cliente (la unica que tiene sentido "tomar" ahora mismo).
+app.post('/panel/conversaciones/:telefono/control', requireCliente, async (req, res, next) => {
   try {
-    const conversacion = await cargarConversacion(req);
-    if (!conversacion) return res.redirect('/panel/conversaciones');
+    const conversaciones = await cargarConversacionesDelCliente(req);
+    if (!conversaciones.length) return res.redirect('/panel/conversaciones');
+    const conversacion = conversaciones[conversaciones.length - 1];
     await prisma.conversacion.update({
       where: { id: conversacion.id },
       data: { modo: 'HUMANO', tomadaPorId: req.session.clienteId },
     });
     emitConversacion(req.session.empresaId, { conversacionId: conversacion.id, modo: 'HUMANO', tomadaPorNombre: req.session.clienteNombre });
-    res.redirect(`/panel/conversaciones/${conversacion.id}?ok=` + encodeURIComponent('Tomaste el control. La IA no responderá este chat hasta que lo devuelvas.'));
+    res.redirect(`/panel/conversaciones/${req.params.telefono}?ok=` + encodeURIComponent('Tomaste el control. La IA no responderá este chat hasta que lo devuelvas.'));
   } catch (err) { next(err); }
 });
 
-app.post('/panel/conversaciones/:id/liberar', requireCliente, async (req, res, next) => {
+app.post('/panel/conversaciones/:telefono/liberar', requireCliente, async (req, res, next) => {
   try {
-    const conversacion = await cargarConversacion(req);
-    if (!conversacion) return res.redirect('/panel/conversaciones');
+    const conversaciones = await cargarConversacionesDelCliente(req);
+    if (!conversaciones.length) return res.redirect('/panel/conversaciones');
+    const conversacion = conversaciones[conversaciones.length - 1];
     await prisma.conversacion.update({
       where: { id: conversacion.id },
       data: { modo: 'IA', tomadaPorId: null },
     });
     emitConversacion(req.session.empresaId, { conversacionId: conversacion.id, modo: 'IA', tomadaPorNombre: null });
-    res.redirect(`/panel/conversaciones/${conversacion.id}?ok=` + encodeURIComponent('Devuelto al agente de IA.'));
+    res.redirect(`/panel/conversaciones/${req.params.telefono}?ok=` + encodeURIComponent('Devuelto al agente de IA.'));
   } catch (err) { next(err); }
 });
 
@@ -975,13 +1018,15 @@ app.post('/panel/conversaciones/reiniciar-todas', requireCliente, async (req, re
   } catch (err) { next(err); }
 });
 
-app.post('/panel/conversaciones/:id/reiniciar', requireCliente, async (req, res, next) => {
+app.post('/panel/conversaciones/:telefono/reiniciar', requireCliente, async (req, res, next) => {
   try {
-    const conversacion = await cargarConversacion(req);
-    if (!conversacion) return res.redirect('/panel/conversaciones');
+    const conversaciones = await cargarConversacionesDelCliente(req);
+    if (!conversaciones.length) return res.redirect('/panel/conversaciones');
+    const telefono = decodeURIComponent(req.params.telefono);
+    const ultimaConversacion = conversaciones[conversaciones.length - 1];
 
     await prisma.clienteFinal.updateMany({
-      where: { empresaId: req.session.empresaId, telefono: conversacion.telefonoCliente },
+      where: { empresaId: req.session.empresaId, telefono },
       data: {
         categoriaInteres: null,
         presupuesto: null,
@@ -1000,11 +1045,11 @@ app.post('/panel/conversaciones/:id/reiniciar', requireCliente, async (req, res,
       },
     });
     await prisma.conversacion.update({
-      where: { id: conversacion.id },
+      where: { id: ultimaConversacion.id },
       data: { modo: 'IA', tomadaPorId: null },
     });
-    emitConversacion(req.session.empresaId, { conversacionId: conversacion.id, modo: 'IA', tomadaPorNombre: null });
-    res.redirect(`/panel/conversaciones/${conversacion.id}?ok=` + encodeURIComponent('Se reinició la memoria del cliente: el agente lo tratará como una charla nueva desde el próximo mensaje.'));
+    emitConversacion(req.session.empresaId, { conversacionId: ultimaConversacion.id, modo: 'IA', tomadaPorNombre: null });
+    res.redirect(`/panel/conversaciones/${req.params.telefono}?ok=` + encodeURIComponent('Se reinició la memoria del cliente: el agente lo tratará como una charla nueva desde el próximo mensaje.'));
   } catch (err) { next(err); }
 });
 
@@ -1013,13 +1058,13 @@ app.post('/panel/conversaciones/:id/reiniciar', requireCliente, async (req, res,
 // registro de ClienteFinal (memoria, categoria, favoritos, carrito, etc.) -
 // no queda ni rastro en la base. Los pedidos ya creados NO se borran (son
 // registros de negocio reales), pero quedan sin cliente asociado.
-app.post('/panel/conversaciones/:id/eliminar', requireCliente, async (req, res, next) => {
+app.post('/panel/conversaciones/:telefono/eliminar', requireCliente, async (req, res, next) => {
   try {
-    const conversacion = await cargarConversacion(req);
-    if (!conversacion) return res.redirect('/panel/conversaciones');
+    const conversaciones = await cargarConversacionesDelCliente(req);
+    if (!conversaciones.length) return res.redirect('/panel/conversaciones');
 
     const agenteIds = await agenteIdsDe(req.session.empresaId);
-    const telefono = conversacion.telefonoCliente;
+    const telefono = decodeURIComponent(req.params.telefono);
 
     await prisma.$transaction([
       prisma.mensaje.deleteMany({ where: { conversacion: { agenteId: { in: agenteIds }, telefonoCliente: telefono } } }),
@@ -1033,15 +1078,16 @@ app.post('/panel/conversaciones/:id/eliminar', requireCliente, async (req, res, 
 
 // Mandar un mensaje real por WhatsApp como humano (solo si ya se tomo el
 // control de este chat).
-app.post('/panel/conversaciones/:id/mensaje', requireCliente, async (req, res, next) => {
+app.post('/panel/conversaciones/:telefono/mensaje', requireCliente, async (req, res, next) => {
   try {
-    const conversacion = await cargarConversacion(req);
-    if (!conversacion) return res.redirect('/panel/conversaciones');
+    const conversaciones = await cargarConversacionesDelCliente(req);
+    if (!conversaciones.length) return res.redirect('/panel/conversaciones');
+    const conversacion = conversaciones[conversaciones.length - 1];
     if (conversacion.modo !== 'HUMANO') {
-      return res.redirect(`/panel/conversaciones/${conversacion.id}?err=` + encodeURIComponent('Primero tenés que tomar el control de este chat.'));
+      return res.redirect(`/panel/conversaciones/${req.params.telefono}?err=` + encodeURIComponent('Primero tenés que tomar el control de este chat.'));
     }
     const texto = String((req.body || {}).texto || '').trim();
-    if (!texto) return res.redirect(`/panel/conversaciones/${conversacion.id}`);
+    if (!texto) return res.redirect(`/panel/conversaciones/${req.params.telefono}`);
 
     const conexion = conversacion.agente.conexion;
     if (conexion && conexion.estado === 'CONECTADO') {
@@ -1058,17 +1104,17 @@ app.post('/panel/conversaciones/:id/mensaje', requireCliente, async (req, res, n
       usuarioNombre: req.session.clienteNombre,
     });
 
-    res.redirect(`/panel/conversaciones/${conversacion.id}`);
+    res.redirect(`/panel/conversaciones/${req.params.telefono}`);
   } catch (err) { next(err); }
 });
 
 // Buscador de productos para mandar una tarjeta manual (solo devuelve lo
 // minimo para la lista: el backend decide y filtra, nunca se manda el
 // catalogo completo al navegador).
-app.get('/panel/conversaciones/:id/productos-buscar', requireCliente, async (req, res, next) => {
+app.get('/panel/conversaciones/:telefono/productos-buscar', requireCliente, async (req, res, next) => {
   try {
-    const conversacion = await cargarConversacion(req);
-    if (!conversacion) return res.status(404).json([]);
+    const conversaciones = await cargarConversacionesDelCliente(req);
+    if (!conversaciones.length) return res.status(404).json([]);
     const q = String(req.query.q || '').trim();
 
     const productos = await prisma.producto.findMany({
@@ -1090,19 +1136,20 @@ app.get('/panel/conversaciones/:id/productos-buscar', requireCliente, async (req
 // el mismo mecanismo que usa el agente IA (fichaProducto + fotoParaMostrar +
 // wa.enviarImagen), solo que disparado a mano por un humano con el control
 // tomado.
-app.post('/panel/conversaciones/:id/producto', requireCliente, async (req, res, next) => {
+app.post('/panel/conversaciones/:telefono/producto', requireCliente, async (req, res, next) => {
   try {
-    const conversacion = await cargarConversacion(req);
-    if (!conversacion) return res.redirect('/panel/conversaciones');
+    const conversaciones = await cargarConversacionesDelCliente(req);
+    if (!conversaciones.length) return res.redirect('/panel/conversaciones');
+    const conversacion = conversaciones[conversaciones.length - 1];
     if (conversacion.modo !== 'HUMANO') {
-      return res.redirect(`/panel/conversaciones/${conversacion.id}?err=` + encodeURIComponent('Primero tenés que tomar el control de este chat.'));
+      return res.redirect(`/panel/conversaciones/${req.params.telefono}?err=` + encodeURIComponent('Primero tenés que tomar el control de este chat.'));
     }
     const productoId = Number((req.body || {}).productoId);
     const producto = await prisma.producto.findFirst({
       where: { id: productoId, empresaId: req.session.empresaId },
       include: { variantes: { where: { activa: true }, orderBy: { id: 'asc' } } },
     });
-    if (!producto) return res.redirect(`/panel/conversaciones/${conversacion.id}?err=` + encodeURIComponent('Ese producto ya no existe.'));
+    if (!producto) return res.redirect(`/panel/conversaciones/${req.params.telefono}?err=` + encodeURIComponent('Ese producto ya no existe.'));
 
     const empresa = await prisma.empresa.findUnique({ where: { id: req.session.empresaId } });
     const caption = fichaProducto(producto, {}, empresa.moneda || 'BOB');
@@ -1119,7 +1166,7 @@ app.post('/panel/conversaciones/:id/producto', requireCliente, async (req, res, 
       envioOk = envio.ok;
     }
     if (!envioOk) {
-      return res.redirect(`/panel/conversaciones/${conversacion.id}?err=` + encodeURIComponent('No se pudo enviar el producto por WhatsApp.'));
+      return res.redirect(`/panel/conversaciones/${req.params.telefono}?err=` + encodeURIComponent('No se pudo enviar el producto por WhatsApp.'));
     }
 
     const mensajeGuardado = await prisma.mensaje.create({
@@ -1134,7 +1181,7 @@ app.post('/panel/conversaciones/:id/producto', requireCliente, async (req, res, 
       mediaTipo: mensajeGuardado.mediaTipo, createdAt: mensajeGuardado.createdAt, usuarioNombre: req.session.clienteNombre,
     });
 
-    res.redirect(`/panel/conversaciones/${conversacion.id}`);
+    res.redirect(`/panel/conversaciones/${req.params.telefono}`);
   } catch (err) { next(err); }
 });
 

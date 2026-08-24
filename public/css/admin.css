@@ -593,6 +593,14 @@ body.admin, body.admin-login {
 
 /* ---------- Cabecera de datos del cliente (reemplaza los stat-card sueltos) ---------- */
 .conv-cliente-card { margin-bottom: 1.1rem; }
+.conv-divisor {
+  display: flex; align-items: center; justify-content: center; text-align: center;
+  margin: .6rem 0; padding: .3rem 0;
+}
+.conv-divisor span {
+  font-size: .74rem; color: var(--muted); background: var(--bg-2);
+  border: 1px solid var(--border); border-radius: 999px; padding: .3rem .8rem;
+}
 .conv-direccion-link { color: var(--primary-2); text-decoration: none; }
 .conv-direccion-link:hover { text-decoration: underline; }
 

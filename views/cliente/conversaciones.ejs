@@ -19,7 +19,7 @@
   <div class="stat-card stat-done"><span class="stat-num"><%= stats.mensajes %></span><span class="stat-label">Mensajes totales</span></div>
 </div>
 
-<% if (conversaciones.length === 0) { %>
+<% if (clientes.length === 0) { %>
   <div class="empty-state">
     <h3>Aún no hay conversaciones</h3>
     <p>Cuando tus clientes escriban a tu agente (o pruebes el chat), aparecerán aquí.</p>
@@ -29,21 +29,22 @@
   <div class="table-wrap">
     <table class="leads-table">
       <thead>
-        <tr><th>Cliente</th><th>Atendida por</th><th class="num">Mensajes</th><th>Cobrada de</th><th>Último mensaje</th><th></th></tr>
+        <tr><th>Cliente</th><th>Atendida por</th><th class="num">Mensajes</th><th class="num">Sesiones</th><th>Último mensaje</th><th></th></tr>
       </thead>
       <tbody>
-        <% conversaciones.forEach(function (c) { %>
-          <tr class="row-link" onclick="window.location='/panel/conversaciones/<%= c.id %>'" style="cursor:pointer">
+        <% clientes.forEach(function (c) { %>
+          <% var href = '/panel/conversaciones/' + encodeURIComponent(c.telefonoCliente); %>
+          <tr class="row-link" onclick="window.location='<%= href %>'" style="cursor:pointer">
             <td>
               <strong><%= c.nombreCliente || c.telefonoCliente %></strong>
               <% if (c.nombreCliente) { %><div class="muted" style="font-size:.78rem"><%= c.telefonoCliente %></div><% } %>
             </td>
             <td><span class="badge <%= c.modo === 'HUMANO' ? 'badge-done' : 'badge-new' %>"><%= c.modo === 'HUMANO' ? 'Humano' : 'IA' %></span></td>
-            <td class="num"><%= c._count.mensajes %></td>
-            <td><span class="badge <%= c.origen === 'INCLUIDA' ? 'badge-new' : 'badge-done' %>"><%= c.origen === 'INCLUIDA' ? 'Plan' : 'Paquete' %></span></td>
+            <td class="num"><%= c.mensajes %></td>
+            <td class="num"><%= c.sesiones %></td>
             <td class="nowrap muted"><%= new Date(c.ultimoMensajeAt).toLocaleString('es-BO', { dateStyle:'short', timeStyle:'short' }) %></td>
             <td class="actions-cell">
-              <a class="icon-btn" title="Ver conversación" href="/panel/conversaciones/<%= c.id %>" onclick="event.stopPropagation()"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg></a>
+              <a class="icon-btn" title="Ver conversación" href="<%= href %>" onclick="event.stopPropagation()"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg></a>
             </td>
           </tr>
         <% }); %>
