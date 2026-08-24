@@ -94,8 +94,13 @@ describe('generarRespuesta - la IA puede mostrar productos reales via tool_calls
       return { content: 'Aca tenes la zapatilla que buscabas.', tool_calls: [] };
     };
 
+    // Nombra el producto puntual por su nombre a proposito: sin nombre
+    // puntual, la regla de "solo tarjeta de categoria" (backend, no la IA)
+    // resuelve el turno entero en codigo y nunca llega a invocar la IA -
+    // este test verifica especificamente que el tool_calling con la IA
+    // funciona de punta a punta, asi que necesita el camino que SI la usa.
     const historial = [{ rol: 'CLIENTE', contenido: 'Busco zapatillas' }];
-    const salida = await generarRespuesta(agenteId, TELEFONO, historial, 'Que tienen en calzado?', undefined, { llamarInyectado });
+    const salida = await generarRespuesta(agenteId, TELEFONO, historial, 'Tienen la Zapatilla de test?', undefined, { llamarInyectado });
 
     assert.equal(salida.ok, true);
     assert.equal(salida.error, undefined);

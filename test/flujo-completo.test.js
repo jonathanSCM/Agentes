@@ -478,18 +478,12 @@ describe('menu de categorias en dos niveles', () => {
     assert.match(r, /2\. Sandalias/);
   });
 
-  test('elegida la subcategoria, RECIEN AHI aparecen los productos', async () => {
-    await reiniciarLead({ categoriaInteres: 'Botas', categoriaId: subcategoria.id });
-    const producto = await prisma.producto.findFirst({ where: { categoriaId: subcategoria.id } });
-    const { llamar, recibido } = iaFalsa([
-      { tool_calls: [tool('mostrar_productos', { idsProductos: [producto.id] })] },
-      { content: 'Mira esta.' },
-    ]);
-    const salida = await generarRespuesta(agenteId, TELEFONO, [], 'botas', undefined, { llamarInyectado: llamar });
+  test('elegida la subcategoria por primera vez, sale la tarjeta de esa subcategoria (regla del negocio: backend, no la IA)', async () => {
+    await reiniciarLead({ categoriaInteres: null, categoriaId: null });
+    const salida = await generarRespuesta(agenteId, TELEFONO, [], 'botas', undefined, { llamarInyectado: async () => { throw new Error('no deberia llamarse a la IA'); } });
 
-    assert.match(recibido.toolResults[0], /TOOL_SUCCESS/);
-    assert.equal(salida.fotos.length, 1);
-    assert.match(salida.fotos[0].caption, /Bota alta/);
+    assert.equal(salida.fotos.length, 1, 'tarjeta de la subcategoria Botas, no un producto individual');
+    assert.match(salida.fotos[0].caption, /Botas/);
   });
 
   test('si el cliente pide ver todo el catalogo, mostrar_categorias sale del rubro actual', async () => {
@@ -520,6 +514,82 @@ describe('menu de categorias en dos niveles', () => {
     const salida = await generarRespuesta(agenteId, TELEFONO, [], 'mostrame', undefined, { llamarInyectado: llamar });
     assert.match(recibido.toolResults[0], /TOOL_SUCCESS/);
     assert.ok(salida.fotos.length > 0, 'sin subcategorias no hay paso intermedio');
+  });
+});
+
+// Pedido explicito del dueño despues de varios bugs reales seguidos donde el
+// modelo no llamaba a mostrar_tarjeta_categoria (a veces no llamaba a NINGUNA
+// tool y describia la categoria en texto plano, a veces intentaba
+// mostrar_productos sin categoria elegida): el backend manda la tarjeta el
+// mismo, ANTES de preguntarle a la IA, para el caso deterministico (categoria
+// ya elegida, nada puntual nombrado, tarjeta todavia no vista). La IA ya no
+// decide esto - ver "DECISION DETERMINISTICA" en agente.js, justo antes del
+// loop de vueltas.
+describe('la tarjeta de categoria la manda el backend, sin preguntarle a la IA', () => {
+  test('categoria recien elegida EN ESTE MENSAJE: la tarjeta sale SIN llamar nunca a la IA', async () => {
+    // categoriaId null a proposito: lo que importa es que el mensaje de
+    // ESTE turno sea el que recien resuelve la categoria (detectados.categoriaId),
+    // no una que ya estuviera fijada de antes (ver el comentario del gate en
+    // agente.js - ese es justo el bug que este test previene).
+    await reiniciarLead({ categoriaInteres: null, categoriaId: null, atributosLead: { Genero: 'Hombre' } });
+    let llamadasALaIA = 0;
+    const llamarQueNoDeberiaUsarse = async () => { llamadasALaIA += 1; return { content: 'no deberia llegar aca', tool_calls: [] }; };
+
+    const salida = await generarRespuesta(agenteId, TELEFONO, [], 'quiero zapatillas', undefined, { llamarInyectado: llamarQueNoDeberiaUsarse });
+
+    assert.equal(llamadasALaIA, 0, 'el turno se resuelve entero en codigo, la IA nunca deberia haberse llamado');
+    assert.equal(salida.fotos.length, 1, 'la tarjeta de categoria (una imagen), no tarjetas de producto sueltas');
+    assert.doesNotMatch(salida.respuesta, /tarjeta/i);
+  });
+
+  test('categoria ya elegida de un turno anterior, mensaje de seguimiento SIN nombrarla: el bloque nuevo no intercepta', async () => {
+    // Este es el caso que rompio la primera version del gate: con la
+    // categoria ya fijada de antes, cualquier mensaje de seguimiento
+    // ("mandame foto de la gris", "confirmo el pedido") no debe disparar la
+    // tarjeta pre-emptiva solo porque no nombra un producto por su nombre
+    // completo - eso lo sigue interpretando la IA como corresponde.
+    await reiniciarLead({ atributosLead: { Genero: 'Hombre' } });
+    let llamadasALaIA = 0;
+    const llamar = async () => { llamadasALaIA += 1; return { content: 'segui la conversacion normal.', tool_calls: [] }; };
+
+    await generarRespuesta(agenteId, TELEFONO, [], 'y el envio cuanto sale?', undefined, { llamarInyectado: llamar });
+
+    assert.ok(llamadasALaIA > 0, 'un mensaje de seguimiento que no vuelve a nombrar la categoria tiene que seguir yendo por la IA');
+  });
+
+  test('categoria recien nombrada pero con atributo obligatorio faltante: el bloque nuevo no intercepta, sigue el flujo normal', async () => {
+    await reiniciarLead({ categoriaInteres: null, categoriaId: null, atributosLead: {} }); // sin Genero: falta el obligatorio de "Zapatillas"
+    const { llamar, recibido } = iaFalsa([{ content: '¿Para hombre o para mujer?' }]);
+
+    await generarRespuesta(agenteId, TELEFONO, [], 'quiero zapatillas', undefined, { llamarInyectado: llamar });
+
+    assert.equal(recibido.systems.length, 1, 'la IA SI se llamo (el bloque nuevo no aplica sin el atributo obligatorio)');
+    assert.match(recibido.systems[0], /TODAVIA NO PODES MOSTRAR PRODUCTOS/);
+  });
+
+  test('categoria recien nombrada pero la tarjeta ya se habia mostrado antes: el bloque nuevo no la repite, sigue el flujo normal', async () => {
+    await reiniciarLead({ categoriaInteres: null, categoriaId: null, atributosLead: { Genero: 'Hombre' }, contexto: { tarjetasCategoriaMostradas: [categoriaId] } });
+    const { llamar, recibido } = iaFalsa([{ content: '¿Cual modelo te interesa?' }]);
+
+    const salida = await generarRespuesta(agenteId, TELEFONO, [], 'quiero zapatillas de nuevo', undefined, { llamarInyectado: llamar });
+
+    assert.equal(recibido.systems.length, 1, 'la IA SI se llamo (ya se habia mostrado, no hay nada deterministico que hacer)');
+    assert.equal(salida.fotos.length, 0, 'no se repite la tarjeta sola');
+  });
+
+  test('producto puntual nombrado: el bloque nuevo no aplica, sigue el flujo de la IA', async () => {
+    await reiniciarLead({ atributosLead: { Genero: 'Hombre' } });
+    const { llamar, recibido } = iaFalsa([
+      { tool_calls: [tool('buscar_producto', { nombre: 'Zapatilla 1' })] },
+      { tool_calls: [tool('mostrar_productos', { idsProductos: [productos[0].id] })] },
+      { content: 'Ahi la tenes.' },
+    ]);
+
+    const salida = await generarRespuesta(agenteId, TELEFONO, [], 'tenes la Zapatilla 1?', undefined, { llamarInyectado: llamar });
+
+    assert.ok(recibido.systems.length > 0, 'la IA SI se llamo (nombro un producto puntual, es interpretacion real)');
+    assert.equal(salida.fotos.length, 1);
+    assert.match(salida.fotos[0].caption, /Zapatilla 1/);
   });
 });
 
