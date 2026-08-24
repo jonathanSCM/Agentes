@@ -978,6 +978,37 @@ describe('no se cierra sin saber que se lleva el cliente', () => {
 // vago (ej. "voy a revisar eso") y no quedaban mas vueltas, el codigo
 // forzaba el mismo un llamado a mostrar_productos sin mirar si el cliente
 // ya estaba cerrando.
+// Bug real reportado: "Dentro de Poleras tenemos varios tipos - ¿cuál te
+// interesa?" sin listar ninguna opcion real - el rescate de ultima vuelta
+// tenia un texto generico hardcodeado en vez de armar la lista de verdad.
+describe('BUG - rescate de ultima vuelta con rubro sin elegir: lista los tipos reales', () => {
+  test('rubro con subcategorias: el rescate lista los tipos reales, nunca una pregunta abierta sin opciones', async () => {
+    // El nombre del producto menciona "Calzado" a proposito - asi es como
+    // pasa en la tienda real: buscarConFallback matchea por nombre de
+    // categoria O por nombre de producto, y ese texto compartido es lo que
+    // hace que candidatosActuales no este vacio parado en el rubro (sin
+    // eso, el rescate ni siquiera entra a este camino, cae al de "sin
+    // candidatos" que es un texto todavia mas generico).
+    const productoTextMatch = await prisma.producto.create({
+      data: { empresaId, categoriaId: subcategoria.id, nombre: 'Bota de Calzado urbano', precio: 250, stock: 4, atributos: { Genero: 'Hombre' } },
+    });
+    try {
+      await reiniciarLead({ categoriaInteres: 'Calzado', categoriaId: rubro.id, atributosLead: { Genero: 'Hombre' } });
+      const { llamar } = iaFalsa([{ content: 'Voy a revisar eso para vos.' }]);
+      const salida = await generarRespuesta(agenteId, TELEFONO, [], 'que tipos hay', undefined, { llamarInyectado: llamar });
+
+      // "Sandalias" no deberia aparecer: en el fixture, sus productos son
+      // todos de Genero Mujer, y el lead pidio Hombre - la lista sale
+      // correctamente filtrada por ese dato (subcategoriasDe ya lo hace).
+      assert.match(salida.respuesta, /Botas/);
+      assert.doesNotMatch(salida.respuesta, /Sandalias/);
+      assert.doesNotMatch(salida.respuesta, /tenemos varios tipos/i, 'no puede ser la pregunta generica sin opciones reales');
+    } finally {
+      await prisma.producto.delete({ where: { id: productoTextMatch.id } });
+    }
+  });
+});
+
 describe('BUG - durante el cierre, el rescate de ultima vuelta no debe reabrir el catalogo', () => {
   test('con carrito activo y estadoConversacion en cierre, pregunta datos de cierre en vez de mostrar productos', async () => {
     // estadoConversacion en cierre pero SIN productoFavoritoId: exactamente
