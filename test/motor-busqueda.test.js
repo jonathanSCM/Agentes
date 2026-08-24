@@ -197,13 +197,18 @@ describe('productosCandidatosAMostrar', () => {
 });
 
 describe('seccionProductos - no repetir tarjetas ya enviadas (bug real de produccion)', () => {
+  // pidioProductoPuntual=true en los 3 casos: estos tests verifican la
+  // paginacion/no-repeticion de tarjetas, que es una capa aparte del gate de
+  // "solo tarjeta de categoria salvo busqueda puntual" (ver describe de mas
+  // abajo, "regla del negocio: nunca tarjetas sueltas..."). Sin el gate
+  // salteado, seccionProductos ni siquiera llega a la logica de paginacion.
   test('primera vez: instruye a mostrar TODOS los productos con tarjeta', () => {
     const productos = [
       producto({ id: 10, nombre: 'Licuadora', categoria: 'Electrodomesticos' }),
       producto({ id: 11, nombre: 'Plancha', categoria: 'Electrodomesticos' }),
     ];
     const lead = { categoriaInteres: 'Electrodomesticos', contexto: {} };
-    const texto = seccionProductos(productos, lead);
+    const texto = seccionProductos(productos, lead, null, 'BOB', null, false, true);
     assert.match(texto, /Licuadora/);
     assert.match(texto, /Plancha/);
     assert.match(texto, /mostrar_productos/);
@@ -218,7 +223,7 @@ describe('seccionProductos - no repetir tarjetas ya enviadas (bug real de produc
     // conversacion/prueba anterior, y el sistema solo mandaba la licuadora
     // en tarjeta pero el texto igual mencionaba la plancha sin tarjeta.
     const lead = { categoriaInteres: 'Electrodomesticos', contexto: { fotosEnviadas: [11] } };
-    const texto = seccionProductos(productos, lead);
+    const texto = seccionProductos(productos, lead, null, 'BOB', null, false, true);
     assert.match(texto, /Licuadora/, 'la que falta por mostrar debe seguir apareciendo');
     assert.doesNotMatch(texto, /\[ID 11\]/, 'la que ya se mostro no debe volver a ofrecerse como "nueva" para tarjeta');
   });
@@ -228,12 +233,44 @@ describe('seccionProductos - no repetir tarjetas ya enviadas (bug real de produc
       producto({ id: 10, nombre: 'Sandalia de verano', categoria: 'Calzado' }),
     ];
     const lead = { categoriaInteres: 'Calzado', contexto: { fotosEnviadas: [10] } };
-    const texto = seccionProductos(productos, lead);
+    const texto = seccionProductos(productos, lead, null, 'BOB', null, false, true);
     assert.match(texto, /ya se los mostraste/i);
     assert.match(texto, /Estas son TODAS las opciones reales/);
     // Repetir una tarjeta que el cliente vuelve a pedir SI esta permitido:
     // negarsela porque "ya se la mostro" hace 20 mensajes lo trata mal.
     assert.match(texto, /mandasela de nuevo sin problema/);
+  });
+});
+
+describe('seccionProductos - regla del negocio: nunca tarjetas sueltas sin producto puntual', () => {
+  test('categoria generica, primera vez: fuerza mostrar_tarjeta_categoria, no mostrar_productos', () => {
+    const productos = [
+      producto({ id: 10, nombre: 'Licuadora', categoria: 'Electrodomesticos' }),
+      producto({ id: 11, nombre: 'Plancha', categoria: 'Electrodomesticos' }),
+    ];
+    const lead = { categoriaInteres: 'Electrodomesticos', contexto: {} };
+    const texto = seccionProductos(productos, lead);
+    assert.match(texto, /mostrar_tarjeta_categoria/);
+    assert.doesNotMatch(texto, /Llama.*mostrar_productos/);
+  });
+
+  test('categoria generica, ya se mostro la tarjeta antes: pide el nombre puntual, no repite ni muestra productos', () => {
+    const productos = [
+      producto({ id: 10, nombre: 'Licuadora', categoria: 'Electrodomesticos' }),
+    ];
+    const categoria = productos[0].categoria;
+    const lead = { categoriaInteres: 'Electrodomesticos', contexto: { tarjetasCategoriaMostradas: [categoria.id] } };
+    const texto = seccionProductos(productos, lead, categoria);
+    assert.match(texto, /Ya le mostraste la tarjeta/);
+    assert.doesNotMatch(texto, /Llama AHORA a mostrar_tarjeta_categoria/);
+  });
+
+  test('con pidioProductoPuntual=true, se salta el gate y muestra los productos como antes', () => {
+    const productos = [producto({ id: 10, nombre: 'Licuadora', categoria: 'Electrodomesticos' })];
+    const lead = { categoriaInteres: 'Electrodomesticos', contexto: {} };
+    const texto = seccionProductos(productos, lead, null, 'BOB', null, false, true);
+    assert.match(texto, /Licuadora/);
+    assert.match(texto, /mostrar_productos/);
   });
 });
 

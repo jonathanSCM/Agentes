@@ -11,6 +11,13 @@
 // que NO cuenta como tarjeta: el rescate se queda sin margen para mandar.
 // Por eso el producto necesita 3 fotos DISTINTAS (con urls repetidas el
 // control de duplicados corta antes y el cupo nunca se agota).
+//
+// El cliente nombra el producto puntual por su nombre a proposito: con la
+// regla nueva de "solo tarjeta de categoria salvo busqueda puntual", el
+// rescate generico (sin nombre) fuerza mostrar_tarjeta_categoria en vez de
+// mostrar_productos - una imagen distinta, no sujeta a este mismo cupo de
+// fotos de producto. Este test sigue probando el camino que SI sigue usando
+// mostrar_productos (busqueda puntual), que es donde el cupo aplica.
 const { test, describe, before, after } = require('node:test');
 const assert = require('node:assert/strict');
 
@@ -82,7 +89,7 @@ describe('rescate de la ultima vuelta', () => {
       { content: 'Dame un momento, ya te muestro las opciones.' },
     ]);
 
-    const salida = await generarRespuesta(agenteId, TELEFONO, [], 'mostrame opciones', undefined, { llamarInyectado: llamar });
+    const salida = await generarRespuesta(agenteId, TELEFONO, [], 'tenes la Zapatilla Rescate?', undefined, { llamarInyectado: llamar });
 
     assert.doesNotMatch(
       salida.respuesta,

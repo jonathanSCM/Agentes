@@ -94,7 +94,10 @@ describe('TEST 1 - No mostrar antes de preguntar el genero', () => {
   test('con genero y talla ya sabidos, RECIEN AHI aparecen los productos', () => {
     const lead = { categoriaInteres: 'Zapatillas deportivas', categoriaId: zapatillas.id, talla: '42', atributosLead: { Genero: 'Hombre' }, contexto: {} };
     assert.equal(filtrosCompletos(lead, zapatillas), true);
-    const texto = seccionProductos(productos, lead, zapatillas);
+    // pidioProductoPuntual=true: este test verifica el gate de atributos
+    // obligatorios, no la regla nueva de "solo tarjeta de categoria" (ver
+    // describe aparte para esa regla).
+    const texto = seccionProductos(productos, lead, zapatillas, 'BOB', null, false, true);
     assert.match(texto, /Runner Pro/);
     assert.match(texto, /mostrar_productos/);
   });
@@ -125,7 +128,7 @@ describe('TEST 1 - No mostrar antes de preguntar el genero', () => {
     const lead = { categoriaInteres: 'Zapatillas deportivas', categoriaId: conRecomendado.id, atributosLead: { Genero: 'Hombre' }, contexto: {} };
     assert.deepEqual(atributosFaltantes(conRecomendado, lead, 'OBLIGATORIO'), []);
     assert.deepEqual(atributosFaltantes(conRecomendado, lead, 'RECOMENDADO'), ['Uso']);
-    assert.match(seccionProductos([producto({ id: 1, nombre: 'Runner Pro', categoria: 'Zapatillas deportivas' })], lead, conRecomendado), /Runner Pro/);
+    assert.match(seccionProductos([producto({ id: 1, nombre: 'Runner Pro', categoria: 'Zapatillas deportivas' })], lead, conRecomendado, 'BOB', null, false, true), /Runner Pro/);
   });
 });
 
@@ -193,12 +196,12 @@ describe('TEST 3 - "¿Tenes otros modelos?" con 13 en catalogo', () => {
   });
 
   test('el prompt le dice al modelo el total_matches real, no solo lo mostrado', () => {
-    const texto = seccionProductos(trece, lead, null);
+    const texto = seccionProductos(trece, lead, null, 'BOB', null, false, true);
     assert.match(texto, /total_matches = 13/);
   });
 
   test('PROHIBIDO decir "esos son todos" cuando quedan mas', () => {
-    const texto = seccionProductos(trece, lead, null);
+    const texto = seccionProductos(trece, lead, null, 'BOB', null, false, true);
     assert.match(texto, /JAMAS le digas que "esas son todas"/);
     assert.match(texto, /ver_mas_productos/);
   });
@@ -215,7 +218,7 @@ describe('TEST 3 - "¿Tenes otros modelos?" con 13 en catalogo', () => {
     const { resultados } = buscarConFallback(trece, lead);
     const todos = resultados.map((p) => p.id);
     assert.equal(paginar(resultados, todos).hayMas, false);
-    const texto = seccionProductos(trece, { ...lead, contexto: { fotosEnviadas: todos } }, null);
+    const texto = seccionProductos(trece, { ...lead, contexto: { fotosEnviadas: todos } }, null, 'BOB', null, false, true);
     assert.match(texto, /YA SE LOS MOSTRASTE/);
     assert.match(texto, /quedan por mostrar = 0/);
   });
@@ -371,7 +374,7 @@ describe('TEST 9 - La moneda la decide el backend, nunca la IA', () => {
   });
 
   test('el bloque que ve el modelo tambien lleva la moneda en cada precio', () => {
-    const texto = seccionProductos([p], { categoriaInteres: 'Zapatillas', contexto: {} }, null, 'BOB');
+    const texto = seccionProductos([p], { categoriaInteres: 'Zapatillas', contexto: {} }, null, 'BOB', null, false, true);
     assert.match(texto, /Precio: Bs 80\.00/);
   });
 });
@@ -409,7 +412,7 @@ describe('TEST 11 - Cierre completo: producto -> variante -> precio -> datos -> 
       id: 1, nombre: 'Gym Flex', categoria: 'Zapatillas', precio: 370,
       variantes: [{ id: 55, activa: true, atributos: { Talla: '42', Color: 'Negro' }, stock: 3 }],
     });
-    const texto = seccionProductos([p], { categoriaInteres: 'Zapatillas', contexto: {} }, null, 'BOB');
+    const texto = seccionProductos([p], { categoriaInteres: 'Zapatillas', contexto: {} }, null, 'BOB', null, false, true);
     assert.match(texto, /\[Variante ID 55\]/);
     assert.match(texto, /NUNCA llames crear_pedido sin antes preguntarle al cliente cual elige|preguntale cual de estas elige ANTES de crear el pedido/);
   });
@@ -570,7 +573,7 @@ describe('BUG - "es el unico modelo que tenemos" siendo mentira', () => {
     ];
     productos.forEach((p) => { p.categoria = cat; });
     const lead = { categoriaInteres: 'Zapatillas', categoriaId: cat.id, atributosLead: { Genero: 'Hombre' }, contexto: {} };
-    const texto = seccionProductos(productos, lead, cat, 'BOB');
+    const texto = seccionProductos(productos, lead, cat, 'BOB', null, false, true);
 
     assert.match(texto, /PANORAMA REAL/);
     assert.match(texto, /3 producto\(s\) cargado\(s\) en total/);
@@ -727,7 +730,7 @@ describe('BUG - "quiero otras opciones" y el bot dice que no hay', () => {
 
   test('cuando ya vio lo exacto, el sistema le ofrece las otras en vez de decir que no hay', () => {
     const lead = { categoriaInteres: 'Urbanas', categoriaId: cat.id, color: 'negro', contexto: { fotosEnviadas: [parkSt.id] } };
-    const texto = seccionProductos(productos, lead, cat, 'BOB');
+    const texto = seccionProductos(productos, lead, cat, 'BOB', null, false, true);
     assert.match(texto, /OJO, SI HAY MAS PRODUCTOS/);
     assert.match(texto, /TEKKIRA CUP/);
     assert.match(texto, /PROHIBIDO contestarle que no hay mas/);
@@ -736,7 +739,7 @@ describe('BUG - "quiero otras opciones" y el bot dice que no hay', () => {
   test('si de verdad no queda nada mas, ahi si puede decirlo', () => {
     const solo = [parkSt];
     const lead = { categoriaInteres: 'Urbanas', categoriaId: cat.id, color: 'negro', contexto: { fotosEnviadas: [parkSt.id] } };
-    const texto = seccionProductos(solo, lead, cat, 'BOB');
+    const texto = seccionProductos(solo, lead, cat, 'BOB', null, false, true);
     assert.match(texto, /Estas son TODAS las opciones reales/);
     assert.doesNotMatch(texto, /OJO, SI HAY MAS PRODUCTOS/);
   });
@@ -773,7 +776,7 @@ describe('mostrar primero, afinar despues', () => {
       variantes: [{ activa: true, atributos: { Color: 'negro', Talla: '9' }, stock: 3 }],
     });
     const lead = { categoriaInteres: 'Urbanas', categoriaId: conColores.categoria.id, contexto: {} };
-    const texto = seccionProductos([conColores], lead, conColores.categoria, 'BOB');
+    const texto = seccionProductos([conColores], lead, conColores.categoria, 'BOB', null, false, true);
     assert.match(texto, /NO es un cuestionario para completar antes de mostrar/);
     assert.match(texto, /mostraselos PRIMERO/);
   });

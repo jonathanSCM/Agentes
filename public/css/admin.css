@@ -11,6 +11,29 @@ body.admin, body.admin-login {
   background-color: #150d22;
 }
 
+/* ---------- Selects sueltos (sin .field), ej. los editables en tablas ----------
+   styles.css ya oscurece el <option> de los selects envueltos en .field, pero
+   selects sueltos con solo un style inline (como el de "Nivel" en la tabla de
+   atributos de categoria) quedaban afuera: heredaban el color de texto claro
+   del tema oscuro sobre el fondo blanco por defecto del navegador, y las
+   opciones no seleccionadas quedaban casi ilegibles. Regla general para
+   cualquier select del panel que no la tenga ya cubierta por .field. */
+select option {
+  background-color: #241246;
+  color: var(--text);
+}
+select optgroup {
+  background-color: #1b0f30;
+  color: var(--muted);
+  font-style: normal;
+  font-weight: 700;
+}
+select option:checked,
+select option:hover {
+  background-color: var(--primary);
+  color: #fff;
+}
+
 /* ---------- Login ---------- */
 .admin-login { min-height: 100vh; display: grid; place-items: center; }
 .login-wrap { width: 100%; display: grid; place-items: center; padding: 2rem 1.25rem; }

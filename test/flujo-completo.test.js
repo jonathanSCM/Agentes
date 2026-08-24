@@ -152,7 +152,12 @@ describe('gate real: primero entender, despues mostrar', () => {
     const salida = await generarRespuesta(agenteId, TELEFONO, [], 'quiero zapatillas', undefined, { llamarInyectado: llamar });
 
     assert.equal(salida.ok, true);
-    assert.match(recibido.toolResults[0], /TODAVIA NO le muestres productos/);
+    // Sin producto puntual nombrado, el redirect de "solo tarjeta de
+    // categoria" (Fix B) manda mostrar_productos hacia mostrar_tarjeta_categoria
+    // antes de llegar al gate propio de mostrar_productos - pero esa tool
+    // tiene el MISMO gate de atributos obligatorios, asi que el resultado de
+    // fondo (nada se muestra, se pide Genero) es identico.
+    assert.match(recibido.toolResults[0], /TODAVIA NO le (muestres productos|mandes esta tarjeta)/);
     assert.match(recibido.toolResults[0], /Genero/);
     assert.deepEqual(salida.fotos, [], 'no se mando ninguna tarjeta');
 
@@ -174,7 +179,10 @@ describe('gate real: primero entender, despues mostrar', () => {
       { content: 'Estas son las que mejor te quedan.' },
     ]);
 
-    const salida = await generarRespuesta(agenteId, TELEFONO, [], 'mostrame', undefined, { llamarInyectado: llamar });
+    // Nombra un producto puntual ("Zapatilla 1") para pasar el gate de "solo
+    // tarjeta de categoria" (regla del negocio) y llegar a probar la
+    // paginacion real, que es lo que este test verifica.
+    const salida = await generarRespuesta(agenteId, TELEFONO, [], 'tenes la Zapatilla 1?', undefined, { llamarInyectado: llamar });
 
     assert.match(recibido.toolResults[0], /TOOL_SUCCESS/);
     assert.equal(salida.fotos.length, 3, 'una pagina son 3 tarjetas, aunque el modelo pidiera 5');
@@ -187,30 +195,41 @@ describe('paginacion real contra la base', () => {
   test('ver_mas_productos trae las que faltan y despues avisa que no hay mas', async () => {
     await reiniciarLead({ atributosLead: { Genero: 'Hombre' } });
 
+    // Cada turno nombra un producto puntual (regla del negocio: sin nombre
+    // puntual no hay tarjetas de producto, solo tarjeta de categoria) para
+    // poder seguir probando la paginacion real de mostrar_productos/ver_mas_productos.
     const primera = iaFalsa([
       { tool_calls: [tool('mostrar_productos', { idsProductos: [productos[0].id] })] },
       { content: 'Mira estas.' },
     ]);
-    const r1 = await generarRespuesta(agenteId, TELEFONO, [], 'mostrame', undefined, { llamarInyectado: primera.llamar });
+    const r1 = await generarRespuesta(agenteId, TELEFONO, [], 'tenes la Zapatilla 1?', undefined, { llamarInyectado: primera.llamar });
     assert.equal(r1.fotos.length, 3);
     const vistas1 = r1.fotos.map((f) => f.caption.split('\n')[0]);
 
+    // Ojo: el mensaje NO nombra el producto completo esta vez a proposito
+    // (para no disparar productoNombradoPorCliente, que forzaria mostrar_productos
+    // con un solo ID y pisaria la paginacion que se quiere probar aca) - en
+    // cambio, buscar_producto marca el pedido como puntual (idsPedidosPorNombre),
+    // que alcanza para pasar el gate sin tocar como sigue la tool ver_mas_productos.
     const segunda = iaFalsa([
+      { tool_calls: [tool('buscar_producto', { nombre: 'Zapatilla' })] },
       { tool_calls: [tool('ver_mas_productos', {})] },
       { content: 'Estas son las otras.' },
     ]);
-    const r2 = await generarRespuesta(agenteId, TELEFONO, [], 'tenes otros modelos?', undefined, { llamarInyectado: segunda.llamar });
+    const r2 = await generarRespuesta(agenteId, TELEFONO, [], 'tenes mas modelos como esa?', undefined, { llamarInyectado: segunda.llamar });
     assert.equal(r2.fotos.length, 2, 'quedaban 2 de las 5');
     const vistas2 = r2.fotos.map((f) => f.caption.split('\n')[0]);
     assert.equal(vistas1.filter((v) => vistas2.includes(v)).length, 0, 'no puede repetir las que ya vio');
 
     const tercera = iaFalsa([
+      { tool_calls: [tool('buscar_producto', { nombre: 'Zapatilla' })] },
       { tool_calls: [tool('ver_mas_productos', {})] },
       { content: 'Esas son todas.' },
     ]);
-    await generarRespuesta(agenteId, TELEFONO, [], 'y mas?', undefined, { llamarInyectado: tercera.llamar });
-    assert.match(tercera.recibido.toolResults[0], /Ya le mostraste TODAS las opciones reales/);
-    assert.match(tercera.recibido.toolResults[0], /total_matches = 5/);
+    await generarRespuesta(agenteId, TELEFONO, [], 'tenes mas modelos que esos?', undefined, { llamarInyectado: tercera.llamar });
+    // toolResults[0] = buscar_producto, [1] = ver_mas_productos.
+    assert.match(tercera.recibido.toolResults[1], /Ya le mostraste TODAS las opciones reales/);
+    assert.match(tercera.recibido.toolResults[1], /total_matches = 5/);
   });
 });
 
@@ -382,18 +401,23 @@ describe('cierre del pedido: confirmacion obligatoria', () => {
 describe('tope duro de fotos por turno', () => {
   test('aunque el modelo llame dos veces, nunca se mandan mas de 3 fotos en un turno', async () => {
     await reiniciarLead({ atributosLead: { Genero: 'Hombre' } });
-    // El modelo intenta mostrar en dos tandas dentro del mismo turno.
+    // El modelo intenta mostrar en dos tandas dentro del mismo turno. El
+    // mensaje NO nombra un producto puntual completo a proposito (evita que
+    // productoNombradoPorCliente fuerce ver_mas_productos hacia un solo ID
+    // ya mostrado) - buscar_producto marca el pedido como puntual igual,
+    // que alcanza para pasar el gate de "solo tarjeta de categoria".
     const { llamar, recibido } = iaFalsa([
-      { tool_calls: [tool('mostrar_productos', { idsProductos: productos.map((p) => p.id) })] },
+      { tool_calls: [tool('buscar_producto', { nombre: 'Zapatilla' }), tool('mostrar_productos', { idsProductos: productos.map((p) => p.id) })] },
       { tool_calls: [tool('ver_mas_productos', {})] },
       { content: 'Ahi las tenes.' },
     ]);
-    const salida = await generarRespuesta(agenteId, TELEFONO, [], 'mostrame todo', undefined, { llamarInyectado: llamar });
+    const salida = await generarRespuesta(agenteId, TELEFONO, [], 'que modelos tenes?', undefined, { llamarInyectado: llamar });
 
     assert.ok(salida.fotos.length <= 3, `se mandaron ${salida.fotos.length} fotos, el tope es 3`);
     assert.equal(salida.fotos.length, 3);
-    const segundoResultado = recibido.toolResults[1] || '';
-    assert.match(segundoResultado, /maximo para no llenarle el chat/);
+    // toolResults[0] = buscar_producto, [1] = mostrar_productos, [2] = ver_mas_productos.
+    const tercerResultado = recibido.toolResults[2] || '';
+    assert.match(tercerResultado, /maximo para no llenarle el chat/);
   });
 
   test('el texto que se le pide al modelo ya no lo empuja a cerrar la venta', async () => {
@@ -402,7 +426,7 @@ describe('tope duro de fotos por turno', () => {
       { tool_calls: [tool('mostrar_productos', { idsProductos: [productos[0].id] })] },
       { content: 'Listo.' },
     ]);
-    await generarRespuesta(agenteId, TELEFONO, [], 'mostrame', undefined, { llamarInyectado: llamar });
+    await generarRespuesta(agenteId, TELEFONO, [], 'tenes la Zapatilla 1?', undefined, { llamarInyectado: llamar });
 
     const r = recibido.toolResults[0];
     assert.match(r, /NO lo presiones para que compre/);
@@ -528,7 +552,7 @@ describe('preguntas iniciales: nada se muestra hasta responderlas', () => {
     ]);
     const salida = await generarRespuesta(agenteId, TELEFONO, [], 'quiero zapatillas', undefined, { llamarInyectado: llamar });
 
-    assert.match(recibido.toolResults[0], /TODAVIA NO le muestres productos/);
+    assert.match(recibido.toolResults[0], /TODAVIA NO le (muestres productos|mandes esta tarjeta)/);
     assert.match(recibido.toolResults[0], /Genero/);
     assert.deepEqual(salida.fotos, []);
   });
@@ -580,7 +604,9 @@ describe('el bot ofrece los valores REALES, no pregunta al aire', () => {
     });
     await reiniciarLead({ atributosLead: { Genero: 'Hombre' } });
     const { llamar, recibido } = iaFalsa([{ content: 'Mira estas.' }]);
-    await generarRespuesta(agenteId, TELEFONO, [], 'mostrame', undefined, { llamarInyectado: llamar });
+    // Nombra un producto puntual para pasar el gate de "solo tarjeta de
+    // categoria" y llegar al bloque de resultados que arma esta lista.
+    await generarRespuesta(agenteId, TELEFONO, [], 'tenes la Zapatilla 1?', undefined, { llamarInyectado: llamar });
 
     const system = recibido.systems[0];
     assert.match(system, /VALORES REALES DISPONIBLES/);
@@ -631,14 +657,18 @@ describe('BUG - pedir permiso en bucle en una conversacion larga', () => {
     return { salida, bloqueado: /NO se mostro nada todavia/.test(recibido.toolResults[0] || '') };
   }
 
+  // Ambos turnos nombran el producto puntual ("Park St 2.0") para pasar el
+  // gate de "solo tarjeta de categoria" (regla del negocio) y seguir
+  // probando el mecanismo que motivo este test: el permiso de filtro
+  // relajado no debe pedirse en bucle en una conversacion larga.
   test('la primera vez SI pide permiso (la talla no calza)', async () => {
-    const r = await turnoDelCliente('quiero urbanas');
+    const r = await turnoDelCliente('tenes la Park St 2.0?');
     assert.equal(r.bloqueado, true);
     assert.deepEqual(r.salida.fotos, []);
   });
 
   test('cuando el cliente dice que si, MUESTRA (antes volvia a preguntar para siempre)', async () => {
-    const r = await turnoDelCliente('si muestrame todas las urbanas');
+    const r = await turnoDelCliente('si, dale, mostrame la Park St 2.0');
     assert.equal(r.bloqueado, false, 'no puede volver a pedir permiso: el cliente ya dijo que si');
     assert.equal(r.salida.fotos.length, 1);
   });
@@ -725,16 +755,21 @@ describe('el cliente recibe exactamente lo que pidio', () => {
     assert.match(salida.fotos[0].caption, /Zapatilla 3/);
   });
 
-  test('explorando sin nombrar nada, se sigue completando la pagina', async () => {
+  // ACTUALIZADO (regla del negocio, pedido explicito del dueño): explorando
+  // sin nombrar nada puntual, el sistema YA NO rellena la pagina con
+  // tarjetas de producto - redirige a la tarjeta de categoria (Fix B),
+  // aunque el modelo haya intentado mostrar_productos. Las tarjetas de
+  // producto individuales quedan reservadas a busquedas puntuales.
+  test('explorando sin nombrar nada, se redirige a la tarjeta de categoria (nunca tarjetas sueltas)', async () => {
     await reiniciarLead({ atributosLead: { Genero: 'Hombre' } });
 
     const { llamar } = iaFalsa([
       { tool_calls: [tool('mostrar_productos', { idsProductos: [productos[0].id] })] },
-      { content: 'Mira estas.' },
+      { content: 'Mira esto.' },
     ]);
     const salida = await generarRespuesta(agenteId, TELEFONO, [], 'que modelos tenes?', undefined, { llamarInyectado: llamar });
 
-    assert.equal(salida.fotos.length, 3, 'sin pedido puntual el relleno tiene que seguir vivo');
+    assert.equal(salida.fotos.length, 1, 'una sola imagen: la tarjeta de categoria, no tarjetas de producto');
   });
 });
 
@@ -809,12 +844,17 @@ describe('BUG - durante el cierre, el rescate de ultima vuelta no debe reabrir e
     assert.doesNotMatch(recibido.systems.at(-1) || '', /TODAVIA NO PODES MOSTRAR PRODUCTOS/, 'seccionProductos no deberia bloquear durante el cierre');
   });
 
-  test('sin estar en cierre (explorando), el mismo texto vago SI fuerza mostrar_productos como antes', async () => {
+  // ACTUALIZADO (regla del negocio): fuera de cierre, sin producto puntual
+  // nombrado, el rescate YA NO fuerza mostrar_productos - fuerza la tarjeta
+  // de categoria (Fix C), consistente con que nunca se manden tarjetas de
+  // producto sueltas sin una busqueda puntual.
+  test('sin estar en cierre (explorando) y sin nombrar nada puntual, el rescate fuerza la tarjeta de categoria', async () => {
     await reiniciarLead({ atributosLead: { Genero: 'Hombre' } });
     const { llamar } = iaFalsa([{ content: 'Voy a revisar eso para vos.' }]);
     const salida = await generarRespuesta(agenteId, TELEFONO, [], 'mostrame zapatillas', undefined, { llamarInyectado: llamar });
 
-    assert.match(salida.respuesta, /opciones que tenemos|Alguna te interesa/i, 'fuera de cierre, sigue mostrando el catalogo como rescate');
+    assert.match(salida.respuesta, /zapatillas que tenemos/i, 'fuera de cierre, el rescate manda la tarjeta de categoria');
+    assert.equal(salida.fotos.length, 1, 'una sola imagen: la tarjeta de categoria');
   });
 });
 
