@@ -126,6 +126,25 @@ describe('generarRespuesta - nunca dice "no hay stock" si la busqueda real SI en
   });
 });
 
+describe('generarRespuesta - nunca manda el texto crudo de una tool call al cliente', () => {
+  // Bug real reportado con capturas: en la ultima vuelta (sin tools
+  // disponibles) el modelo escribio `mostrar_productos{"ids":[...]}` como
+  // texto plano, con nombres de producto en vez de IDs reales, y eso le
+  // llego tal cual al cliente por WhatsApp - ningun detector lo atajaba
+  // porque todos exigen candidatosActuales.length, y en este caso no habia.
+  test('si el modelo insiste con la sintaxis de tool call, el sistema no la deja pasar', async () => {
+    const llamarInyectado = async () => ({
+      content: '¡Perdón por eso! 🙈 Aquí te muestro algunas opciones de zapatillas que tenemos disponibles: mostrar_productos{"ids":["Zapatillas urbanas","Zapatillas para correr"]}',
+      tool_calls: [],
+    });
+
+    const salida = await generarRespuesta(agenteId, TELEFONO, [], 'Hola', undefined, { llamarInyectado });
+
+    assert.equal(salida.ok, true);
+    assert.doesNotMatch(salida.respuesta, /mostrar_productos\s*[{(]/, 'el cliente nunca debe ver la sintaxis de la funcion');
+  });
+});
+
 describe('generarRespuesta - nunca afirma "ya esta en tu carrito" si el carrito sigue vacio', () => {
   // Bug real con capturas: el cliente dijo "estoy viendo la Park St 2.0"
   // (solo mirando, sin talla/color) y el bot respondio "ya la tienes en tu

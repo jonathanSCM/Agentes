@@ -830,3 +830,23 @@ describe('pareceQuererCatalogoCompleto', () => {
     assert.equal(pareceQuererCatalogoCompleto('Además de la talla 42, ¿tienen la 43?'), false);
   });
 });
+
+// Bug real reportado con capturas: en la ultima vuelta (sin tools) el modelo
+// escribio "mostrar_productos{"ids":["Zapatillas urbanas"]}" como texto
+// plano en vez de llamar la funcion de verdad, y el cliente vio ese texto
+// crudo en WhatsApp.
+describe('pareceLlamadaDeHerramientaEnTexto', () => {
+  const { pareceLlamadaDeHerramientaEnTexto } = require('../lib/services/agente');
+
+  test('detecta el nombre de una tool seguido de argumentos', () => {
+    assert.equal(pareceLlamadaDeHerramientaEnTexto('Aquí van: mostrar_productos{"ids":["Zapatillas urbanas","Zapatillas para correr"]}'), true);
+    assert.equal(pareceLlamadaDeHerramientaEnTexto('mostrar_categorias({"foo":1})'), true);
+    assert.equal(pareceLlamadaDeHerramientaEnTexto('Te lo agrego: agregar_al_carrito{"idProducto":5}'), true);
+  });
+
+  test('no dispara con texto normal, aunque mencione el nombre suelto', () => {
+    assert.equal(pareceLlamadaDeHerramientaEnTexto('Te muestro las zapatillas que tenemos.'), false);
+    assert.equal(pareceLlamadaDeHerramientaEnTexto('¿Querés que te muestre productos?'), false);
+    assert.equal(pareceLlamadaDeHerramientaEnTexto(''), false);
+  });
+});
