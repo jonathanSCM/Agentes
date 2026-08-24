@@ -436,19 +436,13 @@ describe('tope duro de fotos por turno', () => {
 });
 
 describe('menu de categorias en dos niveles', () => {
-  test('"que vendes" devuelve los RUBROS, no las subcategorias ni un link', async () => {
+  test('"que vendes" devuelve los RUBROS, no las subcategorias ni un link (backend, sin llamar a la IA)', async () => {
     await reiniciarLead({ categoriaInteres: null, categoriaId: null });
-    const { llamar, recibido } = iaFalsa([
-      { tool_calls: [tool('mostrar_categorias', {})] },
-      { content: '¿Cual te interesa?' },
-    ]);
-    await generarRespuesta(agenteId, TELEFONO, [], 'cual es tu catalogo', undefined, { llamarInyectado: llamar });
+    const salida = await generarRespuesta(agenteId, TELEFONO, [], 'cual es tu catalogo', undefined, { llamarInyectado: async () => { throw new Error('no deberia llamarse a la IA'); } });
 
-    const r = recibido.toolResults[0];
-    assert.match(r, /TOOL_SUCCESS/);
-    assert.match(r, /Calzado/, 'tiene que listar el rubro');
-    assert.doesNotMatch(r, /Botas/, 'las subcategorias son del segundo nivel, no de este');
-    assert.doesNotMatch(r, /http/, 'nunca mas un link al catalogo web');
+    assert.match(salida.respuesta, /Calzado/, 'tiene que listar el rubro');
+    assert.doesNotMatch(salida.respuesta, /Botas/, 'las subcategorias son del segundo nivel, no de este');
+    assert.doesNotMatch(salida.respuesta, /http/, 'nunca mas un link al catalogo web');
   });
 
   test('elegido el rubro, el sistema NO muestra productos: ofrece los tipos', async () => {
@@ -591,6 +585,34 @@ describe('la tarjeta de categoria la manda el backend, sin preguntarle a la IA',
     assert.equal(salida.fotos.length, 1);
     assert.match(salida.fotos[0].caption, /Zapatilla 1/);
   });
+
+  // Bug real reportado por WhatsApp: "Hola" -> "que productos tienes?" ->
+  // "Hombre" -> el bot respondia "Parece que tuve un problema..." antes de
+  // mostrar el menu. Reproduce la conversacion completa, turno por turno,
+  // confirmando que nunca hace falta la IA para el camino feliz.
+  test('BUG real: Hola -> que productos tienes -> Hombre -> elegir categoria, sin ningun "tuve un problema"', async () => {
+    await prisma.agenteConfig.updateMany({ where: { agenteId }, data: { preguntasIniciales: ['Genero'] } });
+    await reiniciarLead({ categoriaInteres: null, categoriaId: null, atributosLead: {} });
+    const llamarQueNoDeberia = async () => { throw new Error('no deberia llamarse a la IA en este camino'); };
+
+    const r1 = await generarRespuesta(agenteId, TELEFONO, [], 'Hola', undefined, { llamarInyectado: llamarQueNoDeberia });
+    assert.doesNotMatch(r1.respuesta, /problema|confundi|error/i);
+
+    const h1 = [{ rol: 'CLIENTE', contenido: 'Hola' }, { rol: 'AGENTE', contenido: r1.respuesta }];
+    const r2 = await generarRespuesta(agenteId, TELEFONO, h1, 'que productos tienes?', undefined, { llamarInyectado: llamarQueNoDeberia });
+    assert.doesNotMatch(r2.respuesta, /problema|confundi|error/i);
+
+    // Con "Hombre" contestado, el fixture principal queda con UN SOLO rubro
+    // visible ("Zapatillas" - "Calzado" es todo de Mujer), asi que este
+    // mismo turno ya resuelve categoria + tarjeta (menu_rubro_unico_auto):
+    // no hace falta un turno extra eligiendo de una lista.
+    const h2 = [...h1, { rol: 'CLIENTE', contenido: 'que productos tienes?' }, { rol: 'AGENTE', contenido: r2.respuesta }];
+    const r3 = await generarRespuesta(agenteId, TELEFONO, h2, 'Hombre', undefined, { llamarInyectado: llamarQueNoDeberia });
+    assert.doesNotMatch(r3.respuesta, /problema|confundi|error/i);
+    assert.ok(r3.fotos.length > 0, 'la tarjeta de la categoria tiene que salir de verdad, no un texto vacio');
+
+    await prisma.agenteConfig.updateMany({ where: { agenteId }, data: { preguntasIniciales: [] } });
+  });
 });
 
 // Bug real reportado con capturas de WhatsApp: el cliente contesto el genero
@@ -607,15 +629,10 @@ describe('BUG - sin categoria elegida todavia, no se rompe intentando la tarjeta
   // mostrar_tarjeta_categoria) en vez del menu de varios rubros. Lo que se
   // verifica es lo que de verdad importa: NUNCA "no pude traerte las
   // opciones" sin haber mostrado nada, sea cual sea el camino.
-  test('mostrar_productos sin categoria elegida no termina en "no pude traerte las opciones"', async () => {
+  test('mostrar_productos sin categoria elegida no termina en "no pude traerte las opciones" (ahora resuelto por el backend, sin la IA)', async () => {
     await reiniciarLead({ categoriaInteres: null, categoriaId: null, atributosLead: { Genero: 'Hombre' } });
-    const { llamar, recibido } = iaFalsa([
-      { tool_calls: [tool('mostrar_productos', { idsProductos: [productos[0].id] })] },
-      { content: 'Aca tenes las opciones.' },
-    ]);
-    const salida = await generarRespuesta(agenteId, TELEFONO, [], 'Soy hombre', undefined, { llamarInyectado: llamar });
+    const salida = await generarRespuesta(agenteId, TELEFONO, [], 'Soy hombre', undefined, { llamarInyectado: async () => { throw new Error('no deberia llamarse a la IA'); } });
 
-    assert.match(recibido.toolResults[0], /TOOL_SUCCESS/);
     assert.doesNotMatch(salida.respuesta, /no pude traerte las opciones/i);
     assert.ok(salida.fotos.length > 0, 'algo real se le tiene que haber mostrado');
   });
@@ -642,16 +659,17 @@ describe('preguntas iniciales: nada se muestra hasta responderlas', () => {
     await prisma.agenteConfig.updateMany({ where: { agenteId }, data: { preguntasIniciales: [] } });
   });
 
-  test('ni siquiera el MENU de rubros sale antes de saber el genero', async () => {
+  // Comportamiento nuevo, pedido explicito del dueño: el menu de NOMBRES de
+  // categorias nunca depende de datos del cliente - eso solo importa para
+  // filtrar PRODUCTOS adentro de una categoria puntual (ver el siguiente
+  // test). Antes esto bloqueaba TAMBIEN el menu, lo cual dejaba al cliente
+  // sin poder ver ni que rubros existen hasta contestar una pregunta que no
+  // tenia nada que ver con eso.
+  test('el MENU de rubros SI sale sin saber el genero (backend, sin llamar a la IA)', async () => {
     await reiniciarLead({ categoriaInteres: null, categoriaId: null, atributosLead: {} });
-    const { llamar, recibido } = iaFalsa([
-      { tool_calls: [tool('mostrar_categorias', {})] },
-      { content: '¿Para hombre o para mujer?' },
-    ]);
-    await generarRespuesta(agenteId, TELEFONO, [], 'cual es tu catalogo', undefined, { llamarInyectado: llamar });
+    const salida = await generarRespuesta(agenteId, TELEFONO, [], 'cual es tu catalogo', undefined, { llamarInyectado: async () => { throw new Error('no deberia llamarse a la IA'); } });
 
-    assert.match(recibido.toolResults[0], /TODAVIA NO le muestres el menu/);
-    assert.match(recibido.toolResults[0], /Genero/);
+    assert.match(salida.respuesta, /Calzado|Zapatillas/);
   });
 
   test('tampoco productos, aunque el cliente nombre una categoria', async () => {
@@ -673,7 +691,7 @@ describe('preguntas iniciales: nada se muestra hasta responderlas', () => {
     await generarRespuesta(agenteId, TELEFONO, [], 'hola', undefined, { llamarInyectado: llamar });
 
     const system = recibido.systems[0];
-    assert.match(system, /TODAVIA NO PODES MOSTRAR NADA/);
+    assert.match(system, /TODAVIA NO PODES MOSTRAR PRODUCTOS/);
     assert.match(system, /preguntá UNA sola cosa/);
     assert.match(system, /NUNCA como un formulario/);
   });
