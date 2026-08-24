@@ -54,13 +54,18 @@
     function burbujaFoto(foto) {
       var d = document.createElement('div');
       d.className = 'msg out msg-foto';
-      var img = document.createElement('img');
-      img.src = foto.url;
-      img.alt = 'Foto del producto';
+      // Sin url (ninguna foto real disponible, ni de la tienda ni de sus
+      // productos): se muestra igual como texto, sin un <img> roto - mismo
+      // caso que en WhatsApp real manda solo texto cuando no hay foto.
+      if (foto.url) {
+        var img = document.createElement('img');
+        img.src = foto.url;
+        img.alt = 'Foto del producto';
+        d.appendChild(img);
+      }
       var cap = document.createElement('div');
       cap.className = 'msg-foto-caption';
       cap.textContent = foto.caption || '';
-      d.appendChild(img);
       d.appendChild(cap);
       body.appendChild(d);
       body.scrollTop = body.scrollHeight;

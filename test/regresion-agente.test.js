@@ -53,7 +53,12 @@ describe('generarRespuesta - anti-invento en errores (punto 9/10)', () => {
       throw new Error('Simulacion de falla del proveedor (rate limit, timeout, etc).');
     };
 
-    const salida = await generarRespuesta(agenteId, TELEFONO, [], 'Que productos tienen?', undefined, { llamarInyectado });
+    // Nombra el producto puntual a proposito: sin nombre puntual y sin
+    // categoria elegida, la regla de "el backend decide, no la IA" resuelve
+    // el turno entero en codigo (nunca llega a invocar al proveedor), asi
+    // que este test necesita el camino que SI la usa para poder simular la
+    // falla del proveedor.
+    const salida = await generarRespuesta(agenteId, TELEFONO, [], 'Tienen la Zapatilla de test?', undefined, { llamarInyectado });
 
     assert.equal(salida.ok, true);
     assert.equal(salida.error, true, 'debe marcarse explicitamente como error tecnico');
@@ -67,7 +72,10 @@ describe('generarRespuesta - anti-invento en errores (punto 9/10)', () => {
   test('cuando la IA responde normalmente (sin error), no lleva la marca de error', async () => {
     const llamarInyectado = async () => ({ content: 'Hola, en que te puedo ayudar?', tool_calls: [] });
 
-    const salida = await generarRespuesta(agenteId, TELEFONO, [], 'Hola', undefined, { llamarInyectado });
+    // Nombra el producto puntual, mismo motivo que el test anterior: sin eso
+    // el turno se resuelve entero en codigo (backend deterministico) y la
+    // IA inyectada nunca se llega a invocar.
+    const salida = await generarRespuesta(agenteId, TELEFONO, [], 'Tienen la Zapatilla de test?', undefined, { llamarInyectado });
 
     assert.equal(salida.ok, true);
     assert.equal(salida.error, undefined);

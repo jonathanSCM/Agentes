@@ -16,7 +16,7 @@
     <li><strong>Recomendado</strong>: lo pregunta si la conversación da pie, pero no bloquea la búsqueda.</li>
     <li><strong>Opcional</strong>: solo se usa para filtrar si el cliente lo menciona por su cuenta.</li>
   </ul>
-  <p>Los que marques como "de variante" (ej: Talla, Color) no bloquean guardar el producto en este panel, pero sí cuentan para lo que el agente pregunta.</p>
+  <p>Los que marques como "de variante" (ej: Talla, Color) <strong>nunca bloquean</strong>, aunque los pongas en Obligatorio: se asume que son detalles que el cliente ve y elige en la tarjeta (como la talla), no algo que frena la venta hasta saberlo. Si necesitás que un dato frene la venta (ej. Género), no lo marques como "de variante".</p>
 </div>
 
 <% if (mensaje) { %><div class="alert-ok"><%= mensaje %></div><% } %>
@@ -115,7 +115,7 @@
 <% if (categoria.atributos.length) { %>
   <div class="table-wrap">
     <table class="leads-table">
-      <thead><tr><th>Orden</th><th>Atributo</th><th>Nivel</th><th>Es de variante (talla/color)</th><th>Acciones</th></tr></thead>
+      <thead><tr><th>Orden</th><th>Atributo</th><th>Nivel</th><th>Es de variante (talla/color)</th><th>¿Bloquea la venta?</th><th>Acciones</th></tr></thead>
       <tbody>
         <% categoria.atributos.forEach(function (a) { %>
           <% var formAtr = 'editar-atributo-' + a.id; %>
@@ -123,13 +123,14 @@
             <td><input form="<%= formAtr %>" name="orden" type="number" value="<%= a.orden %>" style="width:60px;<%= inputStyle %>" /></td>
             <td><input form="<%= formAtr %>" name="nombre" type="text" value="<%= a.nombre %>" style="width:100%;min-width:160px;<%= inputStyle %>" /></td>
             <td>
-              <select form="<%= formAtr %>" name="nivel" style="<%= inputStyle %>">
+              <select form="<%= formAtr %>" name="nivel" class="js-nivel-bloqueo" data-badge="bloqueo-<%= a.id %>" style="<%= inputStyle %>">
                 <% ['OBLIGATORIO','RECOMENDADO','OPCIONAL'].forEach(function (n) { %>
                   <option value="<%= n %>" <%= a.nivel === n ? 'selected' : '' %>><%= n.charAt(0) + n.slice(1).toLowerCase() %></option>
                 <% }); %>
               </select>
             </td>
-            <td><input form="<%= formAtr %>" name="esDeVariante" type="checkbox" value="1" <%= a.esDeVariante ? 'checked' : '' %> /></td>
+            <td><input form="<%= formAtr %>" name="esDeVariante" type="checkbox" value="1" class="js-variante-bloqueo" data-badge="bloqueo-<%= a.id %>" <%= a.esDeVariante ? 'checked' : '' %> /></td>
+            <td><span id="bloqueo-<%= a.id %>" class="badge"></span></td>
             <td class="actions-cell">
               <button form="<%= formAtr %>" class="btn btn-ghost" style="padding:.3rem .7rem;font-size:.8rem" type="submit">Guardar</button>
               <form method="POST" action="/panel/categorias/<%= categoria.id %>/atributos/<%= a.id %>/eliminar" class="inline-form"
@@ -168,14 +169,53 @@
   </div>
   <div class="field" style="max-width:150px">
     <label>Nivel</label>
-    <select name="nivel">
+    <select name="nivel" class="js-nivel-bloqueo" data-badge="bloqueo-nuevo">
       <option value="OPCIONAL">Opcional</option>
       <option value="RECOMENDADO">Recomendado</option>
       <option value="OBLIGATORIO">Obligatorio</option>
     </select>
   </div>
-  <label style="margin:0 0 .6rem"><input type="checkbox" name="esDeVariante" value="1" /> Es de variante</label>
+  <label style="margin:0 0 .6rem"><input type="checkbox" name="esDeVariante" value="1" class="js-variante-bloqueo" data-badge="bloqueo-nuevo" /> Es de variante</label>
+  <span id="bloqueo-nuevo" class="badge" style="margin-bottom:.6rem"></span>
   <button class="btn btn-ghost" type="submit">+ Agregar atributo</button>
 </form>
+
+<script>
+  // Mismo criterio que usa el motor (agente.js: atributosFaltantes) y el
+  // backend al guardar un producto (server.js: atributosObligatoriosFaltantes):
+  // un atributo "de variante" NUNCA bloquea, ni siquiera en Obligatorio. Esto
+  // solo hace visible esa regla en el momento de configurarla - antes no
+  // habia ninguna señal y por eso un negocio real marco "Genero" como
+  // variante pensando que igual iba a frenar la venta.
+  (function () {
+    function actualizar(badgeId) {
+      var badge = document.getElementById(badgeId);
+      if (!badge) return;
+      var nivelSel = document.querySelector('.js-nivel-bloqueo[data-badge="' + badgeId + '"]');
+      var varianteChk = document.querySelector('.js-variante-bloqueo[data-badge="' + badgeId + '"]');
+      var esObligatorio = nivelSel && nivelSel.value === 'OBLIGATORIO';
+      var esVariante = varianteChk && varianteChk.checked;
+      badge.className = 'badge';
+      if (esObligatorio && !esVariante) {
+        badge.classList.add('badge-new');
+        badge.textContent = '🔒 Bloquea hasta saberlo';
+      } else if (esObligatorio && esVariante) {
+        badge.classList.add('badge-alerta');
+        badge.textContent = '⚠️ No bloquea (es de variante)';
+      } else {
+        badge.classList.add('badge-off');
+        badge.textContent = 'No bloquea';
+      }
+    }
+    var badgeIds = new Set();
+    document.querySelectorAll('[data-badge]').forEach(function (el) { badgeIds.add(el.getAttribute('data-badge')); });
+    badgeIds.forEach(function (id) {
+      actualizar(id);
+      document.querySelectorAll('[data-badge="' + id + '"]').forEach(function (el) {
+        el.addEventListener('change', function () { actualizar(id); });
+      });
+    });
+  })();
+</script>
 
 <%- include('partials/fin') %>

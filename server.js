@@ -1967,7 +1967,13 @@ async function atributosObligatoriosFaltantes(categoriaId, atributosProducto) {
   const obligatorios = await prisma.categoriaAtributo.findMany({
     where: { categoriaId: Number(categoriaId), nivel: 'OBLIGATORIO', esDeVariante: false },
   });
-  return obligatorios.filter((a) => !atributosProducto[a.nombre]).map((a) => a.nombre);
+  // Comparacion case-insensitive: bug real con datos reales, un producto
+  // quedo con "talla" en vez de "Talla" (distinto de lo configurado en la
+  // categoria) y la comparacion exacta lo dejo pasar como si estuviera
+  // completo. Las claves reales del formulario no cambian (se guardan tal
+  // cual las tipeo el usuario) - solo la comparacion ignora mayusculas.
+  const clavesCargadas = new Set(Object.keys(atributosProducto || {}).map((k) => k.toLowerCase()));
+  return obligatorios.filter((a) => !clavesCargadas.has(a.nombre.toLowerCase())).map((a) => a.nombre);
 }
 
 app.get('/panel/productos/nuevo', requireCliente, async (req, res, next) => {

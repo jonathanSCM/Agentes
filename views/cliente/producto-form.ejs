@@ -87,6 +87,25 @@
       (c.hijas || []).forEach(function (h) { acc[h.id] = obligatorios(h); });
       return acc;
     }, {})) %>;
+    // Nombres REALES de atributo configurados por categoria (todos, no solo
+    // los obligatorios) - se usan para llenar los <datalist> con la
+    // ortografia exacta que espera el motor, en vez de sugerencias
+    // genericas. Bug real: un producto quedo con "talla" en minuscula en
+    // vez de "Talla" y eso rompio el filtro para ese producto - sugerir el
+    // nombre exacto de la categoria reduce mucho esa clase de error (el
+    // campo sigue siendo texto libre, para no perder flexibilidad con
+    // atributos que no estan configurados en la categoria).
+    window.__categoriasAtributosNombres = <%- JSON.stringify(categorias.reduce(function (acc, c) {
+      var separar = function (cat) {
+        return {
+          producto: cat.atributos.filter(function (a) { return !a.esDeVariante; }).map(function (a) { return a.nombre; }),
+          variante: cat.atributos.filter(function (a) { return a.esDeVariante; }).map(function (a) { return a.nombre; }),
+        };
+      };
+      acc[c.id] = separar(c);
+      (c.hijas || []).forEach(function (h) { acc[h.id] = separar(h); });
+      return acc;
+    }, {})) %>;
   </script>
   <div class="field">
     <label for="caracteristicas">Características (separadas por coma)</label>
@@ -362,9 +381,36 @@
       ? 'Esta categoría requiere cargar estos atributos abajo: ' + obligatorios.join(', ') + '.'
       : '';
   }
+  // Rellena los <datalist> de sugerencias con los nombres REALES configurados
+  // en la categoria elegida (ortografia exacta), antes que la lista generica
+  // fija - asi el autocompletado ofrece "Talla"/"Genero" tal cual los espera
+  // el motor, en vez de que el usuario los tipee a mano y se equivoque
+  // (bug real: "talla" en minuscula rompio el filtro de un producto).
+  var GENERICOS_PRODUCTO = ['Marca', 'Material', 'Color', 'Modelo', 'Voltaje', 'Capacidad', 'Peso', 'Sabor', 'Potencia', 'Garantía'];
+  var GENERICOS_VARIANTE = ['Talla', 'Color', 'Modelo', 'Sabor', 'Presentación', 'Tamaño'];
+  function actualizarDatalist(id, nombresPropios, genericos) {
+    var dl = document.getElementById(id);
+    if (!dl) return;
+    var vistos = new Set();
+    var opciones = [];
+    (nombresPropios || []).concat(genericos).forEach(function (n) {
+      var clave = n.toLowerCase();
+      if (vistos.has(clave)) return;
+      vistos.add(clave);
+      opciones.push(n);
+    });
+    dl.innerHTML = opciones.map(function (n) { return '<option value="' + n.replace(/"/g, '&quot;') + '"></option>'; }).join('');
+  }
+  function actualizarDatalistsCategoria() {
+    var nombres = (window.__categoriasAtributosNombres || {})[selectCategoria && selectCategoria.value] || { producto: [], variante: [] };
+    actualizarDatalist('atributos-sugeridos', nombres.producto, GENERICOS_PRODUCTO);
+    actualizarDatalist('atributos-variante-sugeridos', nombres.variante, GENERICOS_VARIANTE);
+  }
   if (selectCategoria) {
     selectCategoria.addEventListener('change', actualizarHintCategoria);
+    selectCategoria.addEventListener('change', actualizarDatalistsCategoria);
     actualizarHintCategoria();
+    actualizarDatalistsCategoria();
   }
 })();
 </script>

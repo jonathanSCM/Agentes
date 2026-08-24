@@ -609,6 +609,32 @@ describe('la tarjeta de categoria la manda el backend, sin preguntarle a la IA',
     assert.match(salida.fotos[0].caption, /Zapatilla 1/);
   });
 
+  // Bug real detectado probando en vivo (chat de prueba del panel, sin
+  // WhatsApp real conectado): una categoria sin NINGUNA foto cargada (ni en
+  // la categoria, ni en ninguno de sus productos) hacia que el texto con
+  // precio/cantidad/link se perdiera entero - no entraba en ninguna de las
+  // ramas de envio de mostrar_tarjeta_categoria, y el bot igual confirmaba
+  // "TOOL_SUCCESS" y le decia al cliente "echale un vistazo" a algo que
+  // nunca le llego (ni imagen ni texto).
+  test('categoria SIN ninguna foto cargada: el texto con los datos reales no se pierde', async () => {
+    const catSinFotos = await prisma.categoria.create({ data: { empresaId, nombre: 'Gorras' } });
+    const prodSinFoto = await prisma.producto.create({
+      data: { empresaId, categoriaId: catSinFotos.id, nombre: 'Gorra clasica', precio: 80, stock: 5, fotos: [] },
+    });
+    try {
+      await reiniciarLead({ categoriaInteres: null, categoriaId: null, atributosLead: {} });
+      const salida = await generarRespuesta(agenteId, TELEFONO, [], 'quiero gorras', undefined, { llamarInyectado: async () => { throw new Error('no deberia llamarse a la IA'); } });
+
+      assert.equal(salida.fotos.length, 1, 'tiene que haber una entrada, aunque sea sin imagen, para no perder el texto');
+      assert.equal(salida.fotos[0].url, null);
+      assert.match(salida.fotos[0].caption, /Gorras/);
+      assert.match(salida.fotos[0].caption, /Bs 80/, 'el precio real no puede perderse');
+    } finally {
+      await prisma.producto.delete({ where: { id: prodSinFoto.id } });
+      await prisma.categoria.delete({ where: { id: catSinFotos.id } });
+    }
+  });
+
   // Bug real reportado por WhatsApp: "Hola" -> "que productos tienes?" ->
   // "Hombre" -> el bot respondia "Parece que tuve un problema..." antes de
   // mostrar el menu. Reproduce la conversacion completa, turno por turno,
