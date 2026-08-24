@@ -7,6 +7,15 @@ const fs = require('fs');
 // trabajo (ej. un launcher externo), dotenv no debe depender del cwd.
 require('dotenv').config({ path: path.join(__dirname, '.env') });
 
+// Todo el negocio opera en Bolivia (un solo huso horario, UTC-4, sin horario
+// de verano). Sin esto, el contenedor corre en UTC por defecto: las horas
+// que se muestran en el panel (conversaciones, pedidos) quedan corridas
+// varias horas, y los cortes de "hoy" para las estadisticas (inicioDeHoy)
+// tambien calculan el dia equivocado. Se puede overridear con la variable
+// de entorno TZ si hiciera falta (ej. para otro pais). Tiene que ir ANTES
+// de cualquier "new Date()"/"toLocaleString" de la app.
+process.env.TZ = process.env.TZ || 'America/La_Paz';
+
 // Esta validacion va ANTES de cualquier require de la app a proposito: si va
 // despues, el primer modulo que necesite una variable (lib/crypto.js) revienta
 // con su propio error y solo se entera de UNA variable por deploy fallido.
