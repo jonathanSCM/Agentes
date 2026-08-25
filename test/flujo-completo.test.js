@@ -1160,6 +1160,37 @@ describe('BUG - durante el cierre, el rescate de ultima vuelta no debe reabrir e
     assert.equal(carrito.length, 1, 'el carrito no debe tocarse solo por mostrarle otra categoria');
   });
 
+  // Bug real reportado por WhatsApp real: cliente agrego un jean al carrito,
+  // dijo "Quiero ver tambien camisas" (camisas es un RUBRO con subcategorias
+  // en el fixture: "Calzado" -> Botas/Sandalias) y el bot le repitio el MENU
+  // COMPLETO de rubros en vez de listar los tipos - porque mostrar_tarjeta_categoria
+  // le falla a un rubro sin productos propios, y el codigo caia al respaldo
+  // equivocado. Insistio con "camisas" a secas y el bot salto directo a
+  // "¿me confirmas tu nombre?", ignorando la pregunta.
+  test('si pide un RUBRO con subcategorias durante el cierre, se le listan los tipos - no el menu completo ni la pregunta de cierre', async () => {
+    await reiniciarLead({ atributosLead: { Genero: 'Hombre' }, estadoConversacion: 'DATOS_DE_PEDIDO' });
+    await agregarAlCarrito([{ idProducto: productos[0].id, idVariante: productos[0].variantes[0].id, cantidad: 1, precio: productos[0].precio }]);
+
+    const { llamar } = iaFalsa([{ content: 'Voy a revisar eso para vos.' }]);
+    const salida = await generarRespuesta(agenteId, TELEFONO, [], 'Quiero ver tambien calzado', undefined, { llamarInyectado: llamar });
+
+    assert.doesNotMatch(salida.respuesta, /confirmas que esta todo bien|ya tengo todo listo|nombre para el pedido/i);
+    assert.doesNotMatch(salida.respuesta, /1\. Zapatillas/i, 'no debe repetir el menu completo de rubros');
+    assert.match(salida.respuesta, /Botas/i, 'debe listar los tipos DENTRO del rubro pedido');
+    assert.match(salida.respuesta, /Sandalias/i);
+  });
+
+  test('lo mismo funciona con el nombre de categoria pelado, sin "quiero ver" adelante', async () => {
+    await reiniciarLead({ atributosLead: { Genero: 'Hombre' }, estadoConversacion: 'DATOS_DE_PEDIDO' });
+    await agregarAlCarrito([{ idProducto: productos[0].id, idVariante: productos[0].variantes[0].id, cantidad: 1, precio: productos[0].precio }]);
+
+    const { llamar } = iaFalsa([{ content: 'Voy a revisar eso para vos.' }]);
+    const salida = await generarRespuesta(agenteId, TELEFONO, [], 'calzado', undefined, { llamarInyectado: llamar });
+
+    assert.doesNotMatch(salida.respuesta, /nombre para el pedido/i, 'no debe saltar a pedir el nombre ignorando lo que el cliente pidio');
+    assert.match(salida.respuesta, /Botas/i);
+  });
+
   // Bug real reportado con capturas de WhatsApp: cliente agrego un producto
   // al carrito, dijo "No nada mas" (queria pasar al cierre) y el bot
   // respondio "Parece que hubo un inconveniente al enviar las opciones de
