@@ -1052,6 +1052,60 @@ describe('BUG - durante el cierre, el rescate de ultima vuelta no debe reabrir e
     assert.doesNotMatch(recibido.systems.at(-1) || '', /TODAVIA NO PODES MOSTRAR PRODUCTOS/, 'seccionProductos no deberia bloquear durante el cierre');
   });
 
+  // Bug real reportado con capturas de WhatsApp: en pleno cierre (carrito con
+  // algo), el cliente pedia explicitamente ver otra cosa ("quiero ver
+  // camisas para hombre", "no puedo ver otra categoria?", "quiero seguir
+  // mirando que tienes") y el bot repetia SIEMPRE la misma pregunta de
+  // cierre ("¿confirmas que esta todo bien?"), sin importar la respuesta -
+  // el cliente quedaba sin forma de seguir mirando el catalogo.
+  test('si el cliente pide explicitamente ver otra cosa durante el cierre, se le muestra en vez de repetir la pregunta de cierre', async () => {
+    await reiniciarLead({ atributosLead: { Genero: 'Hombre' }, estadoConversacion: 'DATOS_DE_PEDIDO' });
+    await agregarAlCarrito([{ idProducto: productos[0].id, idVariante: productos[0].variantes[0].id, cantidad: 1, precio: productos[0].precio }]);
+
+    // Mismo texto vago que el test de arriba (dispara pareceAnuncioDeBusqueda
+    // en las 3 vueltas) - lo que cambia es el mensaje del cliente.
+    const { llamar } = iaFalsa([{ content: 'Voy a revisar eso para vos.' }]);
+    const salida = await generarRespuesta(agenteId, TELEFONO, [], 'Quiero seguir mirando que tienes en la tienda', undefined, { llamarInyectado: llamar });
+
+    assert.doesNotMatch(salida.respuesta, /confirmas que esta todo bien|ya tengo todo listo/i, 'no debe repetir la pregunta de cierre cuando el cliente pidio explicitamente ver otra cosa');
+    // El lead ya tenia "Zapatillas" fijada (reiniciarLead): sin nombrar una
+    // categoria nueva en este mensaje, se le vuelve a mostrar ESA (util
+    // igual, no rompe el contexto) en vez del menu de rubros - lo que
+    // importa para este test es que muestre algo real, nunca la pregunta de
+    // cierre generica.
+    assert.match(salida.respuesta, /Echale un vistazo a zapatillas|Esto es lo que tenemos/i, 'debe mostrar algo real para navegar');
+  });
+
+  test('si ya vio la tarjeta de su categoria y pide seguir mirando sin nombrar otra, se le manda el menu de rubros', async () => {
+    await reiniciarLead({
+      atributosLead: { Genero: 'Hombre' },
+      estadoConversacion: 'DATOS_DE_PEDIDO',
+      contexto: { tarjetasCategoriaMostradas: [categoriaId] },
+    });
+    await agregarAlCarrito([{ idProducto: productos[0].id, idVariante: productos[0].variantes[0].id, cantidad: 1, precio: productos[0].precio }]);
+
+    const { llamar } = iaFalsa([{ content: 'Voy a revisar eso para vos.' }]);
+    const salida = await generarRespuesta(agenteId, TELEFONO, [], 'Quiero seguir mirando que tienes en la tienda', undefined, { llamarInyectado: llamar });
+
+    assert.doesNotMatch(salida.respuesta, /confirmas que esta todo bien|ya tengo todo listo/i);
+    assert.match(salida.respuesta, /Esto es lo que tenemos/i, 'ya vio esa tarjeta: cae al menu real de rubros');
+  });
+
+  test('si el cliente nombra una categoria puntual durante el cierre, se le manda la tarjeta de ESA categoria sin perder el carrito', async () => {
+    await reiniciarLead({ atributosLead: { Genero: 'Hombre' }, estadoConversacion: 'DATOS_DE_PEDIDO' });
+    await agregarAlCarrito([{ idProducto: productos[0].id, idVariante: productos[0].variantes[0].id, cantidad: 1, precio: productos[0].precio }]);
+
+    const { llamar } = iaFalsa([{ content: 'Voy a revisar eso para vos.' }]);
+    const salida = await generarRespuesta(agenteId, TELEFONO, [], 'Quiero ver botas', undefined, { llamarInyectado: llamar });
+
+    assert.doesNotMatch(salida.respuesta, /confirmas que esta todo bien|ya tengo todo listo/i);
+    assert.match(salida.respuesta, /botas/i, 'debe mostrar la tarjeta de la categoria pedida, no la que ya estaba en el lead');
+
+    const cliente = await prisma.clienteFinal.findFirst({ where: { telefono: TELEFONO } });
+    const carrito = (cliente.contexto && cliente.contexto.carrito && cliente.contexto.carrito.items) || [];
+    assert.equal(carrito.length, 1, 'el carrito no debe tocarse solo por mostrarle otra categoria');
+  });
+
   // ACTUALIZADO (regla del negocio): fuera de cierre, sin producto puntual
   // nombrado, el rescate YA NO fuerza mostrar_productos - fuerza la tarjeta
   // de categoria (Fix C), consistente con que nunca se manden tarjetas de

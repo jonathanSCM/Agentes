@@ -20,10 +20,27 @@ before(async () => {
   await prisma.clienteFinal.deleteMany({ where: { telefono: TELEFONO } });
   await prisma.empresa.deleteMany({ where: { slug: SLUG } });
 
+  // Se reusa el plan real "PRO" ya sembrado (prisma/seed.js) en vez de crear
+  // uno nuevo: modeloParaPlan matchea por el codigo EXACTO "PRO" para elegir
+  // gpt-4o (el modelo caro) en vez de caer directo en el economico - sin
+  // esto no hay forma de probar el reintento por rate limit (el fallback y
+  // el modelo original serian el mismo). El codigo es unico en la tabla, asi
+  // que crear uno propio con el mismo codigo rompe el seed.
+  const planPro = await prisma.plan.findUnique({ where: { codigo: 'PRO' } });
+
   const empresa = await prisma.empresa.create({
     data: {
       nombre: 'Empresa de Test',
       slug: SLUG,
+      suscripcion: planPro
+        ? {
+            create: {
+              planId: planPro.id,
+              estado: 'ACTIVA',
+              periodoFin: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+            },
+          }
+        : undefined,
       agentes: {
         create: [
           { nombre: 'Agente de test', estado: 'ACTIVO', config: { create: {} } },
@@ -85,6 +102,54 @@ describe('generarRespuesta - anti-invento en errores (punto 9/10)', () => {
   test('agente inexistente no rompe, responde con ok:false controlado', async () => {
     const salida = await generarRespuesta(999999999, TELEFONO, [], 'Hola', undefined, {});
     assert.equal(salida.ok, false);
+  });
+
+  test('si el proveedor devuelve 429 (rate limit), reintenta UNA vez con el modelo economico en vez de fallar el turno', async () => {
+    let llamadas = 0;
+    let modeloDelReintento = null;
+    const llamarInyectado = async ({ modelo }) => {
+      llamadas += 1;
+      if (llamadas === 1) {
+        // Simula exactamente el error real visto en produccion hoy: dos
+        // conversaciones simultaneas saturaron el limite de tokens/minuto
+        // de gpt-4o (429), y el cliente se quedaba sin respuesta.
+        const err = new Error('Rate limit reached for gpt-4o on tokens per min (TPM)');
+        err.status = 429;
+        throw err;
+      }
+      if (llamadas === 2) modeloDelReintento = modelo;
+      // Texto neutro a proposito: no debe disparar ninguno de los
+      // detectores de "texto vago" (no nombra un producto, no lista nada,
+      // no es una pregunta) para que el turno cierre en UNA sola vuelta y
+      // el test pueda contar las llamadas con precision.
+      return { content: 'Listo, avisame si necesitas algo mas.', tool_calls: [] };
+    };
+
+    const salida = await generarRespuesta(agenteId, TELEFONO, [], 'Tienen la Zapatilla de test?', undefined, { llamarInyectado });
+
+    assert.equal(llamadas, 2, 'debio reintentar exactamente una vez, sin gastar una vuelta extra del loop');
+    // El reintento debe llegar con el modelo economico, no con el mismo que
+    // acaba de fallar por saturacion.
+    assert.equal(modeloDelReintento, 'gpt-4o-mini');
+    assert.equal(salida.ok, true);
+    assert.equal(salida.error, undefined, 'el turno no debe marcarse como error tecnico: el reintento salvo la respuesta');
+    assert.equal(salida.respuesta, 'Listo, avisame si necesitas algo mas.');
+  });
+
+  test('si el proveedor devuelve un error que NO es 429, no reintenta y responde el error tecnico honesto', async () => {
+    let llamadas = 0;
+    const llamarInyectado = async () => {
+      llamadas += 1;
+      const err = new Error('Servicio no disponible');
+      err.status = 500;
+      throw err;
+    };
+
+    const salida = await generarRespuesta(agenteId, TELEFONO, [], 'Tienen la Zapatilla de test?', undefined, { llamarInyectado });
+
+    assert.equal(llamadas, 1, 'un error que no es de rate limit no debe reintentarse');
+    assert.equal(salida.error, true);
+    assert.match(salida.respuesta, /no pude consultar/i);
   });
 });
 
