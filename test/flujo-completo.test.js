@@ -1191,6 +1191,25 @@ describe('BUG - durante el cierre, el rescate de ultima vuelta no debe reabrir e
     assert.match(salida.respuesta, /Botas/i);
   });
 
+  // Bug real reportado por WhatsApp real (segunda vez, con logs): el
+  // cliente ya habia visto los tipos de "Zapatillas" (correr/urbanas), tenia
+  // un producto en el carrito, y pidio EXPLICITAMENTE salir de esa categoria
+  // ("que mas tienes ya vi zapatillas", "otras categorias?"). El fix
+  // anterior (rubro-con-subcategorias) seguia mirando la categoria YA
+  // FIJADA en el lead y le repetia "1. correr 2. urbanas" sin parar - nunca
+  // lo dejaba salir. Debe mostrar el menu COMPLETO de rubros, no las
+  // subcategorias de la categoria vieja.
+  test('si pide EXPLICITAMENTE otras categorias (no las de dentro del rubro actual), muestra el menu completo, no repite las subcategorias viejas', async () => {
+    await reiniciarLead({ atributosLead: { Genero: 'Hombre' }, categoriaInteres: 'Calzado', categoriaId: rubro.id, estadoConversacion: 'INTENCION_DE_COMPRA' });
+    await agregarAlCarrito([{ idProducto: productos[0].id, idVariante: productos[0].variantes[0].id, cantidad: 1, precio: productos[0].precio }]);
+
+    const { llamar } = iaFalsa([{ content: 'Voy a revisar eso para vos.' }]);
+    const salida = await generarRespuesta(agenteId, TELEFONO, [], 'Que mas tienes ya vi botas', undefined, { llamarInyectado: llamar });
+
+    assert.doesNotMatch(salida.respuesta, /1\. Botas\s*\n\s*2\. Sandalias/i, 'no debe repetir las subcategorias de la categoria ya vista');
+    assert.match(salida.respuesta, /Zapatillas/i, 'debe mostrar el menu completo de rubros para que pueda salir de Calzado');
+  });
+
   // Bug real reportado con capturas de WhatsApp: cliente agrego un producto
   // al carrito, dijo "No nada mas" (queria pasar al cierre) y el bot
   // respondio "Parece que hubo un inconveniente al enviar las opciones de
