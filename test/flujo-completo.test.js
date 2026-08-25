@@ -1106,6 +1106,24 @@ describe('BUG - durante el cierre, el rescate de ultima vuelta no debe reabrir e
     assert.equal(carrito.length, 1, 'el carrito no debe tocarse solo por mostrarle otra categoria');
   });
 
+  // Bug real reportado con capturas de WhatsApp: cliente agrego un producto
+  // al carrito, dijo "No nada mas" (queria pasar al cierre) y el bot
+  // respondio "Parece que hubo un inconveniente al enviar las opciones de
+  // los joggers. ¿Te parece si intento mandartelas de nuevo?" - un fallo
+  // tecnico que nunca ocurrio (no se llamo a ninguna tool ese turno, y el
+  // cliente ni siquiera habia pedido ver mas opciones).
+  test('si el modelo inventa un fallo tecnico que nunca ocurrio, no se le manda esa excusa al cliente', async () => {
+    await reiniciarLead({ atributosLead: { Genero: 'Hombre' }, estadoConversacion: 'DATOS_DE_PEDIDO' });
+    await agregarAlCarrito([{ idProducto: productos[0].id, idVariante: productos[0].variantes[0].id, cantidad: 1, precio: productos[0].precio }]);
+
+    const { llamar } = iaFalsa([{
+      content: 'Parece que hubo un inconveniente al enviar las opciones de los joggers. ¿Te parece si intento mandártelas de nuevo?',
+    }]);
+    const salida = await generarRespuesta(agenteId, TELEFONO, [], 'No nada mas', undefined, { llamarInyectado: llamar });
+
+    assert.doesNotMatch(salida.respuesta, /inconveniente|hubo un problema|intento mandartelas/i, 'no debe inventar un fallo tecnico que nunca paso');
+  });
+
   // ACTUALIZADO (regla del negocio): fuera de cierre, sin producto puntual
   // nombrado, el rescate YA NO fuerza mostrar_productos - fuerza la tarjeta
   // de categoria (Fix C), consistente con que nunca se manden tarjetas de
