@@ -1209,6 +1209,41 @@ describe('BUG - durante el cierre, el rescate de ultima vuelta no debe reabrir e
     assert.doesNotMatch(salida.respuesta, /inconveniente|hubo un problema|intento mandartelas/i, 'no debe inventar un fallo tecnico que nunca paso');
   });
 
+  // Segunda vez que este mismo tipo de bug aparecio en vivo, con OTRA
+  // redaccion que el regex anterior no cubria: "¡Perdon por el
+  // inconveniente, parece que no se envio la informacion de las camisas!"
+  // (no dice "hubo un inconveniente" ni "parece que hubo").
+  test('reconoce otra redaccion real del mismo fallo inventado ("perdon por el inconveniente... no se envio")', async () => {
+    await reiniciarLead({ atributosLead: { Genero: 'Hombre' }, estadoConversacion: 'DATOS_DE_PEDIDO' });
+    await agregarAlCarrito([{ idProducto: productos[0].id, idVariante: productos[0].variantes[0].id, cantidad: 1, precio: productos[0].precio }]);
+
+    const { llamar } = iaFalsa([{
+      content: '¡Perdón por el inconveniente, parece que no se envió la información de las camisas! ¿Te gustaría que intente enviarte las opciones de nuevo?',
+    }]);
+    const salida = await generarRespuesta(agenteId, TELEFONO, [], 'Jonathan Campos', undefined, { llamarInyectado: llamar });
+
+    assert.doesNotMatch(salida.respuesta, /inconveniente|no se envio|perdon/i, 'no debe inventar un fallo tecnico que nunca paso');
+  });
+
+  // Bug real reportado por WhatsApp real: con el pedido ya creado, el
+  // cliente pregunto "¿en cuanto tiempo me llegara?" y el bot contesto
+  // "entre 2 a 3 dias habiles" - un dato que no existe en ningun lado del
+  // sistema (no hay ningun campo de tiempo de entrega en el schema).
+  test('no inventa un plazo de entrega: no hay ningun dato real de eso en el sistema', async () => {
+    await reiniciarLead({
+      atributosLead: { Genero: 'Hombre' }, estadoConversacion: 'PEDIDO_COMPLETADO',
+      nombre: 'Jonathan Campos', formaPago: 'EFECTIVO', tipoEntrega: 'DOMICILIO',
+      direccionEntrega: 'https://maps.app.goo.gl/dKW6ue86pc53L7bbA', ubicacionLat: -17.767619, ubicacionLng: -63.181035,
+    });
+
+    const { llamar } = iaFalsa([{
+      content: 'La entrega a domicilio suele tardar entre 2 a 3 días hábiles, dependiendo de tu ubicación.',
+    }]);
+    const salida = await generarRespuesta(agenteId, TELEFONO, [], 'En cuanto tiempo me llegara?', undefined, { llamarInyectado: llamar });
+
+    assert.doesNotMatch(salida.respuesta, /\d+\s*a\s*\d+\s*dias|dias habiles/i, 'no debe inventar un plazo de entrega concreto');
+  });
+
   // ACTUALIZADO (regla del negocio): fuera de cierre, sin producto puntual
   // nombrado, el rescate YA NO fuerza mostrar_productos - fuerza la tarjeta
   // de categoria (Fix C), consistente con que nunca se manden tarjetas de
