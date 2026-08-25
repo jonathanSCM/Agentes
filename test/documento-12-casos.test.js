@@ -708,7 +708,7 @@ describe('BUG - "blancas" no matcheaba con "blanco"', () => {
 // Pedidos del dueño: que tras un rato sin hablar el bot no diga "ya te lo
 // mostre", y que nunca nombre un producto sin mandar su tarjeta.
 describe('reenvio de tarjetas y "aqui esta" sin tarjeta', () => {
-  const { contextoReiniciadoPorInactividad, nombraUnProductoReal } = require('../lib/services/agente');
+  const { contextoReiniciadoPorInactividad, nombraUnProductoReal, mencionaModeloInventado } = require('../lib/services/agente');
 
   test('tras 15 minutos de silencio se olvida lo mostrado', () => {
     const hace15 = new Date(Date.now() - 15 * 60 * 1000).toISOString();
@@ -745,6 +745,36 @@ describe('reenvio de tarjetas y "aqui esta" sin tarjeta', () => {
     const candidatos = [producto({ id: 1, nombre: 'Zapatillas Park St 2.0' })];
     assert.equal(nombraUnProductoReal('Quiero ver la Park St 2.0', candidatos), 'Zapatillas Park St 2.0');
     assert.equal(nombraUnProductoReal('¿Tienen la Deportivo Negro en talla XL?', [producto({ id: 2, nombre: 'Jogger Deportivo Negro' })]), 'Jogger Deportivo Negro');
+  });
+
+  // Bug real probando en vivo, verificado contra la base: el cliente eligio
+  // "Zapatillas urbanas" y el bot respondio "tenemos modelos como *Zapatillas
+  // Urbanas Flex* o *Zapatillas CityWalk*" - NINGUNO de los dos existe en el
+  // catalogo (los reales eran Park St 2.0, Superstar 80 ADV, Drop Step low
+  // 2.0, TEKKIRA CUP). El modelo se inventa "ejemplos" en vez de mostrar el
+  // bloque de resultados real.
+  test('detecta un modelo inventado como "ejemplo" que no existe en el catalogo', () => {
+    const candidatos = [
+      producto({ id: 1, nombre: 'Zapatillas Park St 2.0' }),
+      producto({ id: 2, nombre: 'Zapatillas Superstar 80 ADV' }),
+    ];
+    assert.equal(
+      mencionaModeloInventado('Por ejemplo, tenemos modelos como "Zapatillas Urbanas Flex" o "Zapatillas CityWalk".', candidatos),
+      'Zapatillas Urbanas Flex',
+    );
+    assert.equal(
+      mencionaModeloInventado('Genial, tenemos en zapatillas urbanas modelos como *Zapatillas Urbanas Flex*, ¿te interesa alguna en particular?', candidatos),
+      'Zapatillas Urbanas Flex',
+    );
+  });
+
+  test('no marca invencion cuando el "ejemplo" es un producto real del catalogo', () => {
+    const candidatos = [producto({ id: 1, nombre: 'Zapatillas Park St 2.0' })];
+    assert.equal(
+      mencionaModeloInventado('Por ejemplo, tenemos modelos como *Zapatillas Park St 2.0*.', candidatos),
+      null,
+    );
+    assert.equal(mencionaModeloInventado('¿Para hombre o para mujer?', candidatos), null);
   });
 });
 
