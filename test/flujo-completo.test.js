@@ -191,6 +191,31 @@ describe('gate real: primero entender, despues mostrar', () => {
   });
 });
 
+// Bug real probando en vivo: el cliente ya habia mandado un link de Maps
+// invalido para el sistema, se le pidio uno nuevo, mando uno bueno (bare,
+// sin ninguna otra palabra) y el modelo NO llamo a actualizar_datos_lead
+// para guardarlo - direccionEntrega se quedo pegada en el link viejo, y
+// confirmar_pedido rechazaba el pedido en bucle sin que hubiera forma real
+// de salir de ahi, sin importar cuantos links buenos mandara despues.
+describe('BUG - un link de Maps nuevo se guarda aunque la IA no llame a actualizar_datos_lead', () => {
+  test('el link se persiste deterministicamente en direccionEntrega', async () => {
+    await reiniciarLead({
+      atributosLead: { Genero: 'Hombre' },
+      nombre: 'Cesar Prueba', formaPago: 'EFECTIVO', tipoEntrega: 'DOMICILIO',
+      direccionEntrega: 'https://maps.google.com/?q=-17.78,-63.18', // el link "invalido" de antes
+      ubicacionLat: null, ubicacionLng: null,
+    });
+
+    // La IA falsa simula EXACTAMENTE el bug real: no llama a ninguna tool,
+    // solo se disculpa de nuevo - como si no hubiera "visto" el link nuevo.
+    const { llamar } = iaFalsa([{ content: 'Perdon, ¿podrias reenviar tu ubicacion?' }]);
+    await generarRespuesta(agenteId, TELEFONO, [], 'https://maps.app.goo.gl/dKW6ue86pc53L7bbA', undefined, { llamarInyectado: llamar });
+
+    const cliente = await prisma.clienteFinal.findFirst({ where: { telefono: TELEFONO } });
+    assert.equal(cliente.direccionEntrega, 'https://maps.app.goo.gl/dKW6ue86pc53L7bbA', 'el link nuevo se guarda solo, sin depender de que la IA llame a la tool');
+  });
+});
+
 describe('paginacion real contra la base', () => {
   test('ver_mas_productos trae las que faltan y despues avisa que no hay mas', async () => {
     await reiniciarLead({ atributosLead: { Genero: 'Hombre' } });
@@ -531,6 +556,35 @@ describe('menu de categorias en dos niveles', () => {
     const salida = await generarRespuesta(agenteId, TELEFONO, [], 'mostrame', undefined, { llamarInyectado: llamar });
     assert.match(recibido.toolResults[0], /TOOL_SUCCESS/);
     assert.ok(salida.fotos.length > 0, 'sin subcategorias no hay paso intermedio');
+  });
+});
+
+// Bug real probando en vivo: el chat de prueba del panel ("Probar mi
+// agente") usa un telefono sintetico, nunca uno real. Si la empresa YA tenia
+// WhatsApp conectado de verdad, las tools intentaban un envio real contra
+// ese telefono falso - nunca llegaba nada a fotosParaMostrar, asi que el
+// chat de prueba jamas mostraba imagenes para ninguna empresa con WhatsApp
+// ya conectado (el caso mas comun entre clientes reales de la plataforma).
+describe('BUG - el chat de prueba no debe intentar un envio real aunque WhatsApp este conectado', () => {
+  before(async () => {
+    await prisma.conexionWhatsApp.deleteMany({ where: { agenteId } });
+    await prisma.conexionWhatsApp.create({ data: { agenteId, estado: 'CONECTADO' } });
+  });
+  after(async () => {
+    await prisma.conexionWhatsApp.deleteMany({ where: { agenteId } });
+  });
+
+  test('con modoPrueba, la tarjeta se manda por fotosParaMostrar, nunca por un envio real', async () => {
+    await reiniciarLead({ atributosLead: { Genero: 'Hombre' } });
+    // Sin llamarInyectado invocado en absoluto para esta tarjeta: el bloque
+    // preemptivo (backend, no la IA) la manda directo. Si el codigo
+    // intentara un envio real contra la conexion CONECTADA de arriba, esta
+    // llamada de red real fallaria o colgaria el test - que pase rapido y
+    // con fotos reales confirma que modoPrueba evito ese camino.
+    const salida = await generarRespuesta(agenteId, TELEFONO, [], 'quiero zapatillas', undefined, { modoPrueba: true });
+
+    assert.equal(salida.fotos.length, 1, 'la tarjeta de categoria debe llegar por fotosParaMostrar');
+    assert.ok(salida.fotos[0].url, 'con conexion CONECTADA pero modoPrueba, la imagen sigue siendo la real del producto');
   });
 });
 

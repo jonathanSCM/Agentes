@@ -2671,6 +2671,13 @@ app.post('/panel/agente/mensaje', requireCliente, requireRol('OWNER', 'ADMIN'), 
       telefonoCliente: String(telefono || 'demo').slice(0, 40),
       contenido: String(mensaje).slice(0, 1000),
       baseUrl: `${req.protocol}://${req.get('host')}`,
+      // Este endpoint es EXCLUSIVO del chat de prueba del panel (telefono
+      // sintetico, nunca un numero real - ver comentario de atenderMensaje
+      // en lib/services/conversaciones.js). Bug real: si la empresa ya tenia
+      // WhatsApp conectado de verdad, las tools intentaban un envio real
+      // contra ese telefono falso - ninguna foto llegaba a fotosParaMostrar
+      // y el chat de prueba nunca mostraba imagenes.
+      modoPrueba: true,
     });
 
     // Revisa si hay que avisar (plan por acabar / sin saldo). No bloquea la respuesta.

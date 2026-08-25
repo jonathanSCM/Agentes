@@ -23,6 +23,19 @@ describe('extraerUrlDeMaps', () => {
   test('no confunde un link de otra pagina con uno de Maps', () => {
     assert.equal(extraerUrlDeMaps('mirá esto https://www.instagram.com/algo'), null);
   });
+
+  // Bug real probando en vivo: "maps.google.com" (sin "www", sin "/maps" en
+  // la ruta - dominio de toda la vida, distinto de "google.com/maps") no
+  // matcheaba ningun patron. El cliente mandaba el link, el bot le seguia
+  // preguntando el nombre como si lo hubiera aceptado, y recien en
+  // confirmar_pedido le avisaba que "la ubicacion no es valida" - confuso,
+  // porque el bot ya habia avanzado varios mensajes despues.
+  test('reconoce "maps.google.com" (dominio distinto de "google.com/maps")', () => {
+    assert.equal(
+      extraerUrlDeMaps('https://maps.google.com/?q=-17.783327,-63.182140'),
+      'https://maps.google.com/?q=-17.783327,-63.182140'
+    );
+  });
 });
 
 describe('extraerCoordenadas', () => {
@@ -58,6 +71,11 @@ describe('resolverCoordenadas', () => {
   test('un link largo con coordenadas ya visibles se resuelve sin red', async () => {
     const r = await resolverCoordenadas('https://www.google.com/maps/@-17.783,-63.182,15z');
     assert.deepEqual(r, { lat: -17.783, lng: -63.182 });
+  });
+
+  test('un link de "maps.google.com" con ?q= se resuelve sin red', async () => {
+    const r = await resolverCoordenadas('https://maps.google.com/?q=-17.783327,-63.182140');
+    assert.deepEqual(r, { lat: -17.783327, lng: -63.18214 });
   });
 
   test('un link acortado que no existe nunca revienta, devuelve null', async () => {

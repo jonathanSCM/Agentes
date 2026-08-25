@@ -734,6 +734,18 @@ describe('reenvio de tarjetas y "aqui esta" sin tarjeta', () => {
     assert.equal(nombraUnProductoReal('En este momento tenemos las Zapatillas Park St 2.0 disponibles.', candidatos), 'Zapatillas Park St 2.0');
     assert.equal(nombraUnProductoReal('¿Para hombre o para mujer?', candidatos), null);
   });
+
+  // Bug real probando en vivo: el cliente escribio "Quiero ver la Park St
+  // 2.0" (sin la palabra "Zapatillas" que encabeza el nombre real del
+  // producto) y el bot no lo reconocio - le pregunto "¿algun modelo en
+  // particular?" en vez de mandarle la tarjeta del producto que acababa de
+  // nombrar con toda claridad. Un cliente real casi nunca repite la palabra
+  // del rubro al pedir un modelo puntual.
+  test('reconoce el producto aunque el cliente omita la palabra del rubro al pedirlo', () => {
+    const candidatos = [producto({ id: 1, nombre: 'Zapatillas Park St 2.0' })];
+    assert.equal(nombraUnProductoReal('Quiero ver la Park St 2.0', candidatos), 'Zapatillas Park St 2.0');
+    assert.equal(nombraUnProductoReal('¿Tienen la Deportivo Negro en talla XL?', [producto({ id: 2, nombre: 'Jogger Deportivo Negro' })]), 'Jogger Deportivo Negro');
+  });
 });
 
 // Bug reportado por el dueño del negocio en una charla real con el bot: el

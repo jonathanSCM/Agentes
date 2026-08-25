@@ -313,6 +313,23 @@ describe('extraerFiltros', () => {
     const cambios = extraerFiltros('Voy a ver que tienen', productos);
     assert.equal(cambios.talla, undefined);
   });
+
+  // Bug real probando en vivo: el cliente mando un link de Google Maps
+  // valido despues de que uno anterior fallara, y el modelo no volvio a
+  // llamar actualizar_datos_lead - direccionEntrega se quedo pegada en el
+  // link viejo para siempre, y confirmar_pedido rechazaba el pedido en
+  // bucle. Se guarda deterministicamente, igual que la talla arriba.
+  test('detecta un link de Google Maps de forma deterministica (bug real: la IA a veces no lo vuelve a guardar)', () => {
+    const productos = [producto({ categoria: 'Calzado' })];
+    const cambios = extraerFiltros('https://maps.app.goo.gl/dKW6ue86pc53L7bbA', productos);
+    assert.equal(cambios.direccionEntrega, 'https://maps.app.goo.gl/dKW6ue86pc53L7bbA');
+  });
+
+  test('sin ningun link de Maps en el texto, no toca direccionEntrega', () => {
+    const productos = [producto({ categoria: 'Calzado' })];
+    const cambios = extraerFiltros('Mi direccion es Av Siempre Viva 123', productos);
+    assert.equal(cambios.direccionEntrega, undefined);
+  });
 });
 
 describe('resolverSeleccionMenu', () => {
