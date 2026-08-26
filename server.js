@@ -1203,13 +1203,21 @@ app.get('/panel/pedidos', requireCliente, async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-// Avisa por WhatsApp que el pedido fue confirmado, SOLO si el cliente
-// escribio hace menos de 24hs (fuera de esa ventana, Meta no deja mandar
-// texto libre, solo plantillas aprobadas - eso no esta implementado aca).
-// Si algo falla (sin conexion, fuera de ventana, error de red) simplemente
-// no se notifica - el cambio de estado ya se guardo igual, esto es un extra.
-async function notificarConfirmacionPedido(empresaId, pedido) {
+// Avisa por WhatsApp que el pedido cambio de estado (confirmado / entregado /
+// cancelado), SOLO si el cliente escribio hace menos de 24hs (fuera de esa
+// ventana, Meta no deja mandar texto libre, solo plantillas aprobadas - eso
+// no esta implementado aca). Si algo falla (sin conexion, fuera de ventana,
+// error de red) simplemente no se notifica - el cambio de estado ya se guardo
+// igual, esto es un extra.
+const TEXTOS_CAMBIO_DE_ESTADO = {
+  CONFIRMADO: '¡Tu pedido fue confirmado! ✅ Ya lo estamos preparando y coordinando la entrega. Cualquier duda, escribinos por acá.',
+  ENTREGADO: '¡Tu pedido fue entregado! 📦 Esperamos que lo disfrutes. Cualquier duda o problema con lo que recibiste, escribinos por acá.',
+  CANCELADO: 'Tu pedido fue cancelado. Si tenes alguna duda o queres volver a hacerlo, escribinos por acá.',
+};
+async function notificarCambioDeEstadoPedido(empresaId, pedido, estadoNuevo) {
   try {
+    const texto = TEXTOS_CAMBIO_DE_ESTADO[estadoNuevo];
+    if (!texto) return false; // estado sin mensaje definido, no hay nada que avisar
     if (!pedido.clienteId) return false;
     const cliente = await prisma.clienteFinal.findUnique({ where: { id: pedido.clienteId } });
     if (!cliente) return false;
@@ -1223,7 +1231,6 @@ async function notificarConfirmacionPedido(empresaId, pedido) {
     });
     if (!conversacion || !dentroDeVentana24h(conversacion.ultimoMensajeAt)) return false;
 
-    const texto = '¡Tu pedido fue confirmado! ✅ Ya lo estamos preparando y coordinando la entrega. Cualquier duda, escribinos por acá.';
     await wa.enviarTexto(agente.conexion, cliente.telefono, texto);
 
     const mensajeGuardado = await prisma.mensaje.create({
@@ -1234,7 +1241,7 @@ async function notificarConfirmacionPedido(empresaId, pedido) {
     });
     return true;
   } catch (err) {
-    console.error('No se pudo notificar la confirmacion del pedido por WhatsApp:', err);
+    console.error('No se pudo notificar el cambio de estado del pedido por WhatsApp:', err);
     return false;
   }
 }
@@ -1275,9 +1282,11 @@ app.post('/panel/pedidos/:id/estado', requireCliente, async (req, res, next) => 
     });
 
     let mensajeOk = 'Pedido actualizado.';
-    if (estadoNuevo === 'CONFIRMADO') {
-      const notificado = await notificarConfirmacionPedido(empresaId, pedido);
-      mensajeOk = notificado ? 'Pedido confirmado y cliente avisado por WhatsApp.' : 'Pedido confirmado (no se pudo avisar por WhatsApp: sin conexión o fuera de la ventana de 24hs).';
+    if (TEXTOS_CAMBIO_DE_ESTADO[estadoNuevo]) {
+      const ETIQUETAS_ESTADO = { CONFIRMADO: 'confirmado', ENTREGADO: 'marcado como entregado', CANCELADO: 'cancelado' };
+      const notificado = await notificarCambioDeEstadoPedido(empresaId, pedido, estadoNuevo);
+      const etiqueta = ETIQUETAS_ESTADO[estadoNuevo];
+      mensajeOk = notificado ? `Pedido ${etiqueta} y cliente avisado por WhatsApp.` : `Pedido ${etiqueta} (no se pudo avisar por WhatsApp: sin conexión o fuera de la ventana de 24hs).`;
     }
 
     res.redirect(`${volverA}?ok=` + encodeURIComponent(mensajeOk));
@@ -2790,6 +2799,11 @@ app.post('/webhooks/whatsapp', (req, res) => {
       }
       if (conexion.agente.estado !== 'ACTIVO') return;
 
+      // Marca "leido" + "escribiendo..." antes de procesar - es un extra de
+      // UX (el cliente ve que el mensaje llego mientras se arma la
+      // respuesta), nunca debe frenar el procesamiento real si falla.
+      wa.marcarLeidoYEscribiendo(conexion, mensaje.id).catch(() => {});
+
       const telefonoCliente = mensaje.from;
       const baseUrl = `${req.protocol}://${req.get('host')}`;
       await prisma.conexionWhatsApp.update({ where: { id: conexion.id }, data: { ultimoMensajeAt: new Date() } });
@@ -2822,7 +2836,14 @@ app.post('/webhooks/whatsapp', (req, res) => {
       encolarRespuesta(`${conexion.agente.id}:${telefonoCliente}`, async () => {
         const salida = await generarYRegistrarRespuesta(conexion.agente.id, telefonoCliente, entrada.conversacionId, texto, baseUrl);
         if (salida.ok && salida.respuesta) {
-          const envio = await wa.enviarTexto(conexion, telefonoCliente, salida.respuesta);
+          // Si el backend armo botones reales para esta respuesta (ver el
+          // bloque preemptivo de forma de pago en agente.js), se manda como
+          // mensaje interactivo en vez de texto plano - el cliente toca en
+          // vez de tipear, y el ID que vuelve ya es el que espera el resto
+          // del flujo (interpretarMensajeEntrante mas abajo).
+          const envio = (salida.botones && salida.botones.length)
+            ? await wa.enviarBotones(conexion, telefonoCliente, salida.respuesta, salida.botones)
+            : await wa.enviarTexto(conexion, telefonoCliente, salida.respuesta);
           if (!envio.ok) {
             console.error(`--- webhook: fallo el envio por WhatsApp a ${telefonoCliente} (agente ${conexion.agente.id}): ${envio.error}`);
           }

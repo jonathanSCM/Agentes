@@ -260,6 +260,206 @@ describe('Plan A - toolChoice "requerido" quita la opcion de improvisar', () => 
   });
 });
 
+describe('Backstop de frustracion: escalada a asesor por turnos sin avanzar de estado', () => {
+  test('con el contador ya en el umbral, se fuerza derivar_a_asesor (tools filtradas + toolChoice requerido)', async () => {
+    // 7 guardado + 1 que suma este turno (mismo estado que el guardado) = 8: justo el umbral.
+    await reiniciarLead({
+      atributosLead: { Genero: 'Hombre' },
+      estadoConversacion: 'EXPLORANDO',
+      contexto: { estadoConversacionAnterior: 'EXPLORANDO', turnosSinAvanzarEstado: 7 },
+    });
+    let toolsVistos; let toolChoiceVisto;
+    const llamar = async ({ tools, toolChoice }) => {
+      if (!toolsVistos) { toolsVistos = tools; toolChoiceVisto = toolChoice; }
+      return { content: 'Perfecto, voy a derivarte con un asesor.', tool_calls: [tool('derivar_a_asesor', { tipo: 'problema_no_resuelto' })] };
+    };
+    await generarRespuesta(agenteId, TELEFONO, [], 'sigo sin entender', undefined, { llamarInyectado: llamar });
+
+    assert.equal(toolChoiceVisto, 'requerido');
+    const nombres = toolsVistos.map((t) => t.function.name);
+    assert.deepEqual(nombres, ['derivar_a_asesor'], 'con el umbral alcanzado, la unica tool ofrecida debe ser derivar_a_asesor');
+  });
+
+  test('por debajo del umbral, no se fuerza nada (comportamiento normal)', async () => {
+    await reiniciarLead({
+      atributosLead: { Genero: 'Hombre' },
+      estadoConversacion: 'EXPLORANDO',
+      contexto: { estadoConversacionAnterior: 'EXPLORANDO', turnosSinAvanzarEstado: 1 },
+    });
+    let toolsVistos;
+    const llamar = async ({ tools }) => {
+      if (!toolsVistos) toolsVistos = tools;
+      return { content: 'Aca esta.', tool_calls: [] };
+    };
+    // Nombra un producto puntual: sin el backstop, esto ya deja toolChoice en "auto".
+    await generarRespuesta(agenteId, TELEFONO, [], 'tenes la Zapatilla 1?', undefined, { llamarInyectado: llamar });
+
+    const nombres = toolsVistos.map((t) => t.function.name);
+    assert.ok(nombres.includes('mostrar_productos'), 'las tools normales siguen disponibles, no se filtro a derivar_a_asesor');
+  });
+
+  test('si ya se derivo antes (estadoLead DERIVADO_A_ASESOR), no se vuelve a forzar aunque el contador siga alto', async () => {
+    await reiniciarLead({
+      atributosLead: { Genero: 'Hombre' },
+      estadoConversacion: 'EXPLORANDO',
+      estadoLead: 'DERIVADO_A_ASESOR',
+      contexto: { estadoConversacionAnterior: 'EXPLORANDO', turnosSinAvanzarEstado: 10 },
+    });
+    let toolChoiceVisto;
+    const llamar = async ({ toolChoice }) => {
+      if (!toolChoiceVisto) toolChoiceVisto = toolChoice;
+      return { content: '', tool_calls: [tool('mostrar_tarjeta_categoria', {})] };
+    };
+    await generarRespuesta(agenteId, TELEFONO, [], 'que tienes', undefined, { llamarInyectado: llamar });
+
+    // Este mensaje SI cumple las condiciones de soloAccionValida (Plan A), asi
+    // que "requerido" viene de ESE gate, no del backstop de frustracion -
+    // lo importante aca es que no se filtraron las tools a solo derivar_a_asesor.
+    assert.equal(toolChoiceVisto, 'requerido');
+  });
+
+  test('el contador persiste y se acumula entre mensajes separados de la misma conversacion', async () => {
+    await reiniciarLead({ atributosLead: { Genero: 'Hombre' }, estadoConversacion: 'EXPLORANDO' });
+    const llamarSinAvanzar = async () => ({ content: 'Dale, contame mas.', tool_calls: [] });
+
+    await generarRespuesta(agenteId, TELEFONO, [], 'hola', undefined, { llamarInyectado: llamarSinAvanzar });
+    let cliente = await prisma.clienteFinal.findFirst({ where: { telefono: TELEFONO } });
+    assert.equal(cliente.contexto.estadoConversacionAnterior, 'EXPLORANDO');
+    assert.equal(cliente.contexto.turnosSinAvanzarEstado, 0, 'primer turno: no habia nada guardado todavia, arranca en 0');
+
+    await generarRespuesta(agenteId, TELEFONO, [], 'segundo mensaje, sigo sin decidirme', undefined, { llamarInyectado: llamarSinAvanzar });
+    cliente = await prisma.clienteFinal.findFirst({ where: { telefono: TELEFONO } });
+    assert.equal(cliente.contexto.turnosSinAvanzarEstado, 1, 'segundo turno sin cambiar de estado: el contador sube a 1');
+  });
+
+  test('un cliente navegando categorias distintas seguidas NO acumula el contador (no esta trabado, esta mirando)', async () => {
+    // estadoConversacion se queda en EXPLORANDO en los 3 mensajes (navegar el
+    // catalogo no mueve el estado) - sin el chequeo de cambio de categoria,
+    // esto solo con estadoConversacion hubiera sumado 1, 2 y 3.
+    await reiniciarLead({ estadoConversacion: 'EXPLORANDO' });
+    const llamar = async () => ({ content: 'Mira, esto es lo que tenemos.', tool_calls: [] });
+
+    await generarRespuesta(agenteId, TELEFONO, [], 'que tienes en botas', undefined, { llamarInyectado: llamar });
+    let cliente = await prisma.clienteFinal.findFirst({ where: { telefono: TELEFONO } });
+    assert.equal(cliente.contexto.turnosSinAvanzarEstado, 0);
+
+    await generarRespuesta(agenteId, TELEFONO, [], 'y en sandalias?', undefined, { llamarInyectado: llamar });
+    cliente = await prisma.clienteFinal.findFirst({ where: { telefono: TELEFONO } });
+    assert.equal(cliente.contexto.turnosSinAvanzarEstado, 0, 'cambio de categoria: cuenta como progreso, el contador no debe subir');
+
+    await generarRespuesta(agenteId, TELEFONO, [], 'y zapatillas tienen?', undefined, { llamarInyectado: llamar });
+    cliente = await prisma.clienteFinal.findFirst({ where: { telefono: TELEFONO } });
+    assert.equal(cliente.contexto.turnosSinAvanzarEstado, 0, 'otro cambio de categoria mas: sigue en 0');
+  });
+});
+
+// Idea tomada de un bot de citas (DentalFlow): con el carrito vacio,
+// confirmar_pedido/crear_pedido no tienen NADA que confirmar ni crear - se
+// sacan del array de tools que se le manda al proveedor, en vez de confiar
+// solo en el prompt. La IA no puede llamar una funcion que ni le llego.
+describe('tools dinamicas: confirmar_pedido/crear_pedido solo existen con carrito activo', () => {
+  test('carrito vacio: no se le ofrecen confirmar_pedido ni crear_pedido', async () => {
+    await reiniciarLead({ atributosLead: { Genero: 'Hombre' } });
+    let toolsVistos;
+    const llamar = async ({ tools }) => {
+      if (!toolsVistos) toolsVistos = tools;
+      return { content: '', tool_calls: [tool('mostrar_tarjeta_categoria', {})] };
+    };
+    await generarRespuesta(agenteId, TELEFONO, [], 'que tienes', undefined, { llamarInyectado: llamar });
+
+    const nombres = toolsVistos.map((t) => t.function.name);
+    assert.ok(!nombres.includes('confirmar_pedido'), 'no deberia poder llamar confirmar_pedido sin nada en el carrito');
+    assert.ok(!nombres.includes('crear_pedido'), 'no deberia poder llamar crear_pedido sin nada en el carrito');
+    assert.ok(nombres.includes('mostrar_productos'), 'el resto de las tools sigue disponible');
+  });
+
+  test('con algo en el carrito, confirmar_pedido y crear_pedido vuelven a estar disponibles', async () => {
+    await reiniciarLead({ atributosLead: { Genero: 'Hombre' }, estadoConversacion: 'DATOS_DE_PEDIDO' });
+    await agregarAlCarrito([{ idProducto: productos[0].id, idVariante: productos[0].variantes[0].id, cantidad: 1, precio: productos[0].precio }]);
+    let toolsVistos;
+    const llamar = async ({ tools }) => {
+      if (!toolsVistos) toolsVistos = tools;
+      return { content: '¿Cómo preferís pagar?', tool_calls: [] };
+    };
+    await generarRespuesta(agenteId, TELEFONO, [], 'quiero pagar', undefined, { llamarInyectado: llamar });
+
+    const nombres = toolsVistos.map((t) => t.function.name);
+    assert.ok(nombres.includes('confirmar_pedido'));
+    assert.ok(nombres.includes('crear_pedido'));
+  });
+});
+
+describe('botones interactivos de forma de pago (pre-emptivo, sin pasar por la IA)', () => {
+  test('con nombre, entrega y ubicacion ya resueltos, y 2+ metodos habilitados, se mandan botones sin llamar a la IA', async () => {
+    await prisma.agenteConfig.update({ where: { agenteId }, data: { aceptaQr: true, aceptaEfectivo: true } });
+    await reiniciarLead({
+      nombre: 'Jonathan Campos',
+      tipoEntrega: 'DOMICILIO',
+      ubicacionLat: -17.78,
+      ubicacionLng: -63.18,
+      estadoConversacion: 'DATOS_DE_PEDIDO',
+    });
+    await agregarAlCarrito([{ idProducto: productos[0].id, idVariante: productos[0].variantes[0].id, cantidad: 1, precio: productos[0].precio }]);
+
+    const salida = await generarRespuesta(agenteId, TELEFONO, [], 'como pago?', undefined, { llamarInyectado: async () => { throw new Error('no deberia llamarse a la IA'); } });
+
+    assert.ok(salida.botones, 'deberia venir con botones');
+    assert.deepEqual(salida.botones.map((b) => b.id), ['QR', 'EFECTIVO']);
+    await prisma.agenteConfig.update({ where: { agenteId }, data: { aceptaQr: false, aceptaEfectivo: true } });
+  });
+
+  test('con un solo metodo de pago habilitado, no manda botones (cae al flujo normal con la IA)', async () => {
+    // Fixture por defecto: solo aceptaEfectivo=true (ver before() del archivo).
+    await reiniciarLead({
+      nombre: 'Jonathan Campos',
+      tipoEntrega: 'DOMICILIO',
+      ubicacionLat: -17.78,
+      ubicacionLng: -63.18,
+      estadoConversacion: 'DATOS_DE_PEDIDO',
+    });
+    await agregarAlCarrito([{ idProducto: productos[0].id, idVariante: productos[0].variantes[0].id, cantidad: 1, precio: productos[0].precio }]);
+
+    const llamar = async () => ({ content: '¿Cómo preferís pagar? Aceptamos efectivo.', tool_calls: [] });
+    const salida = await generarRespuesta(agenteId, TELEFONO, [], 'como pago?', undefined, { llamarInyectado: llamar });
+
+    assert.ok(!salida.botones, 'con un solo metodo no hay nada que "elegir" con botones');
+  });
+
+  test('sin nombre valido todavia, no se adelanta a preguntar la forma de pago', async () => {
+    await prisma.agenteConfig.update({ where: { agenteId }, data: { aceptaQr: true } });
+    await reiniciarLead({
+      tipoEntrega: 'DOMICILIO',
+      ubicacionLat: -17.78,
+      ubicacionLng: -63.18,
+      estadoConversacion: 'DATOS_DE_PEDIDO',
+    });
+    await agregarAlCarrito([{ idProducto: productos[0].id, idVariante: productos[0].variantes[0].id, cantidad: 1, precio: productos[0].precio }]);
+
+    const llamar = async () => ({ content: '¿Cual es tu nombre?', tool_calls: [] });
+    const salida = await generarRespuesta(agenteId, TELEFONO, [], 'hola', undefined, { llamarInyectado: llamar });
+
+    assert.ok(!salida.botones, 'sin nombre todavia, el gate de botones debe autoexcluirse');
+    await prisma.agenteConfig.update({ where: { agenteId }, data: { aceptaQr: false } });
+  });
+
+  test('entrega a domicilio sin coordenadas resueltas todavia, no se adelanta (la resolucion sigue siendo trabajo del handler)', async () => {
+    await prisma.agenteConfig.update({ where: { agenteId }, data: { aceptaQr: true } });
+    await reiniciarLead({
+      nombre: 'Jonathan Campos',
+      tipoEntrega: 'DOMICILIO',
+      direccionEntrega: 'Av. Ballivian 1234',
+      estadoConversacion: 'DATOS_DE_PEDIDO',
+    });
+    await agregarAlCarrito([{ idProducto: productos[0].id, idVariante: productos[0].variantes[0].id, cantidad: 1, precio: productos[0].precio }]);
+
+    const llamar = async () => ({ content: 'Necesito tu ubicacion real, no una direccion escrita.', tool_calls: [] });
+    const salida = await generarRespuesta(agenteId, TELEFONO, [], 'ahi te paso mi direccion', undefined, { llamarInyectado: llamar });
+
+    assert.ok(!salida.botones, 'sin coordenadas resueltas todavia, no hay que preguntar forma de pago');
+    await prisma.agenteConfig.update({ where: { agenteId }, data: { aceptaQr: false } });
+  });
+});
+
 describe('paginacion real contra la base', () => {
   test('ver_mas_productos trae las que faltan y despues avisa que no hay mas', async () => {
     await reiniciarLead({ atributosLead: { Genero: 'Hombre' } });
