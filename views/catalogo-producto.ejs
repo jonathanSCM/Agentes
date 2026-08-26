@@ -83,7 +83,7 @@
   /* ---------- Info del producto ---------- */
   .marca-badge{display:inline-block;font-size:.76rem;font-weight:700;letter-spacing:.03em;text-transform:uppercase;color:var(--tenue);background:var(--panel);border:1px solid var(--borde);padding:4px 11px;border-radius:999px;margin-bottom:12px;}
   h1{font-size:1.9rem;font-weight:800;letter-spacing:-.02em;line-height:1.15;margin-bottom:14px;}
-  .stock{font-size:.8rem;padding:4px 12px;border-radius:999px;background:var(--stock-bg);color:var(--tenue);display:inline-block;width:fit-content;font-weight:600;}
+  .stock{font-size:.8rem;padding:4px 12px;border-radius:999px;background:var(--stock-bg);color:var(--tenue);display:inline-block;width:fit-content;font-weight:600;margin-top:18px;}
   .stock.bajo{background:var(--stock-bajo-bg);color:var(--stock-bajo-color);}
   .stock.agotado{background:var(--stock-agotado-bg);color:var(--stock-agotado-color);}
 
@@ -191,16 +191,6 @@
 
         <% var variantes = producto.variantes || []; %>
         <% var stockBase = variantes.length ? variantes.reduce(function(s,v){return s+v.stock}, 0) : producto.stock; %>
-        <span class="stock <%= stockBase === 0 ? 'agotado' : (stockBase <= 5 ? 'bajo' : '') %>">
-          <%= stockBase === 0 ? 'Agotado' : (stockBase <= 5 ? 'Últimas unidades' : 'Disponible') %>
-        </span>
-
-        <% if (producto.descripcion) { %>
-          <div class="seccion-descripcion">
-            <h3>Descripción</h3>
-            <p class="descripcion"><%= producto.descripcion %></p>
-          </div>
-        <% } %>
 
         <div class="compra-card">
           <p class="precio" id="precio-mostrado"><%= simboloCatalogo %> <%= Number(producto.precio).toFixed(2) %></p>
@@ -241,6 +231,17 @@
             <% } %>
           <% } %>
         </div>
+
+        <span class="stock <%= stockBase === 0 ? 'agotado' : (stockBase <= 5 ? 'bajo' : '') %>">
+          <%= stockBase === 0 ? 'Agotado' : (stockBase <= 5 ? 'Últimas unidades' : 'Disponible') %>
+        </span>
+
+        <% if (producto.descripcion) { %>
+          <div class="seccion-descripcion">
+            <h3>Descripción</h3>
+            <p class="descripcion"><%= producto.descripcion %></p>
+          </div>
+        <% } %>
       </div>
     </div>
 

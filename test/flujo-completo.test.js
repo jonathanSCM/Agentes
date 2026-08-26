@@ -543,6 +543,25 @@ describe('cierre del pedido: confirmacion obligatoria', () => {
     assert.equal(await prisma.pedido.count({ where: { empresaId } }), 0, 'no se creo ningun pedido');
   });
 
+  // Bug real reportado: nada impedia que el modelo llamara confirmar_pedido
+  // y crear_pedido SEGUIDOS, dentro del mismo turno/mensaje del cliente - el
+  // pedido terminaba "confirmado" sin que el cliente hubiera visto nunca el
+  // resumen como un mensaje propio suyo para poder leerlo y contestar.
+  test('BUG - confirmar_pedido y crear_pedido en el MISMO turno: crear_pedido se rechaza igual', async () => {
+    const variante = await prisma.variante.findFirst({ where: { productoId: productos[0].id } });
+    await agregarAlCarrito([{ idProducto: productos[0].id, idVariante: variante.id, cantidad: 1, precio: productos[0].precio }]);
+    const { llamar, recibido } = iaFalsa([
+      { tool_calls: [tool('confirmar_pedido', {})] },
+      { tool_calls: [tool('crear_pedido', {})] },
+      { content: 'Listo.' },
+    ]);
+    await generarRespuesta(agenteId, TELEFONO, [], 'dale, cerremos ya', undefined, { llamarInyectado: llamar });
+
+    assert.match(recibido.toolResults[0], /Resumen REAL del pedido/, 'confirmar_pedido si arma el resumen');
+    assert.match(recibido.toolResults[1], /TODAVIA NO crees el pedido en este mismo turno/, 'crear_pedido en el MISMO turno se rechaza, aunque los items coincidan exacto');
+    assert.equal(await prisma.pedido.count({ where: { empresaId } }), 0, 'no se creo nada: el cliente todavia no tuvo turno para contestar');
+  });
+
   test('confirmar_pedido arma el resumen real con precio y moneda de la base', async () => {
     const variante = await prisma.variante.findFirst({ where: { productoId: productos[0].id } });
     await agregarAlCarrito([{ idProducto: productos[0].id, idVariante: variante.id, cantidad: 2, precio: productos[0].precio }]);
@@ -586,12 +605,18 @@ describe('cierre del pedido: confirmacion obligatoria', () => {
     const variante = await prisma.variante.findFirst({ where: { productoId: productos[1].id }, orderBy: { id: 'asc' } });
     const stockAntes = variante.stock;
     await agregarAlCarrito([{ idProducto: productos[1].id, idVariante: variante.id, cantidad: 2, precio: productos[1].precio }]);
+    // Con conversacionId real y cada mensaje del cliente persistido antes de
+    // generarRespuesta (igual que en produccion): asi el contador de turno
+    // distingue estos dos pasos como turnos DISTINTOS, no el mismo.
+    const conv = await prisma.conversacion.create({ data: { agenteId, telefonoCliente: TELEFONO, ultimoMensajeAt: new Date() } });
 
+    await prisma.mensaje.create({ data: { conversacionId: conv.id, rol: 'CLIENTE', contenido: 'quiero 2' } });
     const paso1 = iaFalsa([{ tool_calls: [tool('confirmar_pedido', {})] }, { content: '¿Esta todo bien?' }]);
-    await generarRespuesta(agenteId, TELEFONO, [], 'quiero 2', undefined, { llamarInyectado: paso1.llamar });
+    await generarRespuesta(agenteId, TELEFONO, [], 'quiero 2', conv.id, { llamarInyectado: paso1.llamar });
 
+    await prisma.mensaje.create({ data: { conversacionId: conv.id, rol: 'CLIENTE', contenido: 'si, esta todo bien' } });
     const paso2 = iaFalsa([{ tool_calls: [tool('crear_pedido', {})] }, { content: 'Listo, pedido tomado.' }]);
-    await generarRespuesta(agenteId, TELEFONO, [], 'si, esta todo bien', undefined, { llamarInyectado: paso2.llamar });
+    await generarRespuesta(agenteId, TELEFONO, [], 'si, esta todo bien', conv.id, { llamarInyectado: paso2.llamar });
 
     assert.match(paso2.recibido.toolResults[0], /TOOL_SUCCESS: pedido #\d+ creado/);
 
@@ -606,6 +631,69 @@ describe('cierre del pedido: confirmacion obligatoria', () => {
 
     const lead = await prisma.clienteFinal.findFirst({ where: { telefono: TELEFONO } });
     assert.equal(lead.estadoConversacion, 'PEDIDO_COMPLETADO', 'usa un estado del enum nuevo');
+  });
+
+  // Bug real reportado por WhatsApp: el cliente ya habia visto el resumen y
+  // contesto "si, todo" - pero la IA fallo las 3 vueltas sin llamar a
+  // crear_pedido (a veces repitiendo confirmar_pedido, a veces con texto de
+  // mas) y el sistema le volvia a preguntar "¿confirmas que esta todo bien?"
+  // como si el cliente no hubiera dicho nada, obligandolo a contestar "si"
+  // dos o tres veces para lo mismo.
+  test('BUG - si el resumen YA se habia confirmado antes y la IA falla las 3 vueltas sin actuar, se crea el pedido igual (no se repite la pregunta)', async () => {
+    const variante = await prisma.variante.findFirst({ where: { productoId: productos[0].id } });
+    await agregarAlCarrito([{ idProducto: productos[0].id, idVariante: variante.id, cantidad: 1, precio: productos[0].precio }]);
+
+    // Simula que confirmar_pedido ya corrio en un turno anterior: mismo
+    // formato de firma que arma el handler real (productoId:varianteId:cantidad).
+    const cliente = await prisma.clienteFinal.findFirst({ where: { telefono: TELEFONO } });
+    await prisma.clienteFinal.update({
+      where: { id: cliente.id },
+      data: { contexto: { ...(cliente.contexto || {}), resumenConfirmado: `${productos[0].id}:${variante.id}:1` } },
+    });
+
+    // La IA nunca llama a ninguna tool en las 3 vueltas: siempre el mismo
+    // anuncio de accion vago (mismo texto que ya usa otro test de esta suite
+    // para forzar el colapso de la ultima vuelta - "voy a revisar" dispara
+    // el detector de anuncioDeBusqueda en las 3 vueltas).
+    const antes = await prisma.pedido.count({ where: { empresaId } });
+    const { llamar } = iaFalsa([{ content: 'Voy a revisar eso para vos.' }]);
+    const salida = await generarRespuesta(agenteId, TELEFONO, [], 'si, todo', undefined, { llamarInyectado: llamar });
+
+    assert.doesNotMatch(salida.respuesta, /confirmás que está todo bien/i, 'no debe repetir la pregunta de confirmacion');
+    assert.equal(await prisma.pedido.count({ where: { empresaId } }), antes + 1, 'el pedido se crea igual, por codigo, en vez de volver a preguntar');
+  });
+
+  // Contraparte: si el resumen NUNCA se confirmo de verdad (resumenConfirmado
+  // no coincide con el carrito actual), el mismo camino NO debe crear nada -
+  // sigue preguntando como siempre. Esto es lo que evita que el fix de
+  // arriba cree un pedido por una lectura equivocada del mensaje.
+  // Bug real reportado por WhatsApp: el cliente dio su nombre, la IA fallo
+  // las 3 vueltas sin relayar el resumen (a veces por rechazo de un
+  // detector, a veces por texto de mas), y el sistema le mostraba una
+  // pregunta VACIA ("¿confirmas que esta todo bien?") sin decir nunca que
+  // productos, precios ni total se estaban confirmando. El resumen con
+  // datos reales tiene que ser obligatorio antes de pedir confirmacion.
+  test('BUG - sin resumenConfirmado coincidente, se MUESTRA el resumen real (items+precios+total) en vez de una pregunta vacia', async () => {
+    const variante = await prisma.variante.findFirst({ where: { productoId: productos[0].id } });
+    await agregarAlCarrito([{ idProducto: productos[0].id, idVariante: variante.id, cantidad: 1, precio: productos[0].precio }]);
+    // Sin tocar resumenConfirmado: sigue null (nunca se confirmo este pedido).
+
+    const antes = await prisma.pedido.count({ where: { empresaId } });
+    const { llamar } = iaFalsa([{ content: 'Voy a revisar eso para vos.' }]);
+    const salida = await generarRespuesta(agenteId, TELEFONO, [], 'hola', undefined, { llamarInyectado: llamar });
+
+    assert.match(salida.respuesta, /Zapatilla 1/, 'tiene que nombrar el producto real, no una pregunta vacia');
+    assert.match(salida.respuesta, /Bs 301\.00/, 'tiene que mostrar el precio real');
+    assert.match(salida.respuesta, /Total: Bs 301\.00/, 'tiene que mostrar el total real');
+    assert.match(salida.respuesta, /confirmás que está todo bien/i);
+    assert.equal(await prisma.pedido.count({ where: { empresaId } }), antes, 'mostrar el resumen no crea el pedido - falta la respuesta del cliente');
+
+    // El resumen recien mostrado en ESTE turno no habilita crear_pedido en
+    // el turno siguiente si se responde inmediato dentro del mismo mensaje -
+    // pero SI en un mensaje realmente posterior (ver el describe de arriba,
+    // "resumen ya confirmado antes").
+    const cliente = await prisma.clienteFinal.findFirst({ where: { telefono: TELEFONO } });
+    assert.equal(cliente.contexto.resumenConfirmado, `${productos[0].id}:${variante.id}:1`, 'igual se guarda: el proximo mensaje del cliente ya puede cerrar');
   });
 
   test('una direccion escrita a mano (sin ubicacion real) NO deja avanzar: pide ubicacion o link de Maps', async () => {
@@ -1157,8 +1245,15 @@ describe('recorrido de venta acordado con el negocio', () => {
     await reiniciarLead({ atributosLead: { Genero: 'Hombre' } });
     const conv = await prisma.conversacion.create({ data: { agenteId, telefonoCliente: TELEFONO, ultimoMensajeAt: new Date() } });
     const variante = await prisma.variante.findFirst({ where: { productoId: productos[0].id }, orderBy: { id: 'asc' } });
+    // Cada mensaje del cliente se persiste ANTES de generarRespuesta, igual
+    // que en produccion (procesarMensajeEntrante ya lo guarda antes de
+    // llamar al motor) - el contador de turno (helpers.turno) cuenta
+    // mensajes reales de CLIENTE en la conversacion, asi que sin esto los 4
+    // pasos de este test quedarian todos "en el mismo turno".
+    const turnoDelCliente = (texto) => prisma.mensaje.create({ data: { conversacionId: conv.id, rol: 'CLIENTE', contenido: texto } });
 
     // 1) agrega el primero
+    await turnoDelCliente('me interesa la primera');
     const a = iaFalsa([{ tool_calls: [tool('agregar_al_carrito', { idProducto: productos[0].id, idVariante: variante.id, cantidad: 1 })] }, { content: '¿Deseas ver algo mas?' }]);
     await generarRespuesta(agenteId, TELEFONO, [], 'me interesa la primera', conv.id, { llamarInyectado: a.llamar });
     assert.match(a.recibido.toolResults[0], /agregado al carrito/);
@@ -1167,6 +1262,7 @@ describe('recorrido de venta acordado con el negocio', () => {
 
     // 2) dice que si y agrega otro (con su variante: el cliente la vio en la tarjeta)
     const variante2 = await prisma.variante.findFirst({ where: { productoId: productos[1].id }, orderBy: { id: 'asc' } });
+    await turnoDelCliente('agregame tambien la otra');
     const b = iaFalsa([{ tool_calls: [tool('agregar_al_carrito', { idProducto: productos[1].id, idVariante: variante2.id, cantidad: 2 })] }, { content: 'Listo.' }]);
     await generarRespuesta(agenteId, TELEFONO, [], 'agregame tambien la otra', conv.id, { llamarInyectado: b.llamar });
     assert.match(b.recibido.toolResults[0], /Zapatilla 1/, 'el primero sigue en el carrito');
@@ -1181,10 +1277,12 @@ describe('recorrido de venta acordado con el negocio', () => {
         ubicacionLat: -17.767619, ubicacionLng: -63.181035,
       },
     });
+    await turnoDelCliente('no, eso es todo');
     const c = iaFalsa([{ tool_calls: [tool('confirmar_pedido', {})] }, { content: '¿Esta todo bien?' }]);
     await generarRespuesta(agenteId, TELEFONO, [], 'no, eso es todo', conv.id, { llamarInyectado: c.llamar });
     assert.match(c.recibido.toolResults[0], /Resumen REAL del pedido/);
 
+    await turnoDelCliente('si');
     const d = iaFalsa([{ tool_calls: [tool('crear_pedido', {})] }, { content: 'Pedido tomado.' }]);
     await generarRespuesta(agenteId, TELEFONO, [], 'si', conv.id, { llamarInyectado: d.llamar });
 

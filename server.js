@@ -995,6 +995,7 @@ app.post('/panel/conversaciones/reiniciar-todas', requireCliente, async (req, re
       where: { empresaId: req.session.empresaId },
       data: {
         categoriaInteres: null,
+        categoriaId: null,
         presupuesto: null,
         cantidad: null,
         marca: null,
@@ -1002,6 +1003,7 @@ app.post('/panel/conversaciones/reiniciar-todas', requireCliente, async (req, re
         color: null,
         observaciones: null,
         productoFavoritoId: null,
+        varianteFavoritaId: null,
         productosDescartados: [],
         productosMostrados: [],
         estadoConversacion: 'EXPLORANDO',
@@ -1029,6 +1031,7 @@ app.post('/panel/conversaciones/:telefono/reiniciar', requireCliente, async (req
       where: { empresaId: req.session.empresaId, telefono },
       data: {
         categoriaInteres: null,
+        categoriaId: null,
         presupuesto: null,
         cantidad: null,
         marca: null,
@@ -1036,6 +1039,7 @@ app.post('/panel/conversaciones/:telefono/reiniciar', requireCliente, async (req
         color: null,
         observaciones: null,
         productoFavoritoId: null,
+        varianteFavoritaId: null,
         productosDescartados: [],
         productosMostrados: [],
         estadoConversacion: 'EXPLORANDO',

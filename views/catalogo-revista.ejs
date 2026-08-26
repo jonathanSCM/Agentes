@@ -17,16 +17,10 @@
   :root{--fondo:#faf8f4;--panel:#ffffff;--tinta:#211f1c;--tenue:#8a8375;--acento:<%= (config && config.colorPrimario) || '#8a4b32' %>;--acento-2:<%= (config && config.colorSecundario) || '#211f1c' %>;--borde:#e8e2d6;}
   *{margin:0;padding:0;box-sizing:border-box;}
   body{background:var(--fondo);color:var(--tinta);font-family:'Inter',system-ui,sans-serif;min-height:100vh;}
-  main{max-width:1040px;margin:0 auto;padding:0 24px 90px;}
+  main{max-width:1040px;margin:0 auto;padding:28px 24px 90px;}
 
-  header{text-align:center;padding:54px 20px 30px;border-bottom:1px solid var(--borde);margin-bottom:8px;}
-  header .brand{display:inline-flex;align-items:center;gap:.6rem;margin-bottom:18px;}
-  header img{width:34px;height:34px;border-radius:50%;object-fit:cover;}
-  header .brand strong{font-family:'Fraunces',serif;font-size:1.1rem;letter-spacing:.03em;text-transform:uppercase;}
-  .banner-filtro{background:var(--panel);border:1px solid var(--borde);padding:12px 18px;margin:18px 0;display:flex;align-items:center;gap:10px;flex-wrap:wrap;font-size:.85rem;}
-  .banner-filtro span{color:var(--tenue);}
-
-  .categoria-seccion{margin-top:56px;}
+  .categoria-seccion{margin-top:36px;}
+  .categoria-seccion:first-child{margin-top:8px;}
   .categoria-titulo{text-align:center;margin-bottom:26px;}
   .categoria-titulo h2{font-family:'Fraunces',serif;font-size:1.7rem;font-weight:600;}
   .categoria-titulo span{color:var(--tenue);font-size:.8rem;letter-spacing:.04em;text-transform:uppercase;}
@@ -51,13 +45,6 @@
 </style>
 </head>
 <body>
-  <header>
-    <div class="brand">
-      <% if (config && config.logoUrl) { %><img src="<%= config.logoUrl %>" alt="" /><% } %>
-      <strong><%= empresa.marca || empresa.nombre %></strong>
-    </div>
-  </header>
-
   <main>
     <%
       // Mismos parametros de sesion + filtro activo para que el detalle del
@@ -71,12 +58,6 @@
       }
       var qProducto = paramsProducto.length ? '?' + paramsProducto.join('&') : '';
     %>
-    <% if (hayFiltro) { %>
-      <div class="banner-filtro">
-        <span>Mostrando solo lo que pediste: <%= [filtro.categoria, filtro.color, filtro.talla, filtro.marca].filter(Boolean).join(' · ') %></span>
-      </div>
-    <% } %>
-
     <% if (productos.length === 0) { %>
       <div class="vacio"><h2>😕</h2><p>Todavía no hay productos cargados.</p></div>
     <% } else { %>
@@ -84,7 +65,7 @@
         <% categorias.forEach(function (c) { %>
           <section class="categoria-seccion" data-categoria="<%= c.nombre %>">
             <div class="categoria-titulo">
-              <h2><%= c.nombre %></h2>
+              <% if (!hayFiltro) { %><h2><%= c.nombre %></h2><% } %>
               <span><%= c.productos.length %> pieza<%= c.productos.length === 1 ? '' : 's' %></span>
             </div>
             <div class="grid">
