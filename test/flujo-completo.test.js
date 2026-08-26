@@ -216,6 +216,50 @@ describe('BUG - un link de Maps nuevo se guarda aunque la IA no llame a actualiz
   });
 });
 
+// Plan A del planning "dos mejoras estructurales": en el turno exacto donde
+// hay candidatos reales para mostrar y el cliente no nombro nada puntual ni
+// esta en cierre, la unica respuesta valida es una tool call - se le pide
+// al proveedor toolChoice:"requerido" para que NO pueda responder con texto
+// libre (la clase de bug que genero "Zapatillas Urbanas Flex" inventado).
+describe('Plan A - toolChoice "requerido" quita la opcion de improvisar', () => {
+  test('con candidatos reales y sin producto puntual, se pide toolChoice "requerido"', async () => {
+    await reiniciarLead({ atributosLead: { Genero: 'Hombre' } });
+    const vistos = [];
+    const llamar = async ({ toolChoice }) => {
+      vistos.push(toolChoice);
+      return { content: '', tool_calls: [tool('mostrar_tarjeta_categoria', {})] };
+    };
+    await generarRespuesta(agenteId, TELEFONO, [], 'que tienes', undefined, { llamarInyectado: llamar });
+
+    assert.equal(vistos[0], 'requerido');
+  });
+
+  test('si el cliente nombro un producto puntual, sigue "auto" (pregunta legitima/afinar sigue permitido)', async () => {
+    await reiniciarLead({ atributosLead: { Genero: 'Hombre' } });
+    const vistos = [];
+    const llamar = async ({ toolChoice }) => {
+      vistos.push(toolChoice);
+      return { content: 'Aca esta.', tool_calls: [] };
+    };
+    await generarRespuesta(agenteId, TELEFONO, [], 'tenes la Zapatilla 1?', undefined, { llamarInyectado: llamar });
+
+    assert.equal(vistos[0], 'auto');
+  });
+
+  test('en cierre (carrito con algo), sigue "auto" - el cliente puede necesitar una pregunta libre para cerrar', async () => {
+    await reiniciarLead({ atributosLead: { Genero: 'Hombre' }, estadoConversacion: 'DATOS_DE_PEDIDO' });
+    await agregarAlCarrito([{ idProducto: productos[0].id, idVariante: productos[0].variantes[0].id, cantidad: 1, precio: productos[0].precio }]);
+    const vistos = [];
+    const llamar = async ({ toolChoice }) => {
+      vistos.push(toolChoice);
+      return { content: '¿Cómo preferís pagar?', tool_calls: [] };
+    };
+    await generarRespuesta(agenteId, TELEFONO, [], 'quiero pagar', undefined, { llamarInyectado: llamar });
+
+    assert.equal(vistos[0], 'auto');
+  });
+});
+
 describe('paginacion real contra la base', () => {
   test('ver_mas_productos trae las que faltan y despues avisa que no hay mas', async () => {
     await reiniciarLead({ atributosLead: { Genero: 'Hombre' } });
@@ -528,22 +572,23 @@ describe('menu de categorias en dos niveles', () => {
     assert.match(salida.fotos[0].caption, /Botas/);
   });
 
-  test('si el cliente pide ver todo el catalogo, mostrar_categorias sale del rubro actual', async () => {
+  // ACTUALIZADO: "que mas venden?" ahora lo intercepta un bloque preemptivo
+  // (backend, antes de llamar a la IA) - ver describe "BUG - Ya vi X, que
+  // mas tienes" mas abajo, que prueba esto en detalle. Este test confirma
+  // que la IA ni siquiera se invoca para este mensaje.
+  test('si el cliente pide ver todo el catalogo, se resuelve en codigo sin llamar a la IA - nunca se queda en el rubro actual', async () => {
     // Bug real: con categoriaInteres ya fijado en un rubro con subcategorias
     // ("Calzado"), el cliente pregunto "que mas venden?" y el bot siguio
     // devolviendo solo los tipos de calzado en vez del catalogo completo.
     await reiniciarLead({ categoriaInteres: 'Calzado', categoriaId: rubro.id });
-    const { llamar, recibido } = iaFalsa([
-      { tool_calls: [tool('mostrar_categorias', {})] },
-      { content: '¿Cual te interesa?' },
-    ]);
-    await generarRespuesta(agenteId, TELEFONO, [], 'que mas venden?', undefined, { llamarInyectado: llamar });
+    let llamadasALaIA = 0;
+    const llamarQueNoDeberiaUsarse = async () => { llamadasALaIA += 1; return { content: 'no deberia llegar aca', tool_calls: [] }; };
+    const salida = await generarRespuesta(agenteId, TELEFONO, [], 'que mas venden?', undefined, { llamarInyectado: llamarQueNoDeberiaUsarse });
 
-    const r = recibido.toolResults[0];
-    assert.match(r, /TOOL_SUCCESS/);
-    assert.match(r, /Calzado/, 'tiene que listar los rubros, no los tipos');
-    assert.doesNotMatch(r, /Dentro de "Calzado"/, 'no debe quedarse en el drill-down del rubro anterior');
-    assert.doesNotMatch(r, /Botas/, 'las subcategorias son del segundo nivel, no de este');
+    assert.equal(llamadasALaIA, 0, 'se resuelve entero en codigo, la IA no deberia haberse llamado');
+    assert.match(salida.respuesta, /Calzado/, 'tiene que listar los rubros, no los tipos');
+    assert.doesNotMatch(salida.respuesta, /Dentro de "Calzado"/, 'no debe quedarse en el drill-down del rubro anterior');
+    assert.doesNotMatch(salida.respuesta, /Botas/, 'las subcategorias son del segundo nivel, no de este');
   });
 
   test('un rubro SIN subcategorias muestra sus productos directamente', async () => {
@@ -1208,6 +1253,23 @@ describe('BUG - durante el cierre, el rescate de ultima vuelta no debe reabrir e
 
     assert.doesNotMatch(salida.respuesta, /1\. Botas\s*\n\s*2\. Sandalias/i, 'no debe repetir las subcategorias de la categoria ya vista');
     assert.match(salida.respuesta, /Zapatillas/i, 'debe mostrar el menu completo de rubros para que pueda salir de Calzado');
+  });
+
+  // Bug real probando en vivo (hallazgo menor, SIN carrito ni cierre): "Ya
+  // vi poleras, que mas tienes" repitio las subcategorias de Poleras en vez
+  // de subir al menu completo. Causa: pareceQuererCatalogoCompleto solo se
+  // evaluaba DENTRO del handler de mostrar_categorias - si la IA ese turno
+  // no la llamaba, la señal nunca se aplicaba. Ahora hay un bloque
+  // preemptivo (antes de la IA) que la detecta siempre.
+  test('sin carrito ni cierre, "ya vi X, que mas tienes" tambien sube al menu completo sin llamar a la IA', async () => {
+    await reiniciarLead({ atributosLead: { Genero: 'Hombre' }, categoriaInteres: 'Calzado', categoriaId: rubro.id });
+    let llamadasALaIA = 0;
+    const llamarQueNoDeberiaUsarse = async () => { llamadasALaIA += 1; return { content: 'no deberia llegar aca', tool_calls: [] }; };
+    const salida = await generarRespuesta(agenteId, TELEFONO, [], 'Ya vi botas, que mas tienes', undefined, { llamarInyectado: llamarQueNoDeberiaUsarse });
+
+    assert.equal(llamadasALaIA, 0, 'se resuelve entero en codigo, la IA no deberia haberse llamado');
+    assert.match(salida.respuesta, /Zapatillas/i);
+    assert.doesNotMatch(salida.respuesta, /Sandalias/i, 'no debe repetir las subcategorias de la categoria ya vista');
   });
 
   // Bug real reportado con capturas de WhatsApp: cliente agrego un producto
