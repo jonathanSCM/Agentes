@@ -829,6 +829,25 @@ describe('menu de categorias en dos niveles', () => {
     assert.match(r, /2\. Sandalias/);
   });
 
+  // Bug real reportado por WhatsApp: mostrar_categorias manda un menu de
+  // TEXTO real (rubros o subcategorias), pero no marcaba "tarjetasEnTurno"
+  // (esa bandera es solo para fotos) - una frase perfectamente honesta como
+  // "aqui tienes las opciones" despues de ese menu se rechazaba igual que si
+  // no se hubiera mandado nada, y el bot terminaba escribiendo "tuve un
+  // problema para mostrarte las opciones" (una excusa inventada) en la
+  // vuelta siguiente, por un menu que SI se habia mandado de verdad.
+  test('BUG - presentar el menu de subcategorias con una frase tipo "aqui tienes" NO se rechaza como invencion', async () => {
+    await reiniciarLead({ categoriaInteres: 'Calzado', categoriaId: rubro.id });
+    const { llamar, recibido } = iaFalsa([
+      { tool_calls: [tool('mostrar_categorias', {})] },
+      { content: 'Aquí tienes las opciones que tenemos 👇' },
+    ]);
+    const salida = await generarRespuesta(agenteId, TELEFONO, [], 'que tipos tenes', undefined, { llamarInyectado: llamar });
+
+    assert.equal(recibido.systems.length, 2, 'no debe forzar una vuelta extra: el menu de texto cuenta como contenido real');
+    assert.equal(salida.respuesta, 'Aquí tienes las opciones que tenemos 👇', 'se respeta el texto del modelo tal cual, no se pisa con un rescate');
+  });
+
   // Bug real reportado: si el rubro tiene un atributo obligatorio propio
   // (ej. Genero) ademas de subcategorias, este handler listaba los tipos
   // directo, sin preguntar el atributo antes - mismo bug que el de
