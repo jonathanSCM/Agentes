@@ -1659,6 +1659,43 @@ describe('BUG - durante el cierre, el rescate de ultima vuelta no debe reabrir e
 // El cross-sell se elimino por completo (causaba que el bot insistiera con
 // productos fuera de contexto): ni al agregar al carrito por chat, ni al
 // agregar desde el catalogo web, se sugiere nada mas.
+// Bug real reportado por WhatsApp: cliente agrega algo al carrito, el bot
+// pregunta "¿algo mas te gustaria ver?" (instruccion estandar de
+// agregar_al_carrito), el cliente contesta vago ("muestrame", sin nombrar
+// nada puntual) - y el sistema le repetia las subcategorias de la categoria
+// VIEJA (la que tenia elegida antes de agregar al carrito) en vez de subir
+// al menu completo de rubros, porque nada soltaba categoriaId.
+describe('BUG - "muestrame" vago despues de "algo mas" sube al menu completo, no repite la categoria vieja', () => {
+  test('el ultimo mensaje del bot preguntando "algo mas" + respuesta vaga = menu completo, sin llamar a la IA', async () => {
+    await reiniciarLead({ categoriaInteres: subcategoria.nombre, categoriaId: subcategoria.id, atributosLead: { Genero: 'Mujer' } });
+    await agregarAlCarrito([{ idProducto: productos[0].id, idVariante: productos[0].variantes[0].id, cantidad: 1, precio: productos[0].precio }]);
+    const historialConPregunta = [
+      { rol: 'CLIENTE', contenido: 'algo mas' },
+      { rol: 'AGENTE', contenido: '¡Perfecto! ¿Qué más te gustaría ver?' },
+    ];
+
+    const salida = await generarRespuesta(agenteId, TELEFONO, historialConPregunta, 'muestrame', undefined, { llamarInyectado: async () => { throw new Error('no deberia llamarse a la IA'); } });
+
+    assert.match(salida.respuesta, /Calzado/, 'tiene que subir al menu completo de rubros');
+    assert.doesNotMatch(salida.respuesta, /Botas|Sandalias/, 'no debe repetir las subcategorias de la categoria vieja (Calzado)');
+  });
+
+  test('sin esa pregunta previa del bot, "muestrame" vago NO fuerza el menu completo (comportamiento normal, sigue con la IA)', async () => {
+    await reiniciarLead({ categoriaInteres: subcategoria.nombre, categoriaId: subcategoria.id, atributosLead: { Genero: 'Mujer' } });
+    await agregarAlCarrito([{ idProducto: productos[0].id, idVariante: productos[0].variantes[0].id, cantidad: 1, precio: productos[0].precio }]);
+    const historialSinPregunta = [
+      { rol: 'CLIENTE', contenido: 'hola' },
+      { rol: 'AGENTE', contenido: 'Hola, ¿en qué te ayudo?' },
+    ];
+
+    let llamada = false;
+    const llamar = async () => { llamada = true; return { content: 'Dale, contame que buscas.', tool_calls: [] }; };
+    await generarRespuesta(agenteId, TELEFONO, historialSinPregunta, 'muestrame', undefined, { llamarInyectado: llamar });
+
+    assert.equal(llamada, true, 'sin la pregunta especifica del bot, no se activa el atajo - sigue el flujo normal con la IA');
+  });
+});
+
 describe('BUG - cross-sell eliminado por completo', () => {
   test('el aviso de "agregaste algo desde la web" ya no sugiere productos relacionados', async () => {
     await reiniciarLead({ atributosLead: { Genero: 'Hombre' } });
