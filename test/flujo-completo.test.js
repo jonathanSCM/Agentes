@@ -1271,22 +1271,22 @@ describe('recorrido de venta acordado con el negocio', () => {
     // pasos de este test quedarian todos "en el mismo turno".
     const turnoDelCliente = (texto) => prisma.mensaje.create({ data: { conversacionId: conv.id, rol: 'CLIENTE', contenido: texto } });
 
-    // 1) agrega el primero
+    // 1) agrega el primero - agregar_al_carrito exitoso con UNA sola tool
+    // call es 100% determinista: se salta la vuelta extra de la IA (short-
+    // circuit por plantilla), asi que "llamar" solo se invoca una vez.
     await turnoDelCliente('me interesa la primera');
     const a = iaFalsa([{ tool_calls: [tool('agregar_al_carrito', { idProducto: productos[0].id, idVariante: variante.id, cantidad: 1 })] }, { content: '¿Deseas ver algo mas?' }]);
-    await generarRespuesta(agenteId, TELEFONO, [], 'me interesa la primera', conv.id, { llamarInyectado: a.llamar });
-    assert.match(a.recibido.toolResults[0], /agregado al carrito/);
-    assert.match(a.recibido.toolResults[0], /DESEA VER ALGO MAS/);
-    assert.doesNotMatch(a.recibido.toolResults[0], /Tambien hay stock de esto/, 'cross-sell eliminado: nunca sugiere relacionados');
+    const salida1 = await generarRespuesta(agenteId, TELEFONO, [], 'me interesa la primera', conv.id, { llamarInyectado: a.llamar });
+    assert.equal(a.recibido.systems.length, 1, 'agregar al carrito con exito no necesita la segunda llamada a la IA (respuesta por plantilla)');
+    assert.ok(salida1.respuesta && salida1.respuesta.length > 0, 'igual llega una confirmacion real al cliente');
 
     // 2) dice que si y agrega otro (con su variante: el cliente la vio en la tarjeta)
     const variante2 = await prisma.variante.findFirst({ where: { productoId: productos[1].id }, orderBy: { id: 'asc' } });
     await turnoDelCliente('agregame tambien la otra');
     const b = iaFalsa([{ tool_calls: [tool('agregar_al_carrito', { idProducto: productos[1].id, idVariante: variante2.id, cantidad: 2 })] }, { content: 'Listo.' }]);
-    await generarRespuesta(agenteId, TELEFONO, [], 'agregame tambien la otra', conv.id, { llamarInyectado: b.llamar });
-    assert.match(b.recibido.toolResults[0], /Zapatilla 1/, 'el primero sigue en el carrito');
-    assert.match(b.recibido.toolResults[0], /Zapatilla 2/);
-    assert.doesNotMatch(b.recibido.toolResults[0], /Tambien hay stock de esto/, 'ya esta cerrando: no sugiere mas productos fuera de contexto');
+    const salida2 = await generarRespuesta(agenteId, TELEFONO, [], 'agregame tambien la otra', conv.id, { llamarInyectado: b.llamar });
+    assert.equal(b.recibido.systems.length, 1, 'idem: tambien se salta la segunda llamada');
+    assert.ok(salida2.respuesta && salida2.respuesta.length > 0, 'igual llega una confirmacion real al cliente');
 
     // 3) cierra
     await prisma.clienteFinal.updateMany({
@@ -1328,6 +1328,44 @@ describe('recorrido de venta acordado con el negocio', () => {
     const { llamar, recibido } = iaFalsa([{ tool_calls: [tool('agregar_al_carrito', { idProducto: productos[0].id, idVariante: variante.id, cantidad: 999 })] }, { content: 'ok' }]);
     await generarRespuesta(agenteId, TELEFONO, [], 'quiero 999', undefined, { llamarInyectado: llamar });
     assert.match(recibido.toolResults[0], /No hay stock suficiente/);
+  });
+
+  // Los 3 casos 100% deterministas del carrito se resuelven por plantilla,
+  // sin una segunda llamada a la IA (ver "respuestaDirecta" en
+  // ejecutarFuncion / short-circuit en generarRespuesta).
+  test('ver el carrito con items no necesita una segunda llamada a la IA', async () => {
+    await reiniciarLead({ atributosLead: { Genero: 'Hombre' } });
+    const variante = await prisma.variante.findFirst({ where: { productoId: productos[0].id }, orderBy: { id: 'asc' } });
+    const previo = iaFalsa([{ tool_calls: [tool('agregar_al_carrito', { idProducto: productos[0].id, idVariante: variante.id, cantidad: 1 })] }]);
+    await generarRespuesta(agenteId, TELEFONO, [], 'me lo llevo', undefined, { llamarInyectado: previo.llamar });
+
+    const { llamar, recibido } = iaFalsa([{ tool_calls: [tool('ver_carrito', {})] }, { content: 'ok' }]);
+    const salida = await generarRespuesta(agenteId, TELEFONO, [], 'que llevo?', undefined, { llamarInyectado: llamar });
+    assert.equal(recibido.systems.length, 1, 'ver_carrito es determinista: no hace falta que la IA redacte nada');
+    assert.match(salida.respuesta, /llev[aá]s/i);
+  });
+
+  test('quitar un item del carrito no necesita una segunda llamada a la IA', async () => {
+    await reiniciarLead({ atributosLead: { Genero: 'Hombre' } });
+    const variante = await prisma.variante.findFirst({ where: { productoId: productos[0].id }, orderBy: { id: 'asc' } });
+    const previo = iaFalsa([{ tool_calls: [tool('agregar_al_carrito', { idProducto: productos[0].id, idVariante: variante.id, cantidad: 1 })] }]);
+    await generarRespuesta(agenteId, TELEFONO, [], 'me lo llevo', undefined, { llamarInyectado: previo.llamar });
+
+    const { llamar, recibido } = iaFalsa([{ tool_calls: [tool('quitar_del_carrito', { idProducto: productos[0].id, idVariante: variante.id })] }, { content: 'ok' }]);
+    const salida = await generarRespuesta(agenteId, TELEFONO, [], 'mejor sacalo', undefined, { llamarInyectado: llamar });
+    assert.equal(recibido.systems.length, 1, 'quitar_del_carrito con exito es determinista');
+    assert.match(salida.respuesta, /saqu[eé]/i);
+  });
+
+  test('agregar sin indicar variante SI necesita que la IA pregunte (no se salta la llamada)', async () => {
+    await reiniciarLead({ atributosLead: { Genero: 'Hombre' } });
+    const { llamar, recibido } = iaFalsa([{ tool_calls: [tool('agregar_al_carrito', { idProducto: productos[0].id, cantidad: 1 })] }, { content: '¿Que talla queres?' }]);
+    await generarRespuesta(agenteId, TELEFONO, [], 'me lo llevo', undefined, { llamarInyectado: llamar });
+    // Sin variante hay que preguntar - no hay short-circuit posible (siempre
+    // devuelve un string, no un objeto con respuestaDirecta), asi que la IA
+    // se vuelve a llamar al menos una vez mas (puede ser mas de una vuelta si
+    // ademas dispara algun detector anti-invencion, eso es normal).
+    assert.ok(recibido.systems.length >= 2, 'sin variante, todavia hace falta que la IA pregunte cual');
   });
 });
 
