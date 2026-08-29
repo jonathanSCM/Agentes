@@ -82,6 +82,7 @@ const { resolverCoordenadas, extraerUrlDeMaps } = require('./lib/services/ubicac
 const { carritoDe, guardarCarrito, agregarItem } = require('./lib/services/carrito');
 const { generarPlantillaExcel, parsearFilasExcel, importarCatalogo } = require('./lib/services/catalogoExcel');
 const { transicionValida, requiereRestock, dentroDeVentana24h } = require('./lib/services/pedidos');
+const { costoUSD } = require('./lib/services/costoIA');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -2932,6 +2933,86 @@ app.get('/admin/mensajes', requireAuth, (req, res) => {
     leads: lista,
     stats: leads.stats(),
   });
+});
+
+// --- Costo real de IA (tokens que Proshop le paga a OpenAI/Anthropic) ---
+app.get('/admin/costo-ia', requireAuth, async (req, res, next) => {
+  try {
+    const hace7 = new Date(); hace7.setHours(0, 0, 0, 0); hace7.setDate(hace7.getDate() - 6);
+    const hace30 = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+
+    const [filas30, filasPorEmpresa, filas7, mensajesClientePeriodo] = await Promise.all([
+      prisma.usoIA.findMany({ where: { createdAt: { gte: hace30 } } }),
+      prisma.usoIA.groupBy({
+        by: ['empresaId'],
+        where: { createdAt: { gte: hace30 } },
+        _sum: { promptTokens: true, cachedTokens: true, completionTokens: true },
+        _count: true,
+      }),
+      prisma.usoIA.findMany({ where: { createdAt: { gte: hace7 } }, select: { createdAt: true, promptTokens: true, cachedTokens: true, completionTokens: true, modelo: true } }),
+      prisma.mensaje.count({ where: { rol: 'CLIENTE', createdAt: { gte: hace30 } } }),
+    ]);
+
+    const empresas = await prisma.empresa.findMany({
+      where: { id: { in: filasPorEmpresa.map((f) => f.empresaId) } },
+      select: { id: true, nombre: true },
+    });
+    const nombreEmpresa = new Map(empresas.map((e) => [e.id, e.nombre]));
+
+    // Costo por fila (agrupado tambien por modelo, cada uno tiene precio distinto)
+    let costoTotal = 0;
+    let promptReintentos = 0;
+    let promptTotal = 0;
+    for (const f of filas30) {
+      const c = costoUSD(f.modelo, f);
+      if (c != null) costoTotal += c;
+      promptTotal += f.promptTokens;
+      if (f.proposito === 'reintento_forzado') promptReintentos += f.promptTokens;
+    }
+
+    // Costo por empresa (para la tabla)
+    const filasEmpresaConCosto = filasPorEmpresa.map((f) => {
+      const propias = filas30.filter((x) => x.empresaId === f.empresaId);
+      const costo = propias.reduce((s, x) => s + (costoUSD(x.modelo, x) || 0), 0);
+      return {
+        empresaId: f.empresaId,
+        nombre: nombreEmpresa.get(f.empresaId) || `Empresa #${f.empresaId}`,
+        llamadas: f._count,
+        promptTokens: f._sum.promptTokens || 0,
+        cachedTokens: f._sum.cachedTokens || 0,
+        completionTokens: f._sum.completionTokens || 0,
+        costo,
+      };
+    }).sort((a, b) => b.costo - a.costo);
+
+    // Serie diaria de costo (ultimos 7 dias)
+    const dias = ['dom', 'lun', 'mar', 'mié', 'jue', 'vie', 'sáb'];
+    const serie = [];
+    for (let i = 6; i >= 0; i--) {
+      const d = new Date(); d.setHours(0, 0, 0, 0); d.setDate(d.getDate() - i);
+      const fin = new Date(d); fin.setDate(fin.getDate() + 1);
+      const delDia = filas7.filter((x) => x.createdAt >= d && x.createdAt < fin);
+      const total = delDia.reduce((s, x) => s + (costoUSD(x.modelo, x) || 0), 0);
+      serie.push({ etiqueta: dias[d.getDay()], total });
+    }
+
+    const totalLlamadas = filas30.length;
+    const llamadasPorMensaje = mensajesClientePeriodo > 0 ? totalLlamadas / mensajesClientePeriodo : 0;
+
+    res.render('admin/costo-ia', {
+      title: 'Panel Proshop - Costo de IA',
+      tituloPagina: 'Costo de IA',
+      activo: 'costo-ia',
+      stats: {
+        costoTotal,
+        pctReintentos: promptTotal > 0 ? Math.round((promptReintentos / promptTotal) * 100) : 0,
+        llamadasPorMensaje,
+        totalLlamadas,
+      },
+      serie,
+      empresas: filasEmpresaConCosto,
+    });
+  } catch (err) { next(err); }
 });
 
 // ---------- Utilidades ----------

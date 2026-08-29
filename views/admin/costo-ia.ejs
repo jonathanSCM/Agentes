@@ -1,0 +1,72 @@
+<%- include('partials/inicio') %>
+
+<div class="page-head">
+  <h2>Costo de IA</h2>
+  <p>Lo que Proshop le paga a OpenAI/Anthropic por todas las empresas, últimos 30 días.</p>
+</div>
+
+<div class="admin-stats">
+  <div class="stat-card"><span class="stat-num">US$ <%= stats.costoTotal.toFixed(2) %></span><span class="stat-label">Costo total estimado</span></div>
+  <div class="stat-card <%= stats.pctReintentos > 20 ? 'stat-new' : '' %>"><span class="stat-num"><%= stats.pctReintentos %>%</span><span class="stat-label">Del gasto es reintentos forzados</span></div>
+  <div class="stat-card"><span class="stat-num"><%= stats.llamadasPorMensaje.toFixed(2) %></span><span class="stat-label">Llamadas de IA por mensaje del cliente</span></div>
+  <div class="stat-card"><span class="stat-num"><%= stats.totalLlamadas %></span><span class="stat-label">Llamadas totales a la IA</span></div>
+</div>
+
+<div class="dash-grid">
+  <div class="dash-card">
+    <div class="dash-card-head"><h3>Costo por día (últimos 7)</h3></div>
+    <% if (serie.every(function(d){return d.total===0})) { %>
+      <p class="dash-empty">Todavía no hay suficientes datos para el gráfico.</p>
+    <% } else { %>
+      <div class="mini-chart">
+        <% var maxv = Math.max.apply(null, serie.map(function(d){return d.total})) || 1; %>
+        <% serie.forEach(function (d) { %>
+          <div class="mini-bar-wrap">
+            <div class="mini-bar" style="height:<%= Math.round((d.total / maxv) * 100) %>%" title="US$ <%= d.total.toFixed(4) %>"></div>
+            <span class="mini-lbl"><%= d.etiqueta %></span>
+          </div>
+        <% }); %>
+      </div>
+    <% } %>
+  </div>
+</div>
+
+<div class="page-head">
+  <h2 style="font-size:1.2rem">Costo por empresa (30 días)</h2>
+</div>
+
+<% if (empresas.length === 0) { %>
+  <div class="empty-state">
+    <h3>Todavía no hay datos de uso de IA</h3>
+    <p>En cuanto una conversación real pase por el agente, va a aparecer acá.</p>
+  </div>
+<% } else { %>
+<div class="table-wrap">
+  <table class="leads-table">
+    <thead>
+      <tr>
+        <th>Empresa</th>
+        <th>Llamadas</th>
+        <th>Tokens prompt</th>
+        <th>Tokens cacheados</th>
+        <th>Tokens completion</th>
+        <th>Costo estimado</th>
+      </tr>
+    </thead>
+    <tbody>
+      <% empresas.forEach(function (e) { %>
+        <tr>
+          <td><%= e.nombre %></td>
+          <td><%= e.llamadas %></td>
+          <td><%= e.promptTokens.toLocaleString('es') %></td>
+          <td><%= e.cachedTokens.toLocaleString('es') %></td>
+          <td><%= e.completionTokens.toLocaleString('es') %></td>
+          <td>US$ <%= e.costo.toFixed(4) %></td>
+        </tr>
+      <% }); %>
+    </tbody>
+  </table>
+</div>
+<% } %>
+
+<%- include('partials/fin') %>

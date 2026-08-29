@@ -105,7 +105,7 @@ const PLANES = [
     maxProductos: 2000,
     maxUsuarios: 10,
     recomendado: false,
-    modeloIa: 'gpt-5.2-chat-latest',
+    modeloIa: 'gpt-4o',
     marcaBlanca: true,
     orden: 4,
     categoria: 'EMPRESARIAL',

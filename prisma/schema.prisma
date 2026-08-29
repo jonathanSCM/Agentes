@@ -213,8 +213,32 @@ model Empresa {
   comprasPaquete CompraPaquete[]
   notificaciones Notificacion[]
   suscripcion    Suscripcion?
+  usosIA         UsoIA[]
 
   @@map("empresas")
+}
+
+// Costo real de IA que paga Proshop (no el cliente) por cada llamada a
+// OpenAI/Anthropic. Ver docs del dashboard interno /admin/costo-ia.
+model UsoIA {
+  id        Int     @id @default(autoincrement())
+  empresaId Int
+  empresa   Empresa @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  // referencia suelta, sin FK, solo para poder ubicar el turno si hace falta
+  conversacionId Int?
+  proveedor      String // "openai" | "anthropic"
+  modelo         String
+  // "respuesta" (vuelta 0, turno normal) | "reintento_forzado" (vuelta > 0,
+  // el sistema corrigio la vuelta anterior via RECORDATORIO DEL SISTEMA)
+  proposito        String   @default("respuesta")
+  vuelta           Int      @default(0)
+  promptTokens     Int
+  cachedTokens     Int      @default(0)
+  completionTokens Int
+  createdAt        DateTime @default(now())
+
+  @@index([empresaId, createdAt])
+  @@map("usos_ia")
 }
 
 model Usuario {
