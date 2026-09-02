@@ -9,7 +9,7 @@
 </div>
 
 <p class="muted" style="font-size:.85rem;margin:-.6rem 0 1.2rem">
-  <strong>PRUEBA</strong>: probando sin pagar todavía · <strong>ACTIVA</strong>: al día · <strong>MOROSA</strong>: venció y no se confirmó el pago (agente apagado) · <strong>CANCELADA</strong>: dada de baja. Se confirman pagos desde <a href="/admin/pagos" style="color:var(--primary-2)">Pagos</a>.
+  <strong>PRUEBA</strong>: probando sin pagar todavía · <strong>ACTIVA</strong>: al día · <strong>MOROSA</strong>: venció y no se confirmó el pago (el agente sigue respondiendo si le queda saldo extra ya pagado, pero no se le puede agregar catálogo nuevo) · <strong>CANCELADA</strong>: dada de baja, sin acceso. Se confirman pagos desde <a href="/admin/pagos" style="color:var(--primary-2)">Pagos</a>.
 </p>
 
 <% if (mensaje) { %><div class="alert-ok"><%= mensaje %></div><% } %>
@@ -53,6 +53,12 @@
             <td class="num"><%= e.consumo ? e.consumo.extraDisponible.toLocaleString('es-BO') : '—' %></td>
             <td class="nowrap muted"><%= new Date(e.createdAt).toLocaleDateString('es-BO') %></td>
             <td class="actions-cell">
+              <% if (e.suscripcion && ['MOROSA', 'CANCELADA'].includes(e.suscripcion.estado)) { %>
+                <form method="POST" action="/admin/registrados/<%= e.id %>/reactivar" class="inline-form"
+                      onsubmit="return confirm('¿Reactivar la suscripción de «<%= e.nombre %>» por 30 días?');">
+                  <button class="btn btn-primary" style="padding:.35rem .7rem;font-size:.8rem" type="submit">Reactivar</button>
+                </form>
+              <% } %>
               <% if (e.suscripcion) { %>
                 <form method="POST" action="/admin/registrados/<%= e.id %>/simular" class="inline-form sim-form"
                       title="Simular conversaciones entrantes para probar el consumo">

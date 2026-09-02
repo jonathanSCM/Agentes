@@ -56,6 +56,7 @@ const {
   obtenerEstadoConsumo,
   obtenerResumenEmpresa,
   registrarCompraPaquete,
+  puedeEditarCatalogo,
 } = require('./lib/services/suscripciones');
 const { registrarCliente, autenticar } = require('./lib/services/auth');
 const { procesarMensajeEntrante, atenderMensaje, generarYRegistrarRespuesta } = require('./lib/services/conversaciones');
@@ -1663,6 +1664,10 @@ app.post('/panel/categorias', requireCliente, async (req, res, next) => {
     const nombre = String(req.body.nombre || '').trim().slice(0, 120);
     if (!nombre) return res.redirect('/panel/categorias?err=' + encodeURIComponent('El nombre es obligatorio.'));
 
+    if (!(await puedeEditarCatalogo(req.session.empresaId))) {
+      return res.redirect('/panel/categorias?err=' + encodeURIComponent('Tu suscripción no está al día: regularizá el pago para poder agregar categorías nuevas.'));
+    }
+
     // Si se eligio un rubro padre, se crea directo como subcategoria (mismo
     // criterio que /panel/categorias/:id/subcategorias). Antes esta ruta
     // SIEMPRE creaba un rubro de primer nivel: si alguien cargaba un subtipo
@@ -2052,6 +2057,9 @@ function expandirAtributosPorListas(atributos) {
 app.post('/panel/productos', requireCliente, upload.array('fotos', 8), async (req, res, next) => {
   const { nombre, descripcion, precio, stock, activo } = req.body || {};
   try {
+    if (!(await puedeEditarCatalogo(req.session.empresaId))) {
+      return res.redirect('/panel/productos?ok=' + encodeURIComponent('Tu suscripción no está al día: regularizá el pago para poder agregar productos nuevos.'));
+    }
     const plan = await planDeEmpresa(req.session.empresaId);
     const total = await prisma.producto.count({ where: { empresaId: req.session.empresaId } });
     if (plan && total >= plan.maxProductos) {
@@ -3143,6 +3151,20 @@ app.post('/admin/registrados/:id', requireAuth, async (req, res, next) => {
     else await prisma.suscripcion.create({ data: { empresaId: id, ...datosSub } });
 
     res.redirect('/admin/registrados?ok=' + encodeURIComponent('Cambios guardados.'));
+  } catch (err) { next(err); }
+});
+
+// Atajo de un click para MOROSA/CANCELADA: mismo POST de edicion de arriba,
+// pero sin tener que abrir el formulario completo (pedido explicito: hacer
+// mas visible la reactivacion, que hoy esta perdida dentro del form).
+app.post('/admin/registrados/:id/reactivar', requireAuth, async (req, res, next) => {
+  const id = Number(req.params.id);
+  try {
+    await prisma.suscripcion.update({
+      where: { empresaId: id },
+      data: { estado: 'ACTIVA', periodoFin: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) },
+    });
+    res.redirect('/admin/registrados?ok=' + encodeURIComponent('Suscripción reactivada.'));
   } catch (err) { next(err); }
 });
 
