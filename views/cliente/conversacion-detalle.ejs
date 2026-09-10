@@ -7,7 +7,7 @@
 
 <div class="page-head page-head-row">
   <div>
-    <h2>Conversación con <%= cliente && cliente.nombre ? cliente.nombre : telefono %></h2>
+    <h2>Conversación con <%= (cliente && (cliente.nombre || cliente.nombrePerfil)) || telefono %></h2>
     <p>
       <%= telefono %>
       <a href="https://wa.me/<%= telefono.replace(/\D/g,'') %>" target="_blank" rel="noopener" style="color:var(--primary-2);margin-left:.6rem">Hablar por WhatsApp</a>

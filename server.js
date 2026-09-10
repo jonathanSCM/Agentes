@@ -862,10 +862,10 @@ app.get('/panel/conversaciones', requireCliente, async (req, res, next) => {
     const clientesFinales = telefonos.length
       ? await prisma.clienteFinal.findMany({
           where: { empresaId: req.session.empresaId, telefono: { in: telefonos } },
-          select: { telefono: true, nombre: true },
+          select: { telefono: true, nombre: true, nombrePerfil: true },
         })
       : [];
-    const nombrePorTelefono = new Map(clientesFinales.map((c) => [c.telefono, c.nombre]));
+    const nombrePorTelefono = new Map(clientesFinales.map((c) => [c.telefono, c.nombre || c.nombrePerfil]));
 
     // Un mismo cliente que vuelve a escribir despues de la ventana de
     // agrupacion (6h) genera una Conversacion nueva (se cobra aparte) - se
@@ -2818,6 +2818,19 @@ app.post('/webhooks/whatsapp', (req, res) => {
       const telefonoCliente = mensaje.from;
       const baseUrl = `${req.protocol}://${req.get('host')}`;
       await prisma.conexionWhatsApp.update({ where: { id: conexion.id }, data: { ultimoMensajeAt: new Date() } });
+
+      // Nombre de perfil de WhatsApp (Meta lo manda en "contacts", junto a
+      // "messages", en cada webhook con mensaje entrante) - se guarda para
+      // mostrarlo en el panel aunque el cliente todavia no dio su nombre
+      // real para el pedido. Nunca bloquea nada si falla o no viene.
+      const nombrePerfil = cambio?.contacts?.[0]?.profile?.name || null;
+      if (nombrePerfil) {
+        prisma.clienteFinal.upsert({
+          where: { empresaId_telefono: { empresaId: conexion.agente.empresaId, telefono: telefonoCliente } },
+          update: { nombrePerfil },
+          create: { empresaId: conexion.agente.empresaId, telefono: telefonoCliente, nombrePerfil },
+        }).catch(() => {});
+      }
 
       const texto = await interpretarMensajeEntrante(mensaje, conexion, telefonoCliente);
       if (!texto) return; // tipo de mensaje no soportado (sticker, video, documento...) o vacio

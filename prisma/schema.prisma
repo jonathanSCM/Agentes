@@ -640,6 +640,11 @@ model ClienteFinal {
   empresaId Int
   empresa   Empresa  @relation(fields: [empresaId], references: [id], onDelete: Cascade)
   nombre    String?
+  // Nombre de perfil de WhatsApp (contacts[0].profile.name del webhook de
+  // Meta) - siempre disponible desde el primer mensaje, a diferencia de
+  // "nombre" (que recien se llena cuando el cliente lo confirma para el
+  // pedido). Se usa solo para mostrar en el panel, nunca para datos de envio.
+  nombrePerfil String?
   telefono  String
   createdAt DateTime @default(now())
 
