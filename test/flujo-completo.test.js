@@ -1322,6 +1322,42 @@ describe('recorrido de venta acordado con el negocio', () => {
     assert.match(recibido.toolResults[0], /carrito esta vacio/);
   });
 
+  // Bug real reportado con capturas de WhatsApp: el cliente confirmaba el
+  // resumen ("si") y en vez de crear_pedido, el modelo volvia a llamar a
+  // confirmar_pedido - eso re-mostraba el mismo resumen para siempre
+  // (loop infinito, el cliente contestaba "ok"/"si"/"?" sin que nada
+  // avanzara nunca). confirmar_pedido ahora rechaza reconfirmar un pedido
+  // (misma firma de items) que ya se confirmo en un turno anterior.
+  test('si la IA vuelve a llamar confirmar_pedido sobre un pedido ya confirmado, se la corrige en vez de repetir el loop', async () => {
+    await reiniciarLead({
+      atributosLead: { Genero: 'Hombre' }, nombre: 'Juan', tipoEntrega: 'DOMICILIO', direccionEntrega: 'Av 1', formaPago: 'EFECTIVO',
+      ubicacionLat: -17.767619, ubicacionLng: -63.181035,
+    });
+    const conv = await prisma.conversacion.create({ data: { agenteId, telefonoCliente: TELEFONO, ultimoMensajeAt: new Date() } });
+    const turnoDelCliente = (texto) => prisma.mensaje.create({ data: { conversacionId: conv.id, rol: 'CLIENTE', contenido: texto } });
+    const variante = await prisma.variante.findFirst({ where: { productoId: productos[0].id }, orderBy: { id: 'asc' } });
+
+    await turnoDelCliente('me lo llevo');
+    const previo = iaFalsa([{ tool_calls: [tool('agregar_al_carrito', { idProducto: productos[0].id, idVariante: variante.id, cantidad: 1 })] }]);
+    await generarRespuesta(agenteId, TELEFONO, [], 'me lo llevo', conv.id, { llamarInyectado: previo.llamar });
+
+    // Turno 1: confirmar_pedido de verdad (primera vez) -> muestra el resumen
+    await turnoDelCliente('termina');
+    const a = iaFalsa([{ tool_calls: [tool('confirmar_pedido', {})] }, { content: 'Resumen mostrado.' }]);
+    await generarRespuesta(agenteId, TELEFONO, [], 'termina', conv.id, { llamarInyectado: a.llamar });
+    assert.match(a.recibido.toolResults[0], /Resumen REAL del pedido/);
+
+    // Turno 2: el cliente ya confirmo, pero la IA (por error) vuelve a
+    // llamar confirmar_pedido en vez de crear_pedido - el backend debe
+    // rechazarlo y decirle que llame a crear_pedido, NUNCA repetir el resumen.
+    await turnoDelCliente('si');
+    const b = iaFalsa([{ tool_calls: [tool('confirmar_pedido', {})] }, { content: 'ok' }]);
+    await generarRespuesta(agenteId, TELEFONO, [], 'si', conv.id, { llamarInyectado: b.llamar });
+    assert.match(b.recibido.toolResults[0], /YA fue confirmado/);
+    assert.match(b.recibido.toolResults[0], /crear_pedido/);
+    assert.doesNotMatch(b.recibido.toolResults[0], /Resumen REAL del pedido/, 'no debe volver a mostrar el resumen - eso es lo que causaba el loop infinito');
+  });
+
   test('no deja agregar mas unidades de las que hay en stock', async () => {
     await reiniciarLead({ atributosLead: { Genero: 'Hombre' } });
     const variante = await prisma.variante.findFirst({ where: { productoId: productos[0].id }, orderBy: { id: 'asc' } });

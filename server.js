@@ -68,7 +68,6 @@ const { initSocket, emitMensaje, emitConversacion } = require('./lib/services/re
 const { detectarPais } = require('./lib/services/geo');
 const { precioPlanParaPais, precioPaqueteParaPais, simboloMoneda } = require('./lib/services/precios');
 const { buscarProductosFiltrados, fotoParaMostrar, coloresConFotoDeVariantes, mensajeWhatsappProducto } = require('./lib/services/catalogo');
-const { productosRelacionados } = require('./lib/services/recomendaciones');
 const { guardarEmbeddingDeProducto } = require('./lib/services/embeddings');
 
 // Texto fuente para el embedding de busqueda semantica: todo lo que describe
@@ -397,7 +396,6 @@ app.get('/catalogo/:slug/producto/:id', async (req, res, next) => {
     const ogUrl = `${req.protocol}://${req.get('host')}${req.originalUrl}`;
 
     const colores = coloresConFotoDeVariantes(producto);
-    const relacionados = await productosRelacionados(empresa.id, producto.id);
 
     // Mismo filtro (categoria/color/talla/marca) que ya usa /catalogo/:slug:
     // si el cliente llego aca desde una vista filtrada, "Volver al catalogo"
@@ -427,7 +425,7 @@ app.get('/catalogo/:slug/producto/:id', async (req, res, next) => {
 
     res.render('catalogo-producto', {
       title: `${producto.nombre} · ${empresa.marca || empresa.nombre}`,
-      empresa, config, producto, colores, relacionados,
+      empresa, config, producto, colores,
       simboloCatalogo: simboloMoneda(empresa.moneda),
       numeroWhatsapp: agente ? agente.numeroWhatsapp : null,
       tokenSesion: sesion ? req.query.s : null,

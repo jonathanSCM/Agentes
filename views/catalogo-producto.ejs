@@ -21,12 +21,13 @@
      el color de la pagina sale de estas variables, asi que el toggle es
      solo redefinirlas una vez, nada mas se toca por vista. */
   :root{
-    --fondo:#0f1117;--panel:#181b24;--panel-2:#1f2330;--tinta:#eef0f6;--tenue:#9aa1b5;--borde:#262b38;
+    /* Gris oscuro neutro, nunca negro puro: pedido explicito del dueño. */
+    --fondo:#1c1c1e;--panel:#28282b;--panel-2:#323235;--tinta:#f0f0f2;--tenue:#a3a3a8;--borde:#3c3c40;
     --acento:<%= (config && config.colorPrimario) || '#22c58b' %>;--acento-2:<%= (config && config.colorSecundario) || '#22c58b' %>;
     --stock-bg:rgba(255,255,255,.06);
     --stock-bajo-bg:rgba(255,180,60,.16);--stock-bajo-color:#ffc36b;
     --stock-agotado-bg:rgba(255,90,90,.16);--stock-agotado-color:#ff9a9a;
-    --ph-grad-a:#141722;--ph-grad-b:#1b1f2c;
+    --ph-grad-a:#232326;--ph-grad-b:#2c2c30;
   }
   body.tema-claro{
     --fondo:#f5f6f8;--panel:#ffffff;--panel-2:#eef0f3;--tinta:#181a20;--tenue:#68707d;--borde:#e1e4ea;
@@ -59,11 +60,11 @@
   .galeria-principal{position:relative;border-radius:22px;overflow:hidden;background:radial-gradient(120% 120% at 30% 15%,#f6f6f8,#e3e4e8);box-shadow:0 24px 55px -22px rgba(0,0,0,.6);padding:26px;cursor:zoom-in;}
   .galeria-principal img{width:100%;display:block;aspect-ratio:1/1;object-fit:contain;transition:opacity .2s;}
   .galeria .ph{width:100%;aspect-ratio:1/1;border-radius:22px;display:flex;align-items:center;justify-content:center;color:var(--tenue);background:linear-gradient(135deg,var(--ph-grad-a),var(--ph-grad-b));box-shadow:0 24px 55px -22px rgba(0,0,0,.6);}
-  .contador-fotos{position:absolute;right:16px;bottom:16px;background:rgba(10,12,18,.78);backdrop-filter:blur(6px);color:var(--tinta);font-size:.76rem;font-weight:600;padding:5px 11px;border-radius:999px;}
-  .zoom-hint{position:absolute;left:16px;bottom:16px;background:rgba(10,12,18,.78);backdrop-filter:blur(6px);color:var(--tinta);font-size:.72rem;font-weight:600;padding:5px 11px;border-radius:999px;display:flex;align-items:center;gap:5px;}
+  .contador-fotos{position:absolute;right:16px;bottom:16px;background:rgba(40,40,44,.78);backdrop-filter:blur(6px);color:var(--tinta);font-size:.76rem;font-weight:600;padding:5px 11px;border-radius:999px;}
+  .zoom-hint{position:absolute;left:16px;bottom:16px;background:rgba(40,40,44,.78);backdrop-filter:blur(6px);color:var(--tinta);font-size:.72rem;font-weight:600;padding:5px 11px;border-radius:999px;display:flex;align-items:center;gap:5px;}
 
   /* ---------- Lightbox de zoom ---------- */
-  .lightbox{position:fixed;inset:0;background:rgba(6,7,11,.92);display:none;align-items:center;justify-content:center;z-index:50;padding:24px;}
+  .lightbox{position:fixed;inset:0;background:rgba(28,28,30,.94);display:none;align-items:center;justify-content:center;z-index:50;padding:24px;}
   .lightbox.abierto{display:flex;}
   .lightbox img{max-width:100%;max-height:100%;object-fit:contain;touch-action:pinch-zoom;border-radius:8px;}
   .lightbox-cerrar{position:absolute;top:18px;right:20px;width:42px;height:42px;border-radius:50%;border:none;background:rgba(255,255,255,.1);color:#fff;font-size:1.3rem;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:background .15s;}
@@ -122,19 +123,6 @@
   .btn-whatsapp:hover{transform:translateY(-1px);}
 
   .aviso-sesion{background:var(--stock-bajo-bg);border:1px solid color-mix(in srgb, var(--stock-bajo-color) 35%, transparent);color:var(--stock-bajo-color);border-radius:11px;padding:13px 15px;font-size:.85rem;margin-bottom:16px;line-height:1.5;}
-
-  /* ---------- Tambien te puede interesar ---------- */
-  .relacionados{margin-top:56px;}
-  .relacionados h2{font-size:1.2rem;font-weight:800;letter-spacing:-.01em;margin-bottom:18px;}
-  .relacionados-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:16px;}
-  .rel-card{background:var(--panel);border:1px solid var(--borde);border-radius:16px;overflow:hidden;text-decoration:none;color:inherit;display:block;transition:transform .15s,border-color .15s;}
-  .rel-card:hover{transform:translateY(-2px);border-color:var(--tenue);}
-  .rel-card .rel-foto{width:100%;aspect-ratio:1/1;background:linear-gradient(160deg,#f6f6f8,#e3e4e8);display:flex;align-items:center;justify-content:center;padding:14px;}
-  .rel-card img{max-width:100%;max-height:100%;object-fit:contain;display:block;}
-  .rel-card .rel-ph{width:100%;aspect-ratio:1/1;display:flex;align-items:center;justify-content:center;color:var(--tenue);background:linear-gradient(135deg,var(--ph-grad-a),var(--ph-grad-b));font-size:.8rem;}
-  .rel-card-body{padding:12px 14px;}
-  .rel-card-nombre{font-size:.86rem;font-weight:650;margin-bottom:5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-  .rel-card-precio{color:var(--acento);font-weight:700;font-size:.92rem;}
 </style>
 </head>
 <body class="<%= (config && config.temaProducto === 'claro') ? 'tema-claro' : '' %>">
@@ -245,26 +233,6 @@
       </div>
     </div>
 
-    <% if (relacionados && relacionados.length) { %>
-      <div class="relacionados">
-        <h2>También te puede interesar</h2>
-        <div class="relacionados-grid">
-          <% relacionados.forEach(function (r) { %>
-            <a class="rel-card" href="/catalogo/<%= empresa.slug %>/producto/<%= r.id %><%= qVolver %>">
-              <% if (r.fotos && r.fotos.length) { %>
-                <div class="rel-foto"><img src="<%= r.fotos[0] %>" alt="<%= r.nombre %>" /></div>
-              <% } else { %>
-                <div class="rel-ph">Sin foto</div>
-              <% } %>
-              <div class="rel-card-body">
-                <div class="rel-card-nombre"><%= r.nombre %></div>
-                <div class="rel-card-precio"><%= simboloCatalogo %> <%= Number(r.precio).toFixed(2) %></div>
-              </div>
-            </a>
-          <% }); %>
-        </div>
-      </div>
-    <% } %>
   </main>
 
   <div class="lightbox" id="lightbox" onclick="cerrarZoom(event)">
