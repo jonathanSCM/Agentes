@@ -2365,7 +2365,7 @@ app.get('/panel/configuracion', requireCliente, requireRol('OWNER', 'ADMIN'), as
 const MONEDAS_CATALOGO = ['BOB', 'USD', 'PEN'];
 
 app.post('/panel/configuracion', requireCliente, requireRol('OWNER', 'ADMIN'), upload.fields([{ name: 'qr', maxCount: 1 }, { name: 'logo', maxCount: 1 }]), async (req, res, next) => {
-  const { nombre, numeroWhatsapp, mensajeBienvenida, tono, estado, instrucciones, derivarAHumano, aceptaEfectivo, aceptaTarjeta, aceptaQr, quitarQr, moneda, direccionTienda, tiendaLat, tiendaLng, preguntasIniciales, colorPrimario, colorSecundario, quitarLogo, plantillaCatalogo, temaProducto } = req.body || {};
+  const { nombre, numeroWhatsapp, mensajeBienvenida, tono, estado, instrucciones, derivarAHumano, aceptaEfectivo, aceptaTarjeta, aceptaQr, flujoDeterminista, quitarQr, moneda, direccionTienda, tiendaLat, tiendaLng, preguntasIniciales, colorPrimario, colorSecundario, quitarLogo, plantillaCatalogo, temaProducto } = req.body || {};
   try {
     const agente = await obtenerAgente(req.session.empresaId);
 
@@ -2417,6 +2417,7 @@ app.post('/panel/configuracion', requireCliente, requireRol('OWNER', 'ADMIN'), u
         aceptaEfectivo: aceptaEfectivo === '1',
         aceptaTarjeta: aceptaTarjeta === '1',
         aceptaQr: aceptaQr === '1',
+        flujoDeterminista: flujoDeterminista === '1',
         qrCobroUrl,
         logoUrl,
         colorPrimario: hexValido(colorPrimario) ? colorPrimario.trim() : (agente.config?.colorPrimario || null),
@@ -2746,10 +2747,36 @@ app.get('/webhooks/whatsapp', (req, res) => {
 // el reconocimiento de fotos, la transcripcion de audio y la ubicacion NO
 // duplican el flujo de conversacion, solo alimentan la misma puerta de
 // entrada que un mensaje escrito a mano.
+// Manda por WhatsApp lo que armo el motor: lista, pedido de ubicacion, botones
+// o texto. Si WhatsApp rechaza un mensaje interactivo (titulo demasiado largo,
+// etc.) se cae a texto plano con las opciones, para que el cliente nunca se
+// quede sin respuesta.
+async function enviarSalidaPorWhatsApp(conexion, telefonoCliente, salida) {
+  const textoPlano = salida.textoRegistro || salida.respuesta;
+  let envio;
+  if (salida.lista) {
+    envio = await wa.enviarLista(conexion, telefonoCliente, salida.respuesta, salida.lista);
+  } else if (salida.solicitarUbicacion) {
+    envio = await wa.enviarSolicitudUbicacion(conexion, telefonoCliente, salida.respuesta);
+  } else if (salida.botones && salida.botones.length) {
+    envio = await wa.enviarBotones(conexion, telefonoCliente, salida.respuesta, salida.botones);
+  } else {
+    return wa.enviarTexto(conexion, telefonoCliente, salida.respuesta);
+  }
+  if (!envio.ok) {
+    console.error(`--- webhook: fallo el mensaje interactivo a ${telefonoCliente}, se manda como texto: ${envio.error}`);
+    envio = await wa.enviarTexto(conexion, telefonoCliente, textoPlano);
+  }
+  return envio;
+}
+
 async function interpretarMensajeEntrante(mensaje, conexion, telefonoCliente) {
   if (mensaje.text?.body?.trim()) return mensaje.text.body.trim();
-  if (mensaje.interactive?.list_reply?.id) return mensaje.interactive.list_reply.id;
-  if (mensaje.interactive?.button_reply?.id) return mensaje.interactive.button_reply.id;
+  // Para el historial y el panel se devuelve el TITULO legible que toco el
+  // cliente ("Calzado"), no el ID tecnico ("rubro:12"); el ID viaja aparte
+  // (idBoton, ver el handler del webhook) para que el flujo determinista lo use.
+  if (mensaje.interactive?.list_reply?.id) return mensaje.interactive.list_reply.title || mensaje.interactive.list_reply.id;
+  if (mensaje.interactive?.button_reply?.id) return mensaje.interactive.button_reply.title || mensaje.interactive.button_reply.id;
 
   if (mensaje.type === 'image' && mensaje.image?.id) {
     const media = await wa.obtenerMedia(conexion, mensaje.image.id);
@@ -2828,6 +2855,8 @@ app.post('/webhooks/whatsapp', (req, res) => {
       wa.marcarLeidoYEscribiendo(conexion, mensaje.id).catch(() => {});
 
       const telefonoCliente = mensaje.from;
+      // ID tecnico del boton/lista que toco el cliente (null si escribio texto).
+      const idBoton = mensaje.interactive?.list_reply?.id || mensaje.interactive?.button_reply?.id || null;
       const baseUrl = `${req.protocol}://${req.get('host')}`;
       await prisma.conexionWhatsApp.update({ where: { id: conexion.id }, data: { ultimoMensajeAt: new Date() } });
 
@@ -2869,26 +2898,37 @@ app.post('/webhooks/whatsapp', (req, res) => {
       // generacion de respuesta automatica).
       if (entrada.modo === 'HUMANO') return;
 
-      encolarRespuesta(`${conexion.agente.id}:${telefonoCliente}`, async () => {
-        const salida = await generarYRegistrarRespuesta(conexion.agente.id, telefonoCliente, entrada.conversacionId, texto, baseUrl);
+      const claveCliente = `${conexion.agente.id}:${telefonoCliente}`;
+      const generarYEnviar = async () => {
+        const salida = await generarYRegistrarRespuesta(conexion.agente.id, telefonoCliente, entrada.conversacionId, texto, baseUrl, false, { idBoton });
         if (salida.ok && salida.respuesta) {
-          // Si el backend armo botones reales para esta respuesta (ver el
-          // bloque preemptivo de forma de pago en agente.js), se manda como
-          // mensaje interactivo en vez de texto plano - el cliente toca en
-          // vez de tipear, y el ID que vuelve ya es el que espera el resto
-          // del flujo (interpretarMensajeEntrante mas abajo).
-          const envio = (salida.botones && salida.botones.length)
-            ? await wa.enviarBotones(conexion, telefonoCliente, salida.respuesta, salida.botones)
-            : await wa.enviarTexto(conexion, telefonoCliente, salida.respuesta);
+          // Si el backend armo lista/botones/pedido de ubicacion (flujo
+          // determinista, o el bloque preemptivo de forma de pago de
+          // agente.js), se manda como mensaje interactivo en vez de texto
+          // plano - el cliente toca en vez de tipear, y el ID que vuelve es
+          // el que espera el motor (idBoton).
+          const envio = await enviarSalidaPorWhatsApp(conexion, telefonoCliente, salida);
           if (!envio.ok) {
             console.error(`--- webhook: fallo el envio por WhatsApp a ${telefonoCliente} (agente ${conexion.agente.id}): ${envio.error}`);
           }
           emitMensaje(conexion.agente.empresaId, {
-            conversacionId: entrada.conversacionId, rol: 'AGENTE', contenido: salida.respuesta, createdAt: new Date(),
+            conversacionId: entrada.conversacionId, rol: 'AGENTE', contenido: salida.textoRegistro || salida.respuesta, createdAt: new Date(),
           });
         }
         notif.verificarAvisos(conexion.agente.empresaId).catch((e) => console.error('verificarAvisos:', e.message));
-      });
+      };
+      // Todo lo que genera/envia respuesta de ESTE cliente corre en serie
+      // (clave "gen:"): un comando de boton y una respuesta de texto nunca
+      // tocan el carrito a la vez ni crean un pedido doble.
+      const enSerie = () => conBloqueoDeCliente(`gen:${claveCliente}`, generarYEnviar);
+      if (idBoton) {
+        // Un toque de boton/lista es un COMANDO (+1, Quitar, Confirmar...), no
+        // texto para agrupar: se ejecuta de inmediato y sin debounce, si no el
+        // segundo toque pisaria al primero (ver bufferMensajes.js).
+        enSerie().catch((err) => console.error('Error generando respuesta de boton:', err));
+      } else {
+        encolarRespuesta(claveCliente, enSerie);
+      }
     } catch (err) {
       console.error('Error procesando webhook de WhatsApp:', err);
     }

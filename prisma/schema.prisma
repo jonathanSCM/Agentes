@@ -390,6 +390,10 @@ model AgenteConfig {
   // confirmacion automatica de cobro, eso lo verifica un humano por fuera.
   aceptaQr          Boolean  @default(false)
   qrCobroUrl        String?
+  // Interruptor por agente del flujo determinista (menus con listas, "algo
+  // mas?", edicion de carrito y cierre por plantillas y botones, sin llamar a
+  // la IA). Apagado = el comportamiento de siempre. Ver flujoDeterminista.js.
+  flujoDeterminista Boolean  @default(false)
   aceptaEfectivo    Boolean  @default(true)
   aceptaTarjeta     Boolean  @default(false)
   // Ubicacion REAL del local, para los pedidos con retiro en tienda. El bot

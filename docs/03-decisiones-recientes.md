@@ -579,3 +579,32 @@ promover Talla o Color no hace nada.
 
 `test/atributos-bloqueantes.test.js` (11 casos) cubre las dos fallas y el chat
 reportado. Suite determinista completa: **194 tests en verde**.
+
+
+## 26. Flujo determinista del Vendedor IA (menús, carrito y cierre con listas y botones, sin IA)
+
+**Problema.** Cada mensaje costaba entre 1,5 y 1,9 llamadas a la IA (~7 mil tokens de entrada cada una), aunque buena parte del recorrido es un menú o un formulario: elegir categoría, "¿algo más?", editar el carrito y cerrar el pedido (nombre, entrega, ubicación, pago, resumen, confirmar). En la conversación real #134 ≈60 % de las llamadas eran de esos turnos.
+
+**Decisión.** Módulo `lib/services/flujoDeterminista.js` (máquina de estados, estado en `ClienteFinal.contexto.flujo = { paso, ts, intentos }`) que responde con plantillas, listas y botones de WhatsApp y reutiliza `mostrar_tarjeta_categoria`, `confirmar_pedido` y `crear_pedido` (los totales y el stock siguen calculándolos esos handlers). La IA queda para preguntas abiertas: cada paso cede a la IA si el cliente pregunta (`?`) o falla 3 veces. Parte de los archivos del jefe (`flujoDeterminista.js`, `whatsapp-interactivo.js`, `maquina-de-estados.md`), con estos ajustes tras la revisión:
+
+- **Detrás de un flag por agente** (`AgenteConfig.flujoDeterminista`, default `false`, checkbox en Configuración). Apagado = comportamiento anterior. Rollback: desmarcar.
+- **Nombre estricto** (`nombrePlausible`): `nombreValido` aceptaba "Ok", "Nada mas", "Terminar" o "hola buenas tardes" como nombre. El flujo exige ≤3 palabras solo con letras y ninguna palabra de una lista de exclusión (un nombre ya guardado se sigue juzgando con `nombreValido`, igual que `confirmar_pedido`).
+- **Los toques de botón/lista saltean el debounce de 5 s** y todo lo que genera respuesta de un cliente corre en serie (`conBloqueoDeCliente`, clave `gen:`): si no, dos "➕ 1" seguidos contaban uno y un comando podía correr a la vez que un texto.
+- **Deduplicación del webhook por `mensaje.id`** (`lib/services/dedupe.js`, en memoria, TTL 1 h): con comandos con estado un reenvío de Meta no es inocuo.
+- **El historial conserva las opciones** (`textoRegistro`): la IA y el panel ven "1. Calzado / 2. …" y no solo "¿cuál te interesa?".
+- **Respaldo a texto** si WhatsApp rechaza una lista/botones/pedido de ubicación (`enviarSalidaPorWhatsApp` en `server.js`).
+- `interpretarMensajeEntrante` devuelve el **título** del botón/lista (no el ID técnico); el ID viaja aparte como `idBoton`.
+- **Bug del diseño original encontrado por los tests**: tras `confirmar_pedido`/`crear_pedido` el flujo escribía el `contexto` desde su copia en memoria y pisaba la firma del resumen y el vaciado del carrito; ahora relee el lead después de cada tool (`refrescar`).
+- Con el flag activo, el regreso desde la web ("Quiero *X*") lo contesta el flujo: `carritoWebPendiente` ya no se consume antes en `generarRespuesta` en ese caso exacto.
+
+**Carrito web ↔ WhatsApp (hallazgo 3 del audit).** El link del catálogo vive 24 h pero una conversación se renueva a las 6 h; la web guardaba el carrito con el `conversacionId` firmado en el link (viejo) y pisaba/ocultaba el actual. Ahora usa la conversación abierta del cliente (`conversacionParaCarritoWeb`) o `null` (adoptable por la próxima conversación dentro de las 24 h). Se mantiene "carrito por conversación" (decisión de negocio de `carrito.js`).
+
+**Archivos.** `lib/services/flujoDeterminista.js`, `dedupe.js`, `whatsapp.js` (`enviarLista`, `enviarSolicitudUbicacion`, `textoDeLista`), `conversaciones.js`, `agente.js`, `server.js`, `views/cliente/configuracion.ejs`, migración `20261027120000_agente_flujo_determinista`.
+
+**Medición.** Cada respuesta del flujo emite el log `respuesta_por_flujo` (no genera fila en `usos_ia`, porque no hay llamada). Comparar llamadas por mensaje y por pedido en `/admin/costo-ia` antes y después de activar el flag en un agente piloto.
+
+**Fuera de alcance (siguiente fase).** Comprobante de pago por estado (evitar visión), atributos obligatorios con botones, filtrar tools por estado, modelos más baratos para las llamadas que queden.
+
+### Verificación
+
+`test/flujo-determinista.test.js` (18 casos, con una IA inyectada que cuenta llamadas y debe quedar en 0), `test/dedupe.test.js`, `test/whatsapp.test.js` (listas/ubicación), `test/carrito.test.js` y `test/carrito-web-conversacion.test.js`. Suite completa: **484 tests en verde**. Prueba de humo por el webhook real: duplicado ignorado, `respuesta_por_flujo` sin llamadas a la IA, respaldo a texto cuando Meta rechaza el mensaje, y dos toques simultáneos de "➕ 1" aplicados ambos.

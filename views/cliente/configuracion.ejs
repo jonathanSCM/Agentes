@@ -223,6 +223,11 @@
       <label style="display:block;margin-bottom:.3rem"><input type="checkbox" id="aceptaQr" name="aceptaQr" value="1" <%= config.aceptaQr ? 'checked' : '' %> /> QR</label>
     </div>
 
+    <div class="field">
+      <label><input type="checkbox" name="flujoDeterminista" value="1" <%= config.flujoDeterminista ? 'checked' : '' %> /> Menús y cierre con botones (sin IA)</label>
+      <p class="muted" style="font-size:.82rem;margin:.3rem 0 0">Las categorías, el "¿algo más?", la edición del carrito y el cierre del pedido (nombre, entrega, pago y confirmación) se resuelven con listas y botones de WhatsApp, sin usar IA. La IA sigue respondiendo las preguntas abiertas. Apagalo para volver al comportamiento anterior.</p>
+    </div>
+
     <div class="field" id="campo-qr" style="<%= config.aceptaQr ? '' : 'display:none' %>">
       <label for="qr">Imagen del QR de cobro</label>
       <p class="muted" style="font-size:.82rem;margin:0 0 .5rem">La misma imagen de QR que ya usás hoy para cobrar (banco, billetera, etc.). El bot la manda tal cual cuando el cliente elige pagar por QR.</p>
