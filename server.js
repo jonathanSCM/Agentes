@@ -59,7 +59,7 @@ const {
   puedeEditarCatalogo,
 } = require('./lib/services/suscripciones');
 const { registrarCliente, autenticar } = require('./lib/services/auth');
-const { procesarMensajeEntrante, atenderMensaje, generarYRegistrarRespuesta } = require('./lib/services/conversaciones');
+const { procesarMensajeEntrante, atenderMensaje, generarYRegistrarRespuesta, conversacionParaCarritoWeb, conBloqueoDeCliente } = require('./lib/services/conversaciones');
 const { encolarRespuesta } = require('./lib/services/bufferMensajes');
 const wa = require('./lib/services/whatsapp');
 const { analizarImagenProducto, transcribirAudio, fichaProducto } = require('./lib/services/agente');
@@ -83,6 +83,7 @@ const { carritoDe, guardarCarrito, agregarItem } = require('./lib/services/carri
 const { generarPlantillaExcel, parsearFilasExcel, importarCatalogo } = require('./lib/services/catalogoExcel');
 const { transicionValida, requiereRestock, dentroDeVentana24h } = require('./lib/services/pedidos');
 const { costoUSD } = require('./lib/services/costoIA');
+const { yaProcesado } = require('./lib/services/dedupe');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -498,7 +499,12 @@ app.post('/catalogo/:slug/producto/:id/carrito', limiteCarritoWeb, async (req, r
     const nombreItem = variante
       ? `${producto.nombre} (${Object.entries(variante.atributos || {}).map(([k, v]) => `${k}: ${v}`).join(', ')})`
       : producto.nombre;
-    const itemsActuales = carritoDe(clienteFinal.contexto || {}, sesion.conversacionId);
+    // El id de conversacion firmado en el link puede ser de una conversacion
+    // vieja (el link dura 24 h, la conversacion se renueva a las 6 h): se usa
+    // la conversacion ABIERTA del cliente, o null (carrito adoptable por la
+    // proxima). Ver conversacionParaCarritoWeb.
+    const conversacionIdCarrito = await conversacionParaCarritoWeb(empresa.id, sesion.telefono);
+    const itemsActuales = carritoDe(clienteFinal.contexto || {}, conversacionIdCarrito);
     const itemsNuevos = agregarItem(itemsActuales, {
       productoId: producto.id, varianteId: variante ? variante.id : null, nombre: nombreItem, precio: precioUnitario, cantidad,
       agregadoEn: new Date().toISOString(),
@@ -508,7 +514,7 @@ app.post('/catalogo/:slug/producto/:id/carrito', limiteCarritoWeb, async (req, r
       where: { id: clienteFinal.id },
       data: {
         contexto: {
-          ...guardarCarrito(clienteFinal.contexto || {}, sesion.conversacionId, itemsNuevos),
+          ...guardarCarrito(clienteFinal.contexto || {}, conversacionIdCarrito, itemsNuevos),
           // El bot no vio este cambio (paso afuera de una tool call): esta
           // marca le avisa en el proximo turno para que reaccione solo, sin
           // que el cliente tenga que repetirselo (ver generarRespuesta).
@@ -2796,6 +2802,12 @@ app.post('/webhooks/whatsapp', (req, res) => {
       const cambio = entry?.changes?.[0]?.value;
       const mensaje = cambio?.messages?.[0];
       if (!mensaje) return; // eventos de status (entregado/leido), ignorar
+      // Meta puede reenviar el mismo mensaje: con comandos que cambian estado
+      // (botones +1/Confirmar) repetirlo no es inocuo.
+      if (yaProcesado(mensaje.id)) {
+        console.log(`--- webhook: mensaje duplicado ignorado (${mensaje.id})`);
+        return;
+      }
 
       const phoneNumberId = cambio?.metadata?.phone_number_id;
       if (!phoneNumberId) return;

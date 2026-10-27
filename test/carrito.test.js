@@ -24,6 +24,18 @@ describe('carrito de la conversacion', () => {
     assert.equal(carritoDe(ctx, 99).length, 0, 'en una conversacion nueva arranca vacio');
   });
 
+  // Carrito armado desde el catalogo web cuando el cliente no tiene ninguna
+  // conversacion abierta: se guarda sin id y la proxima conversacion lo adopta
+  // (dentro de las 24 h), en vez de quedar atado a un id viejo invisible.
+  test('un carrito guardado sin conversacion (null) lo ve cualquier conversacion y se reasigna al guardar', () => {
+    const ctx = guardarCarrito({}, null, [item({})]);
+    assert.equal(carritoDe(ctx, 10).length, 1, 'la conversacion nueva lo adopta');
+    assert.equal(carritoDe(ctx, 99).length, 1, 'cualquiera lo ve mientras no tenga dueño');
+    const reasignado = guardarCarrito(ctx, 10, agregarItem(carritoDe(ctx, 10), item({ productoId: 2 })));
+    assert.equal(carritoDe(reasignado, 10).length, 2);
+    assert.equal(carritoDe(reasignado, 99).length, 0, 'ya con dueño, otra conversacion no lo ve');
+  });
+
   // Pedido real del dueño: no quiere miles de carritos abandonados quedando
   // "abiertos" para siempre (ej. alguien agrego algo desde la web del
   // catalogo y nunca confirmo). Mismo plazo que ya dura el link del catalogo.
