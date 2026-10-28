@@ -1753,7 +1753,7 @@ app.post('/panel/categorias', requireCliente, async (req, res, next) => {
   }
 });
 
-app.get('/panel/categorias/:id', requireCliente, async (req, res, next) => {
+app.get('/panel/categorias/:id(\\d+)', requireCliente, async (req, res, next) => {
   try {
     const categoria = await prisma.categoria.findFirst({
       where: { id: Number(req.params.id), empresaId: req.session.empresaId },
@@ -1779,7 +1779,10 @@ app.get('/panel/categorias/:id', requireCliente, async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-app.post('/panel/categorias/:id', requireCliente, upload.single('imagen'), async (req, res, next) => {
+// ":id(\\d+)": solo numeros. Sin esto "plantilla" entraba aca como si fuera un
+// id (esta ruta se registra antes que /panel/categorias/plantilla) y el boton
+// de cargar la estructura de ropa nunca llegaba a su ruta.
+app.post('/panel/categorias/:id(\\d+)', requireCliente, upload.single('imagen'), async (req, res, next) => {
   try {
     const nombre = String(req.body.nombre || '').trim().slice(0, 120);
     if (!nombre) return res.redirect(`/panel/categorias/${req.params.id}?err=` + encodeURIComponent('El nombre es obligatorio.'));
@@ -1857,7 +1860,9 @@ app.post('/panel/categorias/plantilla', requireCliente, async (req, res, next) =
     }
 
     const msg = creadas
-      ? `Se agregaron ${creadas} categorías. Las que ya tenías quedaron intactas: movelas al rubro que corresponda desde su página.`
+      ? (existentes.size === 0
+        ? `Listo, armamos ${creadas} categorías para tu tienda. Ahora podés agregar tu primer producto.`
+        : `Se agregaron ${creadas} categorías. Las que ya tenías quedaron intactas: movelas a la categoría que corresponda desde su página.`)
       : 'Ya tenías todas esas categorías: no se creó ninguna.';
     res.redirect('/panel/categorias?ok=' + encodeURIComponent(msg));
   } catch (err) { next(err); }
@@ -1878,18 +1883,18 @@ app.post('/panel/categorias/:id/mover', requireCliente, async (req, res, next) =
       // Solo se cuelga de un rubro real, y nunca de si misma: eso dejaria la
       // categoria fuera del arbol y sus productos invisibles para el bot.
       if (!padre || padre.id === categoria.id) {
-        return res.redirect(`/panel/categorias/${categoria.id}?err=` + encodeURIComponent('Ese rubro no es válido.'));
+        return res.redirect(`/panel/categorias/${categoria.id}?err=` + encodeURIComponent('Esa categoría no es válida.'));
       }
       // Una categoria que tiene subcategorias no puede volverse subcategoria:
       // solo se manejan dos niveles.
       const tieneHijas = await prisma.categoria.count({ where: { padreId: categoria.id } });
       if (tieneHijas) {
-        return res.redirect(`/panel/categorias/${categoria.id}?err=` + encodeURIComponent('Esta categoría tiene subcategorías propias: sacáselas antes de moverla.'));
+        return res.redirect(`/panel/categorias/${categoria.id}?err=` + encodeURIComponent('Esta categoría tiene tipos propios: sacáselos antes de moverla.'));
       }
     }
 
     await prisma.categoria.update({ where: { id: categoria.id }, data: { padreId: destino } });
-    res.redirect(`/panel/categorias/${categoria.id}?ok=` + encodeURIComponent(destino ? 'Categoría movida.' : 'Ahora es un rubro de primer nivel.'));
+    res.redirect(`/panel/categorias/${categoria.id}?ok=` + encodeURIComponent(destino ? 'Categoría movida.' : 'Ahora es una categoría principal.'));
   } catch (err) { next(err); }
 });
 
@@ -1904,7 +1909,7 @@ app.post('/panel/categorias/:id/subcategorias', requireCliente, async (req, res,
     if (!padre) return res.redirect('/panel/categorias');
 
     const nombre = String(req.body.nombre || '').trim().slice(0, 120);
-    if (!nombre) return res.redirect(`/panel/categorias/${padre.id}?err=` + encodeURIComponent('El nombre de la subcategoría es obligatorio.'));
+    if (!nombre) return res.redirect(`/panel/categorias/${padre.id}?err=` + encodeURIComponent('El nombre del tipo es obligatorio.'));
 
     const ultima = await prisma.categoria.findFirst({ where: { padreId: padre.id }, orderBy: { orden: 'desc' } });
     await prisma.categoria.create({
@@ -2009,7 +2014,7 @@ app.get('/panel/productos', requireCliente, async (req, res, next) => {
       else if (stockMostrado <= 0) motivoOculto = 'No tiene stock: el agente nunca ofrece algo agotado.';
       else if (!p.categoriaId) motivoOculto = 'No tiene categoría, así que el agente no sabe cuándo ofrecerlo.';
       else if (rubrosDivididos.has(p.categoriaId)) {
-        motivoOculto = `"${p.categoria.nombre}" está dividido en subcategorías, y el cliente siempre elige una. Mové el producto a la subcategoría que corresponda.`;
+        motivoOculto = `"${p.categoria.nombre}" está dividida en tipos, y el cliente siempre elige uno. Mové el producto al tipo que corresponda.`;
       }
       return { ...p, stockMostrado, tieneVariantes: p.variantes.length > 0, motivoOculto };
     });

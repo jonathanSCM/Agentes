@@ -792,3 +792,24 @@ select option:hover {
 /* La tabla de variantes existentes necesita mas ancho que el formulario */
 .pf-variantes { max-width: none; }
 .pf-variantes .pf-agregar { max-width: 760px; }
+
+/* ---------- Categorias ---------- */
+.cat-inicio { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1.1rem; max-width: 900px; }
+.cat-camino { display: flex; flex-direction: column; gap: .8rem; align-items: flex-start; }
+.cat-camino h3 { margin: 0; font-size: 1.05rem; }
+.cat-camino p { margin: 0; font-size: .9rem; }
+.cat-camino .field { width: 100%; margin: 0; }
+.cat-nombre { color: inherit; font-weight: 700; }
+.cat-sin-tipos { opacity: .6; }
+.cat-tipos { font-size: .86rem; }
+.btn-chico { padding: .4rem .8rem; font-size: .85rem; }
+.cat-volver { margin: 0 0 .3rem; font-size: .85rem; }
+.cat-volver a { color: var(--muted); }
+.page-head h2 .badge { vertical-align: middle; margin-left: .4rem; font-weight: 600; }
+.cat-nueva, .cat-form, .cat-seccion, .cat-mas { margin-top: 1.2rem; }
+.cat-niveles { margin: .2rem 0 .8rem 1.1rem; padding: 0; font-size: .9rem; display: grid; gap: .25rem; }
+.cat-agregar-tipo { display: flex; align-items: flex-end; gap: .7rem; margin-top: 1rem; }
+.cat-agregar-tipo .field { flex: 1; margin: 0; }
+.cat-nuevo-dato { margin-top: 1rem; align-items: end; }
+.cat-nuevo-dato .pf-check, .cat-nuevo-dato .badge, .cat-nuevo-dato .btn { align-self: center; }
+@media (max-width: 560px) { .cat-agregar-tipo { flex-direction: column; align-items: stretch; } }

@@ -2,40 +2,53 @@
 
 <div class="page-head">
   <h2>Categorías</h2>
-  <p>Esto es lo que el agente le ofrece al cliente cuando pregunta qué vendés. Son los <strong>rubros</strong>: el primer nivel del menú.</p>
-  <p class="muted" style="font-size:.9rem;margin:.3rem 0 0">Cada rubro puede dividirse en <strong>subcategorías</strong> (Calzado → Botas, Zapatillas...). El cliente elige primero el rubro y después el tipo, así no recibe 40 productos de golpe. Para agregar una subcategoría, entrá al rubro: nunca se crea desde acá.</p>
+  <p>Ordená tus productos en categorías, por ejemplo <strong>Calzado</strong>. Cada una puede tener tipos (Botas, Zapatillas…) para que tu cliente elija paso a paso y no reciba todo de golpe.</p>
 </div>
 
 <% if (mensaje) { %><div class="alert-ok"><%= mensaje %></div><% } %>
-<% if (error) { %><div class="alert-err"><%= error %></div><% } %>
+<% if (error) { %><div class="alert-err" role="alert"><%= error %></div><% } %>
 
 <% if (!categorias.length) { %>
-  <div class="empty-state">
-    <h3>Todavía no hay rubros cargados</h3>
-    <p>Agregá el primero abajo. Después lo vas a poder dividir en subcategorías y elegirlo al crear un producto.</p>
+  <!-- Primer uso: dos caminos claros en vez de un formulario vacio -->
+  <div class="cat-inicio">
+    <form method="POST" action="/panel/categorias/plantilla" class="pf-card cat-camino">
+      <input type="hidden" name="plantilla" value="ropa" />
+      <h3>Vendo ropa o calzado</h3>
+      <p class="muted">Te dejamos armado lo típico: Calzado (zapatillas, botas, zapatos…), Prendas de arriba, Prendas de abajo, Abrigos, Vestidos, Ropa deportiva, Ropa de baño y Accesorios. Después los ajustás a tu gusto.</p>
+      <button class="btn btn-primary" type="submit">Cargar estas categorías</button>
+    </form>
+
+    <form method="POST" action="/panel/categorias" class="pf-card cat-camino">
+      <h3>Prefiero armarlas yo</h3>
+      <p class="muted">Empezá con la primera. Después le agregás tipos si hace falta.</p>
+      <div class="field">
+        <label for="nombre-inicial">Nombre de tu primera categoría</label>
+        <input id="nombre-inicial" name="nombre" type="text" required maxlength="120" placeholder="Ej: Calzado" autocomplete="off" />
+      </div>
+      <button class="btn btn-ghost" type="submit">Crear categoría</button>
+    </form>
   </div>
 <% } else { %>
   <div class="table-wrap">
     <table class="leads-table">
-      <thead><tr><th>Rubro</th><th>Subcategorías</th><th class="num">Productos</th><th class="num">Atributos</th><th>Acciones</th></tr></thead>
+      <thead><tr><th>Categoría</th><th>Tipos</th><th class="num">Productos</th><th>Acciones</th></tr></thead>
       <tbody>
         <% categorias.forEach(function (cat) { %>
           <tr>
-            <td><a href="/panel/categorias/<%= cat.id %>" style="color:inherit;font-weight:600"><%= cat.nombre %></a></td>
-            <td class="muted" style="font-size:.86rem">
+            <td><a href="/panel/categorias/<%= cat.id %>" class="cat-nombre"><%= cat.nombre %></a></td>
+            <td class="muted cat-tipos">
               <% if (cat.hijas.length) { %>
                 <%= cat.hijas.map(function (h) { return h.nombre + ' (' + h._count.productos + ')'; }).join(' · ') %>
               <% } else { %>
-                <span style="opacity:.6">sin dividir</span>
+                <span class="cat-sin-tipos">Sin tipos</span>
               <% } %>
             </td>
             <td class="num"><%= cat._count.productos + cat.hijas.reduce(function (n, h) { return n + h._count.productos; }, 0) %></td>
-            <td class="num"><%= cat._count.atributos %></td>
             <td class="actions-cell">
-              <a class="btn btn-ghost" style="padding:.4rem .8rem;font-size:.85rem" href="/panel/categorias/<%= cat.id %>">Configurar</a>
+              <a class="btn btn-ghost btn-chico" href="/panel/categorias/<%= cat.id %>">Editar</a>
               <form method="POST" action="/panel/categorias/<%= cat.id %>/eliminar" class="inline-form"
-                    onsubmit="return confirm('¿Eliminar este rubro? Se eliminan también sus subcategorías, y los productos que las usan quedan sin categoría.');">
-                <button class="btn btn-ghost" style="padding:.4rem .8rem;font-size:.85rem" type="submit">Eliminar</button>
+                    onsubmit="return confirm('¿Eliminar esta categoría? También se eliminan sus tipos, y los productos que estaban en ella quedan sin categoría.');">
+                <button class="btn btn-ghost btn-chico" type="submit">Eliminar</button>
               </form>
             </td>
           </tr>
@@ -43,43 +56,38 @@
       </tbody>
     </table>
   </div>
+
+  <form method="POST" action="/panel/categorias" class="pf-card cat-nueva">
+    <h3 class="pf-titulo">Agregar otra categoría</h3>
+    <div class="field-row">
+      <div class="field">
+        <label for="nombre">Nombre</label>
+        <input id="nombre" name="nombre" type="text" required maxlength="120" placeholder="Ej: Abrigos" autocomplete="off" />
+      </div>
+      <div class="field">
+        <label for="padreId">¿Dónde va?</label>
+        <select id="padreId" name="padreId">
+          <option value="">Es una categoría nueva</option>
+          <% categorias.forEach(function (cat) { %>
+            <option value="<%= cat.id %>">Es un tipo dentro de “<%= cat.nombre %>”</option>
+          <% }); %>
+        </select>
+      </div>
+    </div>
+    <p class="pf-ayuda">Si es un tipo (por ejemplo Botas dentro de Calzado), elegilo arriba. Si no, quedaría como una categoría más en el menú.</p>
+    <div class="form-actions"><button class="btn btn-primary" type="submit">Agregar</button></div>
+  </form>
+
+  <details class="pf-mas cat-mas">
+    <summary>Cargar las categorías típicas de una tienda de ropa</summary>
+    <div class="pf-mas-cuerpo">
+      <form method="POST" action="/panel/categorias/plantilla">
+        <input type="hidden" name="plantilla" value="ropa" />
+        <p class="muted">Agrega Calzado, Prendas de arriba, Abrigos y otras con sus tipos. <strong>No toca lo que ya tenés</strong> ni crea productos.</p>
+        <button class="btn btn-ghost" type="submit">Cargar categorías sugeridas</button>
+      </form>
+    </div>
+  </details>
 <% } %>
-
-<form method="POST" action="/panel/categorias" class="form-card" style="max-width:500px;margin-top:1.4rem">
-  <h3 style="margin:0 0 1rem;font-size:.95rem">+ Agregar categoría nueva</h3>
-  <p class="muted" style="font-size:.85rem;margin:0 0 .8rem">Un rubro es una opción del menú principal (Calzado, Abrigos). Si lo que querés agregar es un tipo DENTRO de un rubro (Botas dentro de Calzado), elegí ese rubro abajo — si lo dejás así queda como rubro nuevo, y eso puede confundir el menú del bot.</p>
-  <div class="field">
-    <label for="nombre">Nombre *</label>
-    <input id="nombre" name="nombre" type="text" required maxlength="120" placeholder="Ej: Calzado, o Botas" />
-  </div>
-  <div class="field">
-    <label for="padreId">¿Es un tipo dentro de un rubro existente?</label>
-    <select id="padreId" name="padreId">
-      <option value="">No, es un rubro nuevo</option>
-      <% categorias.forEach(function (cat) { %>
-        <option value="<%= cat.id %>">Va dentro de "<%= cat.nombre %>"</option>
-      <% }); %>
-    </select>
-  </div>
-  <div class="form-actions">
-    <button class="btn btn-primary" type="submit">Agregar y configurar</button>
-  </div>
-</form>
-
-<!-- Al fondo a proposito: es una herramienta de uso puntual (cargar de una
-     toda la estructura sugerida), no algo que se use seguido como el form
-     de arriba - no debe competir por atencion con el alta normal. -->
-<form method="POST" action="/panel/categorias/plantilla" class="form-card" style="max-width:500px;margin-top:1.4rem">
-  <input type="hidden" name="plantilla" value="ropa" />
-  <h3 style="margin:0 0 .6rem;font-size:.95rem">Cargar estructura de tienda de ropa</h3>
-  <p class="muted" style="font-size:.85rem;margin:0 0 .9rem">
-    Crea de una vez los rubros típicos con sus tipos adentro: Calzado (zapatillas, botas, zapatos...),
-    Prendas de arriba, Prendas de abajo, Abrigos, Vestidos, Ropa deportiva, Ropa de baño y Accesorios.
-    <strong>No toca lo que ya tenés</strong> ni crea productos: solo arma las carpetas para que cargues los tuyos.
-  </p>
-  <div class="form-actions">
-    <button class="btn btn-ghost" type="submit">Cargar estructura sugerida</button>
-  </div>
-</form>
 
 <%- include('partials/fin') %>

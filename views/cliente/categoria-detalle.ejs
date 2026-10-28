@@ -1,44 +1,38 @@
 <%- include('partials/inicio') %>
+<%
+  var inputStyle = 'background:transparent;border:1px solid rgba(255,255,255,.15);border-radius:8px;padding:.35rem .5rem;color:inherit;font:inherit;font-size:.85rem';
+  var rubrosDisp = typeof rubrosDisponibles !== 'undefined' ? rubrosDisponibles : [];
+  var esTipo = Boolean(categoria.padre);
+%>
 
 <div class="page-head">
-  <h2>
-    <% if (categoria.padre) { %>
-      <a href="/panel/categorias/<%= categoria.padre.id %>" style="color:var(--tenue);font-size:.85rem;font-weight:400">← <%= categoria.padre.nombre %></a>
+  <p class="cat-volver">
+    <% if (esTipo) { %>
+      <a href="/panel/categorias/<%= categoria.padre.id %>">← <%= categoria.padre.nombre %></a>
     <% } else { %>
-      <a href="/panel/categorias" style="color:var(--tenue);font-size:.85rem;font-weight:400">← Rubros</a>
+      <a href="/panel/categorias">← Todas las categorías</a>
     <% } %>
-    <br /><%= categoria.nombre %>
-    <span class="muted" style="font-size:.75rem;font-weight:400"><%= categoria.padre ? 'subcategoría de ' + categoria.padre.nombre : 'rubro' %></span>
+  </p>
+  <h2><%= categoria.nombre %>
+    <span class="badge badge-off"><%= esTipo ? 'Tipo de ' + categoria.padre.nombre : 'Categoría' %></span>
   </h2>
-  <p>Definí cuánto le importa cada atributo al agente antes de recomendar productos de esta categoría:</p>
-  <ul style="margin:.4rem 0 .6rem 1.1rem;padding:0;font-size:.9rem">
-    <li><strong>Obligatorio</strong>: el agente NO le muestra ningún producto al cliente hasta saberlo (ej: Género en una tienda de ropa).</li>
-    <li><strong>Recomendado</strong>: lo pregunta si la conversación da pie, pero no bloquea la búsqueda.</li>
-    <li><strong>Opcional</strong>: solo se usa para filtrar si el cliente lo menciona por su cuenta.</li>
-  </ul>
-  <p>Los que marques como "de variante" (ej: Talla, Color) <strong>nunca bloquean</strong>, aunque los pongas en Obligatorio: se asume que son detalles que el cliente ve y elige en la tarjeta (como la talla), no algo que frena la venta hasta saberlo. Si necesitás que un dato frene la venta (ej. Género), no lo marques como "de variante".</p>
 </div>
 
 <% if (mensaje) { %><div class="alert-ok"><%= mensaje %></div><% } %>
-<% if (error) { %><div class="alert-err"><%= error %></div><% } %>
+<% if (error) { %><div class="alert-err" role="alert"><%= error %></div><% } %>
 
-<%
-  var inputStyle = 'background:transparent;border:1px solid rgba(255,255,255,.15);border-radius:8px;padding:.35rem .5rem;color:inherit;font:inherit;font-size:.85rem';
-  var formCat = 'editar-categoria';
-%>
-<form method="POST" action="/panel/categorias/<%= categoria.id %>" id="<%= formCat %>" class="form-card" style="max-width:500px" enctype="multipart/form-data">
+<!-- Nombre y foto -->
+<form method="POST" action="/panel/categorias/<%= categoria.id %>" id="editar-categoria" class="pf-card cat-form" enctype="multipart/form-data">
   <div class="field">
     <label for="nombre">Nombre</label>
-    <input id="nombre" name="nombre" type="text" value="<%= categoria.nombre %>" style="<%= inputStyle %>" />
+    <input id="nombre" name="nombre" type="text" value="<%= categoria.nombre %>" maxlength="120" />
   </div>
   <div class="field">
-    <label for="imagen">Foto de la categoría</label>
-    <p class="muted" style="font-size:.82rem;margin:0 0 .5rem">El agente la usa para la tarjeta que le manda al cliente cuando pregunta por "<%= categoria.nombre %>" (junto con cuántos modelos hay, desde qué precio, y un link para ver todo). Sin foto, manda el mismo mensaje pero sin imagen.</p>
+    <label for="imagen">Foto (opcional)</label>
+    <p class="pf-ayuda">Se la mostramos al cliente cuando pregunta por “<%= categoria.nombre %>”, junto con cuántos modelos hay y desde qué precio. Sin foto, recibe el mismo mensaje sin imagen.</p>
     <% if (categoria.imagenUrl) { %>
-      <div style="margin-bottom:8px;">
-        <img src="<%= categoria.imagenUrl %>" style="width:120px;height:80px;object-fit:cover;border-radius:8px" />
-      </div>
-      <label style="margin-bottom:.5rem;display:block"><input type="checkbox" name="quitarImagen" value="1" /> Quitar la foto actual</label>
+      <div class="pf-fotos"><img src="<%= categoria.imagenUrl %>" alt="Foto actual de la categoría" style="width:120px;height:80px" /></div>
+      <label class="pf-check"><input type="checkbox" name="quitarImagen" value="1" /> Quitar la foto actual</label>
     <% } %>
     <input id="imagen" name="imagen" type="file" accept="image/*" />
   </div>
@@ -47,138 +41,144 @@
   </div>
 </form>
 
-<form method="POST" action="/panel/categorias/<%= categoria.id %>/mover" class="form-card" style="max-width:500px;margin-top:1rem">
-  <div class="field">
-    <label for="padreId">Pertenece al rubro</label>
-    <p class="muted" style="font-size:.82rem;margin:0 0 .5rem">
-      Si la dejás en "Ninguno", es un rubro de primer nivel y aparece en el menú principal del agente.
+<% if (!esTipo) { %>
+  <!-- Tipos -->
+  <section class="pf-card cat-seccion">
+    <h3 class="pf-titulo">Tipos dentro de “<%= categoria.nombre %>”</h3>
+    <p class="pf-ayuda">
+      Cuando el cliente elige esta categoría, le ofrecemos esta lista y recién después le mostramos productos.
+      Si no agregás tipos, pasa directo a los productos.
     </p>
-    <select id="padreId" name="padreId">
-      <option value="">Ninguno (es un rubro)</option>
-      <% (typeof rubrosDisponibles !== 'undefined' ? rubrosDisponibles : []).forEach(function (r) { %>
-        <option value="<%= r.id %>" <%= categoria.padreId === r.id ? 'selected' : '' %>><%= r.nombre %></option>
-      <% }); %>
-    </select>
-  </div>
-  <div class="form-actions">
-    <button class="btn btn-ghost" type="submit">Mover</button>
-  </div>
-</form>
 
-<% if (!categoria.padre) { %>
-  <div class="page-head" style="margin-top:1.6rem">
-    <h3 style="font-size:1rem">Subcategorías</h3>
-    <p class="muted" style="font-size:.88rem;margin:.2rem 0 0">
-      Los tipos que hay dentro de este rubro. Cuando el cliente elige "<%= categoria.nombre %>", el agente le ofrece esta lista
-      y recién muestra productos cuando elige uno. Si dejás el rubro sin subcategorías, el agente pasa directo a los productos.
+    <% if (categoria.hijas && categoria.hijas.length) { %>
+      <div class="table-wrap">
+        <table class="leads-table">
+          <thead><tr><th>Tipo</th><th class="num">Productos</th><th>Acciones</th></tr></thead>
+          <tbody>
+            <% categoria.hijas.forEach(function (h) { %>
+              <tr>
+                <td><a href="/panel/categorias/<%= h.id %>" class="cat-nombre"><%= h.nombre %></a></td>
+                <td class="num"><%= h._count.productos %></td>
+                <td class="actions-cell">
+                  <a class="btn btn-ghost btn-chico" href="/panel/categorias/<%= h.id %>">Editar</a>
+                  <form method="POST" action="/panel/categorias/<%= h.id %>/eliminar" class="inline-form"
+                        onsubmit="return confirm('¿Eliminar este tipo? Sus productos quedan sin categoría.');">
+                    <button class="btn btn-ghost btn-chico" type="submit">Eliminar</button>
+                  </form>
+                </td>
+              </tr>
+            <% }); %>
+          </tbody>
+        </table>
+      </div>
+    <% } %>
+
+    <form method="POST" action="/panel/categorias/<%= categoria.id %>/subcategorias" class="cat-agregar-tipo">
+      <div class="field">
+        <label for="nuevo-tipo">Agregar un tipo</label>
+        <input id="nuevo-tipo" name="nombre" type="text" maxlength="120" required placeholder="Ej: Botas" autocomplete="off" />
+      </div>
+      <button class="btn btn-ghost" type="submit">+ Agregar</button>
+    </form>
+  </section>
+<% } %>
+
+<!-- Datos que le pregunta el agente al cliente (avanzado) -->
+<details class="pf-mas cat-mas">
+  <summary>Qué le pregunta el agente al cliente <em>(avanzado<%= categoria.atributos.length ? ' · ' + categoria.atributos.length + ' configurado' + (categoria.atributos.length === 1 ? '' : 's') : '' %>)</em></summary>
+  <div class="pf-mas-cuerpo">
+    <p class="pf-ayuda">
+      Podés pedirle al agente que averigüe un dato antes de recomendar productos de esta categoría (por ejemplo el género en una tienda de ropa).
+      Elegí qué tan importante es cada uno:
     </p>
-  </div>
+    <ul class="cat-niveles">
+      <li><strong>Obligatorio</strong>: no muestra ningún producto hasta saberlo.</li>
+      <li><strong>Recomendado</strong>: lo pregunta si la charla da pie, pero no frena la búsqueda.</li>
+      <li><strong>Opcional</strong>: solo lo usa si el cliente lo menciona.</li>
+    </ul>
+    <p class="pf-ayuda">Los datos que marques “de opciones” (talla, color) nunca frenan la venta, ni siquiera en Obligatorio: el cliente los elige en la tarjeta del producto. Si un dato tiene que frenar la venta (ej. género), no lo marques así.</p>
 
-  <% if (categoria.hijas && categoria.hijas.length) { %>
-    <div class="table-wrap">
-      <table class="leads-table">
-        <thead><tr><th>Subcategoría</th><th class="num">Productos</th><th>Acciones</th></tr></thead>
-        <tbody>
-          <% categoria.hijas.forEach(function (h) { %>
-            <tr>
-              <td><a href="/panel/categorias/<%= h.id %>" style="color:inherit;font-weight:600"><%= h.nombre %></a></td>
-              <td class="num"><%= h._count.productos %></td>
-              <td class="actions-cell">
-                <a class="btn btn-ghost" style="padding:.3rem .7rem;font-size:.8rem" href="/panel/categorias/<%= h.id %>">Configurar</a>
-                <form method="POST" action="/panel/categorias/<%= h.id %>/eliminar" class="inline-form"
-                      onsubmit="return confirm('¿Eliminar esta subcategoría? Sus productos quedan sin categoría.');">
-                  <button class="btn btn-ghost" style="padding:.3rem .7rem;font-size:.8rem" type="submit">Eliminar</button>
-                </form>
-              </td>
-            </tr>
+    <% if (categoria.atributos.length) { %>
+      <div class="table-wrap">
+        <table class="leads-table">
+          <thead><tr><th>Orden</th><th>Dato</th><th>Importancia</th><th>De opciones (talla/color)</th><th>¿Frena la venta?</th><th>Acciones</th></tr></thead>
+          <tbody>
+            <% categoria.atributos.forEach(function (a) { %>
+              <% var formAtr = 'editar-atributo-' + a.id; %>
+              <tr>
+                <td><input form="<%= formAtr %>" name="orden" type="number" value="<%= a.orden %>" style="width:60px;<%= inputStyle %>" aria-label="Orden" /></td>
+                <td><input form="<%= formAtr %>" name="nombre" type="text" value="<%= a.nombre %>" style="width:100%;min-width:160px;<%= inputStyle %>" aria-label="Nombre del dato" /></td>
+                <td>
+                  <select form="<%= formAtr %>" name="nivel" class="js-nivel-bloqueo" data-badge="bloqueo-<%= a.id %>" style="<%= inputStyle %>" aria-label="Importancia">
+                    <% ['OBLIGATORIO','RECOMENDADO','OPCIONAL'].forEach(function (n) { %>
+                      <option value="<%= n %>" <%= a.nivel === n ? 'selected' : '' %>><%= n.charAt(0) + n.slice(1).toLowerCase() %></option>
+                    <% }); %>
+                  </select>
+                </td>
+                <td><input form="<%= formAtr %>" name="esDeVariante" type="checkbox" value="1" class="js-variante-bloqueo" data-badge="bloqueo-<%= a.id %>" <%= a.esDeVariante ? 'checked' : '' %> aria-label="Es de opciones" /></td>
+                <td><span id="bloqueo-<%= a.id %>" class="badge"></span></td>
+                <td class="actions-cell">
+                  <button form="<%= formAtr %>" class="btn btn-ghost btn-chico" type="submit">Guardar</button>
+                  <form method="POST" action="/panel/categorias/<%= categoria.id %>/atributos/<%= a.id %>/eliminar" class="inline-form"
+                        onsubmit="return confirm('¿Quitar este dato de la categoría?');">
+                    <button class="btn btn-ghost btn-chico" type="submit">Quitar</button>
+                  </form>
+                </td>
+              </tr>
+              <form id="<%= formAtr %>" method="POST" action="/panel/categorias/<%= categoria.id %>/atributos/<%= a.id %>"></form>
+            <% }); %>
+          </tbody>
+        </table>
+      </div>
+    <% } else { %>
+      <p class="muted">Todavía no configuraste ninguno. No hace falta: el agente funciona igual.</p>
+    <% } %>
+
+    <datalist id="atributos-sugeridos">
+      <option value="Genero"></option><option value="Talla"></option><option value="Color"></option>
+      <option value="Marca"></option><option value="Material"></option><option value="Uso"></option><option value="Estilo"></option>
+    </datalist>
+
+    <form method="POST" action="/panel/categorias/<%= categoria.id %>/atributos" class="field-row cat-nuevo-dato">
+      <div class="field">
+        <label for="nuevo-dato">Nuevo dato</label>
+        <input id="nuevo-dato" list="atributos-sugeridos" name="nombre" type="text" maxlength="60" required placeholder="Ej: Genero" />
+      </div>
+      <div class="field">
+        <label for="nuevo-nivel">Importancia</label>
+        <select id="nuevo-nivel" name="nivel" class="js-nivel-bloqueo" data-badge="bloqueo-nuevo">
+          <option value="OPCIONAL">Opcional</option>
+          <option value="RECOMENDADO">Recomendado</option>
+          <option value="OBLIGATORIO">Obligatorio</option>
+        </select>
+      </div>
+      <input type="hidden" name="orden" value="0" />
+      <label class="pf-check"><input type="checkbox" name="esDeVariante" value="1" class="js-variante-bloqueo" data-badge="bloqueo-nuevo" /> De opciones (talla/color)</label>
+      <span id="bloqueo-nuevo" class="badge"></span>
+      <button class="btn btn-ghost" type="submit">+ Agregar dato</button>
+    </form>
+  </div>
+</details>
+
+<!-- Cambiar de lugar -->
+<details class="pf-mas cat-mas">
+  <summary>Cambiar de lugar <em>(opcional)</em></summary>
+  <div class="pf-mas-cuerpo">
+    <form method="POST" action="/panel/categorias/<%= categoria.id %>/mover">
+      <div class="field">
+        <label for="padreId">Esta <%= esTipo ? 'está dentro de' : 'categoría puede ir dentro de' %></label>
+        <select id="padreId" name="padreId">
+          <option value="">Ninguna: es una categoría principal</option>
+          <% rubrosDisp.forEach(function (r) { %>
+            <option value="<%= r.id %>" <%= categoria.padreId === r.id ? 'selected' : '' %>><%= r.nombre %></option>
           <% }); %>
-        </tbody>
-      </table>
-    </div>
-  <% } else { %>
-    <p class="muted" style="font-size:.85rem;margin:.4rem 0">Sin subcategorías: el agente muestra los productos del rubro directamente.</p>
-  <% } %>
-
-  <form method="POST" action="/panel/categorias/<%= categoria.id %>/subcategorias" class="field-row" style="margin-top:1rem;align-items:flex-end">
-    <div class="field" style="max-width:260px">
-      <label>Nueva subcategoría</label>
-      <input name="nombre" type="text" maxlength="120" required placeholder="Ej: Pantalones elegantes" />
-    </div>
-    <button class="btn btn-ghost" type="submit">+ Agregar subcategoría</button>
-  </form>
-<% } %>
-
-<div class="page-head" style="margin-top:1.6rem">
-  <h3 style="font-size:1rem">Atributos</h3>
-</div>
-
-<% if (categoria.atributos.length) { %>
-  <div class="table-wrap">
-    <table class="leads-table">
-      <thead><tr><th>Orden</th><th>Atributo</th><th>Nivel</th><th>Es de variante (talla/color)</th><th>¿Bloquea la venta?</th><th>Acciones</th></tr></thead>
-      <tbody>
-        <% categoria.atributos.forEach(function (a) { %>
-          <% var formAtr = 'editar-atributo-' + a.id; %>
-          <tr>
-            <td><input form="<%= formAtr %>" name="orden" type="number" value="<%= a.orden %>" style="width:60px;<%= inputStyle %>" /></td>
-            <td><input form="<%= formAtr %>" name="nombre" type="text" value="<%= a.nombre %>" style="width:100%;min-width:160px;<%= inputStyle %>" /></td>
-            <td>
-              <select form="<%= formAtr %>" name="nivel" class="js-nivel-bloqueo" data-badge="bloqueo-<%= a.id %>" style="<%= inputStyle %>">
-                <% ['OBLIGATORIO','RECOMENDADO','OPCIONAL'].forEach(function (n) { %>
-                  <option value="<%= n %>" <%= a.nivel === n ? 'selected' : '' %>><%= n.charAt(0) + n.slice(1).toLowerCase() %></option>
-                <% }); %>
-              </select>
-            </td>
-            <td><input form="<%= formAtr %>" name="esDeVariante" type="checkbox" value="1" class="js-variante-bloqueo" data-badge="bloqueo-<%= a.id %>" <%= a.esDeVariante ? 'checked' : '' %> /></td>
-            <td><span id="bloqueo-<%= a.id %>" class="badge"></span></td>
-            <td class="actions-cell">
-              <button form="<%= formAtr %>" class="btn btn-ghost" style="padding:.3rem .7rem;font-size:.8rem" type="submit">Guardar</button>
-              <form method="POST" action="/panel/categorias/<%= categoria.id %>/atributos/<%= a.id %>/eliminar" class="inline-form"
-                    onsubmit="return confirm('¿Quitar este atributo de la categoría?');">
-                <button class="btn btn-ghost" style="padding:.3rem .7rem;font-size:.8rem" type="submit">Quitar</button>
-              </form>
-            </td>
-          </tr>
-          <form id="<%= formAtr %>" method="POST" action="/panel/categorias/<%= categoria.id %>/atributos/<%= a.id %>"></form>
-        <% }); %>
-      </tbody>
-    </table>
+        </select>
+        <p class="pf-ayuda">Si queda como categoría principal, aparece en el primer menú que ve el cliente.</p>
+      </div>
+      <button class="btn btn-ghost" type="submit">Mover</button>
+    </form>
   </div>
-<% } else { %>
-  <p class="muted" style="font-size:.85rem;margin:.4rem 0">Sin atributos todavía.</p>
-<% } %>
-
-<datalist id="atributos-sugeridos">
-  <option value="Genero"></option>
-  <option value="Talla"></option>
-  <option value="Color"></option>
-  <option value="Marca"></option>
-  <option value="Material"></option>
-  <option value="Uso"></option>
-  <option value="Estilo"></option>
-</datalist>
-
-<form method="POST" action="/panel/categorias/<%= categoria.id %>/atributos" class="field-row" style="margin-top:1rem;align-items:flex-end">
-  <div class="field" style="max-width:220px">
-    <label>Nuevo atributo</label>
-    <input list="atributos-sugeridos" name="nombre" type="text" maxlength="60" required placeholder="Ej: Genero" />
-  </div>
-  <div class="field" style="max-width:90px">
-    <label>Orden</label>
-    <input name="orden" type="number" value="0" />
-  </div>
-  <div class="field" style="max-width:150px">
-    <label>Nivel</label>
-    <select name="nivel" class="js-nivel-bloqueo" data-badge="bloqueo-nuevo">
-      <option value="OPCIONAL">Opcional</option>
-      <option value="RECOMENDADO">Recomendado</option>
-      <option value="OBLIGATORIO">Obligatorio</option>
-    </select>
-  </div>
-  <label style="margin:0 0 .6rem"><input type="checkbox" name="esDeVariante" value="1" class="js-variante-bloqueo" data-badge="bloqueo-nuevo" /> Es de variante</label>
-  <span id="bloqueo-nuevo" class="badge" style="margin-bottom:.6rem"></span>
-  <button class="btn btn-ghost" type="submit">+ Agregar atributo</button>
-</form>
+</details>
 
 <script>
   // Mismo criterio que usa el motor (agente.js: atributosFaltantes) y el
@@ -198,13 +198,13 @@
       badge.className = 'badge';
       if (esObligatorio && !esVariante) {
         badge.classList.add('badge-new');
-        badge.textContent = '🔒 Bloquea hasta saberlo';
+        badge.textContent = '🔒 Frena hasta saberlo';
       } else if (esObligatorio && esVariante) {
         badge.classList.add('badge-alerta');
-        badge.textContent = '⚠️ No bloquea (es de variante)';
+        badge.textContent = '⚠️ No frena (es de opciones)';
       } else {
         badge.classList.add('badge-off');
-        badge.textContent = 'No bloquea';
+        badge.textContent = 'No frena';
       }
     }
     var badgeIds = new Set();

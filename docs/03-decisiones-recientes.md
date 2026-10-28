@@ -648,3 +648,23 @@ reportado. Suite determinista completa: **194 tests en verde**.
 **Verificado** en el navegador (escritorio y celular, sin scroll horizontal): alta con categoría nueva + 6 combinaciones, edición agregando 2 combinaciones donde 1 ya existía (se creó solo la nueva), y bloqueo del envío si se elige "Sí" sin armar combinaciones. Suite: 516 tests (+12 de `variantes-form`, +4 de `primeros-pasos`).
 
 **Pendiente de esta línea (fases siguientes del plan de UI):** menú lateral agrupado, categorías más simples, configuración en pestañas y pasada de diseño (quedan ~190 `style=` en línea; la tabla de variantes existentes todavía los usa).
+
+
+## 29. Menú lateral agrupado y categorías más simples
+
+**Problema.** El menú tenía 13 ítems planos en "Operación" (más 3 de facturación) y la pantalla de Categorías explicaba rubros, subcategorías y atributos en tres párrafos antes de dejar crear nada. Un negocio nuevo no sabía por dónde empezar.
+
+**Menú (fase D, `views/cliente/partials/inicio.ejs`).** Mismos 16 enlaces y mismos permisos por rol, agrupados por lo que hace el negocio: Inicio, *Vender* (Conversaciones, Pedidos, Clientes), *Mi catálogo* (Productos, Categorías, Inventario), *Mi agente* (Agente IA, WhatsApp, Configuración), *Resultados* (Reportes, Inteligencia) y *Mi cuenta* (Mi equipo, Mi consumo, Comprar paquete, Mis compras; solo OWNER, igual que antes).
+
+**Vocabulario.** En el panel se dice **categoría** y **tipo** (Calzado → Botas) en vez de rubro/subcategoría/grupo. Los nombres internos (`padreId`, `/subcategorias`, "rubro" en los menús del bot) no cambian.
+
+**Categorías (fase C).**
+- Sin categorías: dos caminos claros, "Vendo ropa o calzado" (carga la estructura sugerida) y "Prefiero armarlas yo" (nombre de la primera).
+- Con categorías: tabla corta (Categoría, Tipos, Productos, Editar/Eliminar), formulario de una línea para agregar, y la plantilla de ropa queda plegada abajo.
+- Detalle: nombre y foto arriba; "Tipos" con alta en una línea; lo avanzado va plegado: *Qué le pregunta el agente al cliente* (los atributos obligatorios/recomendados/opcionales, con las reglas explicadas en 3 líneas y la misma señal de "frena / no frena la venta") y *Cambiar de lugar*.
+- **Bug que ya existía y que se arregló:** `POST /panel/categorias/plantilla` quedaba capturada por `POST /panel/categorias/:id` (registrada antes), así que el botón "Cargar estructura de ropa" nunca funcionó (respondía "El nombre es obligatorio"). Ahora las rutas `:id` de categoría solo aceptan números. Test de regresión en `test/rutas-categorias.test.js`.
+- Mensajes del servidor reescritos con las palabras nuevas; el de la plantilla distingue negocio nuevo ("Listo, armamos N categorías…") de uno que ya tenía categorías.
+
+**Verificado** contra el servidor local con una cuenta de prueba (ya borrada): el menú muestra los 5 grupos, la plantilla crea 26 categorías, el detalle de una categoría y el de un tipo cargan, renombrar y agregar tipos responden bien, y el formulario de producto usa "categoría". **No se pudo revisar el aspecto visual**: el navegador integrado no logró abrir localhost en esta sesión. Suite: 518 tests.
+
+**Pendiente de esta línea:** configuración en pestañas (fase E) y pasada de diseño (fase F), incluida la revisión visual de estas pantallas.

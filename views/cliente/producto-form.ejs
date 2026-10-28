@@ -40,10 +40,10 @@
     </div>
 
     <div class="field">
-      <label for="categoriaId">¿En qué grupo va?</label>
+      <label for="categoriaId">¿En qué categoría va?</label>
       <% if (hayCategorias) { %>
         <select id="categoriaId" name="categoriaId">
-          <option value="">Sin grupo por ahora</option>
+          <option value="">Sin categoría por ahora</option>
           <% categorias.forEach(function (c) { %>
             <% if (c.hijas && c.hijas.length) { %>
               <optgroup label="<%= c.nombre %>">
@@ -56,9 +56,9 @@
             <% } %>
           <% }); %>
         </select>
-        <button type="button" class="pf-link" id="btn-categoria-nueva">¿No está? Crear un grupo nuevo</button>
+        <button type="button" class="pf-link" id="btn-categoria-nueva">¿No está? Crear una categoría nueva</button>
       <% } else { %>
-        <p class="muted pf-ayuda">Todavía no tenés grupos (por ejemplo: Calzado, Camisetas, Accesorios). Escribí el primero y lo creamos junto con el producto.</p>
+        <p class="muted pf-ayuda">Todavía no tenés categorías (por ejemplo: Calzado, Camisetas, Accesorios). Escribí la primera y la creamos junto con el producto.</p>
       <% } %>
       <div id="categoria-nueva-wrap" <%= hayCategorias && !b.categoriaNueva ? 'hidden' : '' %>>
         <input id="categoriaNueva" name="categoriaNueva" type="text" maxlength="120"
@@ -368,7 +368,7 @@
     if (!selectCategoria || !hintAtributos) return;
     var obligatorios = (window.__categoriasAtributos || {})[selectCategoria.value] || [];
     hintAtributos.textContent = obligatorios.length
-      ? 'Este grupo pide completar en “Más detalles”: ' + obligatorios.join(', ') + '.'
+      ? 'Esta categoría pide completar en “Más detalles”: ' + obligatorios.join(', ') + '.'
       : '';
     if (obligatorios.length && detalles) detalles.open = true;
   }
