@@ -65,6 +65,10 @@ Detectado al analizar el proyecto, no está en los 50 puntos del documento pero 
 - **El webhook de WhatsApp no valida la firma de Meta** (`X-Hub-Signature-256`). Cualquiera que conozca un `phoneNumberId` puede inyectar mensajes falsos: consume conversaciones pagas y dispara envíos a números arbitrarios. La solución son ~20 líneas (HMAC-SHA256 del body crudo con el App Secret), pero **necesita el App Secret de la app de Meta**, que hay que sacar del panel de Meta y cargar como `WHATSAPP_APP_SECRET`.
 - **Todo asume un solo proceso.** Los timers de debounce (`bufferMensajes.js`), el mutex por cliente (`conversaciones.js`) y el job de facturación viven en memoria. Con dos réplicas habría cobros y notificaciones duplicados. Hoy no es un problema real con una sola instancia; la solución de fondo (Redis o locks en Postgres) es trabajo grande. **Decisión: no escalar a más de una réplica hasta que haga falta.**
 
+## Recordatorio: piloto del flujo determinista (anotado 2026-10-28, a pedido del dueño)
+
+El código ya está en `main` y desplegable, con el flag `flujoDeterminista` apagado en todos los agentes. **Falta el piloto**: activar el checkbox "Menús y cierre con botones (sin IA)" en UN agente de prueba, recorrer el checklist del PDF de instrucciones en WhatsApp real (lista con "Ver más", botones tras agregar, retorno desde la web, editar carrito con tope de stock, cierre a domicilio y retiro, QR, pregunta en medio del cierre), confirmar que Meta acepta los textos de listas/botones, y comparar llamadas por mensaje y por pedido contra la línea base de `usos_ia` (`/admin/costo-ia`, log `respuesta_por_flujo`). Rollback: desmarcar el checkbox. **El dueño decidió posponerlo**; recordárselo más adelante.
+
 ## Cómo usar este archivo
 
 Si el próximo pedido es "seguí con lo del documento del jefe", ya no queda nada del documento salvo lo omitido por ser de pago. Lo que sigue en prioridad es la lista de infraestructura de arriba.
