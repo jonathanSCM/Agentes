@@ -1,313 +1,308 @@
 <%- include('partials/inicio') %>
+<%
+  var esEdicion = Boolean(producto);
+  // Al volver de un error de validacion, "borrador" trae lo que el usuario ya habia escrito.
+  var b = producto || (typeof borrador !== 'undefined' && borrador) || {};
+  var yaTieneVariantes = Boolean(producto && producto.variantes && producto.variantes.length);
+  var categorias = typeof categoriasExistentes !== 'undefined' ? categoriasExistentes : [];
+  var categoriaIdActual = b.categoriaId ? Number(b.categoriaId) : (b.categoria && !isNaN(Number(b.categoria)) ? Number(b.categoria) : null);
+  var hayCategorias = categorias.length > 0;
+  var atributosProducto = esEdicion && producto.atributos ? producto.atributos : {};
+  if (!esEdicion && b.atributoClave) {
+    var _k = [].concat(b.atributoClave), _v = [].concat(b.atributoValor || []);
+    atributosProducto = {};
+    _k.forEach(function (k, i) { if (k && _v[i]) atributosProducto[k] = _v[i]; });
+  }
+  var entradasAtributos = Object.entries(atributosProducto);
+  if (!entradasAtributos.length) entradasAtributos = [['', '']];
+  var tieneCaracteristicas = Array.isArray(b.caracteristicas) ? b.caracteristicas.length > 0 : Boolean(b.caracteristicas);
+  var tieneDetalles = Boolean(b.descripcion || b.sku || tieneCaracteristicas || Object.keys(atributosProducto).length);
+%>
 
 <div class="page-head">
-  <h2><%= producto ? 'Editar producto' : 'Agregar producto' %></h2>
-  <p>Estos datos son los que el agente usará para responder a tus clientes.</p>
+  <h2><%= esEdicion ? 'Editar producto' : 'Agregar producto' %></h2>
+  <p>Lo justo para que tu agente lo ofrezca. Lo demás es opcional.</p>
 </div>
 
-<% if (error) { %><div class="alert-err"><%= error %></div><% } %>
+<% if (error) { %><div class="alert-err" role="alert"><%= error %></div><% } %>
+<% if (typeof mensaje !== 'undefined' && mensaje) { %><div class="alert-ok"><%= mensaje %></div><% } %>
 
-<form method="POST" action="<%= producto ? '/panel/productos/' + producto.id : '/panel/productos' %>" class="form-card" enctype="multipart/form-data">
-  <div class="field">
-    <label for="nombre">Nombre *</label>
-    <input id="nombre" name="nombre" type="text" required maxlength="120"
-           value="<%= producto ? producto.nombre : '' %>" placeholder="Ej: Zapatilla Runner Pro" />
-  </div>
-  <div class="field">
-    <label for="sku">SKU / código interno</label>
-    <input id="sku" name="sku" type="text" maxlength="60"
-           value="<%= producto && producto.sku ? producto.sku : '' %>" placeholder="Ej: ZAP-RUN-001" />
-  </div>
-  <div class="field">
-    <label for="descripcion">Descripción</label>
-    <input id="descripcion" name="descripcion" type="text" maxlength="200"
-           value="<%= producto && producto.descripcion ? producto.descripcion : '' %>" placeholder="Color, talla, material..." />
-  </div>
-  <div class="field-row">
+<form id="form-producto" method="POST" action="<%= esEdicion ? '/panel/productos/' + producto.id : '/panel/productos' %>" class="pf" enctype="multipart/form-data" novalidate>
+
+  <!-- 1. Lo básico -->
+  <section class="pf-card">
+    <h3 class="pf-titulo"><span class="pf-num">1</span> ¿Qué vendés?</h3>
+
     <div class="field">
-      <label for="precio">Precio (<%= moneda %>) *</label>
-      <input id="precio" name="precio" type="number" min="0" step="0.01" required
-             value="<%= producto ? Number(producto.precio).toFixed(2) : '' %>" placeholder="0.00" />
+      <label for="nombre">Nombre del producto *</label>
+      <input id="nombre" name="nombre" type="text" required maxlength="120"
+             value="<%= b.nombre || '' %>" placeholder="Ej: Zapatilla Runner Pro" autocomplete="off" />
     </div>
+
     <div class="field">
-      <label for="stock">Stock</label>
-      <%
-        var yaTieneVariantes = Boolean(producto && producto.variantes && producto.variantes.length);
-      %>
-      <input id="stock" name="stock" type="number" min="0"
-             value="<%= producto ? producto.stock : '0' %>" placeholder="0"
-             <%= yaTieneVariantes ? 'disabled' : '' %> />
-    </div>
-  </div>
-  <div class="field">
-    <label>
-      <input type="checkbox" id="tiene-variantes" <%= yaTieneVariantes ? 'checked disabled' : '' %> />
-      Este producto tiene variantes (talla, color, etc.)
-    </label>
-    <p class="muted" style="font-size:.82rem;margin:.3rem 0 0">
-      <% if (yaTieneVariantes) { %>
-        El stock se maneja por variante (más abajo) — para volver a usar el stock general primero eliminá las variantes cargadas.
-      <% } else if (producto) { %>
-        Si marcás esto, el Stock de arriba se bloquea en 0: vas a cargar el stock real por variante más abajo.
+      <label for="categoriaId">¿En qué grupo va?</label>
+      <% if (hayCategorias) { %>
+        <select id="categoriaId" name="categoriaId">
+          <option value="">Sin grupo por ahora</option>
+          <% categorias.forEach(function (c) { %>
+            <% if (c.hijas && c.hijas.length) { %>
+              <optgroup label="<%= c.nombre %>">
+                <% c.hijas.forEach(function (h) { %>
+                  <option value="<%= h.id %>" <%= categoriaIdActual === h.id ? 'selected' : '' %>><%= h.nombre %></option>
+                <% }); %>
+              </optgroup>
+            <% } else { %>
+              <option value="<%= c.id %>" <%= categoriaIdActual === c.id ? 'selected' : '' %>><%= c.nombre %></option>
+            <% } %>
+          <% }); %>
+        </select>
+        <button type="button" class="pf-link" id="btn-categoria-nueva">¿No está? Crear un grupo nuevo</button>
       <% } else { %>
-        Si marcás esto, el Stock de arriba queda en 0: vas a poder agregar las variantes con su propio stock después de guardar el producto.
+        <p class="muted pf-ayuda">Todavía no tenés grupos (por ejemplo: Calzado, Camisetas, Accesorios). Escribí el primero y lo creamos junto con el producto.</p>
       <% } %>
-    </p>
-  </div>
-  <%
-    var categorias = typeof categoriasExistentes !== 'undefined' ? categoriasExistentes : [];
-    var categoriaIdActual = producto && producto.categoriaId ? producto.categoriaId : (producto && producto.categoria ? Number(producto.categoria) : null);
-  %>
-  <div class="field">
-    <label for="categoriaId">Categoría</label>
-    <select id="categoriaId" name="categoriaId">
-      <option value="">Sin categoría</option>
-      <% categorias.forEach(function (c) { %>
-        <% if (c.hijas && c.hijas.length) { %>
-          <%# Rubro dividido: el producto va en una subcategoria, no en el rubro %>
-          <optgroup label="<%= c.nombre %>">
-            <% c.hijas.forEach(function (h) { %>
-              <option value="<%= h.id %>" <%= categoriaIdActual === h.id ? 'selected' : '' %>><%= h.nombre %></option>
-            <% }); %>
-          </optgroup>
-        <% } else { %>
-          <option value="<%= c.id %>" <%= categoriaIdActual === c.id ? 'selected' : '' %>><%= c.nombre %></option>
-        <% } %>
-      <% }); %>
-    </select>
-    <p class="muted" style="font-size:.82rem;margin:.4rem 0 0" id="hint-atributos-categoria"></p>
-    <p class="muted" style="font-size:.8rem;margin:.3rem 0 0"><a href="/panel/categorias" style="color:var(--primary-2)">Administrar rubros y subcategorías</a></p>
-  </div>
-  <script>
-    window.__categoriasAtributos = <%- JSON.stringify(categorias.reduce(function (acc, c) {
-      var obligatorios = function (cat) {
-        return cat.atributos.filter(function (a) { return a.nivel === 'OBLIGATORIO' && !a.esDeVariante; }).map(function (a) { return a.nombre; });
-      };
-      acc[c.id] = obligatorios(c);
-      (c.hijas || []).forEach(function (h) { acc[h.id] = obligatorios(h); });
-      return acc;
-    }, {})) %>;
-    // Nombres REALES de atributo configurados por categoria (todos, no solo
-    // los obligatorios) - se usan para llenar los <datalist> con la
-    // ortografia exacta que espera el motor, en vez de sugerencias
-    // genericas. Bug real: un producto quedo con "talla" en minuscula en
-    // vez de "Talla" y eso rompio el filtro para ese producto - sugerir el
-    // nombre exacto de la categoria reduce mucho esa clase de error (el
-    // campo sigue siendo texto libre, para no perder flexibilidad con
-    // atributos que no estan configurados en la categoria).
-    window.__categoriasAtributosNombres = <%- JSON.stringify(categorias.reduce(function (acc, c) {
-      var separar = function (cat) {
-        return {
-          producto: cat.atributos.filter(function (a) { return !a.esDeVariante; }).map(function (a) { return a.nombre; }),
-          variante: cat.atributos.filter(function (a) { return a.esDeVariante; }).map(function (a) { return a.nombre; }),
-        };
-      };
-      acc[c.id] = separar(c);
-      (c.hijas || []).forEach(function (h) { acc[h.id] = separar(h); });
-      return acc;
-    }, {})) %>;
-  </script>
-  <div class="field">
-    <label for="caracteristicas">Características (separadas por coma)</label>
-    <input id="caracteristicas" name="caracteristicas" type="text" maxlength="300"
-           value="<%= producto && producto.caracteristicas ? producto.caracteristicas.join(', ') : '' %>" placeholder="Ej: Talla M, Color azul" />
-  </div>
-  <div class="field">
-    <label>Atributos del producto</label>
-    <p class="muted" style="font-size:.82rem;margin:0 0 .5rem">Marca, material, voltaje, capacidad... lo que le sirva a tu tipo de producto. Agrega los que quieras.</p>
-    <div id="atributos-lista">
-      <%
-        var atributosProducto = producto && producto.atributos ? producto.atributos : {};
-        var entradas = Object.entries(atributosProducto);
-        if (!entradas.length) entradas = [['', '']];
-      %>
-      <% entradas.forEach(function (par) { %>
-        <div class="atributo-row" style="display:flex;gap:8px;margin-bottom:6px;">
-          <input list="atributos-sugeridos" name="atributoClave[]" placeholder="Ej: Marca" maxlength="60" value="<%= par[0] %>" style="flex:1" />
-          <input name="atributoValor[]" placeholder="Ej: Nike" maxlength="120" value="<%= par[1] %>" style="flex:1" />
-          <button type="button" class="btn btn-ghost btn-quitar-atributo">Quitar</button>
-        </div>
-      <% }); %>
+      <div id="categoria-nueva-wrap" <%= hayCategorias && !b.categoriaNueva ? 'hidden' : '' %>>
+        <input id="categoriaNueva" name="categoriaNueva" type="text" maxlength="120"
+               value="<%= b.categoriaNueva || '' %>" placeholder="Ej: Calzado" autocomplete="off" />
+      </div>
+      <p class="pf-ayuda pf-aviso" id="hint-atributos-categoria" role="status"></p>
     </div>
-    <datalist id="atributos-sugeridos">
-      <option value="Marca"></option>
-      <option value="Material"></option>
-      <option value="Color"></option>
-      <option value="Modelo"></option>
-      <option value="Voltaje"></option>
-      <option value="Capacidad"></option>
-      <option value="Peso"></option>
-      <option value="Sabor"></option>
-      <option value="Potencia"></option>
-      <option value="Garantía"></option>
-    </datalist>
-    <button type="button" id="btn-agregar-atributo" class="btn btn-ghost">+ Agregar atributo</button>
-    <template id="tpl-atributo-row">
-      <div class="atributo-row" style="display:flex;gap:8px;margin-bottom:6px;">
-        <input list="atributos-sugeridos" name="atributoClave[]" placeholder="Ej: Marca" maxlength="60" style="flex:1" />
-        <input name="atributoValor[]" placeholder="Ej: Nike" maxlength="120" style="flex:1" />
-        <button type="button" class="btn btn-ghost btn-quitar-atributo">Quitar</button>
-      </div>
-    </template>
-  </div>
-  <div class="field">
-    <label for="fotos">Fotos</label>
-    <input id="fotos" name="fotos" type="file" accept="image/*" multiple />
-    <% if (producto && producto.fotos && producto.fotos.length) { %>
-      <div class="fotos-existentes" style="display:flex;flex-wrap:wrap;gap:8px;margin-top:8px;">
-        <% producto.fotos.forEach(function (f) { %>
-          <img src="<%= f %>" style="width:80px;height:80px;object-fit:cover;border-radius:8px;" />
-        <% }); %>
-      </div>
-      <label style="margin-top:6px;"><input type="checkbox" name="quitarFotos" value="1" /> Quitar todas las fotos actuales al guardar</label>
-    <% } %>
-    <input type="hidden" name="fotosExistentes" value='<%- producto && producto.fotos ? JSON.stringify(producto.fotos) : "[]" %>' />
-  </div>
-  <div class="field">
-    <label><input type="checkbox" name="activo" value="1" <%= !producto || producto.activo ? 'checked' : '' %> /> Producto activo (visible para el agente)</label>
-  </div>
 
-  <div class="form-actions">
+    <div class="field-row">
+      <div class="field">
+        <label for="precio">Precio (<%= moneda %>) *</label>
+        <input id="precio" name="precio" type="number" min="0" step="0.01" required inputmode="decimal"
+               value="<%= esEdicion ? Number(producto.precio).toFixed(2) : (b.precio || '') %>" placeholder="0.00" />
+      </div>
+      <div class="field" id="campo-stock">
+        <label for="stock">¿Cuántas unidades tenés?</label>
+        <input id="stock" name="stock" type="number" min="0" inputmode="numeric"
+               value="<%= b.stock !== undefined && b.stock !== null ? b.stock : '0' %>" placeholder="0"
+               <%= yaTieneVariantes ? 'disabled' : '' %> />
+        <% if (yaTieneVariantes) { %><p class="pf-ayuda">El stock se maneja en cada variante, más abajo.</p><% } %>
+      </div>
+    </div>
+
+    <div class="field">
+      <label for="fotos">Fotos</label>
+      <input id="fotos" name="fotos" type="file" accept="image/*" multiple />
+      <p class="pf-ayuda">La primera es la que ve el cliente en el catálogo. Podés elegir varias a la vez.</p>
+      <div class="pf-fotos" id="fotos-previa">
+        <% if (esEdicion && producto.fotos && producto.fotos.length) { producto.fotos.forEach(function (f) { %>
+          <img src="<%= f %>" alt="Foto actual" />
+        <% }); } %>
+      </div>
+      <% if (esEdicion && producto.fotos && producto.fotos.length) { %>
+        <label class="pf-check"><input type="checkbox" name="quitarFotos" value="1" /> Quitar las fotos actuales al guardar</label>
+      <% } %>
+      <input type="hidden" name="fotosExistentes" value='<%- esEdicion && producto.fotos ? JSON.stringify(producto.fotos) : "[]" %>' />
+    </div>
+  </section>
+
+  <% if (!esEdicion) { %>
+  <!-- 2. Opciones (solo al crear: al editar las variantes se administran abajo) -->
+  <section class="pf-card">
+    <h3 class="pf-titulo"><span class="pf-num">2</span> ¿Viene en varias opciones?</h3>
+    <p class="pf-ayuda">Por ejemplo, un calzado en distintas tallas y colores. Si es un solo producto, elegí “No”.</p>
+    <div class="pf-eleccion" role="radiogroup" aria-label="¿Viene en varias opciones?">
+      <label class="pf-opcion">
+        <input type="radio" name="variantes_modo" value="no" checked />
+        <span><strong>No, es uno solo</strong><small>Sin tallas ni colores</small></span>
+      </label>
+      <label class="pf-opcion">
+        <input type="radio" name="variantes_modo" value="si" />
+        <span><strong>Sí, tiene opciones</strong><small>Tallas, colores, sabores…</small></span>
+      </label>
+    </div>
+    <div id="bloque-variantes" hidden>
+      <%- include('partials/constructor-variantes', { sugeridas: null }) %>
+    </div>
+  </section>
+  <% } %>
+
+  <!-- Más detalles -->
+  <details class="pf-mas" id="pf-mas" <%= tieneDetalles ? 'open' : '' %>>
+    <summary><span class="pf-num"><%= esEdicion ? '2' : '3' %></span> Más detalles <em>(opcional)</em></summary>
+    <div class="pf-mas-cuerpo">
+      <div class="field">
+        <label for="descripcion">Descripción corta</label>
+        <input id="descripcion" name="descripcion" type="text" maxlength="200"
+               value="<%= b.descripcion || '' %>" placeholder="Ej: Liviana, para correr todos los días" />
+      </div>
+      <div class="field">
+        <label for="sku">Código interno (SKU)</label>
+        <input id="sku" name="sku" type="text" maxlength="60"
+               value="<%= b.sku || '' %>" placeholder="Ej: ZAP-RUN-001" />
+      </div>
+      <div class="field">
+        <label for="caracteristicas">Características (separadas por coma)</label>
+        <input id="caracteristicas" name="caracteristicas" type="text" maxlength="300"
+               value="<%= Array.isArray(b.caracteristicas) ? b.caracteristicas.join(', ') : (b.caracteristicas || '') %>" placeholder="Ej: Impermeable, Suela antideslizante" />
+      </div>
+
+      <div class="field">
+        <label>Datos extra del producto</label>
+        <p class="pf-ayuda">Marca, material, voltaje… lo que le sirva a tu tipo de producto.</p>
+        <div id="atributos-lista">
+          <% entradasAtributos.forEach(function (par) { %>
+            <div class="atributo-row pf-fila">
+              <input list="atributos-sugeridos" name="atributoClave[]" placeholder="Ej: Marca" maxlength="60" value="<%= par[0] %>" aria-label="Nombre del dato" />
+              <input name="atributoValor[]" placeholder="Ej: Nike" maxlength="120" value="<%= par[1] %>" aria-label="Valor" />
+              <button type="button" class="btn btn-ghost btn-quitar-atributo" aria-label="Quitar este dato">×</button>
+            </div>
+          <% }); %>
+        </div>
+        <datalist id="atributos-sugeridos">
+          <option value="Marca"></option><option value="Material"></option><option value="Color"></option>
+          <option value="Modelo"></option><option value="Voltaje"></option><option value="Capacidad"></option>
+          <option value="Peso"></option><option value="Sabor"></option><option value="Potencia"></option><option value="Garantía"></option>
+        </datalist>
+        <button type="button" id="btn-agregar-atributo" class="btn btn-ghost">+ Agregar otro dato</button>
+        <template id="tpl-atributo-row">
+          <div class="atributo-row pf-fila">
+            <input list="atributos-sugeridos" name="atributoClave[]" placeholder="Ej: Marca" maxlength="60" aria-label="Nombre del dato" />
+            <input name="atributoValor[]" placeholder="Ej: Nike" maxlength="120" aria-label="Valor" />
+            <button type="button" class="btn btn-ghost btn-quitar-atributo" aria-label="Quitar este dato">×</button>
+          </div>
+        </template>
+      </div>
+
+      <label class="pf-check"><input type="checkbox" name="activo" value="1" <%= esEdicion ? (producto.activo ? 'checked' : '') : 'checked' %> /> Mostrar este producto a los clientes</label>
+    </div>
+  </details>
+
+  <div class="form-actions pf-acciones">
     <a class="btn btn-ghost" href="/panel/productos">Cancelar</a>
-    <button class="btn btn-primary" type="submit"><%= producto ? 'Guardar cambios' : 'Agregar producto' %></button>
+    <button class="btn btn-primary" type="submit"><%= esEdicion ? 'Guardar cambios' : 'Guardar producto' %></button>
   </div>
 </form>
 
-<% if (producto && producto.id) { %>
-  <div class="page-head" style="margin-top:2rem">
-    <h2 style="font-size:1.1rem">Variantes (talla, color, etc.)</h2>
-    <p class="muted" style="font-size:.85rem">Si este producto se vende en distintas combinaciones (ej: talla + color), cargalas acá con su propio stock. Si no tiene variantes, ignora esta sección y usa el stock de arriba.</p>
-  </div>
+<% if (esEdicion) { %>
+  <section class="pf-card pf-variantes">
+    <h3 class="pf-titulo">Opciones de este producto</h3>
+    <p class="pf-ayuda">Cada combinación (por ejemplo talla 42 en negro) tiene su propio stock y, si querés, su propio precio y fotos.</p>
 
-  <% if (errorVariante) { %><div class="alert-err"><%= errorVariante %></div><% } %>
+    <% if (typeof errorVariante !== 'undefined' && errorVariante) { %><div class="alert-err" role="alert"><%= errorVariante %></div><% } %>
 
-  <%
-    var inputStyleVariante = 'background:transparent;border:1px solid rgba(255,255,255,.15);border-radius:8px;padding:.35rem .5rem;color:inherit;font:inherit;font-size:.82rem';
-  %>
-  <datalist id="atributos-variante-sugeridos">
-    <option value="Talla"></option>
-    <option value="Color"></option>
-    <option value="Modelo"></option>
-    <option value="Sabor"></option>
-    <option value="Presentación"></option>
-    <option value="Tamaño"></option>
-  </datalist>
-  <template id="tpl-atributo-variante-mini">
-    <div class="atributo-row-mini" style="display:flex;gap:4px;">
-      <input list="atributos-variante-sugeridos" name="atributoClave[]" placeholder="Talla" maxlength="60" style="width:76px;<%= inputStyleVariante %>" />
-      <input name="atributoValor[]" placeholder="42" maxlength="120" style="width:84px;<%= inputStyleVariante %>" />
-      <button type="button" class="btn-quitar-atributo-mini" style="background:none;border:none;color:var(--tenue,#9aa1b5);cursor:pointer;font-size:1rem;line-height:1;padding:0 .2rem">×</button>
-    </div>
-  </template>
+    <%
+      var inputStyleVariante = 'background:transparent;border:1px solid rgba(255,255,255,.15);border-radius:8px;padding:.35rem .5rem;color:inherit;font:inherit;font-size:.82rem';
+    %>
+    <datalist id="atributos-variante-sugeridos">
+      <option value="Talla"></option><option value="Color"></option><option value="Modelo"></option>
+      <option value="Sabor"></option><option value="Presentación"></option><option value="Tamaño"></option>
+    </datalist>
+    <template id="tpl-atributo-variante-mini">
+      <div class="atributo-row-mini" style="display:flex;gap:4px;">
+        <input list="atributos-variante-sugeridos" name="atributoClave[]" placeholder="Talla" maxlength="60" style="width:76px;<%= inputStyleVariante %>" />
+        <input name="atributoValor[]" placeholder="42" maxlength="120" style="width:84px;<%= inputStyleVariante %>" />
+        <button type="button" class="btn-quitar-atributo-mini" aria-label="Quitar" style="background:none;border:none;color:var(--tenue,#9aa1b5);cursor:pointer;font-size:1rem;line-height:1;padding:0 .2rem">×</button>
+      </div>
+    </template>
 
-  <% if (producto.variantes.length) { %>
-    <div class="table-wrap">
-      <table class="leads-table">
-        <thead><tr><th>Atributos</th><th>Fotos</th><th class="num">Precio propio</th><th class="num">Stock</th><th>Acciones</th></tr></thead>
-        <tbody>
-          <% producto.variantes.forEach(function (v) { %>
-            <%
-              var formId = 'editar-variante-' + v.id;
-              var entradasVariante = Object.entries(v.atributos || {});
-              if (!entradasVariante.length) entradasVariante = [['', '']];
-              var tieneColorYFotos = Boolean(v.atributos && v.atributos.Color) && v.fotos && v.fotos.length;
-            %>
-            <tr>
-              <td>
-                <div class="atributos-variante" data-form="<%= formId %>" style="display:flex;flex-direction:column;gap:4px;min-width:190px">
-                  <% entradasVariante.forEach(function (par) { %>
-                    <div class="atributo-row-mini" style="display:flex;gap:4px;">
-                      <input form="<%= formId %>" list="atributos-variante-sugeridos" name="atributoClave[]" value="<%= par[0] %>" placeholder="Talla" maxlength="60" style="width:76px;<%= inputStyleVariante %>" />
-                      <input form="<%= formId %>" name="atributoValor[]" value="<%= par[1] %>" placeholder="42" maxlength="120" style="width:84px;<%= inputStyleVariante %>" />
-                      <button type="button" class="btn-quitar-atributo-mini" style="background:none;border:none;color:var(--tenue,#9aa1b5);cursor:pointer;font-size:1rem;line-height:1;padding:0 .2rem">×</button>
-                    </div>
-                  <% }); %>
-                  <button type="button" class="btn btn-ghost btn-agregar-atributo-variante" style="padding:.2rem .5rem;font-size:.75rem;align-self:flex-start">+ atributo</button>
-                </div>
-              </td>
-              <td style="min-width:140px">
-                <% if (v.fotos && v.fotos.length) { %>
-                  <div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:4px;">
-                    <% v.fotos.forEach(function (f) { %>
-                      <img src="<%= f %>" style="width:40px;height:40px;object-fit:cover;border-radius:6px;" />
+    <% if (producto.variantes.length) { %>
+      <div class="table-wrap">
+        <table class="leads-table">
+          <thead><tr><th>Opciones</th><th>Fotos</th><th class="num">Precio propio</th><th class="num">Stock</th><th>Acciones</th></tr></thead>
+          <tbody>
+            <% producto.variantes.forEach(function (v) { %>
+              <%
+                var formId = 'editar-variante-' + v.id;
+                var entradasVariante = Object.entries(v.atributos || {});
+                if (!entradasVariante.length) entradasVariante = [['', '']];
+                var tieneColorYFotos = Boolean(v.atributos && v.atributos.Color) && v.fotos && v.fotos.length;
+              %>
+              <tr>
+                <td>
+                  <div class="atributos-variante" data-form="<%= formId %>" style="display:flex;flex-direction:column;gap:4px;min-width:190px">
+                    <% entradasVariante.forEach(function (par) { %>
+                      <div class="atributo-row-mini" style="display:flex;gap:4px;">
+                        <input form="<%= formId %>" list="atributos-variante-sugeridos" name="atributoClave[]" value="<%= par[0] %>" placeholder="Talla" maxlength="60" style="width:76px;<%= inputStyleVariante %>" />
+                        <input form="<%= formId %>" name="atributoValor[]" value="<%= par[1] %>" placeholder="42" maxlength="120" style="width:84px;<%= inputStyleVariante %>" />
+                        <button type="button" class="btn-quitar-atributo-mini" aria-label="Quitar" style="background:none;border:none;color:var(--tenue,#9aa1b5);cursor:pointer;font-size:1rem;line-height:1;padding:0 .2rem">×</button>
+                      </div>
                     <% }); %>
+                    <button type="button" class="btn btn-ghost btn-agregar-atributo-variante" style="padding:.2rem .5rem;font-size:.75rem;align-self:flex-start">+ opción</button>
                   </div>
-                  <label style="display:block;font-size:.72rem;margin-bottom:4px;"><input form="<%= formId %>" type="checkbox" name="quitarFotos" value="1" /> Quitar</label>
-                <% } %>
-                <input form="<%= formId %>" type="file" name="fotos" accept="image/*" multiple style="width:130px;font-size:.72rem;" />
-                <% if (tieneColorYFotos) { %>
-                  <form method="POST" action="/panel/productos/<%= producto.id %>/variantes/<%= v.id %>/copiar-fotos" class="inline-form" style="margin-top:4px;">
-                    <button class="btn btn-ghost" style="padding:.2rem .5rem;font-size:.7rem" type="submit">Copiar a mismo color</button>
+                </td>
+                <td style="min-width:140px">
+                  <% if (v.fotos && v.fotos.length) { %>
+                    <div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:4px;">
+                      <% v.fotos.forEach(function (f) { %>
+                        <img src="<%= f %>" alt="" style="width:40px;height:40px;object-fit:cover;border-radius:6px;" />
+                      <% }); %>
+                    </div>
+                    <label style="display:block;font-size:.72rem;margin-bottom:4px;"><input form="<%= formId %>" type="checkbox" name="quitarFotos" value="1" /> Quitar</label>
+                  <% } %>
+                  <input form="<%= formId %>" type="file" name="fotos" accept="image/*" multiple style="width:130px;font-size:.72rem;" />
+                  <% if (tieneColorYFotos) { %>
+                    <form method="POST" action="/panel/productos/<%= producto.id %>/variantes/<%= v.id %>/copiar-fotos" class="inline-form" style="margin-top:4px;">
+                      <button class="btn btn-ghost" style="padding:.2rem .5rem;font-size:.7rem" type="submit">Copiar a mismo color</button>
+                    </form>
+                  <% } %>
+                </td>
+                <td class="num"><input form="<%= formId %>" type="number" name="precio" min="0" step="0.01" value="<%= v.precio ? Number(v.precio).toFixed(2) : '' %>" placeholder="Igual al producto" style="width:110px;<%= inputStyleVariante %>" /></td>
+                <td class="num"><input form="<%= formId %>" type="number" name="stock" min="0" value="<%= v.stock %>" style="width:80px;<%= inputStyleVariante %>" /></td>
+                <td class="actions-cell">
+                  <button form="<%= formId %>" class="btn btn-ghost" style="padding:.4rem .8rem;font-size:.85rem" type="submit">Guardar</button>
+                  <form method="POST" action="/panel/productos/<%= producto.id %>/variantes/<%= v.id %>/eliminar" class="inline-form"
+                        onsubmit="return confirm('¿Eliminar esta opción?');">
+                    <button class="btn btn-ghost" style="padding:.4rem .8rem;font-size:.85rem" type="submit">Eliminar</button>
                   </form>
-                <% } %>
-              </td>
-              <td class="num"><input form="<%= formId %>" type="number" name="precio" min="0" step="0.01" value="<%= v.precio ? Number(v.precio).toFixed(2) : '' %>" placeholder="Precio del producto" style="width:110px;<%= inputStyleVariante %>" /></td>
-              <td class="num"><input form="<%= formId %>" type="number" name="stock" min="0" value="<%= v.stock %>" style="width:80px;<%= inputStyleVariante %>" /></td>
-              <td class="actions-cell">
-                <button form="<%= formId %>" class="btn btn-ghost" style="padding:.4rem .8rem;font-size:.85rem" type="submit">Guardar</button>
-                <form method="POST" action="/panel/productos/<%= producto.id %>/variantes/<%= v.id %>/eliminar" class="inline-form"
-                      onsubmit="return confirm('¿Eliminar esta variante?');">
-                  <button class="btn btn-ghost" style="padding:.4rem .8rem;font-size:.85rem" type="submit">Eliminar</button>
-                </form>
-              </td>
-            </tr>
-            <form id="<%= formId %>" method="POST" action="/panel/productos/<%= producto.id %>/variantes/<%= v.id %>" enctype="multipart/form-data"></form>
-          <% }); %>
-        </tbody>
-      </table>
-    </div>
-  <% } %>
+                </td>
+              </tr>
+              <form id="<%= formId %>" method="POST" action="/panel/productos/<%= producto.id %>/variantes/<%= v.id %>" enctype="multipart/form-data"></form>
+            <% }); %>
+          </tbody>
+        </table>
+      </div>
+    <% } %>
 
-  <form method="POST" action="/panel/productos/<%= producto.id %>/variantes" class="form-card" style="max-width:600px;margin-top:1rem" enctype="multipart/form-data">
-    <h3 style="margin:0 0 1rem;font-size:.95rem">Agregar variante</h3>
-    <div class="field">
-      <label>Atributos de esta variante *</label>
-      <p class="muted" style="font-size:.8rem;margin:0 0 .5rem">Ej: Talla = 42, Color = Negro. Agregá los que necesites. Si varias tallas comparten color y foto, escribilas separadas por coma en el valor (ej: Talla = "38, 39, 40"): se crea una variante por cada una, todas con la misma foto.</p>
-      <div id="atributos-nueva-variante-lista">
-        <div class="atributo-row" style="display:flex;gap:8px;margin-bottom:6px;">
-          <input list="atributos-variante-sugeridos" name="atributoClave[]" placeholder="Ej: Talla" maxlength="60" style="flex:1" />
-          <input name="atributoValor[]" placeholder="Ej: 42" maxlength="120" style="flex:1" />
-          <button type="button" class="btn btn-ghost btn-quitar-atributo">Quitar</button>
-        </div>
-        <div class="atributo-row" style="display:flex;gap:8px;margin-bottom:6px;">
-          <input list="atributos-variante-sugeridos" name="atributoClave[]" placeholder="Ej: Color" maxlength="60" style="flex:1" />
-          <input name="atributoValor[]" placeholder="Ej: Negro" maxlength="120" style="flex:1" />
-          <button type="button" class="btn btn-ghost btn-quitar-atributo">Quitar</button>
-        </div>
+    <form id="form-agregar-variantes" method="POST" action="/panel/productos/<%= producto.id %>/variantes" class="pf-agregar">
+      <h4 class="pf-subtitulo"><%= producto.variantes.length ? 'Agregar más opciones' : 'Agregar tallas, colores u otras opciones' %></h4>
+      <%- include('partials/constructor-variantes', { sugeridas: null }) %>
+      <div class="form-actions pf-acciones">
+        <button class="btn btn-primary" type="submit">Guardar estas opciones</button>
       </div>
-      <button type="button" id="btn-agregar-atributo-nueva-variante" class="btn btn-ghost">+ Agregar atributo</button>
-      <template id="tpl-atributo-nueva-variante">
-        <div class="atributo-row" style="display:flex;gap:8px;margin-bottom:6px;">
-          <input list="atributos-variante-sugeridos" name="atributoClave[]" placeholder="Ej: Talla" maxlength="60" style="flex:1" />
-          <input name="atributoValor[]" placeholder="Ej: 42" maxlength="120" style="flex:1" />
-          <button type="button" class="btn btn-ghost btn-quitar-atributo">Quitar</button>
-        </div>
-      </template>
-    </div>
-    <div class="field-row">
-      <div class="field">
-        <label for="v-precio">Precio propio (opcional)</label>
-        <input id="v-precio" name="precio" type="number" min="0" step="0.01" placeholder="Dejar vacío = precio del producto" />
-      </div>
-      <div class="field">
-        <label for="v-stock">Stock *</label>
-        <input id="v-stock" name="stock" type="number" min="0" required value="0" />
-      </div>
-    </div>
-    <div class="field">
-      <label for="v-fotos">Fotos de esta variante (opcional)</label>
-      <p class="muted" style="font-size:.8rem;margin:0 0 .5rem">Si dejaste varias tallas separadas por coma arriba, estas fotos se aplican a todas las que se creen.</p>
-      <input id="v-fotos" name="fotos" type="file" accept="image/*" multiple />
-    </div>
-    <div class="form-actions">
-      <button class="btn btn-primary" type="submit">+ Agregar variante</button>
-    </div>
-  </form>
+    </form>
+  </section>
 <% } %>
 
 <script>
 (function () {
-  // Atributos del producto (bloque de arriba)
+  // ---- Categoria nueva sin salir de la pantalla ----
+  var btnCatNueva = document.getElementById('btn-categoria-nueva');
+  var wrapCatNueva = document.getElementById('categoria-nueva-wrap');
+  var selectCategoria = document.getElementById('categoriaId');
+  var inputCatNueva = document.getElementById('categoriaNueva');
+  if (btnCatNueva && wrapCatNueva) {
+    btnCatNueva.addEventListener('click', function () {
+      wrapCatNueva.hidden = false;
+      btnCatNueva.hidden = true;
+      if (selectCategoria) selectCategoria.value = '';
+      inputCatNueva.focus();
+    });
+  }
+  if (selectCategoria && inputCatNueva) {
+    // Elegir un grupo existente descarta lo que se haya escrito como nuevo
+    selectCategoria.addEventListener('change', function () { if (selectCategoria.value) inputCatNueva.value = ''; });
+  }
+
+  // ---- Vista previa de las fotos elegidas ----
+  var inputFotos = document.getElementById('fotos');
+  var previa = document.getElementById('fotos-previa');
+  if (inputFotos && previa) {
+    inputFotos.addEventListener('change', function () {
+      previa.querySelectorAll('img[data-nueva]').forEach(function (i) { i.remove(); });
+      Array.prototype.slice.call(inputFotos.files || []).forEach(function (f) {
+        var img = document.createElement('img');
+        img.setAttribute('data-nueva', '1');
+        img.alt = 'Foto nueva';
+        img.src = URL.createObjectURL(f);
+        previa.appendChild(img);
+      });
+    });
+  }
+
+  // ---- Datos extra del producto: agregar/quitar filas ----
   var listaProducto = document.getElementById('atributos-lista');
   var tplProducto = document.getElementById('tpl-atributo-row');
   var btnAgregarProducto = document.getElementById('btn-agregar-atributo');
@@ -317,19 +312,7 @@
     });
   }
 
-  // Atributos de "Agregar variante" (form nuevo, abajo del todo)
-  var listaNuevaVariante = document.getElementById('atributos-nueva-variante-lista');
-  var tplNuevaVariante = document.getElementById('tpl-atributo-nueva-variante');
-  var btnAgregarNuevaVariante = document.getElementById('btn-agregar-atributo-nueva-variante');
-  if (listaNuevaVariante && tplNuevaVariante && btnAgregarNuevaVariante) {
-    btnAgregarNuevaVariante.addEventListener('click', function () {
-      listaNuevaVariante.appendChild(tplNuevaVariante.content.cloneNode(true));
-    });
-  }
-
-  // Quitar fila y agregar atributo a una variante YA existente: delegado en
-  // document porque hay una fila por cada variante (hasta 20+), no tiene
-  // sentido un listener por cada una.
+  // Quitar fila / agregar opcion a una variante existente (delegado: hay una fila por variante)
   document.addEventListener('click', function (ev) {
     var btnQuitar = ev.target.closest('.btn-quitar-atributo');
     if (btnQuitar) {
@@ -350,53 +333,56 @@
       if (contenedor && tplMini) {
         var formId = contenedor.getAttribute('data-form');
         var clon = tplMini.content.cloneNode(true);
-        if (formId) {
-          clon.querySelectorAll('input').forEach(function (inp) { inp.setAttribute('form', formId); });
-        }
+        if (formId) clon.querySelectorAll('input').forEach(function (inp) { inp.setAttribute('form', formId); });
         contenedor.insertBefore(clon, btnAgregarVariante);
       }
     }
   });
 
-  // Checkbox "tiene variantes": bloquea el Stock general en 0 (el stock real
-  // va a vivir en las variantes de abajo). Si el producto ya tiene variantes
-  // cargadas, el checkbox viene deshabilitado (no aplica desactivarlo aca).
-  var chkVariantes = document.getElementById('tiene-variantes');
-  var stockInput = document.getElementById('stock');
-  if (chkVariantes && stockInput && !chkVariantes.disabled) {
-    chkVariantes.addEventListener('change', function () {
-      stockInput.disabled = chkVariantes.checked;
-      if (chkVariantes.checked) stockInput.value = '0';
-    });
-  }
+  // ---- Que datos pide el grupo elegido (los valida el servidor al guardar) ----
+  window.__categoriasAtributos = <%- JSON.stringify(categorias.reduce(function (acc, c) {
+    var obligatorios = function (cat) {
+      return cat.atributos.filter(function (a) { return a.nivel === 'OBLIGATORIO' && !a.esDeVariante; }).map(function (a) { return a.nombre; });
+    };
+    acc[c.id] = obligatorios(c);
+    (c.hijas || []).forEach(function (h) { acc[h.id] = obligatorios(h); });
+    return acc;
+  }, {})) %>;
+  // Nombres REALES de atributo de cada categoria, para sugerir la ortografia
+  // exacta que espera el motor (bug real: "talla" en minuscula rompio un filtro).
+  window.__categoriasAtributosNombres = <%- JSON.stringify(categorias.reduce(function (acc, c) {
+    var separar = function (cat) {
+      return {
+        producto: cat.atributos.filter(function (a) { return !a.esDeVariante; }).map(function (a) { return a.nombre; }),
+        variante: cat.atributos.filter(function (a) { return a.esDeVariante; }).map(function (a) { return a.nombre; }),
+      };
+    };
+    acc[c.id] = separar(c);
+    (c.hijas || []).forEach(function (h) { acc[h.id] = separar(h); });
+    return acc;
+  }, {})) %>;
 
-  // Muestra que atributos son obligatorios para la categoria elegida (los
-  // valida el servidor al guardar, esto es solo para avisar antes).
-  var selectCategoria = document.getElementById('categoriaId');
   var hintAtributos = document.getElementById('hint-atributos-categoria');
+  var detalles = document.getElementById('pf-mas');
   function actualizarHintCategoria() {
     if (!selectCategoria || !hintAtributos) return;
     var obligatorios = (window.__categoriasAtributos || {})[selectCategoria.value] || [];
     hintAtributos.textContent = obligatorios.length
-      ? 'Esta categoría requiere cargar estos atributos abajo: ' + obligatorios.join(', ') + '.'
+      ? 'Este grupo pide completar en “Más detalles”: ' + obligatorios.join(', ') + '.'
       : '';
+    if (obligatorios.length && detalles) detalles.open = true;
   }
-  // Rellena los <datalist> de sugerencias con los nombres REALES configurados
-  // en la categoria elegida (ortografia exacta), antes que la lista generica
-  // fija - asi el autocompletado ofrece "Talla"/"Genero" tal cual los espera
-  // el motor, en vez de que el usuario los tipee a mano y se equivoque
-  // (bug real: "talla" en minuscula rompio el filtro de un producto).
   var GENERICOS_PRODUCTO = ['Marca', 'Material', 'Color', 'Modelo', 'Voltaje', 'Capacidad', 'Peso', 'Sabor', 'Potencia', 'Garantía'];
   var GENERICOS_VARIANTE = ['Talla', 'Color', 'Modelo', 'Sabor', 'Presentación', 'Tamaño'];
   function actualizarDatalist(id, nombresPropios, genericos) {
     var dl = document.getElementById(id);
     if (!dl) return;
-    var vistos = new Set();
+    var vistos = {};
     var opciones = [];
     (nombresPropios || []).concat(genericos).forEach(function (n) {
       var clave = n.toLowerCase();
-      if (vistos.has(clave)) return;
-      vistos.add(clave);
+      if (vistos[clave]) return;
+      vistos[clave] = true;
       opciones.push(n);
     });
     dl.innerHTML = opciones.map(function (n) { return '<option value="' + n.replace(/"/g, '&quot;') + '"></option>'; }).join('');
@@ -411,6 +397,51 @@
     selectCategoria.addEventListener('change', actualizarDatalistsCategoria);
     actualizarHintCategoria();
     actualizarDatalistsCategoria();
+  }
+
+  // ---- Alta: "¿Viene en varias opciones?" ----
+  var form = document.getElementById('form-producto');
+  var bloque = document.getElementById('bloque-variantes');
+  var campoStock = document.getElementById('campo-stock');
+  var stockInput = document.getElementById('stock');
+  if (form && bloque) {
+    var radios = form.querySelectorAll('input[name="variantes_modo"]');
+    var constructor = bloque.querySelector('[data-vb]');
+    function conOpciones() {
+      var r = form.querySelector('input[name="variantes_modo"]:checked');
+      return r && r.value === 'si';
+    }
+    function aplicarModo() {
+      var si = conOpciones();
+      bloque.hidden = !si;
+      if (campoStock) campoStock.hidden = si;
+      if (stockInput) stockInput.disabled = si;
+      // Sin opciones, el campo oculto no debe viajar con restos de un intento anterior
+      var json = constructor && constructor.querySelector('[data-vb-json]');
+      if (json) json.disabled = !si;
+    }
+    Array.prototype.forEach.call(radios, function (r) { r.addEventListener('change', aplicarModo); });
+    aplicarModo();
+
+    form.addEventListener('submit', function (ev) {
+      if (conOpciones() && constructor && constructor.vbCantidad && constructor.vbCantidad() === 0) {
+        ev.preventDefault();
+        constructor.vbMostrarError('Elegí al menos una opción (ej: Talla) y escribí sus valores, o marcá “No, es uno solo”.');
+        constructor.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+    });
+  }
+
+  // ---- Edicion: agregar opciones a un producto existente ----
+  var formAgregar = document.getElementById('form-agregar-variantes');
+  if (formAgregar) {
+    formAgregar.addEventListener('submit', function (ev) {
+      var c = formAgregar.querySelector('[data-vb]');
+      if (c && c.vbCantidad && c.vbCantidad() === 0) {
+        ev.preventDefault();
+        c.vbMostrarError('Elegí una opción (ej: Talla) y escribí sus valores para armar las combinaciones.');
+      }
+    });
   }
 })();
 </script>

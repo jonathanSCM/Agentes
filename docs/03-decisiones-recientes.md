@@ -627,3 +627,24 @@ reportado. Suite determinista completa: **194 tests en verde**.
 **Limitación.** Caché en la memoria del proceso (instancia única, igual que `dedupe.js`). Con más de una instancia habría que pasarla a Redis; el TTL corto acota el atraso mientras tanto. Variable opcional: `CATALOGO_CACHE_TTL_MS`.
 
 **Archivos.** `lib/services/catalogoCache.js` (nuevo), `server.js`, `lib/services/agente.js`, `package.json` (`compression`), `test/catalogo-cache.test.js` (10 casos). Suite: **500 tests en verde**. Medido en local con 150 productos: primera visita ~94 ms, siguientes ~10 ms, respuesta comprimida (133 KB de HTML).
+
+
+## 28. Panel más simple para usuarios nuevos: "Primeros pasos" y producto guiado
+
+**Problema.** Un negocio nuevo no entendía qué hacer: Inicio mostraba métricas en cero, y crear un producto con variantes exigía 12 campos en una sola página, guardar, volver a editar y cargar cada variante como pares "Talla = 42" en un segundo formulario. Tres campos se superponían (Descripción, Características y Atributos).
+
+**Fase A: "Primeros pasos" en Inicio** (`lib/services/primerosPasos.js`, `views/cliente/inicio.ejs`). Tarjeta con 3 pasos (agregar un producto, conectar WhatsApp, activar el agente), cada uno con su botón y marcado solo cuando está hecho de verdad (productos > 0, `ConexionWhatsApp.estado = CONECTADO`, `Agente.estado = ACTIVO`). El siguiente pendiente es el único con botón principal. Desaparece cuando los tres están hechos.
+
+**Fase B: formulario de producto guiado** (`views/cliente/producto-form.ejs`, `partials/constructor-variantes.ejs`, `lib/services/variantesForm.js`).
+1. *¿Qué vendés?*: nombre, grupo (categoría, que se puede crear ahí mismo con `categoriaNueva`), precio, stock y fotos con vista previa. Es lo único obligatorio.
+2. *¿Viene en varias opciones?* (solo al crear): "No, es uno solo" / "Sí". Con "Sí" se elige Talla/Color/otra, se escriben los valores separados por coma y el navegador arma la tabla de combinaciones, donde solo se pone stock (y precio propio si hace falta), con "mismo stock para todas". Todo se crea junto con el producto en una sola operación (`variantes: { create }`).
+3. *Más detalles* (plegado): descripción, SKU, características, datos extra y visibilidad. Se abre solo si el grupo elegido exige atributos obligatorios.
+- Al editar, la sección "Opciones de este producto" muestra las variantes existentes y el mismo constructor para agregar más: las combinaciones que ya existen se saltean (`sinLasExistentes`, sin distinguir mayúsculas ni orden).
+- El servidor valida todo `variantesJson` de nuevo (máx. 100 combinaciones por vez, 6 opciones por variante, stock ≥ 0, precio válido o vacío). Las rutas viejas (campos `atributoClave[]` por variante) siguen funcionando.
+- Con variantes, `Producto.stock` queda en 0 (criterio de siempre).
+- Si la categoría nueva ya existe como rubro (sin importar mayúsculas) se reutiliza, para no duplicar el menú del bot. Solo se crea después de validar el resto.
+- Arreglado de paso: re-renderizar la edición con error fallaba con `errorVariante` indefinido.
+
+**Verificado** en el navegador (escritorio y celular, sin scroll horizontal): alta con categoría nueva + 6 combinaciones, edición agregando 2 combinaciones donde 1 ya existía (se creó solo la nueva), y bloqueo del envío si se elige "Sí" sin armar combinaciones. Suite: 516 tests (+12 de `variantes-form`, +4 de `primeros-pasos`).
+
+**Pendiente de esta línea (fases siguientes del plan de UI):** menú lateral agrupado, categorías más simples, configuración en pestañas y pasada de diseño (quedan ~190 `style=` en línea; la tabla de variantes existentes todavía los usa).

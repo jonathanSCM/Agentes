@@ -1,0 +1,230 @@
+<%#
+  Constructor de variantes: el usuario elige las opciones (Talla, Color...),
+  escribe los valores separados por coma y el sistema arma la tabla con todas
+  las combinaciones, para poner solo el stock de cada una. Lo que arma sale en
+  un campo oculto `variantesJson` (se valida de nuevo en el servidor, ver
+  lib/services/variantesForm.js).
+
+  Parametros: sugeridas (nombres de opcion propios de la categoria, opcional)
+%>
+<%
+  var opcionesSugeridas = (typeof sugeridas !== 'undefined' && sugeridas && sugeridas.length) ? sugeridas : ['Talla', 'Color', 'Sabor', 'Tamaño', 'Modelo'];
+%>
+<div class="vb" data-vb data-sugeridas='<%- JSON.stringify(opcionesSugeridas) %>'>
+  <input type="hidden" name="variantesJson" value="[]" data-vb-json />
+
+  <p class="vb-paso"><strong>¿En qué se diferencian?</strong> Tocá todas las que apliquen.</p>
+  <div class="vb-chips" data-vb-chips></div>
+
+  <div class="vb-valores" data-vb-valores></div>
+
+  <div class="vb-tabla-wrap" data-vb-resultado hidden>
+    <p class="vb-paso"><strong>Listo, estas son tus combinaciones.</strong> Poné cuántas unidades tenés de cada una.</p>
+    <div class="vb-masivo">
+      <label>Mismo stock para todas
+        <input type="number" min="0" inputmode="numeric" placeholder="Ej: 5" data-vb-masivo />
+      </label>
+      <button type="button" class="btn btn-ghost" data-vb-aplicar>Aplicar</button>
+    </div>
+    <div class="table-wrap">
+      <table class="leads-table vb-tabla">
+        <thead data-vb-thead></thead>
+        <tbody data-vb-tbody></tbody>
+      </table>
+    </div>
+    <p class="muted vb-nota" data-vb-nota></p>
+  </div>
+  <p class="vb-error" data-vb-error role="alert" hidden></p>
+</div>
+
+<script>
+(function () {
+  var MAX = 100;
+  var raiz = document.querySelector('[data-vb]');
+  if (!raiz) return;
+
+  var chipsEl = raiz.querySelector('[data-vb-chips]');
+  var valoresEl = raiz.querySelector('[data-vb-valores]');
+  var resultadoEl = raiz.querySelector('[data-vb-resultado]');
+  var theadEl = raiz.querySelector('[data-vb-thead]');
+  var tbodyEl = raiz.querySelector('[data-vb-tbody]');
+  var notaEl = raiz.querySelector('[data-vb-nota]');
+  var errorEl = raiz.querySelector('[data-vb-error]');
+  var jsonEl = raiz.querySelector('[data-vb-json]');
+  var masivoEl = raiz.querySelector('[data-vb-masivo]');
+
+  var sugeridas = [];
+  try { sugeridas = JSON.parse(raiz.getAttribute('data-sugeridas')) || []; } catch (e) { sugeridas = []; }
+
+  // opciones: [{ nombre, texto }] en el orden en que se eligieron
+  var opciones = [];
+  // Lo que el usuario ya tipeo por combinacion, para no perderlo al agregar
+  // un valor nuevo y regenerar la tabla.
+  var datosPorClave = {};
+  var combinaciones = [];
+
+  function valoresDe(texto) {
+    var vistos = {};
+    return String(texto || '').split(',').map(function (v) { return v.trim(); }).filter(function (v) {
+      var k = v.toLowerCase();
+      if (!v || vistos[k]) return false;
+      vistos[k] = true;
+      return true;
+    });
+  }
+
+  function claveDe(valores) { return valores.join('\u0001').toLowerCase(); }
+
+  function indiceDe(nombre) {
+    for (var i = 0; i < opciones.length; i++) if (opciones[i].nombre.toLowerCase() === nombre.toLowerCase()) return i;
+    return -1;
+  }
+
+  function dibujarChips() {
+    var nombres = sugeridas.slice();
+    opciones.forEach(function (o) { if (nombres.map(function (n) { return n.toLowerCase(); }).indexOf(o.nombre.toLowerCase()) < 0) nombres.push(o.nombre); });
+    chipsEl.innerHTML = '';
+    nombres.forEach(function (n) {
+      var b = document.createElement('button');
+      b.type = 'button';
+      var activo = indiceDe(n) >= 0;
+      b.className = 'vb-chip' + (activo ? ' is-on' : '');
+      b.setAttribute('aria-pressed', activo ? 'true' : 'false');
+      b.textContent = (activo ? '✓ ' : '') + n;
+      b.addEventListener('click', function () { alternar(n); });
+      chipsEl.appendChild(b);
+    });
+    var otra = document.createElement('span');
+    otra.className = 'vb-otra';
+    otra.innerHTML = '<input type="text" maxlength="40" placeholder="Otra (ej: Material)" aria-label="Agregar otra opción" /><button type="button" class="btn btn-ghost">Agregar</button>';
+    var inp = otra.querySelector('input');
+    var agregar = function () {
+      var n = inp.value.trim();
+      if (n && indiceDe(n) < 0) { opciones.push({ nombre: n.slice(0, 40), texto: '' }); }
+      inp.value = '';
+      refrescar(true);
+    };
+    otra.querySelector('button').addEventListener('click', agregar);
+    inp.addEventListener('keydown', function (ev) { if (ev.key === 'Enter') { ev.preventDefault(); agregar(); } });
+    chipsEl.appendChild(otra);
+  }
+
+  function alternar(nombre) {
+    var i = indiceDe(nombre);
+    if (i >= 0) opciones.splice(i, 1); else opciones.push({ nombre: nombre, texto: '' });
+    refrescar(true);
+  }
+
+  function dibujarValores(enfocarUltima) {
+    valoresEl.innerHTML = '';
+    opciones.forEach(function (o, idx) {
+      var fila = document.createElement('div');
+      fila.className = 'vb-fila-valores';
+      var id = 'vb-valores-' + idx;
+      var ejemplo = /talla/i.test(o.nombre) ? '38, 39, 40' : (/color/i.test(o.nombre) ? 'Negro, Blanco, Azul' : 'Escribí los valores separados por coma');
+      fila.innerHTML = '<label for="' + id + '"></label><input id="' + id + '" type="text" maxlength="300" /><button type="button" class="vb-quitar" aria-label="Quitar esta opción">×</button>';
+      fila.querySelector('label').textContent = o.nombre + ': ¿cuáles?';
+      var inp = fila.querySelector('input');
+      inp.placeholder = ejemplo;
+      inp.value = o.texto;
+      inp.addEventListener('input', function () { o.texto = inp.value; regenerar(); });
+      fila.querySelector('.vb-quitar').addEventListener('click', function () { opciones.splice(idx, 1); refrescar(true); });
+      valoresEl.appendChild(fila);
+      if (enfocarUltima && idx === opciones.length - 1) setTimeout(function () { inp.focus(); }, 0);
+    });
+  }
+
+  function generar() {
+    var activas = opciones.filter(function (o) { return valoresDe(o.texto).length; });
+    var lista = [[]];
+    activas.forEach(function (o) {
+      var nuevas = [];
+      lista.forEach(function (base) { valoresDe(o.texto).forEach(function (v) { nuevas.push(base.concat([v])); }); });
+      lista = nuevas;
+    });
+    return { activas: activas, filas: activas.length ? lista : [] };
+  }
+
+  function regenerar() {
+    // Guarda lo ya tipeado antes de redibujar
+    tbodyEl.querySelectorAll('tr').forEach(function (tr) {
+      datosPorClave[tr.getAttribute('data-clave')] = {
+        stock: tr.querySelector('[data-stock]').value,
+        precio: tr.querySelector('[data-precio]').value,
+      };
+    });
+    var g = generar();
+    var truncado = g.filas.length > MAX;
+    var filas = g.filas.slice(0, MAX);
+    combinaciones = filas.map(function (valores) {
+      var atributos = {};
+      g.activas.forEach(function (o, i) { atributos[o.nombre] = valores[i]; });
+      return { clave: claveDe(valores), valores: valores, atributos: atributos };
+    });
+
+    resultadoEl.hidden = combinaciones.length === 0;
+    theadEl.innerHTML = '';
+    tbodyEl.innerHTML = '';
+    if (combinaciones.length) {
+      var tr = document.createElement('tr');
+      g.activas.forEach(function (o) { var th = document.createElement('th'); th.textContent = o.nombre; tr.appendChild(th); });
+      ['Stock', 'Precio propio (opcional)'].forEach(function (t) { var th = document.createElement('th'); th.textContent = t; th.className = 'num'; tr.appendChild(th); });
+      theadEl.appendChild(tr);
+
+      combinaciones.forEach(function (c) {
+        var fila = document.createElement('tr');
+        fila.setAttribute('data-clave', c.clave);
+        c.valores.forEach(function (v) { var td = document.createElement('td'); td.textContent = v; fila.appendChild(td); });
+        var previo = datosPorClave[c.clave] || { stock: '0', precio: '' };
+        var tdS = document.createElement('td'); tdS.className = 'num';
+        tdS.innerHTML = '<input type="number" min="0" inputmode="numeric" data-stock aria-label="Stock" />';
+        tdS.firstChild.value = previo.stock;
+        var tdP = document.createElement('td'); tdP.className = 'num';
+        tdP.innerHTML = '<input type="number" min="0" step="0.01" inputmode="decimal" data-precio placeholder="Igual al producto" aria-label="Precio propio" />';
+        tdP.firstChild.value = previo.precio;
+        fila.appendChild(tdS); fila.appendChild(tdP);
+        fila.addEventListener('input', exportar);
+        tbodyEl.appendChild(fila);
+      });
+    }
+    notaEl.textContent = combinaciones.length
+      ? combinaciones.length + (combinaciones.length === 1 ? ' combinación' : ' combinaciones') + '.' + (truncado ? ' Mostramos las primeras ' + MAX + ': cargá el resto en una segunda tanda.' : '')
+      : '';
+    exportar();
+  }
+
+  function exportar() {
+    var filas = Array.prototype.slice.call(tbodyEl.querySelectorAll('tr'));
+    var datos = filas.map(function (tr, i) {
+      return {
+        atributos: combinaciones[i] ? combinaciones[i].atributos : {},
+        stock: tr.querySelector('[data-stock]').value || '0',
+        precio: tr.querySelector('[data-precio]').value,
+      };
+    });
+    jsonEl.value = JSON.stringify(datos);
+    if (datos.length) { errorEl.hidden = true; }
+    raiz.dispatchEvent(new CustomEvent('vb-cambio', { detail: { cantidad: datos.length } }));
+  }
+
+  function refrescar(enfocar) {
+    dibujarChips();
+    dibujarValores(enfocar);
+    regenerar();
+  }
+
+  raiz.querySelector('[data-vb-aplicar]').addEventListener('click', function () {
+    var n = masivoEl.value === '' ? null : Math.max(0, parseInt(masivoEl.value, 10) || 0);
+    if (n === null) { masivoEl.focus(); return; }
+    tbodyEl.querySelectorAll('[data-stock]').forEach(function (i) { i.value = String(n); });
+    exportar();
+  });
+
+  // API minima para el formulario que lo contiene
+  raiz.vbCantidad = function () { return combinaciones.length; };
+  raiz.vbMostrarError = function (txt) { errorEl.textContent = txt; errorEl.hidden = false; };
+  raiz.vbReiniciar = function () { opciones = []; datosPorClave = {}; refrescar(false); };
+
+  refrescar(false);
+})();
+</script>

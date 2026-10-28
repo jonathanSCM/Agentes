@@ -11,6 +11,35 @@
   </div>
 <% } %>
 
+<% if (!primerosPasos.completo) { %>
+  <!-- Primeros pasos: solo mientras falte alguno. El siguiente pendiente es el
+       unico con boton principal, para que sea obvio por donde seguir. -->
+  <section class="pasos-card" aria-labelledby="pasos-titulo">
+    <div class="pasos-head">
+      <div>
+        <h3 id="pasos-titulo">Pongamos tu agente a vender</h3>
+        <p class="muted">Te faltan <%= primerosPasos.total - primerosPasos.hechos %> paso<%= primerosPasos.total - primerosPasos.hechos === 1 ? '' : 's' %>. Llevan unos minutos.</p>
+      </div>
+      <span class="pasos-contador"><%= primerosPasos.hechos %> de <%= primerosPasos.total %></span>
+    </div>
+    <div class="bar-lg"><span style="width:<%= Math.round(primerosPasos.hechos / primerosPasos.total * 100) %>%"></span></div>
+    <ol class="pasos-lista">
+      <% primerosPasos.pasos.forEach(function (p) { %>
+        <li class="paso <%= p.hecho ? 'paso-hecho' : (primerosPasos.siguiente && primerosPasos.siguiente.clave === p.clave ? 'paso-actual' : '') %>">
+          <span class="paso-marca" aria-hidden="true"><%= p.hecho ? '✓' : '' %></span>
+          <div class="paso-texto">
+            <strong><%= p.titulo %></strong>
+            <% if (!p.hecho) { %><span class="muted"><%= p.detalle %></span><% } %>
+          </div>
+          <% if (!p.hecho) { %>
+            <a class="btn <%= primerosPasos.siguiente && primerosPasos.siguiente.clave === p.clave ? 'btn-primary' : 'btn-ghost' %>" href="<%= p.href %>"><%= p.boton %></a>
+          <% } %>
+        </li>
+      <% }); %>
+    </ol>
+  </section>
+<% } %>
+
 <!-- KPIs del día -->
 <div class="admin-stats">
   <div class="stat-card">

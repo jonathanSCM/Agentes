@@ -86,6 +86,8 @@ const { costoUSD } = require('./lib/services/costoIA');
 const { yaProcesado } = require('./lib/services/dedupe');
 const compression = require('compression');
 const catalogoCache = require('./lib/services/catalogoCache');
+const { parsearVariantesJson, sinLasExistentes } = require('./lib/services/variantesForm');
+const { pasosIniciales } = require('./lib/services/primerosPasos');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -858,8 +860,21 @@ app.get('/panel', requireCliente, async (req, res, next) => {
       : (resumen.consumo.porcentajeUsado >= 80 && resumen.consumo.extraDisponible === 0
         ? 'Ya usaste el ' + resumen.consumo.porcentajeUsado + '% de tu plan.' : null);
 
+    // "Primeros pasos": lo minimo para que el agente venda. Cada paso se marca
+    // solo cuando de verdad esta hecho; con los tres hechos la tarjeta no sale.
+    const [totalProductos, agentePrincipal] = await Promise.all([
+      prisma.producto.count({ where: { empresaId } }),
+      prisma.agente.findFirst({ where: { empresaId }, orderBy: { id: 'asc' }, include: { conexion: true } }),
+    ]);
+    const primerosPasos = pasosIniciales({
+      productos: totalProductos,
+      whatsappConectado: Boolean(agentePrincipal && agentePrincipal.conexion && agentePrincipal.conexion.estado === 'CONECTADO'),
+      agenteActivo: Boolean(agentePrincipal && agentePrincipal.estado === 'ACTIVO'),
+    });
+
     res.render('cliente/inicio', {
       title: 'Inicio - Proshop', tituloPagina: 'Inicio', activo: 'inicio',
+      primerosPasos,
       consumo: resumen.consumo,
       avisoSaldo,
       kpi: {
@@ -2078,6 +2093,20 @@ function datosCatalogoDesdeForm(body) {
   };
 }
 
+// El formulario guiado deja escribir una categoria nueva sin salir de la
+// pantalla ("categoriaNueva"). Si ya existe un rubro con ese nombre (sin
+// importar mayusculas) se usa ese, para no duplicar el menu del bot.
+async function resolverCategoriaId(empresaId, body) {
+  if (body.categoriaId) return Number(body.categoriaId);
+  const nombre = String(body.categoriaNueva || '').trim().slice(0, 120);
+  if (!nombre) return null;
+  const rubros = await prisma.categoria.findMany({ where: { empresaId, padreId: null }, select: { id: true, nombre: true } });
+  const existente = rubros.find((c) => c.nombre.trim().toLowerCase() === nombre.toLowerCase());
+  if (existente) return existente.id;
+  const creada = await prisma.categoria.create({ data: { empresaId, nombre } });
+  return creada.id;
+}
+
 function urlPublicaDeArchivo(req, filename) {
   return `${req.protocol}://${req.get('host')}/uploads/${filename}`;
 }
@@ -2115,31 +2144,48 @@ app.post('/panel/productos', requireCliente, upload.array('fotos', 8), async (re
     if (!nombre || precio === undefined || precio === '') {
       return res.status(400).render('cliente/producto-form', {
         title: 'Agregar producto - Proshop', tituloPagina: 'Agregar producto', activo: 'productos',
-        producto: null, error: 'El nombre y el precio son obligatorios.',
+        producto: null, borrador: req.body, error: 'El nombre y el precio son obligatorios.',
+        categoriasExistentes: await categoriasExistentes(req.session.empresaId),
+      });
+    }
+    const variantesForm = parsearVariantesJson((req.body || {}).variantesJson);
+    if (!variantesForm.ok) {
+      return res.status(400).render('cliente/producto-form', {
+        title: 'Agregar producto - Proshop', tituloPagina: 'Agregar producto', activo: 'productos',
+        producto: null, borrador: req.body, error: variantesForm.error,
         categoriasExistentes: await categoriasExistentes(req.session.empresaId),
       });
     }
     const datosCatalogo = datosCatalogoDesdeForm(req.body || {});
-    const faltantes = await atributosObligatoriosFaltantes(datosCatalogo.categoriaId, datosCatalogo.atributos);
+    const faltantes = await atributosObligatoriosFaltantes(datosCatalogo.categoriaId || null, datosCatalogo.atributos);
     if (faltantes.length) {
       return res.status(400).render('cliente/producto-form', {
         title: 'Agregar producto - Proshop', tituloPagina: 'Agregar producto', activo: 'productos',
-        producto: null, error: `Esta categoría requiere estos atributos: ${faltantes.join(', ')}.`,
+        producto: null, borrador: req.body, error: `Esta categoría requiere estos atributos: ${faltantes.join(', ')}.`,
         categoriasExistentes: await categoriasExistentes(req.session.empresaId),
       });
     }
+    // La categoria nueva se crea recien ahora que el resto ya valido: un error
+    // de arriba no deja rubros huerfanos.
+    datosCatalogo.categoriaId = await resolverCategoriaId(req.session.empresaId, req.body || {});
     const nombresArchivos = await convertirFotosAJpg(req.files);
     const fotos = nombresArchivos.map((n) => urlPublicaDeArchivo(req, n));
+    const tieneVariantes = variantesForm.variantes.length > 0;
     const nuevoProducto = await prisma.producto.create({
       data: {
         empresaId: req.session.empresaId,
         nombre: String(nombre).trim().slice(0, 120),
         descripcion: descripcion ? String(descripcion).trim().slice(0, 200) : null,
         precio: Number(precio) || 0,
-        stock: parseInt(stock, 10) || 0,
+        // Con variantes el stock vive en cada una (el del producto queda en 0
+        // a proposito, ver Producto.stock en el catalogo).
+        stock: tieneVariantes ? 0 : (parseInt(stock, 10) || 0),
         activo: activo === '1',
         fotos,
         ...datosCatalogo,
+        ...(tieneVariantes ? {
+          variantes: { create: variantesForm.variantes.map((v) => ({ atributos: v.atributos, stock: v.stock, precio: v.precio })) },
+        } : {}),
       },
     });
     // No se espera (no bloquea el guardado ni tarda la respuesta): si falla
@@ -2224,6 +2270,27 @@ app.post('/panel/productos/:id/variantes', requireCliente, upload.array('fotos',
   try {
     const producto = await prisma.producto.findFirst({ where: { id: Number(req.params.id), empresaId: req.session.empresaId } });
     if (!producto) return res.redirect('/panel/productos');
+
+    // Formulario guiado: llega la tabla de combinaciones ya armada (cada una con
+    // su stock y precio). Las que el producto ya tiene se saltean, para que
+    // volver a generar "Talla x Color" no duplique nada.
+    if ((req.body || {}).variantesJson !== undefined) {
+      const form = parsearVariantesJson(req.body.variantesJson);
+      if (!form.ok) return res.redirect(`/panel/productos/${producto.id}/editar?err=` + encodeURIComponent(form.error));
+      const existentes = await prisma.variante.findMany({ where: { productoId: producto.id }, select: { atributos: true } });
+      const nuevas = sinLasExistentes(form.variantes, existentes);
+      if (!nuevas.length) {
+        const msg = form.variantes.length ? 'Esas combinaciones ya estaban cargadas.' : 'Agregá al menos una combinación (ej: Talla 42).';
+        return res.redirect(`/panel/productos/${producto.id}/editar?err=` + encodeURIComponent(msg));
+      }
+      await prisma.variante.createMany({
+        data: nuevas.map((v) => ({ productoId: producto.id, atributos: v.atributos, stock: v.stock, precio: v.precio, fotos: [] })),
+      });
+      // El stock del producto pasa a vivir en las variantes (queda en 0).
+      await prisma.producto.update({ where: { id: producto.id }, data: { stock: 0 } });
+      const msg = nuevas.length === 1 ? 'Variante agregada.' : `${nuevas.length} variantes agregadas.`;
+      return res.redirect(`/panel/productos/${producto.id}/editar?ok=` + encodeURIComponent(msg));
+    }
 
     const atributos = atributosDesdeForm(req.body || {});
     if (Object.keys(atributos).length === 0) {
@@ -2329,6 +2396,7 @@ app.post('/panel/productos/:id', requireCliente, upload.array('fotos', 8), async
         categoriasExistentes: await categoriasExistentes(req.session.empresaId),
       });
     }
+    datosCatalogo.categoriaId = await resolverCategoriaId(req.session.empresaId, req.body || {});
 
     const nombresArchivos = await convertirFotosAJpg(req.files);
     const fotosNuevas = nombresArchivos.map((n) => urlPublicaDeArchivo(req, n));
