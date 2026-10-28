@@ -687,3 +687,17 @@ reportado. Suite determinista completa: **194 tests en verde**.
 - La tabla de variantes existentes y las pantallas nuevas usan clases CSS en vez de estilos en línea; casillas y opciones dentro de `.field` ya no heredan el "input a todo el ancho" (se veían descolocadas). Estilos en línea en `views/cliente`: **206 → 135**. Siguen pendientes las pantallas que no se tocaron (pedido-detalle, inteligencia, conversación, WhatsApp, equipo, agente).
 
 **Verificado** en el navegador (cuenta de demo local): las 4 pestañas, guardar cambios (estado, tono, dirección, tarjeta y plantilla del catálogo quedaron en la base; el flag no cambió), la tabla de variantes, y sin scroll horizontal a 375 px en Inicio, Categorías, Configuración, Productos, producto nuevo y editar. Suite: 518 tests.
+
+
+## 31. "Reintentos forzados" estaba mal medido: la mayoría eran llamadas normales tras una herramienta
+
+**Problema.** El dashboard de costos (`/admin/costo-ia`) y `usos_ia.proposito` mostraban que ~50 % de las llamadas a la IA eran "reintento_forzado" (110 de 219 en producción). Pero `proposito` se guardaba como `vuelta === 0 ? 'respuesta' : 'reintento_forzado'`: cualquier llamada que no fuera la primera del turno contaba como reintento, incluida la que ocurre después de que el modelo ejecuta una función (mostrar_productos, agregar_al_carrito...) para escribir el mensaje con su resultado.
+
+**Qué se encontró** (conversación real contra el modelo, en local, 5 turnos con IA, 20 llamadas): 9 `respuesta` (45 %), 7 `tras_herramienta` (35 %) y 4 reintentos de verdad (20 %). Es decir, la mayor parte del "50 % de reintentos" es el recorrido normal de tool calling. Los reintentos reales sí existen y tienen causas concretas, vistas en el log de etapas:
+- `tarjeta_categoria_bloqueada_preguntas_iniciales`: con "preguntas iniciales" configuradas (Género), la herramienta de mostrar la tarjeta de la categoría se bloquea, el modelo insiste con la misma llamada, se gastan las 3 vueltas y el turno termina con el texto de rescate ("no pude traerte las opciones"). Ocurrió en el primer pedido de producto de la prueba.
+- `texto_vago_forzado_en_ultima_vuelta` apareció en 3 de 5 turnos con IA.
+- `mostrar_productos_sin_puntual_redirigido` y `producto_nombrado_sin_tarjeta` (la herramienta se redirige y hace falta otra vuelta).
+
+**Cambio.** `propositoDeLaVuelta(vuelta, mensajesTurno)` en `agente.js`: `respuesta` (primera llamada), `tras_herramienta` (el último mensaje del turno es un resultado de herramienta) y `reintento_forzado` (el sistema rechazó el texto y obligó a corregirse). No necesita migración (`proposito` es texto). El dashboard sigue sumando solo `reintento_forzado`, que ahora sí es eso. Los datos históricos (hasta el 23-oct) conservan la etiqueta vieja y no se pueden separar.
+
+**Lo que NO se resolvió (para decidir).** Reducir costo real exige atacar (1) los turnos `tras_herramienta` que podrían responderse con plantilla sin segunda llamada (ya se hace con `agregar_al_carrito`), y (2) el bucle de la tarjeta de categoría bloqueada por preguntas iniciales. Test: `test/proposito-vuelta.test.js`.
