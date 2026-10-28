@@ -592,6 +592,7 @@ reportado. Suite determinista completa: **194 tests en verde**.
 - **Los toques de botón/lista saltean el debounce de 5 s** y todo lo que genera respuesta de un cliente corre en serie (`conBloqueoDeCliente`, clave `gen:`): si no, dos "➕ 1" seguidos contaban uno y un comando podía correr a la vez que un texto.
 - **Deduplicación del webhook por `mensaje.id`** (`lib/services/dedupe.js`, en memoria, TTL 1 h): con comandos con estado un reenvío de Meta no es inocuo.
 - **El historial conserva las opciones** (`textoRegistro`): la IA y el panel ven "1. Calzado / 2. …" y no solo "¿cuál te interesa?".
+- **Bloques de rescate de la última vuelta** (la IA falla en pleno cierre y el cliente pide una categoría): con el flag activo los tipos/rubros salen como lista y no como texto numerado.
 - **Respaldo a texto** si WhatsApp rechaza una lista/botones/pedido de ubicación (`enviarSalidaPorWhatsApp` en `server.js`).
 - `interpretarMensajeEntrante` devuelve el **título** del botón/lista (no el ID técnico); el ID viaja aparte como `idBoton`.
 - **Bug del diseño original encontrado por los tests**: tras `confirmar_pedido`/`crear_pedido` el flujo escribía el `contexto` desde su copia en memoria y pisaba la firma del resumen y el vaciado del carrito; ahora relee el lead después de cada tool (`refrescar`).
@@ -607,4 +608,4 @@ reportado. Suite determinista completa: **194 tests en verde**.
 
 ### Verificación
 
-`test/flujo-determinista.test.js` (18 casos, con una IA inyectada que cuenta llamadas y debe quedar en 0), `test/dedupe.test.js`, `test/whatsapp.test.js` (listas/ubicación), `test/carrito.test.js` y `test/carrito-web-conversacion.test.js`. Suite completa: **484 tests en verde**. Prueba de humo por el webhook real: duplicado ignorado, `respuesta_por_flujo` sin llamadas a la IA, respaldo a texto cuando Meta rechaza el mensaje, y dos toques simultáneos de "➕ 1" aplicados ambos.
+`test/flujo-determinista.test.js` (23 casos: menús, carrito, cierre a domicilio y con retiro en tienda, pago con QR, paginación "Ver más", rescate de última vuelta y flag apagado, con una IA inyectada que cuenta llamadas y debe quedar en 0), `test/dedupe.test.js`, `test/whatsapp.test.js` (listas/ubicación), `test/carrito.test.js` y `test/carrito-web-conversacion.test.js`. Suite completa: **490 tests en verde**. Prueba de humo por el webhook real: duplicado ignorado, `respuesta_por_flujo` sin llamadas a la IA, respaldo a texto cuando Meta rechaza el mensaje, y dos toques simultáneos de "➕ 1" aplicados ambos.

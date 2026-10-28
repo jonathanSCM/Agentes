@@ -285,3 +285,144 @@ describe('con el flag APAGADO el comportamiento es el de siempre', () => {
     assert.equal(await pasoDe(), null, 'el flujo no guardo ningun paso');
   });
 });
+
+describe('cierre con retiro en tienda', () => {
+  before(async () => { await prisma.agenteConfig.update({ where: { agenteId }, data: { direccionTienda: 'Av. Tienda 123' } }); });
+  after(async () => { await prisma.agenteConfig.update({ where: { agenteId }, data: { direccionTienda: null } }); });
+
+  test('si la tienda tiene local ofrece las dos opciones, y con retiro NUNCA pide ubicacion', async () => {
+    await lead({ nombre: 'Ana Pérez' }, [itemDe(zapatillas[0])]);
+    await prisma.pedido.deleteMany({ where: { empresaId } });
+    const ia = iaContada();
+
+    const entrega = await toque('mas:no', 'Finalizar', ia);
+    assert.deepEqual(entrega.botones.map((b) => b.id), ['cierre:domicilio', 'cierre:recojo']);
+
+    const pago = await toque('cierre:recojo', 'Retiro en tienda', ia);
+    assert.equal(pago.solicitarUbicacion, undefined, 'con retiro no se pide ubicacion');
+    assert.ok(pago.botones.some((b) => b.id === 'pago:EFECTIVO'), 'pasa directo a la forma de pago');
+
+    const resumen = await toque('pago:EFECTIVO', 'Efectivo', ia);
+    assert.match(resumen.respuesta, /Retira en la tienda: Av\. Tienda 123/);
+
+    const listo = await toque('cierre:confirmar', 'Confirmar ✅', ia);
+    assert.match(listo.respuesta, /el retiro/);
+    assert.equal(ia.llamadas(), 0);
+    const pedido = await prisma.pedido.findFirst({ where: { empresaId } });
+    assert.equal(pedido.tipoEntrega, 'RECOJO');
+    assert.equal(pedido.direccionEntrega, null);
+  });
+});
+
+describe('cierre con pago QR', () => {
+  const wa = require('../lib/services/whatsapp');
+  const enviarImagenOriginal = wa.enviarImagen;
+  let enviadas;
+
+  before(async () => {
+    await prisma.conexionWhatsApp.deleteMany({ where: { agenteId } });
+    await prisma.conexionWhatsApp.create({ data: { agenteId, estado: 'CONECTADO', phoneNumberId: 'TEST_PN_FLUJO_QR', tokenCifrado: 'x' } });
+    wa.enviarImagen = async (conexion, para, url) => { enviadas.push({ para, url }); return { ok: true, id: 'wamid.QR' }; };
+  });
+  after(async () => {
+    wa.enviarImagen = enviarImagenOriginal;
+    await prisma.conexionWhatsApp.deleteMany({ where: { agenteId } });
+    await prisma.agenteConfig.update({ where: { agenteId }, data: { qrCobroUrl: null } });
+  });
+  beforeEach(() => { enviadas = []; });
+
+  test('al confirmar un pedido con QR se manda la imagen del QR y se le avisa al cliente', async () => {
+    await prisma.agenteConfig.update({ where: { agenteId }, data: { qrCobroUrl: 'https://tienda.test/qr.jpg' } });
+    await lead(CIERRE_COMPLETO, [itemDe(zapatillas[0])]);
+    await prisma.pedido.deleteMany({ where: { empresaId } });
+    const ia = iaContada();
+
+    await toque('pago:QR', 'QR', ia);
+    const listo = await toque('cierre:confirmar', 'Confirmar ✅', ia);
+
+    assert.equal(ia.llamadas(), 0);
+    assert.equal(enviadas.length, 1, 'se mando exactamente una imagen');
+    assert.equal(enviadas[0].url, 'https://tienda.test/qr.jpg');
+    assert.match(listo.respuesta, /Te envié el QR/);
+  });
+
+  test('si la tienda no cargo la imagen del QR, no se afirma que se mando: avisa que un asesor lo envia', async () => {
+    await prisma.agenteConfig.update({ where: { agenteId }, data: { qrCobroUrl: null } });
+    await lead(CIERRE_COMPLETO, [itemDe(zapatillas[0])]);
+    await prisma.pedido.deleteMany({ where: { empresaId } });
+    const ia = iaContada();
+
+    await toque('pago:QR', 'QR', ia);
+    const listo = await toque('cierre:confirmar', 'Confirmar ✅', ia);
+
+    assert.equal(enviadas.length, 0);
+    assert.doesNotMatch(listo.respuesta, /Te envié el QR/);
+    assert.match(listo.respuesta, /asesor te va a enviar el QR/);
+  });
+});
+
+describe('paginacion de categorias ("Ver más") con mas de 10 rubros', () => {
+  const idsCreados = { categorias: [], productos: [] };
+
+  before(async () => {
+    for (let n = 1; n <= 12; n += 1) {
+      const categoria = await prisma.categoria.create({ data: { empresaId, nombre: `Cat ${String(n).padStart(2, '0')}` } });
+      const producto = await prisma.producto.create({
+        data: { empresaId, categoriaId: categoria.id, nombre: `Producto paginado ${n}`, precio: 10, stock: 3, atributos: {}, fotos: [] },
+      });
+      idsCreados.categorias.push(categoria.id);
+      idsCreados.productos.push(producto.id);
+    }
+  });
+  after(async () => {
+    await prisma.producto.deleteMany({ where: { id: { in: idsCreados.productos } } });
+    await prisma.categoria.deleteMany({ where: { id: { in: idsCreados.categorias } } });
+  });
+
+  test('la primera pagina muestra 9 categorias + "Ver más", y la segunda las restantes (maximo 10 filas por lista)', async () => {
+    await lead({}, [itemDe(zapatillas[0])]);
+    const ia = iaContada();
+
+    const p0 = await toque('menu:rubros', 'Otra categoría', ia);
+    const filas0 = p0.lista.secciones[0].filas;
+    assert.equal(filas0.length, 10);
+    assert.equal(filas0[9].titulo, 'Ver más ▸');
+    assert.equal(filas0[9].id, 'menu:pag:rubros:1');
+
+    const p1 = await toque('menu:pag:rubros:1', 'Ver más ▸', ia);
+    const filas1 = p1.lista.secciones[0].filas;
+    assert.ok(filas1.length >= 1 && filas1.length <= 10);
+    assert.ok(filas1.every((f) => f.titulo !== 'Ver más ▸'), 'la ultima pagina no ofrece mas');
+    const todos = [...filas0.slice(0, 9), ...filas1].map((f) => f.titulo);
+    assert.equal(new Set(todos).size, todos.length, 'ninguna categoria se repite entre paginas');
+    assert.ok(todos.includes('Calzado') && todos.includes('Zapatillas') && todos.includes('Cat 12'), 'no se pierde ninguna');
+    assert.equal(ia.llamadas(), 0);
+  });
+});
+
+describe('rescate de la ultima vuelta (la IA falla en pleno cierre y el cliente pide una categoria)', () => {
+  async function conIaQueFalla() {
+    // con la forma de pago ya elegida (si no, el motor manda primero los botones de pago)
+    await lead({ ...CIERRE_COMPLETO, formaPago: 'EFECTIVO' }, [itemDe(zapatillas[0])]);
+    const vago = { content: 'aqui tienes la info, dale un vistazo', tool_calls: [] }; // afirma mostrar algo sin tarjeta
+    return escribe('calzado', { llamar: async () => vago });
+  }
+
+  test('con el flag activo los tipos salen como LISTA de WhatsApp, no como texto numerado', async () => {
+    const r = await conIaQueFalla();
+    assert.ok(r.lista, 'responde una lista');
+    assert.deepEqual(r.lista.secciones[0].filas.map((f) => f.titulo).sort(), ['Botas', 'Sandalias']);
+    assert.doesNotMatch(r.respuesta, /^Dentro de "Calzado" tenemos:\n1\./);
+  });
+
+  test('con el flag apagado sigue saliendo el texto numerado de siempre', async () => {
+    await prisma.agenteConfig.update({ where: { agenteId }, data: { flujoDeterminista: false } });
+    try {
+      const r = await conIaQueFalla();
+      assert.equal(r.lista, undefined);
+      assert.match(r.respuesta, /Dentro de "Calzado" tenemos:\n1\. /);
+    } finally {
+      await prisma.agenteConfig.update({ where: { agenteId }, data: { flujoDeterminista: true } });
+    }
+  });
+});
