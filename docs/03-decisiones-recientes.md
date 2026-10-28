@@ -609,3 +609,21 @@ reportado. Suite determinista completa: **194 tests en verde**.
 ### Verificación
 
 `test/flujo-determinista.test.js` (23 casos: menús, carrito, cierre a domicilio y con retiro en tienda, pago con QR, paginación "Ver más", rescate de última vuelta y flag apagado, con una IA inyectada que cuenta llamadas y debe quedar en 0), `test/dedupe.test.js`, `test/whatsapp.test.js` (listas/ubicación), `test/carrito.test.js` y `test/carrito-web-conversacion.test.js`. Suite completa: **490 tests en verde**. Prueba de humo por el webhook real: duplicado ignorado, `respuesta_por_flujo` sin llamadas a la IA, respaldo a texto cuando Meta rechaza el mensaje, y dos toques simultáneos de "➕ 1" aplicados ambos.
+
+
+## 27. Catálogo público más liviano: caché en memoria, sin embeddings y con compresión
+
+**Problema.** `/catalogo/:slug` cargaba TODO el catálogo de la empresa (productos + variantes + categorías) desde Postgres en cada visita, incluyendo el vector `Producto.embedding` (1536 números por producto) que solo usa el bot. No había caché HTTP ni compresión. Una promo con muchas visitas pegaba a la base una vez por visita.
+
+**Decisión.** Se queda Postgres como fuente de verdad (ver análisis Postgres vs NoSQL: los atributos flexibles ya viven en columnas `Json`). Se agrega solo una capa de lectura:
+1. **Consulta liviana**: `omit: { embedding: true }` en el listado y en la ficha de producto.
+2. **Compresión** (`compression`, br/gzip) y `Cache-Control: public, max-age=30d, immutable` para `/uploads` (los nombres de archivo son únicos: timestamp + aleatorio). `public/` (css/js) sigue revalidando porque conserva nombres entre deploys.
+3. **Caché en memoria por empresa** (`lib/services/catalogoCache.js`, TTL 45 s, tope 500 entradas): solo el LISTADO. El filtro por categoría/color/talla se aplica sobre la copia cacheada. Visitas simultáneas comparten una sola carga, y una carga que empezó antes de una invalidación no puede guardar su dato viejo.
+
+**Invalidación.** Cualquier escritura (POST/PUT/DELETE) bajo `/panel` invalida la empresa de la sesión y bajo `/admin` invalida todo (`invalidarCatalogoAlTerminarEscritura` en `server.js`); eso cubre productos, variantes, stock manual, categorías, importación de Excel, cancelaciones con restock y config. El bot descuenta stock al crear un pedido, que no pasa por el panel: `agente.js` invalida la empresa justo después de la transacción.
+
+**Qué NO cambia.** El stock real se sigue validando contra Postgres al agregar al carrito y al confirmar el pedido: lo peor que puede mostrar el listado es un número con hasta 45 s de atraso. La ficha de producto y el carrito no se cachean.
+
+**Limitación.** Caché en la memoria del proceso (instancia única, igual que `dedupe.js`). Con más de una instancia habría que pasarla a Redis; el TTL corto acota el atraso mientras tanto. Variable opcional: `CATALOGO_CACHE_TTL_MS`.
+
+**Archivos.** `lib/services/catalogoCache.js` (nuevo), `server.js`, `lib/services/agente.js`, `package.json` (`compression`), `test/catalogo-cache.test.js` (10 casos). Suite: **500 tests en verde**. Medido en local con 150 productos: primera visita ~94 ms, siguientes ~10 ms, respuesta comprimida (133 KB de HTML).

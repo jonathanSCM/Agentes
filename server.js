@@ -84,6 +84,8 @@ const { generarPlantillaExcel, parsearFilasExcel, importarCatalogo } = require('
 const { transicionValida, requiereRestock, dentroDeVentana24h } = require('./lib/services/pedidos');
 const { costoUSD } = require('./lib/services/costoIA');
 const { yaProcesado } = require('./lib/services/dedupe');
+const compression = require('compression');
+const catalogoCache = require('./lib/services/catalogoCache');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -171,6 +173,12 @@ async function descargarYConvertirFotoDesdeUrl(req, url) {
 app.set('trust proxy', 1);
 app.set('view engine', 'ejs');
 app.set('views', path.join(__dirname, 'views'));
+app.use(compression());
+// Las fotos subidas tienen nombre unico (timestamp + aleatorio, ver multer
+// mas abajo): nunca se reemplazan en el mismo nombre, asi que el navegador y
+// cualquier CDN las pueden guardar por mucho tiempo. El resto de public/ (css,
+// js) conserva el nombre entre deploys y se sigue revalidando.
+app.use('/uploads', express.static(path.join(__dirname, 'public', 'uploads'), { maxAge: '30d', immutable: true }));
 app.use(express.static(path.join(__dirname, 'public')));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
@@ -288,29 +296,41 @@ app.get('/l/:codigo', async (req, res, next) => {
 // Catalogo publico de una empresa (sin login): el agente manda este link
 // cuando el cliente pide "el catálogo" en general, en vez de un producto
 // puntual. Reutiliza el slug de la empresa (el mismo que ya usa cada tenant).
+// Carga el catalogo completo de una empresa (lo unico que cuesta de
+// /catalogo/:slug). Va por catalogoCache: ver lib/services/catalogoCache.js.
+async function cargarCatalogoPublico(slug) {
+  const empresa = await prisma.empresa.findUnique({
+    where: { slug },
+    include: { agentes: { take: 1, include: { config: true } } },
+  });
+  if (!empresa) return null;
+
+  const productosDb = await prisma.producto.findMany({
+    where: { empresaId: empresa.id, activo: true },
+    orderBy: [{ categoria: { nombre: 'asc' } }, { nombre: 'asc' }],
+    // El vector de busqueda semantica pesa (1536 numeros por producto) y solo
+    // lo usa el bot: la web publica nunca lo necesita.
+    omit: { embedding: true },
+    include: { variantes: { where: { activa: true } }, categoria: { include: { padre: true } } },
+  });
+  // Si el producto tiene variantes, el stock real es la suma de sus
+  // variantes (Producto.stock queda en 0 a proposito en ese caso) - mismo
+  // criterio que /panel/productos, si no el catalogo publico muestra
+  // "Agotado" en productos que si tienen stock real.
+  const productos = productosDb.map((p) => ({
+    ...p,
+    stockMostrado: p.variantes.length ? p.variantes.reduce((suma, v) => suma + v.stock, 0) : p.stock,
+  }));
+  const agente = empresa.agentes[0];
+  return { empresaId: empresa.id, empresa, productos, agente, config: agente ? agente.config : null };
+}
+
 app.get('/catalogo/:slug', async (req, res, next) => {
   try {
-    const empresa = await prisma.empresa.findUnique({
-      where: { slug: req.params.slug },
-      include: { agentes: { take: 1, include: { config: true } } },
-    });
-    if (!empresa) return res.status(404).render('404', { title: 'Página no encontrada' });
-
-    const productosDb = await prisma.producto.findMany({
-      where: { empresaId: empresa.id, activo: true },
-      orderBy: [{ categoria: { nombre: 'asc' } }, { nombre: 'asc' }],
-      include: { variantes: { where: { activa: true } }, categoria: { include: { padre: true } } },
-    });
-    // Si el producto tiene variantes, el stock real es la suma de sus
-    // variantes (Producto.stock queda en 0 a proposito en ese caso) - mismo
-    // criterio que /panel/productos, si no el catalogo publico muestra
-    // "Agotado" en productos que si tienen stock real.
-    const productos = productosDb.map((p) => ({
-      ...p,
-      stockMostrado: p.variantes.length ? p.variantes.reduce((suma, v) => suma + v.stock, 0) : p.stock,
-    }));
-    const agente = empresa.agentes[0];
-    const config = agente ? agente.config : null;
+    const catalogo = await catalogoCache.obtenerCatalogo(req.params.slug, () => cargarCatalogoPublico(req.params.slug));
+    if (!catalogo) return res.status(404).render('404', { title: 'Página no encontrada' });
+    // Lo cacheado se comparte entre visitas: solo se lee, nunca se modifica.
+    const { empresa, productos, agente, config } = catalogo;
 
     // El bot manda links con filtro real (categoria/color/talla/marca):
     // mismas funciones que ya usa el chat, para que la web nunca muestre un
@@ -383,6 +403,7 @@ app.get('/catalogo/:slug/producto/:id', async (req, res, next) => {
 
     const producto = await prisma.producto.findFirst({
       where: { id: Number(req.params.id), empresaId: empresa.id, activo: true },
+      omit: { embedding: true },
       include: { variantes: { where: { activa: true } }, categoria: true },
     });
     if (!producto) return res.status(404).render('404', { title: 'Producto no encontrado' });
@@ -716,6 +737,28 @@ function requireRol(...rolesPermitidos) {
 
 // Datos comunes de las vistas del panel del cliente
 const notif = require('./lib/services/notificaciones');
+
+// Invalidacion de la cache del catalogo publico (ver catalogoCache.js): todo
+// lo que cambia productos, variantes, stock, categorias o config sale por un
+// POST/PUT/DELETE del panel (o del admin), asi que en vez de recordar cada
+// ruta se invalida al terminar cualquier escritura. Cuesta una recarga extra
+// del catalogo por edicion, nada mas. Los cambios que NO pasan por aca (el bot
+// descontando stock al crear un pedido) invalidan en agente.js.
+function invalidarCatalogoAlTerminarEscritura(obtenerEmpresaId) {
+  return (req, res, next) => {
+    if (req.method !== 'GET' && req.method !== 'HEAD' && req.method !== 'OPTIONS') {
+      res.on('finish', () => {
+        const empresaId = obtenerEmpresaId(req);
+        if (empresaId) catalogoCache.invalidarEmpresa(empresaId);
+        else if (empresaId === null) catalogoCache.invalidarTodo();
+      });
+    }
+    next();
+  };
+}
+app.use('/panel', invalidarCatalogoAlTerminarEscritura((req) => (req.session && req.session.empresaId) || undefined));
+// El admin toca cualquier empresa (marca, slug, moneda): se descarta todo.
+app.use('/admin', invalidarCatalogoAlTerminarEscritura(() => null));
 
 app.use('/panel', async (req, res, next) => {
   if (!req.session || !req.session.clienteId) return next();
