@@ -668,3 +668,22 @@ reportado. Suite determinista completa: **194 tests en verde**.
 **Verificado** contra el servidor local con una cuenta de prueba (ya borrada): el menú muestra los 5 grupos, la plantilla crea 26 categorías, el detalle de una categoría y el de un tipo cargan, renombrar y agregar tipos responden bien, y el formulario de producto usa "categoría". **No se pudo revisar el aspecto visual**: el navegador integrado no logró abrir localhost en esta sesión. Suite: 518 tests.
 
 **Pendiente de esta línea:** configuración en pestañas (fase E) y pasada de diseño (fase F), incluida la revisión visual de estas pantallas.
+
+
+## 30. Configuración en pestañas y pasada de diseño
+
+**Problema.** Configuración era una sola página de 330 líneas que mezclaba lo básico (nombre, tono, pagos) con lo técnico (latitud/longitud, el flag del flujo, "preguntas iniciales"), con 46 estilos en línea. Además, al entrar a Inicio por primera vez el recorrido guiado de 9 pasos arrancaba solo y se pisaba con la tarjeta "Primeros pasos".
+
+**Configuración (`views/cliente/configuracion.ejs`).** Cuatro pestañas en un solo formulario y un solo "Guardar": *Mi agente* (nombre, si está atendiendo, tono, bienvenida, instrucciones, aviso de derivación, número informativo), *Pagos y entrega* (formas de pago, QR, moneda, dirección del local y mapa plegado), *Catálogo web* (logo, colores, estilo y tema como tarjetas) y *Avanzado* (preguntas iniciales y el flag "Menús y cierre con botones"). Mismos nombres de campo, así que el servidor no cambió. Detalles:
+- Sin JavaScript se ven todas las secciones una debajo de otra; con JavaScript hay pestañas con teclado (flechas) y se recuerda la última usada en la sesión.
+- Los enlaces viejos con ancla (`#config-pagos`, `#config-ventas`) siguen funcionando; la clase `.config-nav` se mantiene porque la usa el recorrido guiado.
+- La latitud y longitud ya no se muestran (quedan como campos ocultos que llena el mapa); el mapa de Leaflet se redibuja al abrir la pestaña o el desplegable, que es cuando tiene tamaño real.
+- Si el navegador frena el envío por un campo inválido en otra pestaña, lleva al usuario a esa pestaña.
+- El estado del agente explica cada opción ("Borrador: todavía no contesta").
+
+**Diseño (fase F).**
+- El recorrido guiado ya no arranca solo; sigue con el botón "?" y con un enlace en la tarjeta de Primeros pasos.
+- Importar desde Excel (Productos) queda plegado y explicado en 3 pasos.
+- La tabla de variantes existentes y las pantallas nuevas usan clases CSS en vez de estilos en línea; casillas y opciones dentro de `.field` ya no heredan el "input a todo el ancho" (se veían descolocadas). Estilos en línea en `views/cliente`: **206 → 135**. Siguen pendientes las pantallas que no se tocaron (pedido-detalle, inteligencia, conversación, WhatsApp, equipo, agente).
+
+**Verificado** en el navegador (cuenta de demo local): las 4 pestañas, guardar cambios (estado, tono, dirección, tarjeta y plantilla del catálogo quedaron en la base; el flag no cambió), la tabla de variantes, y sin scroll horizontal a 375 px en Inicio, Categorías, Configuración, Productos, producto nuevo y editar. Suite: 518 tests.

@@ -539,21 +539,26 @@ select option:hover {
 .campo-copiable input { flex: 1; }
 .campo-copiable .btn-copiar { flex-shrink: 0; padding: 0 .9rem; font-size: .82rem; }
 
-/* ---------- Nav de anclas de la página de Configuración ---------- */
+/* ---------- Pestañas de la página de Configuración ---------- */
 .config-nav {
   position: sticky; top: 0; z-index: 5;
-  display: flex; gap: .5rem; flex-wrap: wrap;
+  display: flex; gap: .4rem; flex-wrap: wrap;
   background: var(--surface); backdrop-filter: blur(10px);
   border: 1px solid var(--border); border-radius: var(--radius);
-  padding: .6rem; margin-bottom: 1.2rem;
+  padding: .5rem; margin-bottom: 1.2rem;
 }
-.config-nav a {
-  padding: .4rem .8rem; border-radius: 8px; font-size: .85rem;
-  color: var(--muted); text-decoration: none;
+.config-nav[hidden] { display: none; }
+.config-nav button {
+  padding: .55rem 1rem; border-radius: 10px; font: inherit; font-size: .9rem; font-weight: 600;
+  color: var(--muted); background: transparent; border: 1px solid transparent; cursor: pointer;
 }
-.config-nav a:hover { color: var(--text); background: var(--bg-2); }
-.config-seccion { margin-bottom: 1.2rem; scroll-margin-top: 4.5rem; }
+.config-nav button:hover { color: var(--text); background: var(--bg-2); }
+.config-nav button.is-activa { color: var(--primary-2); background: rgba(47, 227, 166, .12); border-color: rgba(47, 227, 166, .4); }
+.config-nav button:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+.config-seccion { margin-bottom: 1.2rem; max-width: 760px; }
 .config-seccion .dash-card-head h3 { font-size: 1.05rem; }
+.cfg-con-pestanas .config-seccion:not(.is-activa) { display: none; }
+.cfg-guardar { max-width: 760px; }
 
 /* ---------- Panel de conversacion: chat propio (no el de la landing) ---------- */
 .conv-layout { display: grid; grid-template-columns: 1fr 300px; gap: 1.1rem; align-items: start; }
@@ -813,3 +818,52 @@ select option:hover {
 .cat-nuevo-dato { margin-top: 1rem; align-items: end; }
 .cat-nuevo-dato .pf-check, .cat-nuevo-dato .badge, .cat-nuevo-dato .btn { align-self: center; }
 @media (max-width: 560px) { .cat-agregar-tipo { flex-direction: column; align-items: stretch; } }
+
+/* ---------- Configuracion: piezas sueltas (antes eran estilos en linea) ---------- */
+.opcional { font-weight: 400; color: var(--muted); font-style: normal; font-size: .8rem; }
+.cfg-imagen { margin-bottom: .5rem; }
+.cfg-qr { width: 120px; height: 120px; object-fit: contain; border-radius: 8px; background: #fff; padding: 6px; }
+.cfg-logo { width: 56px; height: 56px; object-fit: cover; border-radius: 8px; background: #fff; padding: 4px; }
+.cfg-color { height: 42px; padding: 4px; }
+.cfg-opciones { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: .6rem; }
+.cfg-opciones-corto { grid-template-columns: repeat(auto-fit, minmax(120px, 200px)); }
+.cfg-mapa { margin-bottom: 1rem; }
+.cfg-mapa-acciones { display: flex; gap: .6rem; align-items: center; flex-wrap: wrap; margin-bottom: .6rem; }
+.cfg-mapa-acciones .muted { font-size: .82rem; }
+.cfg-mapa-lienzo { height: 280px; border-radius: 12px; overflow: hidden; border: 1px solid var(--border); }
+.cfg-tel { margin-top: 1rem; }
+.pf-aviso { color: #fde68a; }
+
+/* ---------- Tabla de variantes existentes (antes estilos en linea) ---------- */
+.atributos-variante { display: flex; flex-direction: column; gap: 4px; min-width: 190px; }
+.atributo-row-mini { display: flex; gap: 4px; }
+.mini-in {
+  background: transparent; border: 1px solid rgba(255, 255, 255, .15); border-radius: 8px;
+  padding: .35rem .5rem; color: inherit; font: inherit; font-size: .82rem;
+}
+.mini-in:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px var(--ring); }
+.mini-in-k { width: 76px; }
+.mini-in-v { width: 84px; }
+.mini-in-precio { width: 110px; }
+.mini-in-stock { width: 80px; }
+.mini-x { background: none; border: 0; color: var(--muted); cursor: pointer; font-size: 1rem; line-height: 1; padding: 0 .2rem; }
+.mini-x:hover { color: var(--text); }
+.atributos-variante .btn-chico { align-self: flex-start; padding: .2rem .6rem; font-size: .75rem; }
+.vt-fotos { min-width: 140px; }
+.vt-miniaturas { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 4px; }
+.vt-miniaturas img { width: 40px; height: 40px; object-fit: cover; border-radius: 6px; }
+.vt-quitar { display: block; font-size: .72rem; margin-bottom: 4px; }
+.vt-archivo { width: 130px; font-size: .72rem; }
+.vt-copiar { margin-top: 4px; }
+.vt-copiar .btn-chico { padding: .2rem .5rem; font-size: .7rem; }
+
+/* Primeros pasos: enlace al recorrido */
+.pasos-recorrido { margin: 1rem 0 0; font-size: .85rem; color: var(--muted); }
+
+/* Casillas y opciones dentro de .field: sin esto heredan "input a todo el ancho" y "label en bloque" */
+.field .pf-check, .field .pf-opcion { display: flex; margin-bottom: .35rem; font-weight: 400; font-size: .9rem; color: var(--text); }
+.field .pf-opcion { margin-bottom: 0; }
+.pf-check input, .pf-opcion input, .field .pf-check input, .field .pf-opcion input {
+  width: auto; padding: 0; margin: 0; flex: 0 0 auto; accent-color: var(--primary-2);
+}
+.field .pf-opcion { align-items: flex-start; }

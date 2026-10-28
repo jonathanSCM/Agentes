@@ -37,7 +37,15 @@
         </li>
       <% }); %>
     </ol>
+    <p class="pasos-recorrido">¿Preferís un paseo por el panel? <button type="button" class="pf-link" id="btn-recorrido">Ver el recorrido</button></p>
   </section>
+  <script>
+    (function () {
+      var b = document.getElementById('btn-recorrido');
+      var ayuda = document.getElementById('tourAyudaBtn');
+      if (b && ayuda) b.addEventListener('click', function () { ayuda.click(); });
+    })();
+  </script>
 <% } %>
 
 <!-- KPIs del día -->

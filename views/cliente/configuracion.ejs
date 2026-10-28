@@ -1,24 +1,26 @@
 <%- include('partials/inicio') %>
 
 <div class="page-head">
-  <h2>Configuración del agente</h2>
-  <p>Datos de tu agente de ventas y el número de WhatsApp que usará.</p>
+  <h2>Configuración</h2>
+  <p>Cómo atiende tu agente, cómo cobrás y cómo se ve tu catálogo. Se guarda todo junto con el botón de abajo.</p>
 </div>
 
 <% if (mensaje) { %><div class="alert-ok"><%= mensaje %></div><% } %>
-<% if (error) { %><div class="alert-err"><%= error %></div><% } %>
+<% if (error) { %><div class="alert-err" role="alert"><%= error %></div><% } %>
 
-<nav class="config-nav">
-  <a href="#config-agente">Datos del agente</a>
-  <a href="#config-ventas">Cómo vende</a>
-  <a href="#config-pagos">Pagos y entrega</a>
-  <a href="#config-catalogo">Catálogo web y marca</a>
-</nav>
+<form method="POST" action="/panel/configuracion" enctype="multipart/form-data" id="form-config">
 
-<form method="POST" action="/panel/configuracion" enctype="multipart/form-data">
+  <!-- Las pestañas las activa el JS; sin JS se ven todas las secciones una debajo de otra -->
+  <nav class="config-nav" role="tablist" aria-label="Secciones de la configuración" hidden>
+    <button type="button" role="tab" data-tab="agente">Mi agente</button>
+    <button type="button" role="tab" data-tab="pagos">Pagos y entrega</button>
+    <button type="button" role="tab" data-tab="catalogo">Catálogo web</button>
+    <button type="button" role="tab" data-tab="avanzado">Avanzado</button>
+  </nav>
 
-  <section class="dash-card config-seccion" id="config-agente">
-    <div class="dash-card-head"><h3>Datos del agente</h3></div>
+  <!-- ===== Mi agente ===== -->
+  <section class="dash-card config-seccion" id="config-agente" role="tabpanel" data-panel="agente">
+    <div class="dash-card-head"><h3>Mi agente</h3></div>
 
     <div class="field">
       <label for="nombre">Nombre del agente</label>
@@ -27,87 +29,73 @@
     </div>
 
     <div class="field">
-      <label for="numeroWhatsapp">Número de WhatsApp del agente</label>
-      <input id="numeroWhatsapp" name="numeroWhatsapp" type="tel" maxlength="20"
-             value="<%= agente.numeroWhatsapp || '' %>" placeholder="59171234567" />
-      <p class="muted" style="font-size:.82rem;margin:.4rem 0 0">
-        En formato internacional, sin el signo "+" ni espacios. Ej: Bolivia → <b>591</b> + número.
-      </p>
-    </div>
-
-    <div class="field">
-      <label for="estado">Estado del agente</label>
+      <label for="estado">¿Está atendiendo?</label>
       <select id="estado" name="estado">
-        <% [['ACTIVO','Activo (atiende)'],['PAUSADO','Pausado'],['BORRADOR','Borrador']].forEach(function (e) { %>
+        <% [['ACTIVO','Activo: atiende a tus clientes'],['PAUSADO','Pausado: deja de contestar'],['BORRADOR','Borrador: todavía no contesta']].forEach(function (e) { %>
           <option value="<%= e[0] %>" <%= agente.estado === e[0] ? 'selected' : '' %>><%= e[1] %></option>
         <% }); %>
       </select>
     </div>
 
-    <% if (!agente.numeroWhatsapp) { %>
-      <div class="alert-err" style="margin-top:.8rem">
-        Aún no has puesto tu número de WhatsApp.
-      </div>
-    <% } %>
-    <p class="muted" style="font-size:.82rem;margin:.8rem 0 0">
-      Este número es solo un dato del agente. Para conectarlo de verdad a WhatsApp, andá a la sección
-      <a href="/panel/whatsapp">WhatsApp →</a>
-    </p>
-  </section>
-
-  <section class="dash-card config-seccion" id="config-ventas">
-    <div class="dash-card-head"><h3>Cómo vende</h3></div>
-
     <div class="field">
-      <label for="mensajeBienvenida">Mensaje de bienvenida (opcional)</label>
-      <input id="mensajeBienvenida" name="mensajeBienvenida" type="text" maxlength="200"
-             value="<%= config.mensajeBienvenida || '' %>" placeholder="Ej: Bienvenido a Tienda Doña Rosa, tu tienda de ropa y calzado" />
-      <p class="muted" style="font-size:.82rem;margin:.4rem 0 0">
-        Si lo dejás vacío, el agente se presenta solo (su nombre, tu tienda y qué vendés) en vez de un saludo genérico — normalmente da mejor resultado dejarlo así.
-      </p>
-    </div>
-
-    <div class="field">
-      <label for="tono">Tono del agente</label>
+      <label for="tono">¿Cómo les habla?</label>
       <select id="tono" name="tono">
         <% ['cordial y profesional','amigable y cercano','formal','divertido y casual'].forEach(function (t) { %>
-          <option value="<%= t %>" <%= config.tono === t ? 'selected' : '' %>><%= t %></option>
+          <option value="<%= t %>" <%= config.tono === t ? 'selected' : '' %>><%= t.charAt(0).toUpperCase() + t.slice(1) %></option>
         <% }); %>
       </select>
     </div>
 
     <div class="field">
-      <label for="instrucciones">Instrucciones extra (opcional)</label>
+      <label for="mensajeBienvenida">Mensaje de bienvenida <em class="opcional">(opcional)</em></label>
+      <input id="mensajeBienvenida" name="mensajeBienvenida" type="text" maxlength="200"
+             value="<%= config.mensajeBienvenida || '' %>" placeholder="Ej: Bienvenido a Tienda Doña Rosa, tu tienda de ropa y calzado" />
+      <p class="pf-ayuda">Si lo dejás vacío, el agente se presenta solo (su nombre, tu tienda y qué vendés). Normalmente funciona mejor así.</p>
+    </div>
+
+    <div class="field">
+      <label for="instrucciones">Algo más que deba saber <em class="opcional">(opcional)</em></label>
       <input id="instrucciones" name="instrucciones" type="text" maxlength="200"
              value="<%= config.instrucciones || '' %>" placeholder="Ej: Ofrece el envío gratis en compras mayores a Bs 200" />
     </div>
 
-    <div class="field">
-      <label><input type="checkbox" name="derivarAHumano" value="1" <%= config.derivarAHumano ? 'checked' : '' %> /> Permitir que derive a una persona cuando sea necesario</label>
-    </div>
+    <label class="pf-check"><input type="checkbox" name="derivarAHumano" value="1" <%= config.derivarAHumano ? 'checked' : '' %> /> Que me avise cuando un cliente necesite hablar con una persona</label>
 
-    <div class="field">
-      <label for="preguntasIniciales">Qué pregunta el agente antes de mostrar nada</label>
-      <p class="muted" style="font-size:.82rem;margin:0 0 .5rem">
-        Datos que el agente pide <strong>al principio</strong>, antes incluso de mostrar las categorías: son filtros que aplican a todo tu catálogo.
-        Los pregunta de a uno y en este orden, ofreciéndole al cliente las opciones reales que existen.
-        Separalos por coma. Dejalo vacío para que arranque mostrando el menú.
-      </p>
-      <input id="preguntasIniciales" name="preguntasIniciales" type="text" maxlength="120"
-             value="<%= (config.preguntasIniciales || []).join(', ') %>" placeholder="Genero" />
-      <p class="muted" style="font-size:.8rem;margin:.35rem 0 0">
-        Sugerencia: <code>Genero</code> solo. Agregar <code>Talla</code> acá hace que la pregunte antes de saber si buscás calzado (42) o ropa (M),
-        que suele confundir — conviene dejar la talla configurada dentro de cada categoría.
-      </p>
+    <div class="field cfg-tel">
+      <label for="numeroWhatsapp">Número de WhatsApp del agente</label>
+      <input id="numeroWhatsapp" name="numeroWhatsapp" type="tel" maxlength="20"
+             value="<%= agente.numeroWhatsapp || '' %>" placeholder="59171234567" />
+      <p class="pf-ayuda">Con el código de país, sin “+” ni espacios. Ej: Bolivia → <b>591</b> + número.
+        Este dato es solo informativo: para conectar el número de verdad andá a <a href="/panel/whatsapp">WhatsApp</a>.</p>
+      <% if (!agente.numeroWhatsapp) { %><p class="pf-aviso">Todavía no cargaste tu número.</p><% } %>
     </div>
   </section>
 
-  <section class="dash-card config-seccion" id="config-pagos">
+  <!-- ===== Pagos y entrega ===== -->
+  <section class="dash-card config-seccion" id="config-pagos" role="tabpanel" data-panel="pagos">
     <div class="dash-card-head"><h3>Pagos y entrega</h3></div>
 
     <div class="field">
+      <label>¿Cómo te pueden pagar?</label>
+      <p class="pf-ayuda">El agente solo le ofrece al cliente lo que marques acá.</p>
+      <label class="pf-check"><input type="checkbox" name="aceptaEfectivo" value="1" <%= config.aceptaEfectivo !== false ? 'checked' : '' %> /> Efectivo</label>
+      <label class="pf-check"><input type="checkbox" name="aceptaTarjeta" value="1" <%= config.aceptaTarjeta ? 'checked' : '' %> /> Tarjeta</label>
+      <label class="pf-check"><input type="checkbox" id="aceptaQr" name="aceptaQr" value="1" <%= config.aceptaQr ? 'checked' : '' %> /> QR</label>
+    </div>
+
+    <div class="field" id="campo-qr" <%= config.aceptaQr ? '' : 'hidden' %>>
+      <label for="qr">Imagen de tu QR de cobro</label>
+      <p class="pf-ayuda">La misma que ya usás hoy (banco, billetera, etc.). El agente la manda tal cual cuando el cliente elige pagar por QR.</p>
+      <% if (config.qrCobroUrl) { %>
+        <div class="cfg-imagen"><img src="<%= config.qrCobroUrl %>" alt="QR de cobro actual" class="cfg-qr" /></div>
+        <label class="pf-check"><input type="checkbox" name="quitarQr" value="1" /> Quitar el QR actual</label>
+      <% } %>
+      <input id="qr" name="qr" type="file" accept="image/*" />
+    </div>
+
+    <div class="field">
       <label for="moneda">Moneda de tu catálogo</label>
-      <p class="muted" style="font-size:.82rem;margin:0 0 .5rem">Todos los precios que tenés cargados están en esta moneda. El agente la usa para escribir cualquier precio y nunca la convierte a otra.</p>
+      <p class="pf-ayuda">Todos tus precios están en esta moneda. El agente la usa tal cual y nunca la convierte.</p>
       <select id="moneda" name="moneda">
         <% monedas.forEach(function (m) { %>
           <option value="<%= m %>" <%= (empresa && empresa.moneda) === m ? 'selected' : '' %>><%= m %></option>
@@ -116,40 +104,33 @@
     </div>
 
     <div class="field">
-      <label for="direccionTienda">Dirección de tu local (para retiro en tienda)</label>
-      <p class="muted" style="font-size:.82rem;margin:0 0 .5rem">Si la dejás vacía, el agente solo ofrece entrega a domicilio: nunca inventa una dirección. Si la cargás, se la manda tal cual al cliente que elija pasar a retirar.</p>
+      <label for="direccionTienda">Dirección de tu local <em class="opcional">(para retiro en tienda)</em></label>
+      <p class="pf-ayuda">Si la dejás vacía, el agente solo ofrece entrega a domicilio. Si la cargás, se la manda tal cual a quien elija retirar.</p>
       <input id="direccionTienda" name="direccionTienda" type="text" maxlength="200"
              value="<%= config.direccionTienda || '' %>" placeholder="Ej: Av. Ballivián 1234, entre 2do y 3er anillo" />
     </div>
 
-    <div class="field">
-      <label>Ubicación del local en el mapa (opcional)</label>
-      <p class="muted" style="font-size:.82rem;margin:0 0 .6rem">Tocá el mapa para marcar dónde queda tu local, o usá tu ubicación actual. Esto es lo que ve el cliente cuando elige retirar en tienda.</p>
-      <div style="display:flex;gap:.5rem;margin-bottom:.6rem;flex-wrap:wrap">
-        <button type="button" class="btn btn-ghost" id="btnUbicacionActual" style="padding:.5rem 1rem;font-size:.85rem">📍 Usar mi ubicación</button>
-        <span class="muted" id="ubicacionTexto" style="font-size:.82rem;align-self:center">
-          <%= (config.tiendaLat != null && config.tiendaLng != null) ? `Marcada en ${Number(config.tiendaLat).toFixed(5)}, ${Number(config.tiendaLng).toFixed(5)}` : 'Todavía no marcaste ninguna ubicación.' %>
-        </span>
-      </div>
-      <div id="mapaTienda" style="height:280px;border-radius:12px;overflow:hidden;border:1px solid var(--border)"></div>
-      <div class="field-row" style="margin-top:.6rem">
-        <div class="field">
-          <label for="tiendaLat">Latitud</label>
-          <input id="tiendaLat" name="tiendaLat" type="number" step="any" readonly
-                 value="<%= config.tiendaLat != null ? config.tiendaLat : '' %>" placeholder="Tocá el mapa" />
+    <details class="pf-mas cfg-mapa" id="detalle-mapa" <%= (config.tiendaLat != null && config.tiendaLng != null) ? 'open' : '' %>>
+      <summary>Marcar mi local en el mapa <em>(opcional)</em></summary>
+      <div class="pf-mas-cuerpo">
+        <p class="pf-ayuda">Tocá el mapa donde queda tu local, o usá tu ubicación actual. Es lo que ve el cliente que elige retirar en tienda.</p>
+        <div class="cfg-mapa-acciones">
+          <button type="button" class="btn btn-ghost btn-chico" id="btnUbicacionActual">📍 Usar mi ubicación</button>
+          <span class="muted" id="ubicacionTexto">
+            <%= (config.tiendaLat != null && config.tiendaLng != null) ? `Marcada en ${Number(config.tiendaLat).toFixed(5)}, ${Number(config.tiendaLng).toFixed(5)}` : 'Todavía no marcaste ninguna ubicación.' %>
+          </span>
         </div>
-        <div class="field">
-          <label for="tiendaLng">Longitud</label>
-          <input id="tiendaLng" name="tiendaLng" type="number" step="any" readonly
-                 value="<%= config.tiendaLng != null ? config.tiendaLng : '' %>" placeholder="Tocá el mapa" />
-        </div>
+        <div id="mapaTienda" class="cfg-mapa-lienzo"></div>
+        <input id="tiendaLat" name="tiendaLat" type="hidden" value="<%= config.tiendaLat != null ? config.tiendaLat : '' %>" />
+        <input id="tiendaLng" name="tiendaLng" type="hidden" value="<%= config.tiendaLng != null ? config.tiendaLng : '' %>" />
       </div>
-    </div>
+    </details>
 
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
     <script>
     (function () {
+      if (typeof L === 'undefined') return; // sin red no hay mapa, pero el resto del formulario funciona
       var latInicial = <%- config.tiendaLat != null ? config.tiendaLat : 'null' %>;
       var lngInicial = <%- config.tiendaLng != null ? config.tiendaLng : 'null' %>;
       var centro = (latInicial != null && lngInicial != null) ? [latInicial, lngInicial] : [-16.5, -64.5];
@@ -160,6 +141,11 @@
         attribution: '© OpenStreetMap',
         maxZoom: 19,
       }).addTo(mapa);
+      // El mapa nace dentro de una pestaña/sección plegada (tamaño 0): hay que
+      // avisarle cuando se muestra, o queda con las baldosas cortadas.
+      window.__redibujarMapaTienda = function () { mapa.invalidateSize(); };
+      var detalle = document.getElementById('detalle-mapa');
+      if (detalle) detalle.addEventListener('toggle', function () { if (detalle.open) setTimeout(window.__redibujarMapaTienda, 50); });
 
       var inputLat = document.getElementById('tiendaLat');
       var inputLng = document.getElementById('tiendaLng');
@@ -214,44 +200,18 @@
       });
     })();
     </script>
-
-    <div class="field">
-      <label>Formas de pago que acepta esta tienda</label>
-      <p class="muted" style="font-size:.82rem;margin:0 0 .5rem">El agente SOLO le ofrece al cliente las formas de pago que marques acá.</p>
-      <label style="display:block;margin-bottom:.3rem"><input type="checkbox" name="aceptaEfectivo" value="1" <%= config.aceptaEfectivo !== false ? 'checked' : '' %> /> Efectivo</label>
-      <label style="display:block;margin-bottom:.3rem"><input type="checkbox" name="aceptaTarjeta" value="1" <%= config.aceptaTarjeta ? 'checked' : '' %> /> Tarjeta</label>
-      <label style="display:block;margin-bottom:.3rem"><input type="checkbox" id="aceptaQr" name="aceptaQr" value="1" <%= config.aceptaQr ? 'checked' : '' %> /> QR</label>
-    </div>
-
-    <div class="field">
-      <label><input type="checkbox" name="flujoDeterminista" value="1" <%= config.flujoDeterminista ? 'checked' : '' %> /> Menús y cierre con botones (sin IA)</label>
-      <p class="muted" style="font-size:.82rem;margin:.3rem 0 0">Las categorías, el "¿algo más?", la edición del carrito y el cierre del pedido (nombre, entrega, pago y confirmación) se resuelven con listas y botones de WhatsApp, sin usar IA. La IA sigue respondiendo las preguntas abiertas. Apagalo para volver al comportamiento anterior.</p>
-    </div>
-
-    <div class="field" id="campo-qr" style="<%= config.aceptaQr ? '' : 'display:none' %>">
-      <label for="qr">Imagen del QR de cobro</label>
-      <p class="muted" style="font-size:.82rem;margin:0 0 .5rem">La misma imagen de QR que ya usás hoy para cobrar (banco, billetera, etc.). El bot la manda tal cual cuando el cliente elige pagar por QR.</p>
-      <% if (config.qrCobroUrl) { %>
-        <div style="margin-bottom:8px;">
-          <img src="<%= config.qrCobroUrl %>" style="width:120px;height:120px;object-fit:contain;border-radius:8px;background:#fff;padding:6px" />
-        </div>
-        <label style="margin-bottom:.5rem;display:block"><input type="checkbox" name="quitarQr" value="1" /> Quitar el QR actual</label>
-      <% } %>
-      <input id="qr" name="qr" type="file" accept="image/*" />
-    </div>
   </section>
 
-  <section class="dash-card config-seccion" id="config-catalogo">
-    <div class="dash-card-head"><h3>Catálogo web y marca</h3></div>
-    <p class="muted" style="font-size:.82rem;margin:0 0 1rem">Así se ve la página pública que el agente comparte cuando un cliente quiere ver fotos y precios con más detalle (<a href="/catalogo/<%= empresa.slug %>" target="_blank" rel="noopener">vista previa</a>).</p>
+  <!-- ===== Catálogo web ===== -->
+  <section class="dash-card config-seccion" id="config-catalogo" role="tabpanel" data-panel="catalogo">
+    <div class="dash-card-head"><h3>Catálogo web</h3></div>
+    <p class="pf-ayuda">Es la página pública que el agente comparte cuando un cliente quiere ver fotos y precios con más detalle. <a href="/catalogo/<%= empresa.slug %>" target="_blank" rel="noopener">Ver cómo queda</a>.</p>
 
-    <div style="margin-bottom:.8rem">
-      <label for="logo" style="display:block;margin-bottom:.3rem">Logo de la tienda</label>
+    <div class="field">
+      <label for="logo">Logo de tu tienda</label>
       <% if (config.logoUrl) { %>
-        <div style="margin-bottom:8px;">
-          <img src="<%= config.logoUrl %>" style="width:56px;height:56px;object-fit:cover;border-radius:8px;background:#fff;padding:4px" />
-        </div>
-        <label style="margin-bottom:.5rem;display:block"><input type="checkbox" name="quitarLogo" value="1" /> Quitar el logo actual</label>
+        <div class="cfg-imagen"><img src="<%= config.logoUrl %>" alt="Logo actual" class="cfg-logo" /></div>
+        <label class="pf-check"><input type="checkbox" name="quitarLogo" value="1" /> Quitar el logo actual</label>
       <% } %>
       <input id="logo" name="logo" type="file" accept="image/*" />
     </div>
@@ -259,17 +219,17 @@
     <div class="field-row">
       <div class="field">
         <label for="colorPrimario">Color principal</label>
-        <input id="colorPrimario" name="colorPrimario" type="color" value="<%= config.colorPrimario || '#22c58b' %>" style="height:42px;padding:4px" />
+        <input id="colorPrimario" name="colorPrimario" type="color" class="cfg-color" value="<%= config.colorPrimario || '#22c58b' %>" />
       </div>
       <div class="field">
         <label for="colorSecundario">Color secundario</label>
-        <input id="colorSecundario" name="colorSecundario" type="color" value="<%= config.colorSecundario || '#22c58b' %>" style="height:42px;padding:4px" />
+        <input id="colorSecundario" name="colorSecundario" type="color" class="cfg-color" value="<%= config.colorSecundario || '#22c58b' %>" />
       </div>
     </div>
 
-    <div style="margin-top:1rem">
-      <label style="display:block;margin-bottom:.5rem">Estilo del catálogo</label>
-      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:.6rem">
+    <div class="field">
+      <label>Estilo del catálogo</label>
+      <div class="cfg-opciones" role="radiogroup" aria-label="Estilo del catálogo">
         <%
           var plantillas = [
             { valor: 'clasica', nombre: 'Clásica', desc: 'Grid con buscador' },
@@ -280,19 +240,18 @@
           var plantillaActual = config.plantillaCatalogo || 'clasica';
         %>
         <% plantillas.forEach(function (p) { %>
-          <label style="border:2px solid <%= plantillaActual === p.valor ? 'var(--primary-2)' : 'var(--border)' %>;border-radius:10px;padding:.7rem;cursor:pointer;display:block">
-            <input type="radio" name="plantillaCatalogo" value="<%= p.valor %>" <%= plantillaActual === p.valor ? 'checked' : '' %> style="margin-right:.4rem" />
-            <strong style="font-size:.88rem"><%= p.nombre %></strong>
-            <div class="muted" style="font-size:.76rem;margin-top:.15rem"><%= p.desc %></div>
+          <label class="pf-opcion">
+            <input type="radio" name="plantillaCatalogo" value="<%= p.valor %>" <%= plantillaActual === p.valor ? 'checked' : '' %> />
+            <span><strong><%= p.nombre %></strong><small><%= p.desc %></small></span>
           </label>
         <% }); %>
       </div>
     </div>
 
-    <div style="margin-top:1rem">
-      <label style="display:block;margin-bottom:.5rem">Tema de la página de producto</label>
-      <p class="muted" style="font-size:.78rem;margin:0 0 .5rem">Solo afecta la página de detalle de un producto (cuando el cliente entra a ver fotos, tallas y precio) — el resto del catálogo sigue con el estilo de la plantilla elegida arriba.</p>
-      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:.6rem">
+    <div class="field">
+      <label>Página de cada producto</label>
+      <p class="pf-ayuda">Solo cambia la página de detalle (fotos, tallas y precio). El resto sigue el estilo de arriba.</p>
+      <div class="cfg-opciones cfg-opciones-corto" role="radiogroup" aria-label="Tema de la página de producto">
         <%
           var temas = [
             { valor: 'oscuro', nombre: 'Oscuro' },
@@ -301,29 +260,92 @@
           var temaActual = config.temaProducto || 'oscuro';
         %>
         <% temas.forEach(function (t) { %>
-          <label style="border:2px solid <%= temaActual === t.valor ? 'var(--primary-2)' : 'var(--border)' %>;border-radius:10px;padding:.7rem;cursor:pointer;display:block">
-            <input type="radio" name="temaProducto" value="<%= t.valor %>" <%= temaActual === t.valor ? 'checked' : '' %> style="margin-right:.4rem" />
-            <strong style="font-size:.88rem"><%= t.nombre %></strong>
+          <label class="pf-opcion">
+            <input type="radio" name="temaProducto" value="<%= t.valor %>" <%= temaActual === t.valor ? 'checked' : '' %> />
+            <span><strong><%= t.nombre %></strong></span>
           </label>
         <% }); %>
       </div>
     </div>
   </section>
 
-  <div class="form-actions">
+  <!-- ===== Avanzado ===== -->
+  <section class="dash-card config-seccion" id="config-avanzado" role="tabpanel" data-panel="avanzado">
+    <div class="dash-card-head"><h3>Avanzado</h3></div>
+    <p class="pf-ayuda">Ajustes finos. Si todo funciona bien, no hace falta tocar nada acá.</p>
+
+    <div class="field">
+      <label for="preguntasIniciales">Qué pregunta el agente antes de mostrar nada</label>
+      <p class="pf-ayuda">
+        Datos que pide <strong>al principio</strong> y que filtran todo tu catálogo (por ejemplo el género). Los pregunta de a uno, en este orden, con las opciones reales que tenés.
+        Separalos por coma. Si lo dejás vacío, arranca mostrando el menú.
+      </p>
+      <input id="preguntasIniciales" name="preguntasIniciales" type="text" maxlength="120"
+             value="<%= (config.preguntasIniciales || []).join(', ') %>" placeholder="Genero" />
+      <p class="pf-ayuda">Sugerencia: solo <code>Genero</code>. La talla conviene configurarla dentro de cada categoría, porque la talla de un calzado (42) no es la de una prenda (M).</p>
+    </div>
+
+    <div class="field">
+      <label class="pf-check"><input type="checkbox" name="flujoDeterminista" value="1" <%= config.flujoDeterminista ? 'checked' : '' %> /> Menús y cierre con botones (sin IA)</label>
+      <p class="pf-ayuda">Las categorías, el “¿algo más?”, el carrito y el cierre del pedido (nombre, entrega, pago y confirmación) se resuelven con listas y botones de WhatsApp, sin usar IA. La IA sigue respondiendo las preguntas abiertas. Apagalo para volver al comportamiento anterior.</p>
+    </div>
+  </section>
+
+  <div class="form-actions cfg-guardar">
     <button class="btn btn-primary" type="submit">Guardar configuración</button>
   </div>
 </form>
 
 <script>
 (function () {
+  // Mostrar/ocultar la imagen del QR según la forma de pago
   var chk = document.getElementById('aceptaQr');
   var campo = document.getElementById('campo-qr');
-  if (chk && campo) {
-    chk.addEventListener('change', function () {
-      campo.style.display = chk.checked ? '' : 'none';
+  if (chk && campo) chk.addEventListener('change', function () { campo.hidden = !chk.checked; });
+
+  // Pestañas: una sección a la vez, pero un solo formulario y un solo "Guardar"
+  var form = document.getElementById('form-config');
+  var nav = form.querySelector('.config-nav');
+  var botones = Array.prototype.slice.call(nav.querySelectorAll('[data-tab]'));
+  var paneles = Array.prototype.slice.call(form.querySelectorAll('[data-panel]'));
+  var NOMBRES = botones.map(function (b) { return b.getAttribute('data-tab'); });
+
+  function mostrar(nombre, guardar) {
+    if (NOMBRES.indexOf(nombre) < 0) nombre = NOMBRES[0];
+    botones.forEach(function (b) {
+      var on = b.getAttribute('data-tab') === nombre;
+      b.classList.toggle('is-activa', on);
+      b.setAttribute('aria-selected', on ? 'true' : 'false');
+      b.tabIndex = on ? 0 : -1;
     });
+    paneles.forEach(function (p) { p.classList.toggle('is-activa', p.getAttribute('data-panel') === nombre); });
+    if (nombre === 'pagos' && window.__redibujarMapaTienda) setTimeout(window.__redibujarMapaTienda, 50);
+    if (guardar) { try { sessionStorage.setItem('ps_cfg_tab', nombre); } catch (e) {} }
   }
+
+  botones.forEach(function (b) {
+    b.addEventListener('click', function () { mostrar(b.getAttribute('data-tab'), true); });
+    b.addEventListener('keydown', function (ev) {
+      var i = botones.indexOf(b);
+      if (ev.key === 'ArrowRight') { ev.preventDefault(); botones[(i + 1) % botones.length].focus(); botones[(i + 1) % botones.length].click(); }
+      if (ev.key === 'ArrowLeft') { ev.preventDefault(); botones[(i - 1 + botones.length) % botones.length].focus(); botones[(i - 1 + botones.length) % botones.length].click(); }
+    });
+  });
+
+  // Enlaces viejos con ancla (#config-pagos, #config-ventas...) siguen funcionando
+  var ancla = (location.hash || '').replace('#config-', '');
+  if (ancla === 'ventas') ancla = 'agente';
+  var guardada = null;
+  try { guardada = sessionStorage.getItem('ps_cfg_tab'); } catch (e) {}
+  nav.hidden = false;
+  form.classList.add('cfg-con-pestanas');
+  mostrar(NOMBRES.indexOf(ancla) >= 0 ? ancla : (guardada || NOMBRES[0]), false);
+
+  // Si el navegador frena el envío por un campo inválido que está en otra pestaña, llevamos ahí al usuario
+  form.addEventListener('invalid', function (ev) {
+    var p = ev.target.closest('[data-panel]');
+    if (p) mostrar(p.getAttribute('data-panel'), false);
+  }, true);
 })();
 </script>
 

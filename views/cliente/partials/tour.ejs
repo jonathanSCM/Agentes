@@ -185,12 +185,10 @@
     if (PASOS[i] && PASOS[i].activo === PANEL_ACTIVO) {
       setTimeout(function () { arrancarEnPagina(i); }, 300);
     }
-  } else if (!sessionStorage.getItem('ps_tour_visto') && PANEL_ACTIVO === 'inicio') {
-    // Una sola vez por sesion de navegador, y solo arranca solo si el
-    // primer paso (Inicio) es la pagina en la que ya estas.
-    sessionStorage.setItem('ps_tour_visto', '1');
-    setTimeout(abrirDesdeElPrincipio, 600);
   }
+  // Ya no arranca solo: se pisaba con la tarjeta "Primeros pasos" de Inicio,
+  // que es la guia principal de un negocio nuevo. El recorrido sigue
+  // disponible con el boton "?" de arriba y con el enlace de esa tarjeta.
 
   var btnAyuda = document.getElementById('tourAyudaBtn');
   if (btnAyuda) {

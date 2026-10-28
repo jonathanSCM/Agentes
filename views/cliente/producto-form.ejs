@@ -182,19 +182,15 @@
     <p class="pf-ayuda">Cada combinación (por ejemplo talla 42 en negro) tiene su propio stock y, si querés, su propio precio y fotos.</p>
 
     <% if (typeof errorVariante !== 'undefined' && errorVariante) { %><div class="alert-err" role="alert"><%= errorVariante %></div><% } %>
-
-    <%
-      var inputStyleVariante = 'background:transparent;border:1px solid rgba(255,255,255,.15);border-radius:8px;padding:.35rem .5rem;color:inherit;font:inherit;font-size:.82rem';
-    %>
     <datalist id="atributos-variante-sugeridos">
       <option value="Talla"></option><option value="Color"></option><option value="Modelo"></option>
       <option value="Sabor"></option><option value="Presentación"></option><option value="Tamaño"></option>
     </datalist>
     <template id="tpl-atributo-variante-mini">
-      <div class="atributo-row-mini" style="display:flex;gap:4px;">
-        <input list="atributos-variante-sugeridos" name="atributoClave[]" placeholder="Talla" maxlength="60" style="width:76px;<%= inputStyleVariante %>" />
-        <input name="atributoValor[]" placeholder="42" maxlength="120" style="width:84px;<%= inputStyleVariante %>" />
-        <button type="button" class="btn-quitar-atributo-mini" aria-label="Quitar" style="background:none;border:none;color:var(--tenue,#9aa1b5);cursor:pointer;font-size:1rem;line-height:1;padding:0 .2rem">×</button>
+      <div class="atributo-row-mini">
+        <input list="atributos-variante-sugeridos" name="atributoClave[]" placeholder="Talla" maxlength="60" class="mini-in mini-in-k" />
+        <input name="atributoValor[]" placeholder="42" maxlength="120" class="mini-in mini-in-v" />
+        <button type="button" class="btn-quitar-atributo-mini mini-x" aria-label="Quitar">×</button>
       </div>
     </template>
 
@@ -212,40 +208,40 @@
               %>
               <tr>
                 <td>
-                  <div class="atributos-variante" data-form="<%= formId %>" style="display:flex;flex-direction:column;gap:4px;min-width:190px">
+                  <div class="atributos-variante" data-form="<%= formId %>">
                     <% entradasVariante.forEach(function (par) { %>
-                      <div class="atributo-row-mini" style="display:flex;gap:4px;">
-                        <input form="<%= formId %>" list="atributos-variante-sugeridos" name="atributoClave[]" value="<%= par[0] %>" placeholder="Talla" maxlength="60" style="width:76px;<%= inputStyleVariante %>" />
-                        <input form="<%= formId %>" name="atributoValor[]" value="<%= par[1] %>" placeholder="42" maxlength="120" style="width:84px;<%= inputStyleVariante %>" />
-                        <button type="button" class="btn-quitar-atributo-mini" aria-label="Quitar" style="background:none;border:none;color:var(--tenue,#9aa1b5);cursor:pointer;font-size:1rem;line-height:1;padding:0 .2rem">×</button>
+                      <div class="atributo-row-mini">
+                        <input form="<%= formId %>" list="atributos-variante-sugeridos" name="atributoClave[]" value="<%= par[0] %>" placeholder="Talla" maxlength="60" class="mini-in mini-in-k" />
+                        <input form="<%= formId %>" name="atributoValor[]" value="<%= par[1] %>" placeholder="42" maxlength="120" class="mini-in mini-in-v" />
+                        <button type="button" class="btn-quitar-atributo-mini mini-x" aria-label="Quitar">×</button>
                       </div>
                     <% }); %>
-                    <button type="button" class="btn btn-ghost btn-agregar-atributo-variante" style="padding:.2rem .5rem;font-size:.75rem;align-self:flex-start">+ opción</button>
+                    <button type="button" class="btn btn-ghost btn-chico btn-agregar-atributo-variante">+ opción</button>
                   </div>
                 </td>
-                <td style="min-width:140px">
+                <td class="vt-fotos">
                   <% if (v.fotos && v.fotos.length) { %>
-                    <div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:4px;">
+                    <div class="vt-miniaturas">
                       <% v.fotos.forEach(function (f) { %>
-                        <img src="<%= f %>" alt="" style="width:40px;height:40px;object-fit:cover;border-radius:6px;" />
+                        <img src="<%= f %>" alt="" />
                       <% }); %>
                     </div>
-                    <label style="display:block;font-size:.72rem;margin-bottom:4px;"><input form="<%= formId %>" type="checkbox" name="quitarFotos" value="1" /> Quitar</label>
+                    <label class="vt-quitar"><input form="<%= formId %>" type="checkbox" name="quitarFotos" value="1" /> Quitar</label>
                   <% } %>
-                  <input form="<%= formId %>" type="file" name="fotos" accept="image/*" multiple style="width:130px;font-size:.72rem;" />
+                  <input form="<%= formId %>" type="file" name="fotos" accept="image/*" multiple class="vt-archivo" />
                   <% if (tieneColorYFotos) { %>
-                    <form method="POST" action="/panel/productos/<%= producto.id %>/variantes/<%= v.id %>/copiar-fotos" class="inline-form" style="margin-top:4px;">
-                      <button class="btn btn-ghost" style="padding:.2rem .5rem;font-size:.7rem" type="submit">Copiar a mismo color</button>
+                    <form method="POST" action="/panel/productos/<%= producto.id %>/variantes/<%= v.id %>/copiar-fotos" class="inline-form vt-copiar">
+                      <button class="btn btn-ghost btn-chico" type="submit">Copiar a mismo color</button>
                     </form>
                   <% } %>
                 </td>
-                <td class="num"><input form="<%= formId %>" type="number" name="precio" min="0" step="0.01" value="<%= v.precio ? Number(v.precio).toFixed(2) : '' %>" placeholder="Igual al producto" style="width:110px;<%= inputStyleVariante %>" /></td>
-                <td class="num"><input form="<%= formId %>" type="number" name="stock" min="0" value="<%= v.stock %>" style="width:80px;<%= inputStyleVariante %>" /></td>
+                <td class="num"><input form="<%= formId %>" type="number" name="precio" min="0" step="0.01" value="<%= v.precio ? Number(v.precio).toFixed(2) : '' %>" placeholder="Igual al producto" class="mini-in mini-in-precio" /></td>
+                <td class="num"><input form="<%= formId %>" type="number" name="stock" min="0" value="<%= v.stock %>" class="mini-in mini-in-stock" /></td>
                 <td class="actions-cell">
-                  <button form="<%= formId %>" class="btn btn-ghost" style="padding:.4rem .8rem;font-size:.85rem" type="submit">Guardar</button>
+                  <button form="<%= formId %>" class="btn btn-ghost btn-chico" type="submit">Guardar</button>
                   <form method="POST" action="/panel/productos/<%= producto.id %>/variantes/<%= v.id %>/eliminar" class="inline-form"
                         onsubmit="return confirm('¿Eliminar esta opción?');">
-                    <button class="btn btn-ghost" style="padding:.4rem .8rem;font-size:.85rem" type="submit">Eliminar</button>
+                    <button class="btn btn-ghost btn-chico" type="submit">Eliminar</button>
                   </form>
                 </td>
               </tr>
