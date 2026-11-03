@@ -1,0 +1,64 @@
+<%- include('partials/inicio') %>
+
+<%
+  var etiquetas = { OK: 'Funcionando', CON_FALLAS: 'Con fallas recientes', PROBANDO: 'Probando si volvió', EN_PAUSA: 'En pausa (atendiendo con menú)' };
+  var clase = salud.estado === 'OK' ? '' : 'stat-new';
+%>
+<div class="page-head">
+  <h2>Estado de la IA</h2>
+  <p>Si la IA falla o se queda sin saldo, el bot sigue atendiendo con menú, carrito y pedidos. Acá ves qué pasó y a dónde llegan los avisos.</p>
+</div>
+
+<% if (ok) { %><div class="alert-ok"><%= ok %></div><% } %>
+<% if (err) { %><div class="alert-err"><%= err %></div><% } %>
+<% if (salud.simulando) { %><div class="alert-err"><strong>Caída simulada activa</strong> (SIMULAR_CAIDA_IA). Los clientes reales están siendo atendidos en modo menú. Quitá la variable para volver a la normalidad.</div><% } %>
+
+<div class="admin-stats">
+  <div class="stat-card <%= clase %>"><span class="stat-num" style="font-size:1.1rem"><%= etiquetas[salud.estado] || salud.estado %></span><span class="stat-label">Estado ahora<% if (salud.segundosParaReintentar) { %> · reintenta en <%= salud.segundosParaReintentar %> s<% } %></span></div>
+  <div class="stat-card"><span class="stat-num"><%= salud.fallasRecientes %></span><span class="stat-label">Fallas en los últimos 5 min</span></div>
+  <div class="stat-card"><span class="stat-num"><%= salud.turnosSinIA %></span><span class="stat-label">Mensajes atendidos sin IA (desde el último reinicio)</span></div>
+  <div class="stat-card"><span class="stat-num" style="font-size:1.1rem"><%= salud.canalesDeAlerta.length ? salud.canalesDeAlerta.join(', ') : 'Ninguno' %></span><span class="stat-label">Canales de alerta</span></div>
+</div>
+
+<div class="dash-grid">
+  <div class="dash-card">
+    <div class="dash-card-head"><h3>Último error</h3></div>
+    <% if (!salud.ultimoError) { %>
+      <p class="dash-empty">Sin errores desde el último reinicio.</p>
+    <% } else { %>
+      <p><strong><%= salud.ultimoError.etiqueta %></strong><% if (salud.ultimoError.proveedor) { %> · <%= salud.ultimoError.proveedor %><% } %><% if (salud.ultimoError.modelo) { %> / <%= salud.ultimoError.modelo %><% } %></p>
+      <p class="dash-empty"><%= new Date(salud.ultimoError.en).toLocaleString('es-BO') %> — <%= salud.ultimoError.detalle %></p>
+    <% } %>
+    <% var tipos = Object.keys(salud.contadores); %>
+    <% if (tipos.length) { %>
+      <p style="margin-top:.8rem">Fallas por tipo: <%= tipos.map(function (t) { return t + ' ×' + salud.contadores[t]; }).join(' · ') %></p>
+    <% } %>
+  </div>
+
+  <div class="dash-card">
+    <div class="dash-card-head"><h3>Avisos enviados</h3></div>
+    <% if (!salud.alertas.length) { %>
+      <p class="dash-empty">Todavía no se envió ningún aviso.</p>
+    <% } else { %>
+      <ul style="margin:0;padding-left:1.1rem">
+        <% salud.alertas.forEach(function (a) { %>
+          <li><strong><%= a.titulo %></strong> — <%= new Date(a.en).toLocaleString('es-BO') %> (<%= a.canales.join(', ') || 'solo log' %>)</li>
+        <% }); %>
+      </ul>
+    <% } %>
+    <form method="POST" action="/admin/estado-ia/probar-alerta" style="margin-top:1rem">
+      <button type="submit" class="btn btn-secondary">Enviar alerta de prueba</button>
+    </form>
+  </div>
+</div>
+
+<div class="page-head">
+  <h2 style="font-size:1.2rem">Cómo recibir los avisos</h2>
+</div>
+<p>Configurá una de estas variables en Coolify (y reiniciá):</p>
+<ul>
+  <li><code>ALERTA_NTFY_TOPIC</code> — el nombre de un tema en ntfy.sh (gratis, app para el celular).</li>
+  <li><code>ALERTA_TELEGRAM_BOT_TOKEN</code> y <code>ALERTA_TELEGRAM_CHAT_ID</code> — un bot de Telegram propio.</li>
+  <li><code>ALERTA_WEBHOOK_URL</code> — un webhook de Slack o Discord.</li>
+</ul>
+<p>Se manda un aviso cada 30 minutos como máximo por cada tipo de problema (sin saldo, clave inválida, caída), y otro cuando la IA vuelve.</p>

@@ -93,6 +93,8 @@ const avisoCarritoWeb = require('./lib/services/avisoCarritoWeb');
 const ogImagen = require('./lib/services/ogImagen');
 const { fijarCantidad, totalCarrito } = require('./lib/services/carrito');
 
+if (process.env.SIMULAR_CAIDA_IA) console.warn(`[ATENCION] SIMULAR_CAIDA_IA=${process.env.SIMULAR_CAIDA_IA}: la IA está simulada como caída; los clientes se atienden en modo menú.`);
+
 const app = express();
 const PORT = process.env.PORT || 3000;
 
@@ -3297,6 +3299,28 @@ app.get('/admin/mensajes', requireAuth, (req, res) => {
 });
 
 // --- Costo real de IA (tokens que Proshop le paga a OpenAI/Anthropic) ---
+// Salud de la IA: estado del cortacircuitos, ultimo error, alertas y prueba del canal de avisos.
+app.get('/admin/estado-ia', requireAuth, (req, res) => {
+  const salud = require('./lib/services/saludIA');
+  res.render('admin/estado-ia', {
+    title: 'Panel Proshop - Estado de la IA',
+    tituloPagina: 'Estado de la IA',
+    activo: 'estado-ia',
+    salud: salud.resumen(),
+    ok: req.query.ok || null,
+    err: req.query.err || null,
+  });
+});
+
+app.post('/admin/estado-ia/probar-alerta', requireAuth, async (req, res) => {
+  const salud = require('./lib/services/saludIA');
+  if (!salud.canalesConfigurados().length) {
+    return res.redirect('/admin/estado-ia?err=' + encodeURIComponent('No hay ningún canal de alertas configurado (ver variables ALERTA_* en Coolify).'));
+  }
+  const r = await salud.alertar('prueba:' + Date.now(), '🔔 Prueba de alerta de Proshop', 'Si leés esto, los avisos de caída de la IA te van a llegar.');
+  res.redirect('/admin/estado-ia?' + (r.enviada ? 'ok=' + encodeURIComponent('Alerta de prueba enviada por: ' + r.canales.join(', ')) : 'err=' + encodeURIComponent('No se pudo enviar la alerta de prueba (revisá los logs).')));
+});
+
 app.get('/admin/costo-ia', requireAuth, async (req, res, next) => {
   try {
     const hace7 = new Date(); hace7.setHours(0, 0, 0, 0); hace7.setDate(hace7.getDate() - 6);

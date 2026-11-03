@@ -3,11 +3,12 @@
 // proveedor de IA, el agente JAMAS debe fabricar una respuesta que afirme
 // disponibilidad. Usa la base de datos local real (igual que el resto del
 // proyecto) con datos de prueba propios que se limpian al final.
-const { test, describe, before, after } = require('node:test');
+const { test, describe, before, beforeEach, after } = require('node:test');
 const assert = require('node:assert/strict');
 
 const { prisma } = require('../lib/db');
 const { generarRespuesta } = require('../lib/services/agente');
+const saludIA = require('../lib/services/saludIA');
 
 const SLUG = 'test-regresion-agente';
 const TELEFONO = '000-test-regresion';
@@ -65,7 +66,11 @@ after(async () => {
 });
 
 describe('generarRespuesta - anti-invento en errores (punto 9/10)', () => {
-  test('si el proveedor de IA falla, responde honestamente y NO fabrica disponibilidad', async () => {
+  // El estado de salud de la IA es global del proceso: cada test parte de cero.
+  beforeEach(() => saludIA.reiniciar());
+  after(() => saludIA.reiniciar());
+
+  test('si el proveedor de IA falla, sigue en modo sin IA y NO fabrica disponibilidad', async () => {
     const llamarInyectado = async () => {
       throw new Error('Simulacion de falla del proveedor (rate limit, timeout, etc).');
     };
@@ -78,12 +83,12 @@ describe('generarRespuesta - anti-invento en errores (punto 9/10)', () => {
     const salida = await generarRespuesta(agenteId, TELEFONO, [], 'Tienen la Zapatilla de test?', undefined, { llamarInyectado });
 
     assert.equal(salida.ok, true);
-    assert.equal(salida.error, true, 'debe marcarse explicitamente como error tecnico');
     assert.equal(salida.demo, false, 'NO debe caer en el heuristico de modo demo');
-    // La respuesta debe ser el mensaje honesto, nunca debe mencionar
-    // "disponible" ni el nombre de un producto como si lo hubiera verificado.
-    assert.match(salida.respuesta, /no pude consultar/i);
-    assert.doesNotMatch(salida.respuesta.toLowerCase(), /tenemos varios|disponible ahora|en stock/);
+    // La IA se cayo: el cliente NO se queda con un error, sigue el modo sin IA
+    // (menu y tarjeta reales), y nunca se afirma disponibilidad ni stock.
+    assert.equal(salida.modoSinIA, true);
+    assert.ok(salida.respuesta && salida.respuesta.length > 0);
+    assert.doesNotMatch(salida.respuesta.toLowerCase(), /tenemos varios|disponible ahora|en stock|hay stock/);
   });
 
   test('cuando la IA responde normalmente (sin error), no lleva la marca de error', async () => {
@@ -136,7 +141,7 @@ describe('generarRespuesta - anti-invento en errores (punto 9/10)', () => {
     assert.equal(salida.respuesta, 'Listo, avisame si necesitas algo mas.');
   });
 
-  test('si el proveedor devuelve un error que NO es 429, no reintenta y responde el error tecnico honesto', async () => {
+  test('si el proveedor devuelve un error que NO es 429, no reintenta y sigue en modo sin IA', async () => {
     let llamadas = 0;
     const llamarInyectado = async () => {
       llamadas += 1;
@@ -148,8 +153,7 @@ describe('generarRespuesta - anti-invento en errores (punto 9/10)', () => {
     const salida = await generarRespuesta(agenteId, TELEFONO, [], 'Tienen la Zapatilla de test?', undefined, { llamarInyectado });
 
     assert.equal(llamadas, 1, 'un error que no es de rate limit no debe reintentarse');
-    assert.equal(salida.error, true);
-    assert.match(salida.respuesta, /no pude consultar/i);
+    assert.equal(salida.modoSinIA, true, 'el cliente recibe la respuesta del modo sin IA, no un error');
   });
 });
 
