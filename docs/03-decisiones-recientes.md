@@ -726,3 +726,20 @@ Resultado visto en una conversación real contra el modelo ("quiero ver poleras"
 - `embeddings.js`: ya no registra como error el caso normal de un producto borrado mientras se generaba su vector (`P2025`).
 
 **Revisión completa (local).** Recorrido de humo con una cuenta de prueba (luego borrada): 20/20 pantallas del panel, 19/19 del admin y las públicas (inicio, planes, ingreso, registro, catálogo, ficha de producto, 404) sin errores de servidor ni errores visibles en el HTML. Suite: 528 tests (+1 regresión de este bucle en `flujo-completo.test.js`, +4 en `dato-pendiente.test.js`).
+
+
+## 33. Soporte de la familia gpt-6 (gpt-6-luna)
+
+**Pedido del dueño:** usar "gpt-6 Luna". El identificador real en la API de OpenAI es **`gpt-6-luna`** (minúsculas y con guion; se verificó con `GET /v1/models` de la cuenta, que lista `gpt-6-luna`, `gpt-6-sol`, `gpt-6-astra`, `gpt-6.1-sol` y `gpt-6.1-terra`). "gpt-6 Luna" con espacio y mayúscula daría "model not found".
+
+**Con el motor tal cual estaba, gpt-6-luna fallaba con 400** (probado contra la API real):
+1. rechaza `max_tokens` (pide `max_completion_tokens`);
+2. razona por defecto, y con razonamiento la API no permite function tools en `/v1/chat/completions` ("set reasoning_effort to 'none'"). Con `reasoning_effort: 'none'` llama tools y acepta `temperature`.
+
+**Cambio** (`lib/services/agente.js`): `ajustesDeModeloOpenAI(modelo)` decide el campo de tokens, si se manda `reasoning_effort: 'none'` (toda la familia `gpt-6*`) y si el modelo acepta `temperature`. Los modelos actuales (gpt-4o, gpt-4o-mini, gpt-4.1-mini) no cambian. La regla del negocio "nunca gpt-5.x" sigue intacta. Tests en `test/modelo-gpt6.test.js`.
+
+**Cómo se activa:** Admin → Planes → editar el plan → campo "Modelo de IA" = `gpt-6-luna` (el seed corre en cada deploy pero con `update: {}`, no pisa lo que se cambie ahí). `OPENAI_MODEL` solo se usa para planes sin modelo propio. Los turnos simples (saludos, menús) siguen yendo a `gpt-4o-mini` (`MODELO_ECONOMICO`).
+
+**Verificado** con una conversación real local (plan PRO = gpt-6-luna, luego restaurado a gpt-4o): las llamadas con tools, el menú, la tarjeta de categoría y la pregunta de género funcionan; el log de `usos_ia` registra `gpt-6-luna`.
+
+**Pendiente:** `lib/services/costoIA.js` no tiene precio de gpt-6-luna, así que el dashboard de costos mostrará esas llamadas sin costo (a propósito no se inventa). Hay que cargar el precio oficial de OpenAI (las fuentes de terceros no coinciden).
