@@ -745,3 +745,21 @@ Resultado visto en una conversación real contra el modelo ("quiero ver poleras"
 **Pendiente:** `lib/services/costoIA.js` no tiene precio de gpt-6-luna, así que el dashboard de costos mostrará esas llamadas sin costo (a propósito no se inventa). Hay que cargar el precio oficial de OpenAI (las fuentes de terceros no coinciden).
 
 **Precio de gpt-6-luna cargado** (dato del dueño, nov-2026): $0,10 entrada / $0,50 salida por 1M tokens en `costoIA.js`. El precio de entrada cacheada no se conoce: se usa el de entrada normal, así que el costo mostrado es un techo. Una llamada típica del bot (7.019 de prompt, 5.064 cacheados, 38 de salida) pasa de ~$0,0117 con gpt-4o a ~$0,0007 con Luna (≈16 veces menos).
+
+
+## 34. Pedido #26: producto sin variantes quedaba "2x" y sin talla
+
+**Qué pasó** (primera conversación real del piloto, 3-nov, tel. ...3989, Rox/Tienda Demo, `gpt-6-luna`, flujo con botones activo): el cliente agregó **ZAPATILLAS TEKKIRA CUP** desde la web sin elegir talla ni color, preguntó en el chat por tallas y colores, dijo "en talla 10" y "ok, dame esa", y el pedido #26 salió **2x ZAPATILLAS TEKKIRA CUP** sin talla ni color.
+
+**Causa.** El producto NO tiene variantes: la talla y el color son atributos del propio producto (`Talla: "8,9,9.5,10,10.5"`, `Color: "Blanco nube"`). El carrito no tenía dónde guardar "talla 10", así que el "dame esa" volvió a agregar el mismo producto y `agregarItem` sumó la cantidad (misma línea producto+variante nula). Además la web no podía pedir talla porque no había variantes que elegir. Afecta a cualquier producto cargado así (importación desde Excel sin variantes).
+
+**Arreglo.**
+- `lib/services/seleccionProducto.js` (puro): lee las opciones Talla/Color del producto, valida lo que dijo el cliente contra las reales y arma el texto `Talla: 10, Color: Blanco nube`. Un color único se completa solo; varias tallas exigen elegir una.
+- El carrito guarda `seleccion` por línea. Elegir talla **completa** la línea que venía de la web (no suma unidad); la misma selección otra vez solo suma si la cantidad es explícita; otra talla es otra línea.
+- `agregar_al_carrito` (nuevos parámetros `talla`/`color`): sin talla válida no agrega y le devuelve al modelo las opciones reales para que pregunte. La talla que el lead ya tenía de otro producto ("L") no se cuela porque se valida contra las del producto. Si esa MISMA línea ya está y no viene `cantidad`, no se duplica ("dame esa" = confirmar, no otra unidad).
+- `confirmar_pedido` no avanza si queda una línea de un producto con varias tallas/colores sin elegir.
+- La selección viaja al pedido: el nombre del ítem queda `... (Talla: 10, Color: Blanco nube)`, que es lo que le dice al negocio qué enviar.
+
+**Verificado** repitiendo el incidente con el modelo real (gpt-6-luna, producto de prueba con los mismos atributos): el carrito termina en **1x … (Talla: 10, Color: Blanco nube)**. Tests: `carrito-sin-variantes.test.js` (DB + IA falsa, incluye el pedido completo), `seleccion-producto.test.js`.
+
+**Limitaciones conocidas.** (1) Comprar dos tallas del mismo producto sin variantes crea dos líneas, pero las acciones de la lista de edición del flujo (`item:pid:vid`) apuntan a la primera de ellas. (2) La solución de fondo es cargar esos productos CON variantes (el formulario guiado ya las crea junto con el producto): así cada talla tiene su stock real; hoy el stock es uno solo para todas las tallas. (3) La página web del catálogo sigue sin poder elegir talla en estos productos.
