@@ -701,3 +701,28 @@ reportado. Suite determinista completa: **194 tests en verde**.
 **Cambio.** `propositoDeLaVuelta(vuelta, mensajesTurno)` en `agente.js`: `respuesta` (primera llamada), `tras_herramienta` (el último mensaje del turno es un resultado de herramienta) y `reintento_forzado` (el sistema rechazó el texto y obligó a corregirse). No necesita migración (`proposito` es texto). El dashboard sigue sumando solo `reintento_forzado`, que ahora sí es eso. Los datos históricos (hasta el 23-oct) conservan la etiqueta vieja y no se pueden separar.
 
 **Lo que NO se resolvió (para decidir).** Reducir costo real exige atacar (1) los turnos `tras_herramienta` que podrían responderse con plantilla sin segunda llamada (ya se hace con `agregar_al_carrito`), y (2) el bucle de la tarjeta de categoría bloqueada por preguntas iniciales. Test: `test/proposito-vuelta.test.js`.
+
+
+## 32. Bucle de la tarjeta de categoría bloqueada por un dato pendiente
+
+**Problema.** Con "preguntas iniciales" configuradas (ej. Género) o un atributo obligatorio de la categoría sin responder, `mostrar_tarjeta_categoria` se bloquea a propósito (`TOOL_FAILED`: "preguntá solo Género"). Pero otras dos piezas del motor ignoraban ese bloqueo y empujaban a mandar la misma tarjeta:
+- el detector `debioLlamarTarjetaCategoria` (obliga al modelo a llamarla, y descartaba el texto del modelo aunque fuera justo la pregunta que había que hacer);
+- el rescate de última vuelta (`texto_vago_forzado_en_ultima_vuelta`), que forzaba la tarjeta en código, volvía a chocar con el bloqueo y respondía "Perdón, no pude traerte las opciones".
+Resultado visto en una conversación real contra el modelo ("quiero ver poleras", sin Género): 3 llamadas a gpt-4o y el cliente recibía el mensaje de error en vez de la pregunta.
+
+**Arreglo** (`lib/services/agente.js`):
+- `datoPendienteParaMostrar()` expone la misma condición del bloqueo (preguntas iniciales primero, atributos OBLIGATORIOS de la categoría después) y `preguntaDeDatoPendiente()` arma la pregunta cerrada con las opciones reales ("¿lo buscás de Hombre o de Mujer?").
+- El detector deja de exigir la tarjeta mientras haya un dato pendiente.
+- El rescate de última vuelta pregunta ese dato en código en vez de forzar la tarjeta bloqueada.
+- Si el modelo chocó con el bloqueo en el turno y termina escribiendo algo que no es una pregunta ("dejame revisar un momento"), se reemplaza por la pregunta real (`helpers.bloqueoDatoPendienteEnTurno`).
+- Se probó contra el modelo real: "quiero ver poleras" → "…¿buscás poleras de Hombre o de Mujer?"; "mujer" → tarjeta; ya no hay mensaje de error.
+
+**Decisión que NO se cambió a propósito.** Un primer intento hacía que el backend preguntara el dato sin llamar a la IA al elegir la categoría. Se revirtió: 7 tests del proyecto fijan que, cuando falta un atributo obligatorio, "el bloque nuevo no intercepta, sigue el flujo normal" (la IA lo pide con sus palabras). Se respetó ese diseño.
+
+**Observación sin tocar.** El contador `intentosPreguntaInicial` se incrementa en cada turno aunque la pregunta no se haya hecho todavía (ej. "Hola" lo contesta el menú), y `limpiezaPorCambioDeCategoria` pisa `detectados.contexto` perdiendo ese incremento en el turno en que se detecta la categoría (el log dice `gate_inicial_liberado` pero no se guarda). En la práctica eso evita que el gate se libere sin haber preguntado; si se "arregla" el pisado hay que contar solo los turnos en que de verdad se preguntó.
+
+**Otros arreglos de esta revisión.**
+- `Dockerfile`: el `apk add` de las fuentes ahora reintenta 5 veces (el 28-oct un deploy se cayó por un `DNS: transient error`).
+- `embeddings.js`: ya no registra como error el caso normal de un producto borrado mientras se generaba su vector (`P2025`).
+
+**Revisión completa (local).** Recorrido de humo con una cuenta de prueba (luego borrada): 20/20 pantallas del panel, 19/19 del admin y las públicas (inicio, planes, ingreso, registro, catálogo, ficha de producto, 404) sin errores de servidor ni errores visibles en el HTML. Suite: 528 tests (+1 regresión de este bucle en `flujo-completo.test.js`, +4 en `dato-pendiente.test.js`).

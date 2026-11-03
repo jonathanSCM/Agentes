@@ -7,7 +7,13 @@ WORKDIR /app
 # esto no falla, dibuja cuadraditos vacios. Se noto en las fotos generadas por
 # scripts/seed-catalogo-demo.js, que llegaron al chat del cliente con el nombre
 # del producto en ▯▯▯.
-RUN apk add --no-cache ttf-dejavu fontconfig && fc-cache -f
+# Con reintentos: el 28-oct un deploy entero se cayo aca por un "DNS: transient
+# error" puntual del servidor al bajar el indice de Alpine. Una falla de red de
+# unos segundos no debe tumbar el deploy; si fallan los 5 intentos, falla igual.
+RUN for i in 1 2 3 4 5; do apk add --no-cache ttf-dejavu fontconfig && break; \
+      echo "apk fallo (intento $i/5), reintentando en 5s..."; sleep 5; \
+      [ "$i" = 5 ] && exit 1; \
+    done && fc-cache -f
 
 # npm ci respeta package-lock.json: dos deploys del mismo commit instalan
 # exactamente las mismas versiones (npm install podia traer versiones nuevas).

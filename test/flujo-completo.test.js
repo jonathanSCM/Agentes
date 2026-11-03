@@ -990,6 +990,24 @@ describe('la tarjeta de categoria la manda el backend, sin preguntarle a la IA',
     assert.match(recibido.systems[0], /TODAVIA NO PODES MOSTRAR PRODUCTOS/);
   });
 
+  test('REGRESION bucle de la tarjeta bloqueada: si falta el dato obligatorio y el modelo insiste con la tarjeta, el cliente recibe la PREGUNTA, no "no pude traerte las opciones"', async () => {
+    await reiniciarLead({ categoriaInteres: null, categoriaId: null, atributosLead: {} }); // falta Genero
+    // El modelo insiste dos veces con la tarjeta (bloqueada por el gate) y en la ultima vuelta escribe
+    // un relleno vago. Antes el detector lo obligaba a mandar la tarjeta bloqueada y el turno
+    // terminaba en el texto de error.
+    const { llamar } = iaFalsa([
+      { tool_calls: [tool('mostrar_tarjeta_categoria', {})] },
+      { tool_calls: [tool('mostrar_tarjeta_categoria', {})] },
+      { content: 'Dejame revisar un momento y te cuento.' },
+    ]);
+
+    const salida = await generarRespuesta(agenteId, TELEFONO, [], 'quiero zapatillas', undefined, { llamarInyectado: llamar });
+
+    assert.doesNotMatch(salida.respuesta, /no pude traerte las opciones/i, 'no puede terminar en el texto de error por una tarjeta que el gate bloquea a proposito');
+    assert.match(salida.respuesta, /\?/, 'tiene que ser una pregunta para destrabar el dato que falta');
+    assert.equal(salida.fotos.length, 0, 'no se manda ninguna tarjeta mientras falte el dato');
+  });
+
   test('categoria recien nombrada pero la tarjeta ya se habia mostrado antes: el bloque nuevo no la repite, sigue el flujo normal', async () => {
     await reiniciarLead({ categoriaInteres: null, categoriaId: null, atributosLead: { Genero: 'Hombre' }, contexto: { tarjetasCategoriaMostradas: [categoriaId] } });
     const { llamar, recibido } = iaFalsa([{ content: '¿Cual modelo te interesa?' }]);
