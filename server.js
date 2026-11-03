@@ -89,6 +89,9 @@ const catalogoCache = require('./lib/services/catalogoCache');
 const { parsearVariantesJson, sinLasExistentes } = require('./lib/services/variantesForm');
 const { pasosIniciales } = require('./lib/services/primerosPasos');
 const { esClaveDeOpcion } = require('./lib/services/seleccionProducto');
+const avisoCarritoWeb = require('./lib/services/avisoCarritoWeb');
+const ogImagen = require('./lib/services/ogImagen');
+const { fijarCantidad, totalCarrito } = require('./lib/services/carrito');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -271,6 +274,17 @@ app.get('/', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
+// Carrito del cliente que entro al catalogo con su link (token de sesion): lo
+// mismo que ve el bot. Sin token valido no hay carrito que mostrar.
+async function cargarCarritoWeb(empresa, sesion) {
+  if (!sesion || sesion.empresaId !== empresa.id) return null;
+  const cliente = await prisma.clienteFinal.findUnique({ where: { empresaId_telefono: { empresaId: empresa.id, telefono: sesion.telefono } } });
+  if (!cliente) return { items: [], cantidad: 0, total: 0 };
+  const convId = await conversacionParaCarritoWeb(empresa.id, sesion.telefono);
+  const items = carritoDe(cliente.contexto || {}, convId);
+  return { items, cantidad: items.reduce((n, i) => n + i.cantidad, 0), total: totalCarrito(items), conversacionId: convId, clienteId: cliente.id };
+}
+
 // Las 4 plantillas visuales del catalogo web (ver views/catalogo-*.ejs).
 // Lista blanca explicita: nunca se usa el valor de la config directo como
 // nombre de vista, para no depender de que ese campo este bien saneado.
@@ -378,7 +392,8 @@ app.get('/catalogo/:slug', async (req, res, next) => {
     // reemplaza) la tarjeta con foto real que ya manda el bot.
     const ogTitle = hayFiltro ? `${filtro.categoria || 'Catálogo'} · ${empresa.marca || empresa.nombre}` : `Catálogo · ${empresa.marca || empresa.nombre}`;
     const ogDescripcion = `${productosAMostrar.length} producto${productosAMostrar.length === 1 ? '' : 's'} disponible${productosAMostrar.length === 1 ? '' : 's'} en ${empresa.marca || empresa.nombre}`;
-    const ogImagen = (config && config.logoUrl) || (productosAMostrar.find((p) => p.fotos && p.fotos.length)?.fotos[0]) || null;
+    // Imagen 1200x630 liviana generada por nosotros (ver ogImagen.js), no la foto cruda del negocio.
+    const ogImagenUrl = `${req.protocol}://${req.get('host')}/catalogo/${empresa.slug}/og.jpg`;
     const ogUrl = `${req.protocol}://${req.get('host')}${req.originalUrl}`;
 
     res.render(`catalogo-${vistaCatalogo(config)}`, {
@@ -387,7 +402,8 @@ app.get('/catalogo/:slug', async (req, res, next) => {
       simboloCatalogo: simboloMoneda(empresa.moneda),
       numeroWhatsapp: agente ? agente.numeroWhatsapp : null,
       filtro, hayFiltro, tokenSesion: sesion ? req.query.s : null,
-      ogTitle, ogDescripcion, ogImagen, ogUrl,
+      carritoWeb: await cargarCarritoWeb(empresa, sesion), agregado: false, aviso: false,
+      ogTitle, ogDescripcion, ogImagen: ogImagenUrl, ogUrl,
     });
   } catch (err) { next(err); }
 });
@@ -415,9 +431,23 @@ app.get('/catalogo/:slug/producto/:id', async (req, res, next) => {
     const config = agente ? agente.config : null;
     const sesion = verificarTokenSesion(req.query.s);
 
-    const ogTitle = `${producto.nombre} · ${empresa.marca || empresa.nombre}`;
-    const ogDescripcion = producto.descripcion || `${simboloMoneda(empresa.moneda)} ${Number(producto.precio).toFixed(2)}`;
-    const ogImagen = (producto.fotos && producto.fotos[0]) || (config && config.logoUrl) || null;
+    // Vista previa al compartir el link: precio en el titulo y disponibilidad (con tallas/colores
+    // reales) en la descripcion, para que se entienda sin abrir la pagina.
+    const desde = producto.variantes.length
+      ? Math.min(...producto.variantes.map((v) => Number(v.precio != null ? v.precio : producto.precio)))
+      : Number(producto.precio);
+    const stockTotal = producto.variantes.length ? producto.variantes.reduce((n, v) => n + v.stock, 0) : producto.stock;
+    const unicos = (clave) => [...new Set(producto.variantes.filter((v) => v.stock > 0 && v.atributos && v.atributos[clave]).map((v) => String(v.atributos[clave])))];
+    const tallasOg = unicos('Talla'); const coloresOg = unicos('Color');
+    const ogTitle = `${producto.nombre} · ${simboloMoneda(empresa.moneda)} ${desde.toFixed(2)}`;
+    const ogDescripcion = [
+      stockTotal > 0 ? 'Disponible' : 'Agotado',
+      tallasOg.length ? `Tallas ${tallasOg.slice(0, 8).join(', ')}` : null,
+      coloresOg.length ? `Colores ${coloresOg.slice(0, 5).join(', ')}` : null,
+      producto.descripcion ? producto.descripcion.slice(0, 90) : null,
+      empresa.marca || empresa.nombre,
+    ].filter(Boolean).join(' · ');
+    const ogImagenUrl = `${req.protocol}://${req.get('host')}/catalogo/${empresa.slug}/producto/${producto.id}/og.jpg`;
     const ogUrl = `${req.protocol}://${req.get('host')}${req.originalUrl}`;
 
     const colores = coloresConFotoDeVariantes(producto);
@@ -454,10 +484,11 @@ app.get('/catalogo/:slug/producto/:id', async (req, res, next) => {
       simboloCatalogo: simboloMoneda(empresa.moneda),
       numeroWhatsapp: agente ? agente.numeroWhatsapp : null,
       tokenSesion: sesion ? req.query.s : null,
-      agregado,
+      agregado, aviso: req.query.aviso === '1',
+      carritoWeb: await cargarCarritoWeb(empresa, sesion),
       mensajeWhatsapp,
       filtro, hayFiltro,
-      ogTitle, ogDescripcion, ogImagen, ogUrl,
+      ogTitle, ogDescripcion, ogImagen: ogImagenUrl, ogUrl,
     });
   } catch (err) { next(err); }
 });
@@ -466,22 +497,28 @@ app.get('/catalogo/:slug/producto/:id', async (req, res, next) => {
 // datos (agregar al carrito sin login). No frena a un cliente real, solo
 // evita que alguien la use para saturar la base.
 const intentosCarritoWeb = new Map();
-function limiteCarritoWeb(req, res, next) {
-  const clave = `${req.ip}:${req.params.slug}`;
-  const ahora = Date.now();
-  const ventana = 60 * 1000;
-  const registro = intentosCarritoWeb.get(clave) || { cuenta: 0, desde: ahora };
-  if (ahora - registro.desde > ventana) {
-    registro.cuenta = 0;
-    registro.desde = ahora;
-  }
-  registro.cuenta += 1;
-  intentosCarritoWeb.set(clave, registro);
-  if (registro.cuenta > 20) {
-    return res.status(429).send('Demasiados intentos, esperá un momento.');
-  }
-  next();
+// "tipo" separa los contadores: agregar (20 por minuto) y editar cantidades
+// (60 por minuto: tocar ➖/➕ varias veces es normal).
+function crearLimiteCarritoWeb(tipo, maximo) {
+  return function limite(req, res, next) {
+    const clave = `${tipo}:${req.ip}:${req.params.slug}`;
+    const ahora = Date.now();
+    const ventana = 60 * 1000;
+    const registro = intentosCarritoWeb.get(clave) || { cuenta: 0, desde: ahora };
+    if (ahora - registro.desde > ventana) {
+      registro.cuenta = 0;
+      registro.desde = ahora;
+    }
+    registro.cuenta += 1;
+    intentosCarritoWeb.set(clave, registro);
+    if (registro.cuenta > maximo) {
+      return res.status(429).send('Demasiados intentos, esperá un momento.');
+    }
+    next();
+  };
 }
+const limiteCarritoWeb = crearLimiteCarritoWeb('agregar', 20);
+const limiteEdicionCarritoWeb = crearLimiteCarritoWeb('editar', 60);
 
 // Agregar al carrito desde la web: mismo carrito real que usa el bot
 // (ClienteFinal.contexto.carrito), asi que cuando el cliente vuelve a
@@ -550,7 +587,13 @@ app.post('/catalogo/:slug/producto/:id/carrito', limiteCarritoWeb, async (req, r
       },
     });
 
+    // Aviso por WhatsApp con el detalle (agrupado: si agrega varias cosas seguidas
+    // se manda UN mensaje). Si no se puede (fuera de las 24 h, sin conexion),
+    // devuelve false y la web se arregla sola con su propio aviso.
+    const avisoPorWhatsApp = await avisoCarritoWeb.programarAviso({ empresaId: empresa.id, telefono: sesion.telefono }).catch(() => false);
+
     const paramsVuelta = new URLSearchParams({ s: req.body.s || req.query.s, agregado: '1', cantidad: String(cantidad) });
+    if (avisoPorWhatsApp) paramsVuelta.set('aviso', '1');
     if (variante) paramsVuelta.set('idVariante', String(variante.id));
     // El filtro (categoria/color/talla/marca) viaja en campos ocultos del
     // form: sin esto, agregar al carrito perdia el filtro con el que el
@@ -559,6 +602,98 @@ app.post('/catalogo/:slug/producto/:id/carrito', limiteCarritoWeb, async (req, r
       if (req.body[campo]) paramsVuelta.set(campo, req.body[campo]);
     }
     res.redirect(`/catalogo/${req.params.slug}/producto/${req.params.id}?${paramsVuelta.toString()}`);
+  } catch (err) { next(err); }
+});
+
+// ---- Imagenes de vista previa (Open Graph) ----
+// Portada del catalogo (1200x630, liviana). WhatsApp la usa al pegar el link.
+app.get('/catalogo/:slug/og.jpg', async (req, res, next) => {
+  try {
+    const empresa = await prisma.empresa.findUnique({ where: { slug: req.params.slug }, include: { agentes: { take: 1, include: { config: true } } } });
+    if (!empresa) return res.status(404).end();
+    const config = empresa.agentes[0] ? empresa.agentes[0].config : null;
+    const buf = await ogImagen.conCache(`portada:${empresa.id}:${(config && config.colorPrimario) || ''}`, async () => {
+      const [cantidad, conFoto] = await Promise.all([
+        prisma.producto.count({ where: { empresaId: empresa.id, activo: true } }),
+        prisma.producto.findMany({ where: { empresaId: empresa.id, activo: true, NOT: { fotos: { isEmpty: true } } }, select: { fotos: true }, orderBy: { id: 'asc' }, take: 3 }),
+      ]);
+      return ogImagen.portadaCatalogo({ nombre: empresa.marca || empresa.nombre, cantidad, colorPrimario: config && config.colorPrimario, urlsFotos: conFoto.map((p) => p.fotos[0]) });
+    });
+    res.set({ 'Content-Type': 'image/jpeg', 'Cache-Control': 'public, max-age=3600' }).send(buf);
+  } catch (err) { next(err); }
+});
+
+// Foto de un producto en 1200x630 (si no tiene foto utilizable, la portada del catalogo).
+app.get('/catalogo/:slug/producto/:id/og.jpg', async (req, res, next) => {
+  try {
+    const empresa = await prisma.empresa.findUnique({ where: { slug: req.params.slug } });
+    if (!empresa) return res.status(404).end();
+    const producto = await prisma.producto.findFirst({ where: { id: Number(req.params.id), empresaId: empresa.id, activo: true }, select: { id: true, fotos: true } });
+    if (!producto) return res.status(404).end();
+    const buf = producto.fotos && producto.fotos[0]
+      ? await ogImagen.conCache(`producto:${producto.id}:${producto.fotos[0]}`, () => ogImagen.fotoProducto(producto.fotos[0]))
+      : null;
+    if (!buf) return res.redirect(302, `/catalogo/${empresa.slug}/og.jpg`);
+    res.set({ 'Content-Type': 'image/jpeg', 'Cache-Control': 'public, max-age=3600' }).send(buf);
+  } catch (err) { next(err); }
+});
+
+// ---- Carrito en la web ----
+// Pagina del carrito con cantidades editables. Misma fuente de verdad que el
+// bot (ClienteFinal.contexto.carrito): lo que se cambia aca lo ve el chat.
+app.get('/catalogo/:slug/carrito', async (req, res, next) => {
+  try {
+    const empresa = await prisma.empresa.findUnique({ where: { slug: req.params.slug }, include: { agentes: { take: 1, include: { config: true } } } });
+    if (!empresa) return res.status(404).render('404', { title: 'Página no encontrada' });
+    const sesion = verificarTokenSesion(req.query.s);
+    const agente = empresa.agentes[0];
+    const carritoWeb = await cargarCarritoWeb(empresa, sesion);
+    res.render('catalogo-carrito', {
+      title: `Tu carrito · ${empresa.marca || empresa.nombre}`,
+      empresa, config: agente ? agente.config : null, numeroWhatsapp: agente ? agente.numeroWhatsapp : null,
+      simboloCatalogo: simboloMoneda(empresa.moneda),
+      tokenSesion: sesion ? req.query.s : null, carritoWeb,
+      mensaje: req.query.msg || null, error: req.query.err || null,
+    });
+  } catch (err) { next(err); }
+});
+
+// +1 / -1 / quitar una linea del carrito desde la web.
+app.post('/catalogo/:slug/carrito/linea', limiteEdicionCarritoWeb, async (req, res, next) => {
+  try {
+    const body = req.body || {};
+    const sesion = verificarTokenSesion(body.s || req.query.s);
+    if (!sesion) return res.status(401).send('Este link ya venció. Volvé a pedirlo por WhatsApp.');
+    const empresa = await prisma.empresa.findUnique({ where: { slug: req.params.slug } });
+    if (!empresa || empresa.id !== sesion.empresaId) return res.status(404).send('No encontrado.');
+    const volver = (extra) => res.redirect(`/catalogo/${req.params.slug}/carrito?${new URLSearchParams({ s: body.s, ...extra }).toString()}`);
+
+    const carrito = await cargarCarritoWeb(empresa, sesion);
+    if (!carrito || !carrito.clienteId) return volver({});
+    const productoId = Number(body.productoId);
+    const varianteId = Number(body.varianteId) || null;
+    const seleccion = body.seleccion ? String(body.seleccion) : null;
+    const linea = carrito.items.find((i) => i.productoId === productoId && (i.varianteId || null) === varianteId && (i.seleccion || null) === seleccion);
+    if (!linea) return volver({ err: 'Ese producto ya no está en tu carrito.' });
+
+    let items = carrito.items;
+    const op = String(body.op || '');
+    if (op === 'quitar') {
+      items = items.filter((i) => i !== linea);
+    } else if (op === 'menos') {
+      items = fijarCantidad(items, { productoId, varianteId, seleccion }, linea.cantidad - 1);
+    } else if (op === 'mas') {
+      const fila = varianteId
+        ? await prisma.variante.findUnique({ where: { id: varianteId }, select: { stock: true } })
+        : await prisma.producto.findUnique({ where: { id: productoId }, select: { stock: true } });
+      if (fila && linea.cantidad + 1 > fila.stock) return volver({ err: `No hay más stock: quedan ${fila.stock}.` });
+      items = fijarCantidad(items, { productoId, varianteId, seleccion }, linea.cantidad + 1);
+    } else {
+      return volver({});
+    }
+    const cliente = await prisma.clienteFinal.findUnique({ where: { id: carrito.clienteId } });
+    await prisma.clienteFinal.update({ where: { id: cliente.id }, data: { contexto: guardarCarrito(cliente.contexto || {}, carrito.conversacionId, items) } });
+    return volver({});
   } catch (err) { next(err); }
 });
 

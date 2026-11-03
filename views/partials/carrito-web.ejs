@@ -1,0 +1,57 @@
+<%#
+  Carrito visible en el catalogo web: boton flotante con la cantidad y un aviso
+  "Añadido a tu carrito" al agregar algo. Solo aparece si el cliente entro con su
+  link (tokenSesion). Usa las variables de color de cada plantilla (con respaldo).
+  Parametros: carritoWeb, tokenSesion, empresa, agregado, aviso, simboloCatalogo
+%>
+<%
+  var _cw = (typeof carritoWeb !== 'undefined' && carritoWeb) ? carritoWeb : null;
+  var _tok = (typeof tokenSesion !== 'undefined' && tokenSesion) ? tokenSesion : null;
+  var _agregado = (typeof agregado !== 'undefined' && agregado) ? true : false;
+  var _aviso = (typeof aviso !== 'undefined' && aviso) ? true : false;
+  var _simbolo = (typeof simboloCatalogo !== 'undefined' && simboloCatalogo) ? simboloCatalogo : '';
+%>
+<% if (_tok && _cw && (_cw.cantidad > 0 || _agregado)) { %>
+  <% var _urlCarrito = '/catalogo/' + empresa.slug + '/carrito?s=' + encodeURIComponent(_tok); %>
+  <style>
+    .cw-fab{position:fixed;right:16px;bottom:16px;z-index:60;display:inline-flex;align-items:center;gap:.5rem;padding:.7rem 1rem;border-radius:999px;
+      background:var(--acento,#22c58b);color:#06111f;font:700 .92rem/1 system-ui,-apple-system,"Segoe UI",sans-serif;text-decoration:none;
+      box-shadow:0 8px 24px rgba(0,0,0,.35)}
+    .cw-fab b{display:inline-grid;place-items:center;min-width:1.5rem;height:1.5rem;padding:0 .35rem;border-radius:999px;background:#06111f;color:#fff;font-size:.8rem}
+    .cw-toast{position:fixed;left:50%;bottom:76px;transform:translateX(-50%);z-index:70;width:min(92vw,420px);padding:.9rem 1rem;border-radius:14px;
+      background:var(--panel,#1f2330);color:var(--tinta,#eef0f6);border:1px solid var(--acento,#22c58b);box-shadow:0 12px 32px rgba(0,0,0,.4);
+      font:.92rem/1.4 system-ui,-apple-system,"Segoe UI",sans-serif;transition:opacity .4s,transform .4s}
+    .cw-toast.cw-fuera{opacity:0;transform:translateX(-50%) translateY(10px);pointer-events:none}
+    .cw-toast strong{display:block;margin-bottom:.15rem}
+    .cw-toast small{display:block;color:var(--tenue,#9aa1b5);margin-bottom:.6rem}
+    .cw-acciones{display:flex;gap:.5rem;flex-wrap:wrap}
+    .cw-acciones a,.cw-acciones button{flex:1;min-width:8rem;text-align:center;padding:.55rem .8rem;border-radius:10px;font:600 .88rem system-ui,sans-serif;cursor:pointer;text-decoration:none;border:1px solid var(--borde,#3a3f50);background:transparent;color:inherit}
+    .cw-acciones a.cw-principal{background:var(--acento,#22c58b);border-color:var(--acento,#22c58b);color:#06111f}
+    @media (prefers-reduced-motion:reduce){.cw-toast{transition:none}}
+  </style>
+  <a class="cw-fab" href="<%= _urlCarrito %>" aria-label="Ver mi carrito (<%= _cw.cantidad %>)">
+    <span aria-hidden="true">🛒</span> Carrito <b><%= _cw.cantidad %></b>
+  </a>
+  <% if (_agregado) { %>
+    <div class="cw-toast" id="cw-toast" role="status" aria-live="polite">
+      <strong>✓ Añadido a tu carrito</strong>
+      <small>
+        <%= _cw.cantidad %> producto<%= _cw.cantidad === 1 ? '' : 's' %> · <%= _simbolo %> <%= Number(_cw.total).toFixed(2) %>
+        <% if (_aviso) { %><br />También te lo mandamos por WhatsApp.<% } %>
+      </small>
+      <div class="cw-acciones">
+        <a class="cw-principal" href="<%= _urlCarrito %>">Ver carrito</a>
+        <button type="button" id="cw-seguir">Seguir viendo</button>
+      </div>
+    </div>
+    <script>
+      (function () {
+        var t = document.getElementById('cw-toast');
+        if (!t) return;
+        function cerrar() { t.classList.add('cw-fuera'); }
+        document.getElementById('cw-seguir').addEventListener('click', cerrar);
+        setTimeout(cerrar, 9000);
+      })();
+    </script>
+  <% } %>
+<% } %>

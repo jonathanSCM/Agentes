@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="robots" content="noindex" />
+<title><%= title %></title>
+<%
+  var tema = (config && config.temaProducto) === 'claro' ? 'claro' : 'oscuro';
+  var cw = carritoWeb || { items: [], cantidad: 0, total: 0 };
+  var base = '/catalogo/' + empresa.slug;
+  var volverAlCatalogo = base + (tokenSesion ? '?s=' + encodeURIComponent(tokenSesion) : '');
+  var textoFinalizar = 'Quiero finalizar mi pedido';
+%>
+<style>
+  :root{--fondo:#1c1c1e;--panel:#28282b;--panel-2:#323235;--tinta:#f0f0f2;--tenue:#a3a3a8;--borde:#3c3c40;
+    --acento:<%= (config && config.colorPrimario) || '#22c58b' %>;--error:#ff9a9a}
+  body.tema-claro{--fondo:#f5f6f8;--panel:#ffffff;--panel-2:#eef0f3;--tinta:#181a20;--tenue:#68707d;--borde:#e1e4ea;--error:#c92a2a}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--fondo);color:var(--tinta);font:16px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif}
+  .contenedor{max-width:640px;margin:0 auto;padding:20px 16px 120px}
+  header{display:flex;align-items:center;gap:.7rem;margin-bottom:1.2rem}
+  header img{width:40px;height:40px;border-radius:10px;object-fit:cover;background:#fff}
+  header h1{font-size:1.25rem;margin:0}
+  header a{margin-left:auto;color:var(--acento);font-size:.9rem}
+  .aviso{padding:.7rem 1rem;border-radius:12px;margin-bottom:1rem;font-size:.92rem;background:var(--panel);border:1px solid var(--borde)}
+  .aviso.error{border-color:var(--error);color:var(--error)}
+  ul{list-style:none;margin:0;padding:0;display:grid;gap:.7rem}
+  li{display:grid;grid-template-columns:1fr auto;gap:.4rem .8rem;padding:.9rem 1rem;border-radius:14px;background:var(--panel);border:1px solid var(--borde)}
+  .nombre{font-weight:600}
+  .precio{color:var(--tenue);font-size:.88rem}
+  .controles{display:flex;align-items:center;gap:.4rem;grid-column:1 / -1}
+  .controles form{display:contents}
+  .cant{min-width:2rem;text-align:center;font-weight:700}
+  .btn-c{width:2.4rem;height:2.4rem;border-radius:10px;border:1px solid var(--borde);background:var(--panel-2);color:var(--tinta);font:700 1.1rem system-ui;cursor:pointer}
+  .btn-c:disabled{opacity:.4;cursor:not-allowed}
+  .quitar{margin-left:auto;background:none;border:0;color:var(--tenue);text-decoration:underline;cursor:pointer;font:inherit;font-size:.88rem}
+  .subtotal{font-weight:700;text-align:right}
+  .total{display:flex;justify-content:space-between;align-items:center;margin:1.2rem 0 1rem;padding:1rem;border-radius:14px;background:var(--panel-2);font-size:1.1rem}
+  .total strong{font-size:1.3rem}
+  .acciones{display:grid;gap:.6rem}
+  .btn{display:block;text-align:center;padding:.9rem 1rem;border-radius:12px;font-weight:700;text-decoration:none;border:1px solid var(--borde);color:var(--tinta);background:transparent}
+  .btn.principal{background:#25d366;border-color:#25d366;color:#06220f}
+  .vacio{text-align:center;padding:2.5rem 1rem;color:var(--tenue)}
+  .vacio .btn{margin-top:1rem}
+  .nota{margin-top:1rem;color:var(--tenue);font-size:.85rem;text-align:center}
+</style>
+</head>
+<body class="tema-<%= tema %>">
+<main class="contenedor">
+  <header>
+    <% if (config && config.logoUrl) { %><img src="<%= config.logoUrl %>" alt="" /><% } %>
+    <h1>Tu carrito</h1>
+    <a href="<%= volverAlCatalogo %>">← Seguir viendo</a>
+  </header>
+
+  <% if (error) { %><div class="aviso error" role="alert"><%= error %></div><% } %>
+  <% if (!tokenSesion) { %>
+    <div class="vacio">
+      <p>Para ver tu carrito, abrí el catálogo desde el link que te mandó tu asesor por WhatsApp.</p>
+      <% if (numeroWhatsapp) { %><a class="btn principal" href="https://wa.me/<%= numeroWhatsapp %>" rel="noopener">Ir a WhatsApp</a><% } %>
+    </div>
+  <% } else if (!cw.items.length) { %>
+    <div class="vacio">
+      <p><strong>Tu carrito está vacío.</strong></p>
+      <p>Agregá algo del catálogo y aparece acá.</p>
+      <a class="btn" href="<%= volverAlCatalogo %>">Ver el catálogo</a>
+    </div>
+  <% } else { %>
+    <ul>
+      <% cw.items.forEach(function (i) { %>
+        <li>
+          <div>
+            <div class="nombre"><%= i.nombre %></div>
+            <div class="precio"><%= simboloCatalogo %> <%= Number(i.precio).toFixed(2) %> c/u</div>
+          </div>
+          <div class="subtotal"><%= simboloCatalogo %> <%= (Number(i.precio) * i.cantidad).toFixed(2) %></div>
+          <div class="controles">
+            <% ['menos', 'mas'].forEach(function (op) { %>
+              <% if (op === 'mas') { %><span class="cant" aria-label="Cantidad"><%= i.cantidad %></span><% } %>
+              <form method="POST" action="<%= base %>/carrito/linea">
+                <input type="hidden" name="s" value="<%= tokenSesion %>" />
+                <input type="hidden" name="productoId" value="<%= i.productoId %>" />
+                <input type="hidden" name="varianteId" value="<%= i.varianteId || '' %>" />
+                <input type="hidden" name="seleccion" value="<%= i.seleccion || '' %>" />
+                <input type="hidden" name="op" value="<%= op %>" />
+                <button class="btn-c" type="submit" aria-label="<%= op === 'mas' ? 'Una unidad más' : 'Una unidad menos' %>" <%= (op === 'menos' && i.cantidad <= 1) ? 'disabled' : '' %>><%= op === 'mas' ? '+' : '−' %></button>
+              </form>
+            <% }); %>
+            <form method="POST" action="<%= base %>/carrito/linea" style="margin-left:auto">
+              <input type="hidden" name="s" value="<%= tokenSesion %>" />
+              <input type="hidden" name="productoId" value="<%= i.productoId %>" />
+              <input type="hidden" name="varianteId" value="<%= i.varianteId || '' %>" />
+              <input type="hidden" name="seleccion" value="<%= i.seleccion || '' %>" />
+              <input type="hidden" name="op" value="quitar" />
+              <button class="quitar" type="submit">Quitar</button>
+            </form>
+          </div>
+        </li>
+      <% }); %>
+    </ul>
+
+    <div class="total"><span>Total</span><strong><%= simboloCatalogo %> <%= Number(cw.total).toFixed(2) %></strong></div>
+
+    <div class="acciones">
+      <% if (numeroWhatsapp) { %>
+        <a class="btn principal" href="https://wa.me/<%= numeroWhatsapp %>?text=<%= encodeURIComponent(textoFinalizar) %>" rel="noopener">Finalizar en WhatsApp</a>
+      <% } %>
+      <a class="btn" href="<%= volverAlCatalogo %>">Seguir viendo el catálogo</a>
+    </div>
+    <p class="nota">Lo que cambies acá lo ve tu asesor en el chat. El pedido se confirma por WhatsApp.</p>
+  <% } %>
+</main>
+</body>
+</html>

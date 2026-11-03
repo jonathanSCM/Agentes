@@ -426,3 +426,112 @@ describe('rescate de la ultima vuelta (la IA falla en pleno cierre y el cliente 
     }
   });
 });
+
+// Conversacion real del piloto (3-nov): "3x" por error, "solo quiero un par",
+// "cancela", y despues quedaba atascado en una categoria.
+describe('flujo determinista: correcciones y frases del piloto (0 llamadas a la IA)', () => {
+  const carritoDelLead = async () => ((await leadActual()).contexto || {}).carrito;
+
+  test('"solo quiero un par" con 3x en el carrito lo deja en 1 (antes solo mostraba el carrito)', async () => {
+    await lead({}, [itemDe(zapatillas[0], 3)]);
+    const ia = iaContada();
+    const r = await escribe('de me marcaron 3x yo solo quiero un par de zapatillas', ia);
+    assert.equal(ia.llamadas(), 0);
+    assert.match(r.respuesta, /lo dejé en 1/);
+    assert.equal((await carritoDelLead()).items[0].cantidad, 1);
+    assert.ok(r.botones && r.botones.some((b) => b.id === 'mas:no'), 'sigue con botones para seguir o finalizar');
+  });
+
+  test('pedir mas de lo que hay en stock no lo permite', async () => {
+    await lead({}, [itemDe(zapatillas[0], 1)]);
+    const ia = iaContada();
+    const r = await escribe('dejalo en 9', ia);
+    const { stock } = await prisma.variante.findUnique({ where: { id: zapatillas[0].variantes[0].id }, select: { stock: true } });
+    assert.equal(ia.llamadas(), 0);
+    assert.match(r.respuesta, new RegExp(`quedan ${stock}\\b`));
+    assert.equal((await carritoDelLead()).items[0].cantidad, 1, 'no cambia');
+  });
+
+  test('"quitame uno" resta una unidad', async () => {
+    await lead({}, [itemDe(zapatillas[0], 3)]);
+    const r = await escribe('quitame uno', iaContada());
+    assert.match(r.respuesta, /lo dejé en 2/);
+    assert.equal((await carritoDelLead()).items[0].cantidad, 2);
+  });
+
+  test('con DOS productos distintos no adivina: muestra la lista para elegir cual', async () => {
+    await lead({}, [itemDe(zapatillas[0], 3), itemDe(zapatillas[1], 1)]);
+    const ia = iaContada();
+    const r = await escribe('solo quiero uno', ia);
+    assert.equal(ia.llamadas(), 0);
+    assert.ok(r.lista, 'lista de productos del carrito');
+    assert.equal((await carritoDelLead()).items[0].cantidad, 3, 'no toca nada todavia');
+  });
+
+  test('"cancela" pregunta antes de vaciar (botones) y "Sí, vaciar" vacia de verdad', async () => {
+    await lead({}, [itemDe(zapatillas[0], 2)]);
+    const ia = iaContada();
+    const r = await escribe('cancela', ia);
+    assert.equal(ia.llamadas(), 0);
+    assert.match(r.respuesta, /vaciar tu carrito/);
+    assert.deepEqual(r.botones.map((b) => b.id), ['carrito:vaciar', 'carrito:seguir']);
+    assert.equal((await carritoDelLead()).items.length, 1, 'todavia no se vacio');
+
+    const v = await toque('carrito:vaciar', 'Sí, vaciar', ia);
+    assert.match(v.respuesta, /vacié tu carrito/);
+    const c = await carritoDelLead();
+    assert.ok(!c || c.items.length === 0);
+    assert.equal((await leadActual()).categoriaInteres, null, 'tambien suelta la categoria vieja');
+  });
+
+  test('"No, seguir" no toca el carrito', async () => {
+    await lead({}, [itemDe(zapatillas[0], 2)]);
+    const ia = iaContada();
+    await escribe('cancela el pedido', ia);
+    const r = await toque('carrito:seguir', 'No, seguir', ia);
+    assert.match(r.respuesta, /Esto llevás/);
+    assert.equal((await carritoDelLead()).items[0].cantidad, 2);
+  });
+
+  test('"cancela" con el carrito vacio muestra las categorias en vez de trabarse', async () => {
+    await lead({ categoriaInteres: 'Calzado', categoriaId: rubroCalzado.id });
+    const r = await escribe('cancela', iaContada());
+    assert.match(r.respuesta, /carrito está vacío/);
+    assert.ok(r.lista);
+  });
+
+  test('"quiero hacer una compra" despues de vaciar NO se queda en la categoria vieja: menu de categorias', async () => {
+    await lead({ categoriaInteres: 'Calzado', categoriaId: rubroCalzado.id });
+    const ia = iaContada();
+    const r = await escribe('quiero hacer una compra', ia);
+    assert.equal(ia.llamadas(), 0);
+    assert.ok(r.lista, 'lista de categorias');
+    assert.doesNotMatch(r.respuesta, /Dentro de/);
+    assert.equal((await leadActual()).categoriaInteres, null);
+  });
+
+  test('"algo para mi novia, que me recomiendas" muestra las categorias (no los tipos de la anterior)', async () => {
+    await lead({ categoriaInteres: 'Calzado', categoriaId: rubroCalzado.id });
+    const ia = iaContada();
+    const r = await escribe('quiero comprar algo para mi novia que me recomiendas', ia);
+    assert.equal(ia.llamadas(), 0);
+    assert.match(r.respuesta, /lindo detalle/);
+    assert.ok(r.lista);
+  });
+
+  test('"solo eso tienes?" muestra TODAS las categorias en vez de repetir los tipos', async () => {
+    await lead({ categoriaInteres: 'Calzado', categoriaId: rubroCalzado.id });
+    const ia = iaContada();
+    const r = await escribe('solo eso tienes?', ia);
+    assert.equal(ia.llamadas(), 0);
+    assert.ok(r.lista);
+    assert.doesNotMatch(r.respuesta, /Dentro de/);
+  });
+
+  test('una pregunta normal NO se intercepta (va a la IA)', async () => {
+    await lead({ categoriaInteres: 'Calzado', categoriaId: rubroCalzado.id });
+    const ia = iaContada();
+    await escribe('donde estan ubicados?', ia);
+    assert.ok(ia.llamadas() > 0, 'la ubicacion la contesta la IA como siempre');
+  });
+});

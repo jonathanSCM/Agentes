@@ -232,3 +232,46 @@ describe('textoDeLista', () => {
     assert.equal(texto, 'Esto es lo que tenemos\n1. Calzado\n2. Pantalones');
   });
 });
+
+describe('enviarImagenConBoton', () => {
+  const { enviarImagenConBoton } = require('../lib/services/whatsapp');
+  const datos = { urlImagen: 'https://x.test/img.jpg', texto: '*Zapatillas*\n\nTenemos 5 modelos', boton: 'Ver catálogo', url: 'https://x.test/catalogo/t' };
+
+  test('manda un mensaje cta_url con la imagen arriba y el boton que abre el catalogo', async () => {
+    const cuerpos = [];
+    global.fetch = mock.fn(async (_url, opts) => { cuerpos.push(JSON.parse(opts.body)); return { ok: true, json: async () => ({ messages: [{ id: 'wamid.CTA' }] }) }; });
+    const r = await enviarImagenConBoton(conexionDePrueba(), '+591 7123-4567', datos);
+    assert.equal(r.ok, true);
+    assert.equal(r.conBoton, true);
+    assert.equal(cuerpos.length, 1);
+    assert.deepEqual(cuerpos[0].interactive, {
+      type: 'cta_url',
+      header: { type: 'image', image: { link: 'https://x.test/img.jpg' } },
+      body: { text: '*Zapatillas*\n\nTenemos 5 modelos' },
+      action: { name: 'cta_url', parameters: { display_text: 'Ver catálogo', url: 'https://x.test/catalogo/t' } },
+    });
+  });
+
+  test('si Meta lo rechaza, cae a la imagen con el link escrito (el cliente nunca se queda sin catalogo)', async () => {
+    const tipos = [];
+    global.fetch = mock.fn(async (_url, opts) => {
+      const b = JSON.parse(opts.body);
+      tipos.push(b.type);
+      if (b.type === 'interactive') return { ok: false, status: 400, json: async () => ({ error: { message: 'cta_url no soportado' } }) };
+      return { ok: true, json: async () => ({ messages: [{ id: 'wamid.IMG' }] }) };
+    });
+    const r = await enviarImagenConBoton(conexionDePrueba(), '59171234567', datos);
+    assert.deepEqual(tipos, ['interactive', 'image']);
+    assert.equal(r.ok, true);
+    assert.equal(r.conBoton, false);
+    assert.match(r.errorBoton, /cta_url no soportado/);
+  });
+
+  test('el boton se recorta a 20 caracteres y el cuerpo a 1024', async () => {
+    let cuerpo = null;
+    global.fetch = mock.fn(async (_u, opts) => { cuerpo = JSON.parse(opts.body); return { ok: true, json: async () => ({ messages: [{ id: 'x' }] }) }; });
+    await enviarImagenConBoton(conexionDePrueba(), '59171234567', { ...datos, boton: 'Ver todo el catalogo completo', texto: 'a'.repeat(2000) });
+    assert.equal(cuerpo.interactive.action.parameters.display_text.length, 20);
+    assert.equal(cuerpo.interactive.body.text.length, 1024);
+  });
+});

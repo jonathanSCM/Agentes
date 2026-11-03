@@ -9,6 +9,12 @@
 <meta property="og:description" content="<%= ogDescripcion %>" />
 <% if (ogImagen) { %><meta property="og:image" content="<%= ogImagen %>" /><% } %>
 <meta property="og:url" content="<%= ogUrl %>" />
+<meta property="og:site_name" content="<%= (empresa && (empresa.marca || empresa.nombre)) || '' %>" />
+<meta property="og:locale" content="es_LA" />
+<% if (ogImagen) { %><meta property="og:image:type" content="image/jpeg" />
+<meta property="og:image:width" content="1200" />
+<meta property="og:image:height" content="630" />
+<meta name="twitter:card" content="summary_large_image" /><% } %>
 <meta property="product:price:amount" content="<%= Number(producto.precio).toFixed(2) %>" />
 <meta property="product:price:currency" content="<%= empresa.moneda %>" />
 <meta name="twitter:card" content="<%= ogImagen ? 'summary_large_image' : 'summary' %>" />
@@ -215,7 +221,12 @@
               </button>
             </form>
             <% if (numeroWhatsapp) { %>
-              <a class="btn btn-whatsapp" href="https://wa.me/<%= numeroWhatsapp %>?text=<%= encodeURIComponent(mensajeWhatsapp) %>" target="_blank" rel="noopener">Volver a WhatsApp</a>
+              <% if (aviso) { %>
+                <%# Ya le mandamos el detalle por WhatsApp: el link abre el chat sin mensaje prellenado (si no, el bot confirmaria dos veces) %>
+                <a class="btn btn-whatsapp" href="https://wa.me/<%= numeroWhatsapp %>" target="_blank" rel="noopener">Volver al chat</a>
+              <% } else { %>
+                <a class="btn btn-whatsapp" href="https://wa.me/<%= numeroWhatsapp %>?text=<%= encodeURIComponent(mensajeWhatsapp) %>" target="_blank" rel="noopener">Volver a WhatsApp</a>
+              <% } %>
             <% } %>
           <% } %>
         </div>
@@ -433,5 +444,6 @@
     })();
   </script>
   <% } %>
+<%- include('partials/carrito-web') %>
 </body>
 </html>
