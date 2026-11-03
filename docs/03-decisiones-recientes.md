@@ -743,3 +743,5 @@ Resultado visto en una conversación real contra el modelo ("quiero ver poleras"
 **Verificado** con una conversación real local (plan PRO = gpt-6-luna, luego restaurado a gpt-4o): las llamadas con tools, el menú, la tarjeta de categoría y la pregunta de género funcionan; el log de `usos_ia` registra `gpt-6-luna`.
 
 **Pendiente:** `lib/services/costoIA.js` no tiene precio de gpt-6-luna, así que el dashboard de costos mostrará esas llamadas sin costo (a propósito no se inventa). Hay que cargar el precio oficial de OpenAI (las fuentes de terceros no coinciden).
+
+**Precio de gpt-6-luna cargado** (dato del dueño, nov-2026): $0,10 entrada / $0,50 salida por 1M tokens en `costoIA.js`. El precio de entrada cacheada no se conoce: se usa el de entrada normal, así que el costo mostrado es un techo. Una llamada típica del bot (7.019 de prompt, 5.064 cacheados, 38 de salida) pasa de ~$0,0117 con gpt-4o a ~$0,0007 con Luna (≈16 veces menos).

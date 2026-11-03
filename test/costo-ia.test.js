@@ -17,6 +17,19 @@ describe('costoUSD', () => {
     assert.equal(costo, esperado);
   });
 
+  test('gpt-6-luna: $0,10 entrada y $0,50 salida por millon (cache sin descuento conocido = techo)', () => {
+    const costo = costoUSD('gpt-6-luna', { promptTokens: 7000, cachedTokens: 5000, completionTokens: 40 });
+    assert.equal(costo, (2000 * 0.10 + 5000 * 0.10 + 40 * 0.50) / 1_000_000);
+    // una llamada tipica del bot (7.000 de prompt) cuesta una fraccion de centavo
+    assert.ok(costo < 0.001);
+  });
+
+  test('gpt-6-luna cuesta unas 25 veces menos en entrada que gpt-4o', () => {
+    const luna = costoUSD('gpt-6-luna', { promptTokens: 1_000_000 });
+    const g4o = costoUSD('gpt-4o', { promptTokens: 1_000_000 });
+    assert.equal(Math.round(g4o / luna), 25);
+  });
+
   test('modelo desconocido devuelve null, nunca inventa un costo', () => {
     assert.equal(costoUSD('gpt-5.2-chat-latest', { promptTokens: 100, completionTokens: 50 }), null);
   });
