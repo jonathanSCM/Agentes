@@ -763,3 +763,17 @@ Resultado visto en una conversación real contra el modelo ("quiero ver poleras"
 **Verificado** repitiendo el incidente con el modelo real (gpt-6-luna, producto de prueba con los mismos atributos): el carrito termina en **1x … (Talla: 10, Color: Blanco nube)**. Tests: `carrito-sin-variantes.test.js` (DB + IA falsa, incluye el pedido completo), `seleccion-producto.test.js`.
 
 **Limitaciones conocidas.** (1) Comprar dos tallas del mismo producto sin variantes crea dos líneas, pero las acciones de la lista de edición del flujo (`item:pid:vid`) apuntan a la primera de ellas. (2) La solución de fondo es cargar esos productos CON variantes (el formulario guiado ya las crea junto con el producto): así cada talla tiene su stock real; hoy el stock es uno solo para todas las tallas. (3) La página web del catálogo sigue sin poder elegir talla en estos productos.
+
+
+## 35. Talla y color son siempre variantes (ya no existen como "datos extra")
+
+**Decisión del dueño** (tras el pedido #26): la talla y el color no se cargan como datos sueltos del producto, solo como variantes. Es lo único que da stock por talla y hace que la talla/color salgan en el pedido.
+
+**Cambios** (`server.js`, `views/cliente/producto-form.ejs`, `partials/constructor-variantes.ejs`, `lib/services/seleccionProducto.js`):
+- En "Datos extra" ya no se sugieren Talla ni Color, el formulario lo explica, y el servidor **rechaza** (400, con el mensaje de dónde cargarlos) cualquier intento de guardar "Talla" o "Color" como dato extra, al crear y al editar.
+- **Productos viejos** que los tenían sueltos (como la Tekkira Cup de producción): en la edición ya no aparecen como filas editables; en "Opciones de este producto" sale un aviso amarillo y el constructor llega **precargado** con sus tallas y colores. Solo hay que poner el stock de cada combinación y tocar "Convertir y guardar": se crean las variantes, el stock general pasa a 0 y Talla/Color se quitan de los datos sueltos (el resto, como Género, se conserva). Hasta que se conviertan, guardar otros cambios del producto no los pierde.
+- La red de seguridad de la entrada #34 (talla/color guardados en la línea del carrito para productos sin variantes) se mantiene para los productos que todavía no se hayan convertido.
+
+**Verificado** contra el servidor local con un producto igual a la Tekkira (Talla "8,9,9.5,10,10.5", Color "Blanco nube", Género): crear con Talla suelta → rechazado; la edición ofrece la conversión con el constructor precargado; editar el precio conserva Talla/Color; convertir crea 5 variantes con su stock; después ya no se ofrece. Tests: 566.
+
+**Pendiente.** Los productos de producción con ese formato hay que convertirlos uno por uno desde el panel (hoy es al menos la Tekkira Cup); la importación desde Excel puede seguir dejando Talla/Color sueltos si no se llenan las hojas de variantes (no se tocó).

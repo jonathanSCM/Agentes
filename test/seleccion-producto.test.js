@@ -87,3 +87,22 @@ describe('carrito con seleccion', () => {
     assert.equal(r[1].seleccion, null);
   });
 });
+
+const { separarOpcionesDeAtributos, esClaveDeOpcion } = require('../lib/services/seleccionProducto');
+
+describe('separarOpcionesDeAtributos - talla/color son variantes, no datos sueltos', () => {
+  test('separa Talla y Color del resto, con sus valores', () => {
+    const r = separarOpcionesDeAtributos({ Color: 'Blanco nube', Talla: '8,9,9.5,10,10.5', Genero: 'Unisex', Marca: 'Lotto' });
+    assert.deepEqual(r.opciones, [{ nombre: 'Talla', valores: ['8', '9', '9.5', '10', '10.5'] }, { nombre: 'Color', valores: ['Blanco nube'] }]);
+    assert.deepEqual(r.resto, { Genero: 'Unisex', Marca: 'Lotto' });
+  });
+  test('no distingue mayusculas ni espacios en el nombre', () => {
+    assert.equal(esClaveDeOpcion(' talla '), true);
+    assert.equal(esClaveDeOpcion('COLOR'), true);
+    assert.equal(esClaveDeOpcion('Tallas'), false);
+    assert.equal(esClaveDeOpcion('Marca'), false);
+  });
+  test('sin atributos devuelve vacio', () => {
+    assert.deepEqual(separarOpcionesDeAtributos(null), { opciones: [], resto: {} });
+  });
+});

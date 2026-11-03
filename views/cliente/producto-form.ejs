@@ -13,10 +13,23 @@
     atributosProducto = {};
     _k.forEach(function (k, i) { if (k && _v[i]) atributosProducto[k] = _v[i]; });
   }
-  var entradasAtributos = Object.entries(atributosProducto);
+  // Talla y color NO son "datos extra": son opciones (variantes). Un producto viejo
+  // que los tenia sueltos los ve convertibles mas abajo, no como filas editables.
+  var esOpcion = function (k) { var n = String(k).trim().toLowerCase(); return n === 'talla' || n === 'color'; };
+  var opcionesViejas = [];
+  var datosSinOpciones = {};
+  Object.keys(atributosProducto).forEach(function (k) {
+    if (esOpcion(k)) {
+      var valores = String(atributosProducto[k]).split(',').map(function (v) { return v.trim(); }).filter(Boolean);
+      if (valores.length) opcionesViejas.push({ nombre: k.trim().toLowerCase() === 'talla' ? 'Talla' : 'Color', texto: valores.join(', ') });
+    } else { datosSinOpciones[k] = atributosProducto[k]; }
+  });
+  opcionesViejas.sort(function (a, b) { return a.nombre === 'Talla' ? -1 : (b.nombre === 'Talla' ? 1 : 0); });
+  var convertirOpciones = esEdicion && !yaTieneVariantes && opcionesViejas.length > 0;
+  var entradasAtributos = Object.entries(datosSinOpciones);
   if (!entradasAtributos.length) entradasAtributos = [['', '']];
   var tieneCaracteristicas = Array.isArray(b.caracteristicas) ? b.caracteristicas.length > 0 : Boolean(b.caracteristicas);
-  var tieneDetalles = Boolean(b.descripcion || b.sku || tieneCaracteristicas || Object.keys(atributosProducto).length);
+  var tieneDetalles = Boolean(b.descripcion || b.sku || tieneCaracteristicas || Object.keys(datosSinOpciones).length);
 %>
 
 <div class="page-head">
@@ -141,7 +154,7 @@
 
       <div class="field">
         <label>Datos extra del producto</label>
-        <p class="pf-ayuda">Marca, material, voltaje… lo que le sirva a tu tipo de producto.</p>
+        <p class="pf-ayuda">Marca, material, voltaje… lo que le sirva a tu tipo de producto. <strong>La talla y el color no van acá:</strong> se cargan como opciones del producto.</p>
         <div id="atributos-lista">
           <% entradasAtributos.forEach(function (par) { %>
             <div class="atributo-row pf-fila">
@@ -152,7 +165,7 @@
           <% }); %>
         </div>
         <datalist id="atributos-sugeridos">
-          <option value="Marca"></option><option value="Material"></option><option value="Color"></option>
+          <option value="Marca"></option><option value="Material"></option>
           <option value="Modelo"></option><option value="Voltaje"></option><option value="Capacidad"></option>
           <option value="Peso"></option><option value="Sabor"></option><option value="Potencia"></option><option value="Garantía"></option>
         </datalist>
@@ -253,10 +266,17 @@
     <% } %>
 
     <form id="form-agregar-variantes" method="POST" action="/panel/productos/<%= producto.id %>/variantes" class="pf-agregar">
-      <h4 class="pf-subtitulo"><%= producto.variantes.length ? 'Agregar más opciones' : 'Agregar tallas, colores u otras opciones' %></h4>
-      <%- include('partials/constructor-variantes', { sugeridas: null }) %>
+      <% if (convertirOpciones) { %>
+        <div class="pf-conversion" role="note">
+          <strong>Este producto tiene la talla y el color guardados como datos sueltos.</strong>
+          Así no podemos saber el stock de cada talla ni anotar cuál eligió el cliente en el pedido.
+          Armamos las combinaciones con lo que ya tenías: <strong>poné cuántas unidades hay de cada una</strong> y guardá.
+        </div>
+      <% } %>
+      <h4 class="pf-subtitulo"><%= convertirOpciones ? 'Convertir en opciones con stock' : (producto.variantes.length ? 'Agregar más opciones' : 'Agregar tallas, colores u otras opciones') %></h4>
+      <%- include('partials/constructor-variantes', { sugeridas: null, inicial: convertirOpciones ? opcionesViejas : null }) %>
       <div class="form-actions pf-acciones">
-        <button class="btn btn-primary" type="submit">Guardar estas opciones</button>
+        <button class="btn btn-primary" type="submit"><%= convertirOpciones ? 'Convertir y guardar' : 'Guardar estas opciones' %></button>
       </div>
     </form>
   </section>
@@ -368,7 +388,8 @@
       : '';
     if (obligatorios.length && detalles) detalles.open = true;
   }
-  var GENERICOS_PRODUCTO = ['Marca', 'Material', 'Color', 'Modelo', 'Voltaje', 'Capacidad', 'Peso', 'Sabor', 'Potencia', 'Garantía'];
+  var GENERICOS_PRODUCTO = ['Marca', 'Material', 'Modelo', 'Voltaje', 'Capacidad', 'Peso', 'Sabor', 'Potencia', 'Garantía'];
+  var sinOpciones = function (nombres) { return (nombres || []).filter(function (n) { var k = String(n).trim().toLowerCase(); return k !== 'talla' && k !== 'color'; }); };
   var GENERICOS_VARIANTE = ['Talla', 'Color', 'Modelo', 'Sabor', 'Presentación', 'Tamaño'];
   function actualizarDatalist(id, nombresPropios, genericos) {
     var dl = document.getElementById(id);
@@ -385,7 +406,7 @@
   }
   function actualizarDatalistsCategoria() {
     var nombres = (window.__categoriasAtributosNombres || {})[selectCategoria && selectCategoria.value] || { producto: [], variante: [] };
-    actualizarDatalist('atributos-sugeridos', nombres.producto, GENERICOS_PRODUCTO);
+    actualizarDatalist('atributos-sugeridos', sinOpciones(nombres.producto), GENERICOS_PRODUCTO);
     actualizarDatalist('atributos-variante-sugeridos', nombres.variante, GENERICOS_VARIANTE);
   }
   if (selectCategoria) {

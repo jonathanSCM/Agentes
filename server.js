@@ -88,6 +88,7 @@ const compression = require('compression');
 const catalogoCache = require('./lib/services/catalogoCache');
 const { parsearVariantesJson, sinLasExistentes } = require('./lib/services/variantesForm');
 const { pasosIniciales } = require('./lib/services/primerosPasos');
+const { esClaveDeOpcion } = require('./lib/services/seleccionProducto');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -2086,6 +2087,16 @@ function atributosDesdeForm(body) {
   return atributos;
 }
 
+// La talla y el color son SIEMPRE variantes (cada combinacion con su stock y
+// con su talla/color en el pedido). Como "datos extra" del producto no tienen
+// donde guardar que eligio el cliente: asi salio el pedido #26, "2x ... " sin
+// talla. Se rechaza con un mensaje que dice donde cargarlos.
+function errorPorOpcionesSueltas(atributos) {
+  const claves = Object.keys(atributos || {}).filter(esClaveDeOpcion);
+  if (!claves.length) return null;
+  return `"${claves.join('" y "')}" no va en "Datos extra". La talla y el color se cargan como opciones del producto (arriba, en "¿Viene en varias opciones?"), así cada una tiene su stock y sale en el pedido.`;
+}
+
 // Convierte los campos de texto libre del formulario (categoria,
 // caracteristicas por coma, atributos por filas) a los tipos que espera Prisma.
 function datosCatalogoDesdeForm(body) {
@@ -2162,6 +2173,14 @@ app.post('/panel/productos', requireCliente, upload.array('fotos', 8), async (re
       });
     }
     const datosCatalogo = datosCatalogoDesdeForm(req.body || {});
+    const errorOpciones = errorPorOpcionesSueltas(datosCatalogo.atributos);
+    if (errorOpciones) {
+      return res.status(400).render('cliente/producto-form', {
+        title: 'Agregar producto - Proshop', tituloPagina: 'Agregar producto', activo: 'productos',
+        producto: null, borrador: req.body, error: errorOpciones,
+        categoriasExistentes: await categoriasExistentes(req.session.empresaId),
+      });
+    }
     const faltantes = await atributosObligatoriosFaltantes(datosCatalogo.categoriaId || null, datosCatalogo.atributos);
     if (faltantes.length) {
       return res.status(400).render('cliente/producto-form', {
@@ -2292,7 +2311,13 @@ app.post('/panel/productos/:id/variantes', requireCliente, upload.array('fotos',
         data: nuevas.map((v) => ({ productoId: producto.id, atributos: v.atributos, stock: v.stock, precio: v.precio, fotos: [] })),
       });
       // El stock del producto pasa a vivir en las variantes (queda en 0).
-      await prisma.producto.update({ where: { id: producto.id }, data: { stock: 0 } });
+      // Si la talla/color estaban guardados como datos sueltos del producto
+      // (producto viejo), ya quedaron convertidos en variantes: se sacan de
+      // los datos para no tenerlos duplicados.
+      const atributosLimpios = {};
+      for (const [k, v] of Object.entries(producto.atributos || {})) if (!esClaveDeOpcion(k)) atributosLimpios[k] = v;
+      await prisma.producto.update({ where: { id: producto.id }, data: { stock: 0, atributos: atributosLimpios } });
+      guardarEmbeddingDeProducto(producto.id, textoParaEmbedding({ ...producto, atributos: atributosLimpios })).catch(() => {});
       const msg = nuevas.length === 1 ? 'Variante agregada.' : `${nuevas.length} variantes agregadas.`;
       return res.redirect(`/panel/productos/${producto.id}/editar?ok=` + encodeURIComponent(msg));
     }
@@ -2393,6 +2418,20 @@ app.post('/panel/productos/:id', requireCliente, upload.array('fotos', 8), async
     if (!producto) return res.redirect('/panel/productos');
 
     const datosCatalogo = datosCatalogoDesdeForm(req.body || {});
+    const errorOpciones = errorPorOpcionesSueltas(datosCatalogo.atributos);
+    if (errorOpciones) {
+      return res.status(400).render('cliente/producto-form', {
+        title: 'Editar producto - Proshop', tituloPagina: 'Editar producto', activo: 'productos',
+        producto: { ...producto, ...req.body }, error: errorOpciones,
+        categoriasExistentes: await categoriasExistentes(req.session.empresaId),
+      });
+    }
+    // Productos viejos que guardaron Talla/Color como datos sueltos: el
+    // formulario ya no los muestra ahi (se convierten en opciones), pero hasta
+    // que se conviertan NO se pierden al guardar otros cambios.
+    const opcionesSueltasViejas = {};
+    for (const [k, v] of Object.entries(producto.atributos || {})) if (esClaveDeOpcion(k)) opcionesSueltasViejas[k] = v;
+    datosCatalogo.atributos = { ...datosCatalogo.atributos, ...opcionesSueltasViejas };
     const faltantes = await atributosObligatoriosFaltantes(datosCatalogo.categoriaId, datosCatalogo.atributos);
     if (faltantes.length) {
       return res.status(400).render('cliente/producto-form', {

@@ -10,7 +10,11 @@
 <%
   var opcionesSugeridas = (typeof sugeridas !== 'undefined' && sugeridas && sugeridas.length) ? sugeridas : ['Talla', 'Color', 'Sabor', 'Tamaño', 'Modelo'];
 %>
-<div class="vb" data-vb data-sugeridas='<%- JSON.stringify(opcionesSugeridas) %>'>
+<%
+  // inicial: opciones ya conocidas del producto (talla/color que estaban como datos sueltos), para precargarlas
+  var opcionesIniciales = (typeof inicial !== 'undefined' && inicial && inicial.length) ? inicial : [];
+%>
+<div class="vb" data-vb data-sugeridas='<%- JSON.stringify(opcionesSugeridas) %>' data-inicial='<%- JSON.stringify(opcionesIniciales).replace(/'/g, "&#39;") %>'>
   <input type="hidden" name="variantesJson" value="[]" data-vb-json />
 
   <p class="vb-paso"><strong>¿En qué se diferencian?</strong> Tocá todas las que apliquen.</p>
@@ -224,6 +228,11 @@
   raiz.vbCantidad = function () { return combinaciones.length; };
   raiz.vbMostrarError = function (txt) { errorEl.textContent = txt; errorEl.hidden = false; };
   raiz.vbReiniciar = function () { opciones = []; datosPorClave = {}; refrescar(false); };
+
+  try {
+    var iniciales = JSON.parse(raiz.getAttribute('data-inicial') || '[]');
+    iniciales.forEach(function (o) { if (o && o.nombre) opciones.push({ nombre: String(o.nombre), texto: String(o.texto || '') }); });
+  } catch (e) { /* sin precarga */ }
 
   refrescar(false);
 })();
