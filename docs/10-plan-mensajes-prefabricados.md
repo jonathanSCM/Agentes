@@ -1,6 +1,6 @@
 # Plan: la IA no escribe, solo elige (mensajes prefabricados con datos añadibles)
 
-Fecha: 4-nov-2026. Estado: **plan para aprobación, sin código.**
+Fecha: 4-nov-2026. Estado: **plan aprobado. M0 terminado (ver `docs/03-decisiones-recientes.md` #40).** Siguen la fase 2 del plan 09 y después M1/M2.
 Pedido del dueño: que la IA **no escriba texto libre**. Que elija entre mensajes prefabricados guardados en la base de datos, cada uno con una descripción de lo que dice y con datos que se completan, **igual que las plantillas de WhatsApp**. Todo lo que pueda resolver el backend, lo resuelve el backend. Así la IA gasta menos tokens y no puede inventar ni decir cosas raras.
 
 ## 1. Por qué esto es lo correcto (con los números de hoy)
@@ -128,7 +128,15 @@ Alternativa: hacer la fase 2 antes que M0. Se puede (la fase 2 es datos, motor d
 | Los textos del negocio traen links o promesas raras | el revisor de la fase 1 sigue activo sobre el texto final; los links propios entran a la lista blanca |
 | Alcance | cada fase se entrega sola; M0 no depende de nada |
 
-## 9. Decisiones que necesito de ti
+## 9. Decisiones (respondidas el 4-nov-2026)
+
+1. **Registro de habla:** se mantiene "vos" en los agentes existentes (el campo `registro` queda en `vos` por defecto; el negocio podrá elegir "tú" en M2).
+2. **Mensajes propios:** sí, con tope de 30 o el que defina el plan (`planes.maxMensajesPropios`).
+3. **Tema que la IA no conoce:** pasa con un asesor (mensaje `no_entendi_derivar`), anotando el caso.
+4. **Orden:** M0 → fase 2 → M1/M2 → fase 3.
+
+### Preguntas originales
+
 
 1. **Registro de habla por defecto**: hoy los textos usan "vos" ("Querés", "Tocá"). ¿Se queda el vos para los agentes que ya existen y los nuevos eligen (vos / tú / usted)? Propongo eso.
 2. **¿Los negocios pueden crear mensajes propios**, o solo editar los de fábrica? Propongo ambos, con tope de 40 propios.

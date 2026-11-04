@@ -72,6 +72,15 @@ describe('mensajes pendientes recuperables', () => {
     assert.equal(p.texto, PREGUNTA);
   });
 
+  test('un pedido largo SIN signo de pregunta que solo dispara la tarjeta también queda pendiente; uno corto no', async () => {
+    saludIA.simular('5xx');
+    await clienteEscribe('busco zapatillas');
+    assert.equal((await ultimoDelAgente()).meta, null, 'una categoría nombrada se contesta con su tarjeta: no hay nada pendiente');
+    await clienteEscribe('quiero zapatillas para correr diez kilómetros todas las mañanas con mucho amortiguado');
+    const a = await ultimoDelAgente();
+    assert.equal(a.meta && a.meta.pendienteIA, true);
+  });
+
   test('un toque de botón y el chat de prueba NO quedan pendientes', async () => {
     saludIA.simular('5xx');
     await clienteEscribe('Ver categorías', { idBoton: 'menu:rubros' });

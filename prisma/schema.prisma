@@ -53,6 +53,8 @@ model Plan {
   convIncluidas    Int // conversaciones incluidas por periodo
   maxProductos     Int
   maxUsuarios      Int
+  // Mensajes propios que el negocio puede crear sobre los de fabrica (docs/10).
+  maxMensajesPropios Int    @default(30)
   modeloIa         String   @default("claude-haiku-4-5") // modelo de IA segun el plan
   marcaBlanca      Boolean  @default(false)
   recomendado      Boolean  @default(false)
@@ -214,8 +216,51 @@ model Empresa {
   notificaciones Notificacion[]
   suscripcion    Suscripcion?
   usosIA         UsoIA[]
+  mensajesAgente MensajeAgente[]
+  datosNegocio   DatoNegocio[]
 
   @@map("empresas")
+}
+
+// Lo que el negocio cambia o crea sobre los mensajes de fabrica del agente
+// (los de fabrica viven en el codigo: lib/services/mensajesBase.js). origen:
+// PERSONALIZADO = cambio de texto de uno de fabrica | PROPIO = lo creo el negocio.
+model MensajeAgente {
+  id          Int      @id @default(autoincrement())
+  empresaId   Int
+  empresa     Empresa  @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  clave       String
+  categoria   String?
+  // Que dice y cuando se usa: es lo que lee la IA para elegirlo (fase M1).
+  descripcion String?
+  texto       String
+  // Otras redacciones del mismo mensaje (se alternan para no sonar repetido).
+  variantes   Json     @default("[]")
+  // Solo los PROPIOS: [{ nombre, tipo }]. Los de fabrica declaran las suyas en el codigo.
+  variables   Json     @default("[]")
+  origen      String   @default("PERSONALIZADO")
+  activo      Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @default(now()) @updatedAt
+
+  @@unique([empresaId, clave])
+  @@map("mensajes_agente")
+}
+
+// Datos añadibles del negocio que cualquier mensaje puede usar: {{dato.garantia}}.
+model DatoNegocio {
+  id        Int      @id @default(autoincrement())
+  empresaId Int
+  empresa   Empresa  @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  clave     String
+  etiqueta  String
+  valor     String
+  visible   Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now()) @updatedAt
+
+  @@unique([empresaId, clave])
+  @@map("datos_negocio")
 }
 
 // Costo real de IA que paga Proshop (no el cliente) por cada llamada a
@@ -398,6 +443,10 @@ model AgenteConfig {
   // frecuentes [{ pregunta, respuesta }], horario de atencion (texto por dia)
   // y notas libres para la IA.
   faq               Json     @default("[]")
+  // Como habla el agente: "vos" | "tu" | "usted" (ver lib/services/mensajes.js).
+  registro          String   @default("vos")
+  // Fase M1 (docs/10): la IA elige entre los mensajes prefabricados y no escribe.
+  mensajesPrefabricados Boolean @default(false)
   horarioAtencion   Json?
   conocimiento      String?
   aceptaEfectivo    Boolean  @default(true)
