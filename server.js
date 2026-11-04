@@ -52,6 +52,8 @@ const sharp = require('sharp');
 
 const leads = require('./lib/leads');
 const { prisma } = require('./lib/db');
+const { Prisma } = require('./lib/generated/prisma');
+const { faqDesdeFormulario, horarioDesdeFormulario } = require('./lib/services/faq');
 const {
   obtenerEstadoConsumo,
   obtenerResumenEmpresa,
@@ -2722,6 +2724,10 @@ app.post('/panel/configuracion', requireCliente, requireRol('OWNER', 'ADMIN'), u
         // de nombres de atributo, en el orden en que se van a preguntar.
         preguntasIniciales: String(preguntasIniciales || '')
           .split(',').map((t) => t.trim()).filter(Boolean).slice(0, 5),
+        // Preguntas frecuentes, horario y notas: lo que el bot contesta SIN IA (lib/services/faq.js).
+        faq: faqDesdeFormulario(req.body),
+        horarioAtencion: horarioDesdeFormulario(req.body) || Prisma.JsonNull,
+        conocimiento: req.body.conocimiento ? String(req.body.conocimiento).trim().slice(0, 1500) : null,
         direccionTienda: direccionTienda ? String(direccionTienda).trim().slice(0, 200) : null,
         tiendaLat: tiendaLat ? Number(tiendaLat) : null,
         tiendaLng: tiendaLng ? Number(tiendaLng) : null,

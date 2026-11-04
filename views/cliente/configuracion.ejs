@@ -13,6 +13,7 @@
   <!-- Las pestañas las activa el JS; sin JS se ven todas las secciones una debajo de otra -->
   <nav class="config-nav" role="tablist" aria-label="Secciones de la configuración" hidden>
     <button type="button" role="tab" data-tab="agente">Mi agente</button>
+    <button type="button" role="tab" data-tab="preguntas">Preguntas y horario</button>
     <button type="button" role="tab" data-tab="pagos">Pagos y entrega</button>
     <button type="button" role="tab" data-tab="catalogo">Catálogo web</button>
     <button type="button" role="tab" data-tab="avanzado">Avanzado</button>
@@ -68,6 +69,55 @@
       <p class="pf-ayuda">Con el código de país, sin “+” ni espacios. Ej: Bolivia → <b>591</b> + número.
         Este dato es solo informativo: para conectar el número de verdad andá a <a href="/panel/whatsapp">WhatsApp</a>.</p>
       <% if (!agente.numeroWhatsapp) { %><p class="pf-aviso">Todavía no cargaste tu número.</p><% } %>
+    </div>
+  </section>
+
+  <!-- ===== Preguntas y horario ===== -->
+  <section class="dash-card config-seccion" id="config-preguntas" role="tabpanel" data-panel="preguntas">
+    <div class="dash-card-head"><h3>Preguntas y horario</h3></div>
+    <p class="pf-ayuda">Lo que cargues acá lo contesta tu agente <b>al instante y sin gastar IA</b>, con tus propias palabras. Si el cliente pregunta otra cosa, el agente sigue como siempre.</p>
+
+    <%
+      var NOMBRES_DIA = [['Lunes', 1], ['Martes', 2], ['Miércoles', 3], ['Jueves', 4], ['Viernes', 5], ['Sábado', 6], ['Domingo', 0]];
+      var horarioGuardado = (config.horarioAtencion && Array.isArray(config.horarioAtencion.dias)) ? config.horarioAtencion.dias : [];
+      var diaGuardado = function (n) { return horarioGuardado.filter(function (d) { return Number(d.dia) === n; })[0] || null; };
+      var faqGuardada = Array.isArray(config.faq) ? config.faq : [];
+    %>
+
+    <div class="field">
+      <label>Horario de atención <em class="opcional">(opcional)</em></label>
+      <p class="pf-ayuda">Si lo cargás, cuando un cliente pregunte "¿a qué hora abren?" el agente responde con esto. Si lo dejás vacío, el agente no inventa nada: ofrece pasarlo con una persona.</p>
+      <div class="cfg-horario">
+        <% NOMBRES_DIA.forEach(function (d) { var g = diaGuardado(d[1]); var abierto = g && !g.cerrado; %>
+          <div class="cfg-horario-fila">
+            <label class="pf-check cfg-horario-dia"><input type="checkbox" name="horaAbierto<%= d[1] %>" value="1" <%= abierto ? 'checked' : '' %> data-dia="<%= d[1] %>" /> <%= d[0] %></label>
+            <input type="time" name="horaAbre<%= d[1] %>" value="<%= abierto ? g.abre : '09:00' %>" aria-label="Abre el <%= d[0] %>" />
+            <span>a</span>
+            <input type="time" name="horaCierra<%= d[1] %>" value="<%= abierto ? g.cierra : '18:00' %>" aria-label="Cierra el <%= d[0] %>" />
+          </div>
+        <% }); %>
+      </div>
+    </div>
+
+    <div class="field">
+      <label>Preguntas frecuentes <em class="opcional">(opcional)</em></label>
+      <p class="pf-ayuda">Escribí la pregunta como la haría un cliente y tu respuesta. Ejemplos: "¿Hacen envíos a otras ciudades?" → "Sí, por flota a todo el país, el costo lo paga el cliente." · "¿Tienen garantía?" → "30 días por falla de fábrica." Usá pocas palabras clave en la pregunta.</p>
+      <div id="faq-lista" class="cfg-faq">
+        <% (faqGuardada.length ? faqGuardada : [{ pregunta: '', respuesta: '' }]).forEach(function (f) { %>
+          <div class="cfg-faq-item">
+            <input type="text" name="faqPregunta" maxlength="160" value="<%= f.pregunta || '' %>" placeholder="Pregunta del cliente. Ej: ¿Hacen envíos a otras ciudades?" />
+            <textarea name="faqRespuesta" rows="2" maxlength="600" placeholder="Tu respuesta"><%= f.respuesta || '' %></textarea>
+            <button type="button" class="btn btn-ghost btn-small cfg-faq-quitar" aria-label="Quitar esta pregunta">Quitar</button>
+          </div>
+        <% }); %>
+      </div>
+      <button type="button" class="btn btn-ghost btn-small" id="faq-agregar">+ Agregar otra pregunta</button>
+    </div>
+
+    <div class="field">
+      <label for="conocimiento">Información extra para tu agente <em class="opcional">(opcional)</em></label>
+      <p class="pf-ayuda">Cosas que tu agente debe saber para conversar mejor: políticas de cambios, cómo cuidar un producto. Lo usa la IA, no se envía tal cual.</p>
+      <textarea id="conocimiento" name="conocimiento" rows="4" maxlength="1500" placeholder="Ej: Aceptamos cambios dentro de los 7 días con la etiqueta puesta."><%= config.conocimiento || '' %></textarea>
     </div>
   </section>
 
@@ -298,6 +348,37 @@
 
 <script>
 (function () {
+
+  // Preguntas frecuentes: agregar y quitar filas
+  var lista = document.getElementById('faq-lista');
+  var agregar = document.getElementById('faq-agregar');
+  function filaVacia() {
+    var d = document.createElement('div');
+    d.className = 'cfg-faq-item';
+    d.innerHTML = '<input type="text" name="faqPregunta" maxlength="160" placeholder="Pregunta del cliente. Ej: ¿Tienen garantía?" />' +
+      '<textarea name="faqRespuesta" rows="2" maxlength="600" placeholder="Tu respuesta"></textarea>' +
+      '<button type="button" class="btn btn-ghost btn-small cfg-faq-quitar" aria-label="Quitar esta pregunta">Quitar</button>';
+    return d;
+  }
+  if (lista && agregar) {
+    agregar.addEventListener('click', function () { var f = filaVacia(); lista.appendChild(f); f.querySelector('input').focus(); });
+    lista.addEventListener('click', function (ev) {
+      var b = ev.target.closest('.cfg-faq-quitar');
+      if (!b) return;
+      var fila = b.closest('.cfg-faq-item');
+      if (lista.children.length > 1) fila.remove();
+      else { fila.querySelector('input').value = ''; fila.querySelector('textarea').value = ''; }
+    });
+  }
+  // Horario: un dia sin marcar desactiva sus horas
+  Array.prototype.slice.call(document.querySelectorAll('.cfg-horario [data-dia]')).forEach(function (chk) {
+    function sync() {
+      var fila = chk.closest('.cfg-horario-fila');
+      Array.prototype.slice.call(fila.querySelectorAll('input[type=time]')).forEach(function (t) { t.disabled = !chk.checked; });
+    }
+    chk.addEventListener('change', sync); sync();
+  });
+
   // Mostrar/ocultar la imagen del QR según la forma de pago
   var chk = document.getElementById('aceptaQr');
   var campo = document.getElementById('campo-qr');
