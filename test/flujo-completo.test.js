@@ -229,7 +229,7 @@ describe('Plan A - toolChoice "requerido" quita la opcion de improvisar', () => 
       vistos.push(toolChoice);
       return { content: '', tool_calls: [tool('mostrar_tarjeta_categoria', {})] };
     };
-    await generarRespuesta(agenteId, TELEFONO, [], 'que tienes', undefined, { llamarInyectado: llamar });
+    await generarRespuesta(agenteId, TELEFONO, [], 'dame opciones por favor', undefined, { llamarInyectado: llamar });
 
     assert.equal(vistos[0], 'requerido');
   });
@@ -310,7 +310,7 @@ describe('Backstop de frustracion: escalada a asesor por turnos sin avanzar de e
       if (!toolChoiceVisto) toolChoiceVisto = toolChoice;
       return { content: '', tool_calls: [tool('mostrar_tarjeta_categoria', {})] };
     };
-    await generarRespuesta(agenteId, TELEFONO, [], 'que tienes', undefined, { llamarInyectado: llamar });
+    await generarRespuesta(agenteId, TELEFONO, [], 'dame opciones por favor', undefined, { llamarInyectado: llamar });
 
     // Este mensaje SI cumple las condiciones de soloAccionValida (Plan A), asi
     // que "requerido" viene de ESE gate, no del backstop de frustracion -
@@ -365,7 +365,7 @@ describe('tools dinamicas: confirmar_pedido/crear_pedido solo existen con carrit
       if (!toolsVistos) toolsVistos = tools;
       return { content: '', tool_calls: [tool('mostrar_tarjeta_categoria', {})] };
     };
-    await generarRespuesta(agenteId, TELEFONO, [], 'que tienes', undefined, { llamarInyectado: llamar });
+    await generarRespuesta(agenteId, TELEFONO, [], 'dame opciones por favor', undefined, { llamarInyectado: llamar });
 
     const nombres = toolsVistos.map((t) => t.function.name);
     assert.ok(!nombres.includes('confirmar_pedido'), 'no deberia poder llamar confirmar_pedido sin nada en el carrito');
@@ -1175,7 +1175,7 @@ describe('preguntas iniciales: nada se muestra hasta responderlas', () => {
       { tool_calls: [tool('mostrar_categorias', {})] },
       { content: 'Esto tenemos.' },
     ]);
-    await generarRespuesta(agenteId, TELEFONO, [], 'que tenes', undefined, { llamarInyectado: llamar });
+    await generarRespuesta(agenteId, TELEFONO, [], 'dame opciones por favor', undefined, { llamarInyectado: llamar });
     assert.match(recibido.toolResults[0], /TOOL_SUCCESS/);
   });
 });
