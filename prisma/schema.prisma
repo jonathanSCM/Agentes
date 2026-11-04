@@ -394,6 +394,12 @@ model AgenteConfig {
   // mas?", edicion de carrito y cierre por plantillas y botones, sin llamar a
   // la IA). Apagado = el comportamiento de siempre. Ver flujoDeterminista.js.
   flujoDeterminista Boolean  @default(false)
+  // Lo que el negocio carga para que el bot conteste SIN IA: preguntas
+  // frecuentes [{ pregunta, respuesta }], horario de atencion (texto por dia)
+  // y notas libres para la IA.
+  faq               Json     @default("[]")
+  horarioAtencion   Json?
+  conocimiento      String?
   aceptaEfectivo    Boolean  @default(true)
   aceptaTarjeta     Boolean  @default(false)
   // Ubicacion REAL del local, para los pedidos con retiro en tienda. El bot
@@ -499,6 +505,9 @@ model Mensaje {
   // del equipo. mediaTipo: "imagen" | "audio".
   mediaUrl       String?
   mediaTipo      String?
+  // Marcas del sistema sobre el mensaje: { hasta, fallo, ... } (mensajes
+  // pendientes recuperables, ver docs/09).
+  meta           Json?
   createdAt      DateTime     @default(now())
 
   @@index([conversacionId, createdAt])

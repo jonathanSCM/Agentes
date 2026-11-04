@@ -1,6 +1,7 @@
 node_modules/
 .env
 data/leads.json
+data/evals/
 npm-debug.log*
 *.log
 .DS_Store

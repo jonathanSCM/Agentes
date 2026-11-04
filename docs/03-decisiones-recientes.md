@@ -815,3 +815,18 @@ Resultado visto en una conversación real contra el modelo ("quiero ver poleras"
 **Límites honestos.** El estado del cortacircuitos vive en memoria (instancia única; se rearma solo al reiniciar). Con el modo sin IA el texto libre complejo no se entiende: se ofrece menú o asesor, y queda anotado. No se probó contra una caída real de OpenAI, solo simulada. **No se tocó el prompt fijo (16 mil caracteres) ni las descripciones de las tools:** cada regla nació de un bug real y sin una prueba A/B con IA real adelgazarlas es arriesgado.
 
 **Para activar las alertas:** poner una de las variables `ALERTA_*` en Coolify, reiniciar y usar el botón de prueba de `/admin/estado-ia`.
+
+
+## 38. Fase 0 del plan de Citas y mejoras: evals, base de pruebas aislada y columnas de base
+
+Plan completo y decisiones del dueño en `docs/09-plan-modelo-citas-y-mejoras-agendabot.md` (acento menta, topes por plan para citas, rubros editables, plantillas opcionales creadas desde el panel, ya somos Tech Provider, sin editor de flujo por bloques).
+
+**Evals (`npm run eval`).** `scripts/eval/` (fixture, escenarios, ejecutor), idea tomada de AgendaBot. 18 escenarios con guion (funcionales, resiliencia y seguridad) sobre una empresa propia `eval-tienda` con un agente CON el flujo de botones y otro SIN él; se crea y se borra sola. Opciones: `--k N` (aprueba solo si pasa N veces), `--sin-ia` (IA caída simulada, gratis), `--solo <id>`, `--tipo seguridad`, `--juez` (una IA califica tono, alcance y cierre). Controles automáticos de cada escenario (pedido creado, cantidad, derivación, lo que debe y no debe decir) y universales: sin respuesta vacía ni error técnico, sin filtrar texto interno, **montos que no existen en el catálogo/carrito**, "quedó registrado" sin pedido, datos de otro cliente. Mide llamadas, tokens y costo por escenario; informe en `data/evals/` (ignorado por git).
+- **Línea base (4-nov, gpt-4o-mini, k=1): 17/17, seguridad 5/5, US$ 0,013.** Sin IA: 11/11 de los que corresponden.
+- **Hallazgo de costo:** los 7 escenarios de texto libre con IA real gastaron **3 llamadas y ~19 mil tokens cada uno** (el máximo de vueltas), contra 1,45 llamadas por mensaje del promedio de producción; los resueltos por el flujo gastan 0. Es la medida contra la que se comparan las mejoras de tokens de las fases 1 y 6.
+- **Hallazgo de comportamiento:** con una categoría elegida pero sin tarjeta mostrada, el motor manda la tarjeta de categoría y **tapa** lo que el cliente pidió (p. ej. "quiero hablar con un asesor" respondía "Échale un vistazo a zapatillas"). En una conversación real la tarjeta ya se mostró, así que el fixture marca `tarjetasCategoriaMostradas`; queda anotado como riesgo a revisar en la fase 1.
+- `test/eval-escenarios.test.js` corre los escenarios sin IA dentro de `npm test` (red de seguridad gratis del modo sin IA y del cierre por botones).
+
+**Base de pruebas aislada.** `npm test` ahora corre contra `<tu base>_test` (o `DATABASE_URL_TEST`), nunca contra la de desarrollo (`lib/db.js` la elige cuando corre bajo `node --test`; `TEST_DB_AISLADA=0` lo desactiva). Se crea y migra con **`npm run test:preparar`** (una vez, y de nuevo si se agregan migraciones). Resultado: 654 tests en verde sin tocar la base de desarrollo.
+
+**Migración `20261104120000_mensaje_meta_faq_horario`** (aplicada en desarrollo y en la de pruebas; en producción se aplica sola al desplegar): `mensajes.meta` (JSON), `agente_config.faq` (JSON, default `[]`), `agente_config.horarioAtencion` (JSON) y `agente_config.conocimiento` (texto). Todavía nada las usa: son la base de la fase 1 (mensajes pendientes recuperables y FAQ/horario sin IA).
