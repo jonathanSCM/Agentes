@@ -1,0 +1,25 @@
+<%#
+  Horario semanal editable (lunes a domingo, varios turnos por dia). Se usa dentro de un <form>.
+  Parametros: filasPorDia = { 0: [{horaInicio, horaFin}], 1: [...], ... }
+  Los campos son ini{dia} / fin{dia} repetidos: lib/services/atencion.js parsearHorarioSemana.
+%>
+<% var ORDEN_DIAS = [[1, 'Lunes'], [2, 'Martes'], [3, 'Miércoles'], [4, 'Jueves'], [5, 'Viernes'], [6, 'Sábado'], [0, 'Domingo']]; %>
+<div class="hs">
+  <% ORDEN_DIAS.forEach(function (d) { var filas = filasPorDia[d[0]] || []; %>
+    <div class="hs-dia" data-dia="<%= d[0] %>">
+      <span class="hs-nombre"><%= d[1] %></span>
+      <div class="hs-tramos">
+        <% filas.forEach(function (f) { %>
+          <span class="hs-tramo">
+            <input type="time" name="ini<%= d[0] %>" value="<%= f.horaInicio %>" aria-label="Abre el <%= d[1] %>" />
+            <span>a</span>
+            <input type="time" name="fin<%= d[0] %>" value="<%= f.horaFin %>" aria-label="Cierra el <%= d[1] %>" />
+            <button type="button" class="hs-quitar" aria-label="Quitar este turno">×</button>
+          </span>
+        <% }); %>
+        <span class="hs-cerrado muted" <%= filas.length ? 'hidden' : '' %>>Cerrado</span>
+      </div>
+      <button type="button" class="btn btn-ghost btn-chico hs-agregar" data-dia="<%= d[0] %>">+ Turno</button>
+    </div>
+  <% }); %>
+</div>

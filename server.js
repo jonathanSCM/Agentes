@@ -92,6 +92,10 @@ const compression = require('compression');
 const catalogoCache = require('./lib/services/catalogoCache');
 const { parsearVariantesJson, sinLasExistentes } = require('./lib/services/variantesForm');
 const { pasosIniciales } = require('./lib/services/primerosPasos');
+const { vocabularioDe, lista: listaRubros, cargarEjemplo } = require('./lib/services/rubros');
+const { agendaDe, ZONAS_HORARIAS } = require('./lib/services/configAgenda');
+const { parsearNegocio } = require('./lib/services/miNegocio');
+const limitesCitas = require('./lib/services/limitesCitas');
 const { esClaveDeOpcion } = require('./lib/services/seleccionProducto');
 const avisoCarritoWeb = require('./lib/services/avisoCarritoWeb');
 const ogImagen = require('./lib/services/ogImagen');
@@ -911,6 +915,10 @@ app.use('/panel', async (req, res, next) => {
     res.locals.usuarioNombre = req.session.clienteNombre;
     res.locals.usuarioRol = req.session.clienteRol;
     res.locals.empresaNombre = empresa ? empresa.nombre : '';
+    // Que hace el negocio (productos o citas): el menu y las pantallas se arman segun eso.
+    res.locals.modeloNegocio = empresa ? empresa.modeloNegocio : 'PRODUCTOS';
+    res.locals.vocab = vocabularioDe(empresa);
+    res.locals.negocioCfg = { rubros: listaRubros(), zonas: ZONAS_HORARIAS, agenda: agendaDe(empresa) };
     // Moneda real del catalogo: todas las vistas del panel escriben los
     // precios con esta, nunca con un "Bs" hardcodeado.
     res.locals.moneda = empresa ? empresa.moneda : 'BOB';
@@ -1008,7 +1016,13 @@ app.get('/panel', requireCliente, async (req, res, next) => {
       prisma.producto.count({ where: { empresaId } }),
       prisma.agente.findFirst({ where: { empresaId }, orderBy: { id: 'asc' }, include: { conexion: true } }),
     ]);
+    const [totalServicios, totalRecursos, totalHorarios] = await Promise.all([
+      prisma.servicio.count({ where: { empresaId, activo: true } }),
+      prisma.recurso.count({ where: { empresaId, activo: true } }),
+      prisma.horarioAtencion.count({ where: { empresaId } }),
+    ]);
     const primerosPasos = pasosIniciales({
+      modelo: res.locals.modeloNegocio, servicios: totalServicios, recursos: totalRecursos, horarios: totalHorarios,
       productos: totalProductos,
       whatsappConectado: Boolean(agentePrincipal && agentePrincipal.conexion && agentePrincipal.conexion.estado === 'CONECTADO'),
       agenteActivo: Boolean(agentePrincipal && agentePrincipal.estado === 'ACTIVO'),
@@ -2672,7 +2686,7 @@ app.get('/panel/configuracion', requireCliente, requireRol('OWNER', 'ADMIN'), as
     res.render('cliente/configuracion', {
       title: 'Configuración del agente - Proshop', tituloPagina: 'Configuración', activo: 'configuracion',
       agente, config: agente.config || {}, empresa, monedas: MONEDAS_CATALOGO,
-      mensaje: req.query.ok || null, error: null,
+      mensaje: req.query.ok || null, error: req.query.err || null,
     });
   } catch (err) { next(err); }
 });
@@ -2686,6 +2700,16 @@ app.post('/panel/configuracion', requireCliente, requireRol('OWNER', 'ADMIN'), u
   try {
     const agente = await obtenerAgente(req.session.empresaId);
 
+    // "Mi negocio": que hace el negocio, rubro, zona horaria, vocabulario y reglas de agenda.
+    const empresaActual = await prisma.empresa.findUnique({ where: { id: req.session.empresaId } });
+    const negocio = req.body.modeloNegocio !== undefined ? parsearNegocio(req.body, empresaActual) : null;
+    if (negocio && negocio.errores.length) {
+      return res.status(400).render('cliente/configuracion', {
+        title: 'Configuración del agente - Proshop', tituloPagina: 'Configuración', activo: 'configuracion',
+        agente, config: agente.config || {}, empresa: empresaActual, monedas: MONEDAS_CATALOGO,
+        error: negocio.errores.join(' '), mensaje: null,
+      });
+    }
     // El numero: solo digitos (quita +, espacios, guiones)
     const numero = numeroWhatsapp ? String(numeroWhatsapp).replace(/\D/g, '').slice(0, 20) : null;
     if (numero && numero.length < 8) {
@@ -2735,6 +2759,8 @@ app.post('/panel/configuracion', requireCliente, requireRol('OWNER', 'ADMIN'), u
         aceptaTarjeta: aceptaTarjeta === '1',
         aceptaQr: aceptaQr === '1',
         flujoDeterminista: flujoDeterminista === '1',
+        // Como habla el agente (vos / tu): ver lib/services/mensajes.js
+        ...(negocio && negocio.registro ? { registro: negocio.registro } : {}),
         qrCobroUrl,
         logoUrl,
         colorPrimario: hexValido(colorPrimario) ? colorPrimario.trim() : (agente.config?.colorPrimario || null),
@@ -2757,6 +2783,8 @@ app.post('/panel/configuracion', requireCliente, requireRol('OWNER', 'ADMIN'), u
       },
     });
 
+    if (negocio) await prisma.empresa.update({ where: { id: req.session.empresaId }, data: negocio.empresa });
+
     // La moneda del catalogo vive en la empresa: es la que el bot usa para
     // escribir CUALQUIER precio (nunca la elige el modelo).
     if (MONEDAS_CATALOGO.includes(moneda)) {
@@ -2764,6 +2792,226 @@ app.post('/panel/configuracion', requireCliente, requireRol('OWNER', 'ADMIN'), u
     }
 
     res.redirect('/panel/configuracion?ok=' + encodeURIComponent('Configuración guardada.'));
+  } catch (err) { next(err); }
+});
+
+// Carga los datos de ejemplo del rubro (servicios, equipo y horario) SOLO donde el negocio todavia
+// no tiene nada, sin pasarse del tope de servicios de su plan. Todo queda editable.
+app.post('/panel/negocio/ejemplo', requireCliente, requireRol('OWNER', 'ADMIN'), upload.none(), async (req, res, next) => {
+  try {
+    const empresaId = req.session.empresaId;
+    const rubro = ['clinica', 'salon', 'restaurante', 'inmobiliaria', 'otro'].includes(req.body.rubro) ? req.body.rubro : null;
+    const empresa = await prisma.empresa.findUnique({ where: { id: empresaId } });
+    if (!rubro) return res.redirect('/panel/configuracion?err=' + encodeURIComponent('Elegí primero el rubro de tu negocio.'));
+    await prisma.empresa.update({ where: { id: empresaId }, data: { rubro, modeloNegocio: 'CITAS' } });
+    const { servicios } = await limitesCitas.estadoDeLimites(empresaId);
+    const r = await cargarEjemplo(empresaId, rubro, { topeServicios: servicios.tope });
+    const partes = [];
+    if (r.servicios) partes.push(`${r.servicios} servicio${r.servicios === 1 ? '' : 's'}`);
+    if (r.recursos) partes.push(`${r.recursos} en el equipo`);
+    if (r.horarios) partes.push('el horario de atención');
+    let mensaje = partes.length ? `Listo, cargué ${partes.join(', ')}. Todo se puede cambiar o borrar.` : 'Ya tenías servicios, equipo y horarios cargados: no cambié nada.';
+    if (r.omitidosPorTope) mensaje += ` Tu plan permite ${servicios.tope} servicios: dejé afuera ${r.omitidosPorTope} del ejemplo.`;
+    res.redirect('/panel/atencion/servicios?ok=' + encodeURIComponent(mensaje));
+  } catch (err) { next(err); }
+});
+
+// ============================ ATENCION (modelo de CITAS) ============================
+// Servicios, equipo, horarios y cierres del negocio que agenda citas (docs/09).
+// Ver, cualquier rol; cambiar, solo dueño y administradores.
+const atencion = require('./lib/services/atencion');
+const feriadosSrv = require('./lib/services/feriados');
+const { paisDe } = require('./lib/services/configAgenda');
+const T = require('./lib/services/tiempo');
+
+function soloCitas(req, res, next) {
+  if (res.locals.modeloNegocio === 'CITAS') return next();
+  return res.redirect('/panel/configuracion?err=' + encodeURIComponent('Para usar esta sección elegí "Agendo citas" en Mi negocio.'));
+}
+const puedeEditarAtencion = requireRol('OWNER', 'ADMIN');
+const volver = (res, ruta, { ok, err }) => res.redirect(`${ruta}?${ok ? 'ok=' + encodeURIComponent(ok) : 'err=' + encodeURIComponent(err)}`);
+const idDe = (req) => Number(req.params.id);
+
+// ---- Servicios
+app.get('/panel/atencion/servicios', requireCliente, soloCitas, async (req, res, next) => {
+  try {
+    const empresaId = req.session.empresaId;
+    const [servicios, lim, empresa] = await Promise.all([
+      prisma.servicio.findMany({ where: { empresaId }, orderBy: [{ activo: 'desc' }, { orden: 'asc' }, { id: 'asc' }], include: { _count: { select: { citas: true } } } }),
+      limitesCitas.estadoDeLimites(empresaId),
+      prisma.empresa.findUnique({ where: { id: empresaId } }),
+    ]);
+    res.render('cliente/atencion-servicios', {
+      title: 'Servicios - Proshop', tituloPagina: 'Servicios', activo: 'servicios',
+      servicios, limites: lim.servicios, empresa, mensaje: req.query.ok || null, error: req.query.err || null,
+      puedeEditar: ['OWNER', 'ADMIN'].includes(req.session.clienteRol),
+    });
+  } catch (err) { next(err); }
+});
+
+app.post('/panel/atencion/servicios', requireCliente, soloCitas, puedeEditarAtencion, async (req, res, next) => {
+  try {
+    const v = atencion.validarServicio(req.body);
+    if (v.errores.length) return volver(res, '/panel/atencion/servicios', { err: v.errores.join(' ') });
+    await atencion.crearServicio(req.session.empresaId, v.datos);
+    volver(res, '/panel/atencion/servicios', { ok: 'Servicio agregado.' });
+  } catch (err) { if (err.codigo) return volver(res, '/panel/atencion/servicios', { err: err.message }); return next(err); }
+});
+
+app.post('/panel/atencion/servicios/:id', requireCliente, soloCitas, puedeEditarAtencion, async (req, res, next) => {
+  try {
+    const v = atencion.validarServicio(req.body);
+    if (v.errores.length) return volver(res, '/panel/atencion/servicios', { err: v.errores.join(' ') });
+    await atencion.actualizarServicio(req.session.empresaId, idDe(req), v.datos);
+    volver(res, '/panel/atencion/servicios', { ok: 'Cambios guardados.' });
+  } catch (err) { return volver(res, '/panel/atencion/servicios', { err: err.message }); }
+});
+
+app.post('/panel/atencion/servicios/:id/activo', requireCliente, soloCitas, puedeEditarAtencion, async (req, res, next) => {
+  try {
+    const activar = req.body.activo === '1';
+    await atencion.cambiarActivoServicio(req.session.empresaId, idDe(req), activar);
+    volver(res, '/panel/atencion/servicios', { ok: activar ? 'Servicio activado.' : 'Servicio desactivado: ya no se ofrece, pero se conserva su historial.' });
+  } catch (err) { return volver(res, '/panel/atencion/servicios', { err: err.message }); }
+});
+
+app.post('/panel/atencion/servicios/:id/eliminar', requireCliente, soloCitas, puedeEditarAtencion, async (req, res, next) => {
+  try {
+    await atencion.eliminarServicio(req.session.empresaId, idDe(req));
+    volver(res, '/panel/atencion/servicios', { ok: 'Servicio eliminado.' });
+  } catch (err) { return volver(res, '/panel/atencion/servicios', { err: err.message }); }
+});
+
+// ---- Equipo (personas o recursos que atienden)
+app.get('/panel/atencion/equipo', requireCliente, soloCitas, async (req, res, next) => {
+  try {
+    const empresaId = req.session.empresaId;
+    const [recursos, servicios] = await Promise.all([
+      prisma.recurso.findMany({ where: { empresaId }, orderBy: [{ activo: 'desc' }, { id: 'asc' }], include: { servicios: true, _count: { select: { citas: true } } } }),
+      prisma.servicio.findMany({ where: { empresaId, activo: true }, orderBy: [{ orden: 'asc' }, { id: 'asc' }] }),
+    ]);
+    res.render('cliente/atencion-equipo', {
+      title: 'Equipo - Proshop', tituloPagina: res.locals.vocab.profesionales, activo: 'atencion-equipo',
+      recursos, servicios, mensaje: req.query.ok || null, error: req.query.err || null,
+      puedeEditar: ['OWNER', 'ADMIN'].includes(req.session.clienteRol),
+    });
+  } catch (err) { next(err); }
+});
+
+app.post('/panel/atencion/equipo', requireCliente, soloCitas, puedeEditarAtencion, async (req, res, next) => {
+  try {
+    const v = atencion.validarRecurso(req.body);
+    if (v.errores.length) return volver(res, '/panel/atencion/equipo', { err: v.errores.join(' ') });
+    await atencion.crearRecurso(req.session.empresaId, v.datos, req.body.servicios);
+    volver(res, '/panel/atencion/equipo', { ok: 'Agregado al equipo.' });
+  } catch (err) { next(err); }
+});
+
+app.post('/panel/atencion/equipo/:id', requireCliente, soloCitas, puedeEditarAtencion, async (req, res, next) => {
+  try {
+    const v = atencion.validarRecurso(req.body);
+    if (v.errores.length) return volver(res, '/panel/atencion/equipo', { err: v.errores.join(' ') });
+    await atencion.actualizarRecurso(req.session.empresaId, idDe(req), v.datos, req.body.servicios);
+    volver(res, '/panel/atencion/equipo', { ok: 'Cambios guardados.' });
+  } catch (err) { return volver(res, '/panel/atencion/equipo', { err: err.message }); }
+});
+
+app.post('/panel/atencion/equipo/:id/activo', requireCliente, soloCitas, puedeEditarAtencion, async (req, res, next) => {
+  try {
+    await prisma.recurso.updateMany({ where: { id: idDe(req), empresaId: req.session.empresaId }, data: { activo: req.body.activo === '1' } });
+    volver(res, '/panel/atencion/equipo', { ok: req.body.activo === '1' ? 'Activado.' : 'Desactivado: ya no se le agendan citas nuevas.' });
+  } catch (err) { next(err); }
+});
+
+app.post('/panel/atencion/equipo/:id/eliminar', requireCliente, soloCitas, puedeEditarAtencion, async (req, res, next) => {
+  try {
+    await atencion.eliminarRecurso(req.session.empresaId, idDe(req));
+    volver(res, '/panel/atencion/equipo', { ok: 'Eliminado del equipo.' });
+  } catch (err) { return volver(res, '/panel/atencion/equipo', { err: err.message }); }
+});
+
+// ---- Horarios, cierres y feriados
+const HORARIOS = '/panel/atencion/horarios';
+
+// Proximos feriados nacionales del pais del negocio (del cache; con un tope de espera para no trabar la pantalla).
+async function proximosFeriados(empresa, cuantos = 8) {
+  const pais = paisDe(empresa);
+  if (!pais || process.env.FERIADOS_OFFLINE) return [];
+  const hoy = T.hoy(empresa.zonaHoraria);
+  const anio = Number(hoy.slice(0, 4));
+  try {
+    const espera = new Promise((resolve) => setTimeout(() => resolve(null), 2500));
+    const datos = await Promise.race([Promise.all([feriadosSrv.feriadosDelAnio(pais, anio), feriadosSrv.feriadosDelAnio(pais, anio + 1)]), espera]);
+    if (!datos) return [];
+    return datos.flatMap((d) => d.feriados).filter((f) => !f.regional && f.fecha >= hoy).sort((a, b) => (a.fecha < b.fecha ? -1 : 1)).slice(0, cuantos);
+  } catch (_) { return []; }
+}
+
+app.get(HORARIOS, requireCliente, soloCitas, async (req, res, next) => {
+  try {
+    const empresaId = req.session.empresaId;
+    const empresa = await prisma.empresa.findUnique({ where: { id: empresaId } });
+    const [horarios, recursos, bloqueos, feriados] = await Promise.all([
+      prisma.horarioAtencion.findMany({ where: { empresaId }, orderBy: [{ diaSemana: 'asc' }, { horaInicio: 'asc' }] }),
+      prisma.recurso.findMany({ where: { empresaId, activo: true }, orderBy: { id: 'asc' } }),
+      prisma.bloqueoAgenda.findMany({ where: { empresaId, fin: { gt: new Date() } }, orderBy: { inicio: 'asc' }, include: { recurso: true } }),
+      proximosFeriados(empresa),
+    ]);
+    const porDia = (filas) => { const m = {}; for (let d = 0; d <= 6; d += 1) m[d] = filas.filter((h) => h.diaSemana === d); return m; };
+    res.render('cliente/atencion-horarios', {
+      title: 'Horarios - Proshop', tituloPagina: 'Horarios', activo: 'horarios',
+      empresa, general: porDia(horarios.filter((h) => h.recursoId === null)),
+      recursos: recursos.map((r) => ({ ...r, propio: porDia(horarios.filter((h) => h.recursoId === r.id)), tienePropio: horarios.some((h) => h.recursoId === r.id) })),
+      bloqueos: bloqueos.map((b) => ({ ...b, desdeTxt: T.legible(b.inicio, empresa.zonaHoraria), hastaTxt: T.legible(b.fin, empresa.zonaHoraria) })),
+      feriados, feriadosAbiertos: agendaDe(empresa).feriadosAbiertos, cerrarFeriados: agendaDe(empresa).cerrarFeriados,
+      mensaje: req.query.ok || null, error: req.query.err || null,
+      puedeEditar: ['OWNER', 'ADMIN'].includes(req.session.clienteRol),
+    });
+  } catch (err) { next(err); }
+});
+
+app.post(`${HORARIOS}/general`, requireCliente, soloCitas, puedeEditarAtencion, async (req, res, next) => {
+  try {
+    const { filas, errores } = atencion.parsearHorarioSemana(req.body);
+    if (errores.length) return volver(res, HORARIOS, { err: errores.join(' ') });
+    await atencion.guardarHorario(req.session.empresaId, null, filas);
+    volver(res, HORARIOS, { ok: 'Horario general guardado.' });
+  } catch (err) { next(err); }
+});
+
+app.post(`${HORARIOS}/recurso/:id`, requireCliente, soloCitas, puedeEditarAtencion, async (req, res, next) => {
+  try {
+    const { filas, errores } = req.body.quitar === '1' ? { filas: [], errores: [] } : atencion.parsearHorarioSemana(req.body);
+    if (errores.length) return volver(res, HORARIOS, { err: errores.join(' ') });
+    await atencion.guardarHorario(req.session.empresaId, idDe(req), filas);
+    volver(res, HORARIOS, { ok: filas.length ? 'Horario propio guardado.' : 'Ya no tiene horario propio: usa el general.' });
+  } catch (err) { return volver(res, HORARIOS, { err: err.message }); }
+});
+
+app.post(`${HORARIOS}/bloqueos`, requireCliente, soloCitas, puedeEditarAtencion, async (req, res, next) => {
+  try {
+    const empresa = await prisma.empresa.findUnique({ where: { id: req.session.empresaId } });
+    const v = atencion.validarBloqueo(req.body, empresa.zonaHoraria);
+    if (v.errores.length) return volver(res, HORARIOS, { err: v.errores.join(' ') });
+    await atencion.crearBloqueo(req.session.empresaId, v.datos);
+    volver(res, HORARIOS, { ok: 'Cierre agregado: en ese período no se ofrecen horarios.' });
+  } catch (err) { return volver(res, HORARIOS, { err: err.message }); }
+});
+
+app.post(`${HORARIOS}/bloqueos/:id/eliminar`, requireCliente, soloCitas, puedeEditarAtencion, async (req, res, next) => {
+  try {
+    await atencion.eliminarBloqueo(req.session.empresaId, idDe(req));
+    volver(res, HORARIOS, { ok: 'Cierre eliminado.' });
+  } catch (err) { next(err); }
+});
+
+// Feriados en que SI se trabaja (el resto de los nacionales cierra la agenda solo).
+app.post(`${HORARIOS}/feriados`, requireCliente, soloCitas, puedeEditarAtencion, async (req, res, next) => {
+  try {
+    const empresa = await prisma.empresa.findUnique({ where: { id: req.session.empresaId } });
+    const abiertos = [].concat(req.body.abierto === undefined ? [] : req.body.abierto).filter((f) => T.esFecha(f));
+    await prisma.empresa.update({ where: { id: empresa.id }, data: { configAgenda: { ...(empresa.configAgenda || {}), feriadosAbiertos: abiertos } } });
+    volver(res, HORARIOS, { ok: 'Feriados guardados.' });
   } catch (err) { next(err); }
 });
 
@@ -3949,6 +4197,9 @@ function datosPlanDesdeForm(body) {
     convIncluidas: parseInt(body.convIncluidas, 10) || 0,
     maxProductos: parseInt(body.maxProductos, 10) || 0,
     maxUsuarios: parseInt(body.maxUsuarios, 10) || 1,
+    maxServicios: parseInt(body.maxServicios, 10) || 10,
+    maxCitasMes: parseInt(body.maxCitasMes, 10) || 200,
+    maxMensajesPropios: Number.isFinite(parseInt(body.maxMensajesPropios, 10)) ? parseInt(body.maxMensajesPropios, 10) : 30,
     modeloIa: String(body.modeloIa || 'claude-haiku-4-5').trim().slice(0, 60),
     marcaBlanca: body.marcaBlanca === '1',
     recomendado: body.recomendado === '1',

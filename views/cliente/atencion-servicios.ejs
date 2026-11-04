@@ -1,0 +1,100 @@
+<%- include('partials/inicio') %>
+
+<div class="page-head">
+  <h2>Servicios</h2>
+  <p>Lo que tus clientes pueden reservar: una consulta, un corte, una mesa, una visita. Tu agente solo ofrece horarios libres de estos servicios.</p>
+</div>
+
+<% if (mensaje) { %><div class="alert-ok"><%= mensaje %></div><% } %>
+<% if (error) { %><div class="alert-err" role="alert"><%= error %></div><% } %>
+
+<% var lleno = limites.usados >= limites.tope; var pct = Math.min(100, Math.round(limites.usados / limites.tope * 100)); %>
+<div class="pf-card atn-limite">
+  <div><strong><%= limites.usados %> de <%= limites.tope %></strong> servicios activos en tu plan</div>
+  <div class="bar-lg"><span style="width:<%= pct %>%"></span></div>
+  <% if (lleno) { %><p class="muted">Llegaste al tope. Para agregar más, desactivá alguno o <a href="/panel/consumo">mejorá tu plan</a>.</p>
+  <% } else if (pct >= 80) { %><p class="muted">Te estás acercando al tope de tu plan.</p><% } %>
+</div>
+
+<% if (!servicios.length) { %>
+  <div class="cat-inicio">
+    <form method="POST" action="/panel/negocio/ejemplo" class="pf-card cat-camino">
+      <h3>Empezá con un ejemplo</h3>
+      <p class="muted">Cargamos servicios, equipo y horario típicos de tu rubro. Después cambiás todo lo que quieras.</p>
+      <div class="field">
+        <label for="rubro-ej">Mi rubro</label>
+        <select id="rubro-ej" name="rubro">
+          <% negocioCfg.rubros.forEach(function (r) { %><option value="<%= r.id %>" <%= empresa.rubro === r.id ? 'selected' : '' %>><%= r.nombre %></option><% }); %>
+        </select>
+      </div>
+      <% if (puedeEditar) { %><button class="btn btn-primary" type="submit">Cargar ejemplo</button><% } %>
+    </form>
+    <div class="pf-card cat-camino">
+      <h3>Prefiero armarlos yo</h3>
+      <p class="muted">Agregá el primero con el formulario de abajo.</p>
+    </div>
+  </div>
+<% } %>
+
+<% servicios.forEach(function (s) { %>
+  <div class="pf-card atn-item <%= s.activo ? '' : 'atn-inactivo' %>">
+    <div class="atn-resumen">
+      <div>
+        <strong><%= s.nombre %></strong>
+        <% if (!s.activo) { %><span class="badge badge-done">Desactivado</span><% } %>
+        <div class="muted">
+          <%= s.duracionMin %> min<% if (s.bufferMin) { %> + <%= s.bufferMin %> de descanso<% } %>
+          <% if (s.precio !== null) { %> · <%= simboloCatalogo %> <%= Number(s.precio).toFixed(2) %><% } %>
+          <% if (s.usaPersonas) { %> · hasta <%= s.maxPersonas %> personas<% } %>
+        </div>
+      </div>
+      <% if (puedeEditar) { %>
+      <div class="atn-acciones">
+        <form method="POST" action="/panel/atencion/servicios/<%= s.id %>/activo" class="inline-form">
+          <input type="hidden" name="activo" value="<%= s.activo ? '0' : '1' %>" />
+          <button class="btn btn-ghost btn-chico" type="submit"><%= s.activo ? 'Desactivar' : 'Activar' %></button>
+        </form>
+        <% if (!s._count.citas) { %>
+        <form method="POST" action="/panel/atencion/servicios/<%= s.id %>/eliminar" class="inline-form" onsubmit="return confirm('¿Eliminar este servicio?');">
+          <button class="btn btn-ghost btn-chico" type="submit">Eliminar</button>
+        </form>
+        <% } %>
+      </div>
+      <% } %>
+    </div>
+    <% if (puedeEditar) { %>
+    <details class="atn-editar">
+      <summary>Editar</summary>
+      <form method="POST" action="/panel/atencion/servicios/<%= s.id %>" class="atn-form">
+        <%- include('partials/servicio-campos', { s: s }) %>
+        <button class="btn btn-primary" type="submit">Guardar cambios</button>
+      </form>
+    </details>
+    <% } %>
+  </div>
+<% }); %>
+
+<% if (puedeEditar) { %>
+  <% if (lleno) { %>
+    <div class="pf-card"><p class="muted">No podés agregar más servicios activos con tu plan actual.</p></div>
+  <% } else { %>
+    <form method="POST" action="/panel/atencion/servicios" class="pf-card atn-form">
+      <h3 class="pf-titulo">Agregar un servicio</h3>
+      <%- include('partials/servicio-campos', { s: null }) %>
+      <button class="btn btn-primary" type="submit">Agregar servicio</button>
+    </form>
+  <% } %>
+<% } %>
+
+<script>
+(function () {
+  // "Reserva por cantidad de personas" muestra el maximo
+  Array.prototype.slice.call(document.querySelectorAll('.atn-personas')).forEach(function (chk) {
+    var campo = chk.closest('.atn-form').querySelector('.atn-max-personas');
+    function sync() { if (campo) campo.hidden = !chk.checked; }
+    chk.addEventListener('change', sync); sync();
+  });
+})();
+</script>
+
+<%- include('partials/fin') %>

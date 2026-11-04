@@ -12,12 +12,83 @@
 
   <!-- Las pestañas las activa el JS; sin JS se ven todas las secciones una debajo de otra -->
   <nav class="config-nav" role="tablist" aria-label="Secciones de la configuración" hidden>
+    <button type="button" role="tab" data-tab="negocio">Mi negocio</button>
     <button type="button" role="tab" data-tab="agente">Mi agente</button>
     <button type="button" role="tab" data-tab="preguntas">Preguntas y horario</button>
     <button type="button" role="tab" data-tab="pagos">Pagos y entrega</button>
     <button type="button" role="tab" data-tab="catalogo">Catálogo web</button>
     <button type="button" role="tab" data-tab="avanzado">Avanzado</button>
   </nav>
+
+  <!-- ===== Mi negocio ===== -->
+  <section class="dash-card config-seccion" id="config-negocio" role="tabpanel" data-panel="negocio">
+    <div class="dash-card-head"><h3>Mi negocio</h3></div>
+    <p class="pf-ayuda">Elegí qué hace tu negocio: el menú, las pantallas y tu agente se arman según eso. Si cambiás de idea no se borra nada: lo que cargaste queda guardado.</p>
+
+    <% var esCitasCfg = (empresa && empresa.modeloNegocio) === 'CITAS'; var vocabCfg = vocab; var agendaCfg = negocioCfg.agenda; %>
+    <div class="field">
+      <label>¿Qué hace tu negocio?</label>
+      <label class="pf-check pf-opcion"><input type="radio" name="modeloNegocio" value="PRODUCTOS" data-actual="<%= esCitasCfg ? '' : '1' %>" <%= esCitasCfg ? '' : 'checked' %> /> <span><b>Vendo productos</b><br /><small>Catálogo, carrito y pedidos. Tu agente muestra productos y cierra ventas.</small></span></label>
+      <label class="pf-check pf-opcion"><input type="radio" name="modeloNegocio" value="CITAS" data-actual="<%= esCitasCfg ? '1' : '' %>" <%= esCitasCfg ? 'checked' : '' %> /> <span><b>Agendo citas</b><br /><small>Servicios con turno: clínicas, salones, restaurantes, visitas. Tu agente ofrece horarios libres y agenda.</small></span></label>
+    </div>
+
+    <div id="bloque-citas" <%= esCitasCfg ? '' : 'hidden' %>>
+      <div class="field">
+        <label for="rubro">Rubro <em class="opcional">(solo ayuda a elegir palabras y datos de ejemplo)</em></label>
+        <select id="rubro" name="rubro">
+          <option value="">Sin elegir</option>
+          <% negocioCfg.rubros.forEach(function (r) { %>
+            <option value="<%= r.id %>" <%= (empresa && empresa.rubro) === r.id ? 'selected' : '' %>><%= r.nombre %></option>
+          <% }); %>
+        </select>
+        <p class="pf-ayuda">Si todavía no cargaste nada, podés empezar con servicios, equipo y horario de ejemplo de tu rubro. Es solo un punto de partida: después lo cambiás todo.</p>
+        <button type="submit" class="btn btn-ghost btn-small" formaction="/panel/negocio/ejemplo" formnovalidate>Cargar datos de ejemplo</button>
+      </div>
+
+      <div class="field">
+        <label>Cómo les decís a las cosas</label>
+        <div class="cfg-vocab">
+          <label>Una cita <input type="text" name="vocabCita" maxlength="40" value="<%= vocabCfg.cita %>" placeholder="cita / turno / reserva / visita" /></label>
+          <label>Varias citas <input type="text" name="vocabCitas" maxlength="40" value="<%= vocabCfg.citas %>" /></label>
+          <label>Un servicio <input type="text" name="vocabServicio" maxlength="40" value="<%= vocabCfg.servicio %>" /></label>
+          <label>Varios servicios <input type="text" name="vocabServicios" maxlength="40" value="<%= vocabCfg.servicios %>" /></label>
+          <label>Quien atiende <input type="text" name="vocabProfesional" maxlength="40" value="<%= vocabCfg.profesional %>" placeholder="profesional / estilista / asesor" /></label>
+          <label>Quienes atienden <input type="text" name="vocabProfesionales" maxlength="40" value="<%= vocabCfg.profesionales %>" /></label>
+        </div>
+        <p class="pf-ayuda">Tu agente y tu panel usan estas palabras.</p>
+      </div>
+
+      <div class="field">
+        <label for="zonaHoraria">Zona horaria</label>
+        <select id="zonaHoraria" name="zonaHoraria">
+          <% negocioCfg.zonas.forEach(function (z) { %>
+            <option value="<%= z.id %>" <%= (empresa && empresa.zonaHoraria) === z.id ? 'selected' : '' %>><%= z.nombre %></option>
+          <% }); %>
+        </select>
+        <p class="pf-ayuda">Los horarios que ofrece tu agente son en esta hora.</p>
+      </div>
+
+      <div class="field">
+        <label for="pais">País para los feriados <em class="opcional">(código de 2 letras, ej. BO)</em></label>
+        <input id="pais" name="pais" type="text" maxlength="2" value="<%= (empresa && empresa.pais) || '' %>" placeholder="BO" style="max-width:6rem;text-transform:uppercase" />
+      </div>
+
+      <div class="field">
+        <label>Reglas de la agenda</label>
+        <div class="cfg-vocab">
+          <label>Ofrecer horarios cada
+            <select name="agendaIntervalo">
+              <% [15, 20, 30, 45, 60].forEach(function (m) { %><option value="<%= m %>" <%= agendaCfg.intervaloMin === m ? 'selected' : '' %>><%= m %> minutos</option><% }); %>
+            </select>
+          </label>
+          <label>Anticipación mínima (horas) <input type="number" name="agendaAnticipacionHoras" min="0" max="336" value="<%= Math.round(agendaCfg.anticipacionMin / 60) %>" /></label>
+          <label>Agendar hasta (días adelante) <input type="number" name="agendaDiasMaximos" min="1" max="365" value="<%= agendaCfg.diasMaximos %>" /></label>
+        </div>
+        <label class="pf-check"><input type="checkbox" name="agendaCerrarFeriados" value="1" <%= agendaCfg.cerrarFeriados ? 'checked' : '' %> /> No agendar en feriados nacionales</label>
+        <label class="pf-check"><input type="checkbox" name="agendaPermiteElegir" value="1" <%= agendaCfg.permiteElegirRecurso ? 'checked' : '' %> /> El cliente puede elegir con quién (si hay más de uno)</label>
+      </div>
+    </div>
+  </section>
 
   <!-- ===== Mi agente ===== -->
   <section class="dash-card config-seccion" id="config-agente" role="tabpanel" data-panel="agente">
@@ -44,6 +115,14 @@
         <% ['cordial y profesional','amigable y cercano','formal','divertido y casual'].forEach(function (t) { %>
           <option value="<%= t %>" <%= config.tono === t ? 'selected' : '' %>><%= t.charAt(0).toUpperCase() + t.slice(1) %></option>
         <% }); %>
+      </select>
+    </div>
+
+    <div class="field">
+      <label for="registro">¿Cómo trata a tus clientes?</label>
+      <select id="registro" name="registro">
+        <option value="vos" <%= (config.registro || 'vos') === 'vos' ? 'selected' : '' %>>De vos (¿Querés ver algo más? · Tocá el botón)</option>
+        <option value="tu" <%= config.registro === 'tu' ? 'selected' : '' %>>De tú (¿Quieres ver algo más? · Toca el botón)</option>
       </select>
     </div>
 
@@ -348,6 +427,27 @@
 
 <script>
 (function () {
+
+  // Mi negocio: mostrar lo de citas solo si eligio "Agendo citas", y precargar las palabras del rubro
+  var radios = Array.prototype.slice.call(document.querySelectorAll('input[name=modeloNegocio]'));
+  var bloqueCitas = document.getElementById('bloque-citas');
+  radios.forEach(function (r) { r.addEventListener('change', function () { if (bloqueCitas) bloqueCitas.hidden = document.querySelector('input[name=modeloNegocio]:checked').value !== 'CITAS'; }); });
+  var rubros = <%- JSON.stringify(negocioCfg.rubros) %>;
+  var selRubro = document.getElementById('rubro');
+  if (selRubro) selRubro.addEventListener('change', function () {
+    var r = rubros.filter(function (x) { return x.id === selRubro.value; })[0];
+    if (!r) return;
+    var campos = { vocabCita: 'cita', vocabCitas: 'citas', vocabServicio: 'servicio', vocabServicios: 'servicios', vocabProfesional: 'profesional', vocabProfesionales: 'profesionales' };
+    Object.keys(campos).forEach(function (n) { var el = document.querySelector('[name=' + n + ']'); if (el && r.vocabulario[campos[n]]) el.value = r.vocabulario[campos[n]]; });
+  });
+  var formCfg = document.getElementById('form-config');
+  if (formCfg) formCfg.addEventListener('submit', function (ev) {
+    var elegido = document.querySelector('input[name=modeloNegocio]:checked');
+    var actual = document.querySelector('input[name=modeloNegocio][data-actual="1"]');
+    if (elegido && actual && elegido !== actual && ev.submitter && !ev.submitter.getAttribute('formaction')) {
+      if (!confirm('Vas a cambiar lo que hace tu negocio. No se borra nada, pero el menú y las pantallas van a cambiar. ¿Seguimos?')) ev.preventDefault();
+    }
+  });
 
   // Preguntas frecuentes: agregar y quitar filas
   var lista = document.getElementById('faq-lista');

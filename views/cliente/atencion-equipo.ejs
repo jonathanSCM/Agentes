@@ -1,0 +1,63 @@
+<%- include('partials/inicio') %>
+
+<div class="page-head">
+  <h2><%= vocab.profesionales %></h2>
+  <p>Quién (o qué sala, mesa o consultorio) atiende. Cada uno tiene su propia agenda: así tu agente nunca agenda a dos clientes al mismo tiempo con la misma persona.</p>
+</div>
+
+<% if (mensaje) { %><div class="alert-ok"><%= mensaje %></div><% } %>
+<% if (error) { %><div class="alert-err" role="alert"><%= error %></div><% } %>
+
+<% if (!recursos.length) { %>
+  <div class="pf-card"><p class="muted">Todavía no cargaste a nadie. Con una persona alcanza para empezar. Agregala abajo, o cargá los datos de ejemplo desde <a href="/panel/atencion/servicios">Servicios</a>.</p></div>
+<% } %>
+
+<% recursos.forEach(function (r) {
+     var asignados = r.servicios.map(function (x) { return x.servicioId; }); %>
+  <div class="pf-card atn-item <%= r.activo ? '' : 'atn-inactivo' %>">
+    <div class="atn-resumen">
+      <div>
+        <strong><%= r.nombre %></strong>
+        <span class="badge <%= r.tipo === 'recurso' ? 'badge-new' : 'badge-done' %>"><%= r.tipo === 'recurso' ? 'Sala / mesa' : 'Persona' %></span>
+        <% if (!r.activo) { %><span class="badge badge-done">Desactivado</span><% } %>
+        <div class="muted">
+          <% if (r.especialidad) { %><%= r.especialidad %> · <% } %>
+          capacidad <%= r.capacidad %> ·
+          <%= asignados.length ? 'atiende ' + asignados.length + ' servicio' + (asignados.length === 1 ? '' : 's') : 'atiende todos los servicios' %>
+        </div>
+      </div>
+      <% if (puedeEditar) { %>
+      <div class="atn-acciones">
+        <form method="POST" action="/panel/atencion/equipo/<%= r.id %>/activo" class="inline-form">
+          <input type="hidden" name="activo" value="<%= r.activo ? '0' : '1' %>" />
+          <button class="btn btn-ghost btn-chico" type="submit"><%= r.activo ? 'Desactivar' : 'Activar' %></button>
+        </form>
+        <% if (!r._count.citas) { %>
+        <form method="POST" action="/panel/atencion/equipo/<%= r.id %>/eliminar" class="inline-form" onsubmit="return confirm('¿Quitar del equipo?');">
+          <button class="btn btn-ghost btn-chico" type="submit">Quitar</button>
+        </form>
+        <% } %>
+      </div>
+      <% } %>
+    </div>
+    <% if (puedeEditar) { %>
+    <details class="atn-editar">
+      <summary>Editar</summary>
+      <form method="POST" action="/panel/atencion/equipo/<%= r.id %>" class="atn-form">
+        <%- include('partials/recurso-campos', { r: r, servicios: servicios, asignados: asignados }) %>
+        <button class="btn btn-primary" type="submit">Guardar cambios</button>
+      </form>
+    </details>
+    <% } %>
+  </div>
+<% }); %>
+
+<% if (puedeEditar) { %>
+  <form method="POST" action="/panel/atencion/equipo" class="pf-card atn-form">
+    <h3 class="pf-titulo">Agregar al equipo</h3>
+    <%- include('partials/recurso-campos', { r: null, servicios: servicios, asignados: [] }) %>
+    <button class="btn btn-primary" type="submit">Agregar</button>
+  </form>
+<% } %>
+
+<%- include('partials/fin') %>

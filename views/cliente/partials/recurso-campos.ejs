@@ -1,0 +1,36 @@
+<%#
+  Campos de una persona o recurso del equipo. Parametros: r (existente o null), servicios (activos), asignados (ids que atiende).
+%>
+<div class="field-row">
+  <div class="field">
+    <label>Nombre</label>
+    <input type="text" name="nombre" required maxlength="80" value="<%= r ? r.nombre : '' %>" placeholder="Ej: Dra. Ana, Terraza, Sala 2" autocomplete="off" />
+  </div>
+  <div class="field">
+    <label>Es</label>
+    <select name="tipo">
+      <option value="persona" <%= !r || r.tipo === 'persona' ? 'selected' : '' %>>Una persona</option>
+      <option value="recurso" <%= r && r.tipo === 'recurso' ? 'selected' : '' %>>Una sala, mesa o consultorio</option>
+    </select>
+  </div>
+</div>
+<div class="field-row">
+  <div class="field">
+    <label>Especialidad <em class="opcional">(opcional)</em></label>
+    <input type="text" name="especialidad" maxlength="80" value="<%= r ? (r.especialidad || '') : '' %>" placeholder="Ej: Odontología" />
+  </div>
+  <div class="field">
+    <label>Capacidad</label>
+    <input type="number" name="capacidad" min="1" max="500" value="<%= r ? r.capacidad : 1 %>" />
+    <p class="pf-ayuda">Cuántos clientes atiende a la vez. Una persona: 1. Un salón de 40 lugares: 40.</p>
+  </div>
+</div>
+<% if (servicios.length) { %>
+<div class="field">
+  <label>¿Qué servicios atiende?</label>
+  <p class="pf-ayuda">Si no marcás ninguno, atiende todos.</p>
+  <% servicios.forEach(function (s) { %>
+    <label class="pf-check"><input type="checkbox" name="servicios" value="<%= s.id %>" <%= asignados.indexOf(s.id) >= 0 ? 'checked' : '' %> /> <%= s.nombre %></label>
+  <% }); %>
+</div>
+<% } %>

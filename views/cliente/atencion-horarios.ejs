@@ -1,0 +1,131 @@
+<%- include('partials/inicio') %>
+
+<div class="page-head">
+  <h2>Horarios</h2>
+  <p>Los días y horas en que atendés, tus cierres (vacaciones, feriados propios) y los feriados nacionales. Tu agente solo ofrece horarios que de verdad están libres.</p>
+</div>
+
+<% if (mensaje) { %><div class="alert-ok"><%= mensaje %></div><% } %>
+<% if (error) { %><div class="alert-err" role="alert"><%= error %></div><% } %>
+
+<form method="POST" action="/panel/atencion/horarios/general" class="pf-card atn-form">
+  <h3 class="pf-titulo">Horario general</h3>
+  <p class="muted">Un día sin turnos está cerrado. Para un horario partido (mañana y tarde) agregá dos turnos. Todo el equipo usa este horario salvo que le pongas uno propio.</p>
+  <%- include('partials/horario-semana', { filasPorDia: general }) %>
+  <% if (puedeEditar) { %><button class="btn btn-primary" type="submit">Guardar horario general</button><% } %>
+</form>
+
+<% if (recursos.length) { %>
+  <div class="pf-card">
+    <h3 class="pf-titulo">Horario propio de cada uno <em class="opcional">(opcional)</em></h3>
+    <p class="muted">Si alguien trabaja otros días u horas, dale un horario propio. Si no lo cargás, usa el general.</p>
+    <% recursos.forEach(function (r) { %>
+      <details class="atn-editar">
+        <summary><%= r.nombre %> <%= r.tienePropio ? '· horario propio' : '· usa el general' %></summary>
+        <form method="POST" action="/panel/atencion/horarios/recurso/<%= r.id %>" class="atn-form">
+          <%- include('partials/horario-semana', { filasPorDia: r.propio }) %>
+          <% if (puedeEditar) { %>
+          <div class="atn-acciones">
+            <button class="btn btn-primary" type="submit">Guardar horario propio</button>
+            <% if (r.tienePropio) { %><button class="btn btn-ghost" type="submit" name="quitar" value="1">Quitar y usar el general</button><% } %>
+          </div>
+          <% } %>
+        </form>
+      </details>
+    <% }); %>
+  </div>
+<% } %>
+
+<div class="pf-card">
+  <h3 class="pf-titulo">Cierres</h3>
+  <p class="muted">Vacaciones, un día que no se atiende, una ausencia. En ese período no se ofrecen horarios.</p>
+  <% if (bloqueos.length) { %>
+    <div class="table-wrap">
+      <table class="leads-table">
+        <thead><tr><th>Cuándo</th><th>Quién</th><th>Motivo</th><th></th></tr></thead>
+        <tbody>
+          <% bloqueos.forEach(function (b) { %>
+            <tr>
+              <td><%= b.desdeTxt %> → <%= b.hastaTxt %></td>
+              <td><%= b.recurso ? b.recurso.nombre : 'Todo el negocio' %></td>
+              <td class="muted"><%= b.motivo || '—' %></td>
+              <td class="actions-cell">
+                <% if (puedeEditar) { %>
+                <form method="POST" action="/panel/atencion/horarios/bloqueos/<%= b.id %>/eliminar" class="inline-form" onsubmit="return confirm('¿Quitar este cierre?');">
+                  <button class="btn btn-ghost btn-chico" type="submit">Quitar</button>
+                </form>
+                <% } %>
+              </td>
+            </tr>
+          <% }); %>
+        </tbody>
+      </table>
+    </div>
+  <% } else { %><p class="muted">No hay cierres cargados.</p><% } %>
+
+  <% if (puedeEditar) { %>
+  <form method="POST" action="/panel/atencion/horarios/bloqueos" class="atn-form">
+    <div class="field-row">
+      <div class="field"><label>Desde (día)</label><input type="date" name="fechaDesde" required /></div>
+      <div class="field"><label>Hasta (día)</label><input type="date" name="fechaHasta" /></div>
+      <div class="field"><label>Desde la hora <em class="opcional">(opcional)</em></label><input type="time" name="horaDesde" /></div>
+      <div class="field"><label>Hasta la hora <em class="opcional">(opcional)</em></label><input type="time" name="horaHasta" /></div>
+    </div>
+    <div class="field-row">
+      <div class="field">
+        <label>¿Quién no atiende?</label>
+        <select name="recursoId">
+          <option value="">Todo el negocio</option>
+          <% recursos.forEach(function (r) { %><option value="<%= r.id %>"><%= r.nombre %></option><% }); %>
+        </select>
+      </div>
+      <div class="field"><label>Motivo <em class="opcional">(opcional)</em></label><input type="text" name="motivo" maxlength="120" placeholder="Ej: Vacaciones" /></div>
+    </div>
+    <p class="pf-ayuda">Sin horas, se cierran los días completos.</p>
+    <button class="btn btn-ghost" type="submit">Agregar cierre</button>
+  </form>
+  <% } %>
+</div>
+
+<div class="pf-card">
+  <h3 class="pf-titulo">Feriados nacionales</h3>
+  <% if (!cerrarFeriados) { %>
+    <p class="muted">Tenés desactivado "No agendar en feriados nacionales" (Configuración → Mi negocio): se agenda todos los días.</p>
+  <% } else if (!feriados.length) { %>
+    <p class="muted">No pude cargar los próximos feriados ahora. Los feriados nacionales de tu país (<%= empresa.pais || 'según tu zona horaria' %>) cierran la agenda automáticamente.</p>
+  <% } else { %>
+    <p class="muted">Estos feriados cierran la agenda automáticamente. Marcá los que SÍ trabajás.</p>
+    <form method="POST" action="/panel/atencion/horarios/feriados" class="atn-form">
+      <% feriados.forEach(function (f) { %>
+        <label class="pf-check"><input type="checkbox" name="abierto" value="<%= f.fecha %>" <%= feriadosAbiertos.indexOf(f.fecha) >= 0 ? 'checked' : '' %> <%= puedeEditar ? '' : 'disabled' %> /> <b><%= f.fecha %></b> · <%= f.nombre %> <span class="muted">(trabajamos ese día)</span></label>
+      <% }); %>
+      <% if (puedeEditar) { %><button class="btn btn-ghost" type="submit">Guardar feriados</button><% } %>
+    </form>
+  <% } %>
+</div>
+
+<script>
+(function () {
+  // Horario semanal: agregar y quitar turnos de cada dia
+  document.addEventListener('click', function (ev) {
+    var agregar = ev.target.closest('.hs-agregar');
+    var quitar = ev.target.closest('.hs-quitar');
+    if (agregar) {
+      var dia = agregar.getAttribute('data-dia');
+      var tramos = agregar.closest('.hs-dia').querySelector('.hs-tramos');
+      var s = document.createElement('span');
+      s.className = 'hs-tramo';
+      s.innerHTML = '<input type="time" name="ini' + dia + '" value="09:00" /> <span>a</span> <input type="time" name="fin' + dia + '" value="18:00" /> <button type="button" class="hs-quitar" aria-label="Quitar este turno">×</button>';
+      tramos.insertBefore(s, tramos.querySelector('.hs-cerrado'));
+      tramos.querySelector('.hs-cerrado').hidden = true;
+    }
+    if (quitar) {
+      var contenedor = quitar.closest('.hs-tramos');
+      quitar.closest('.hs-tramo').remove();
+      if (!contenedor.querySelector('.hs-tramo')) contenedor.querySelector('.hs-cerrado').hidden = false;
+    }
+  });
+})();
+</script>
+
+<%- include('partials/fin') %>

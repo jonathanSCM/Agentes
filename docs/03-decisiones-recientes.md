@@ -865,3 +865,26 @@ Plan completo en `docs/10-plan-mensajes-prefabricados.md`. Decisiones del dueño
 **Verificación.** Los 740 tests anteriores pasaron SIN tocarlos (mismos textos); los evals dieron lo mismo que antes de M0 (sin IA 16/16, con IA real 20/20, ~96.800 tokens). Tests nuevos: `mensajes` (28: galería que renderiza cada mensaje en vos y tú, textos de fábrica idénticos a los de antes, sin voseo en "tú", variables, personalización, mensajes propios, datos del negocio, caché), `mensajes-flujo` (5: el negocio cambia un texto y el flujo lo usa, un texto roto no deja al cliente sin respuesta, el registro cambia cómo habla) y `mensajes-codigo` (3: **si alguien vuelve a escribir un texto fijo en el flujo, el test falla**). Total: 749.
 
 **Bug encontrado y corregido de paso:** en `modoSinIA.js` la expresión que cuenta palabras había perdido una barra (`/s+/` en vez de `/\s+/`), así que una pregunta larga sin signo de pregunta no se marcaba como pendiente. Ahora hay un test.
+
+
+## 41. Fase 2 del plan: modelo de negocio configurable (productos o citas) y base de Citas
+
+Plan en `docs/09-plan-modelo-citas-y-mejoras-agendabot.md`. Cada empresa elige qué hace: **vende productos** (todo igual que antes) o **agenda citas**. 790 tests en verde; las pantallas se verificaron en el navegador.
+
+**Datos** (migración `20261105100000_modelo_negocio_citas`): `empresas.modeloNegocio` (PRODUCTOS por defecto), `rubro`, `zonaHoraria` (America/La_Paz), `pais`, `vocabulario`, `configAgenda`; tablas `servicios`, `recursos` (una persona o una sala/mesa con capacidad), `recurso_servicios`, `horarios_atencion`, `bloqueos_agenda`, `citas`, `feriados_cache`; y en los planes `maxServicios` y `maxCitasMes` (GRATIS 3/30, STANDARD 10/200, PRO 30/1000, PREMIUM 100/5000: editables en el admin de planes).
+
+**Motor de agenda** (`lib/services/agenda.js`, portado de AgendaBot, con luxon): horarios libres por servicio/recurso (horario general o propio con turnos partidos, bloqueos, feriados nacionales con cache de Nager.Date y override "trabajamos ese día", buffer de limpieza, anticipación mínima, días máximos, capacidad por personas). **La IA nunca decide si un horario está libre.** `crearCita` bloquea la fila del recurso dentro de una transacción: probado con 5 clientes pidiendo el último lugar a la vez → una sola cita. Reprogramar cancela la original y no gasta cupo del plan. Todo filtra por empresa (un negocio no puede tocar las citas ni los servicios de otro).
+
+**Topes del plan** (`limitesCitas.js`): servicios activos y citas por período de suscripción (las canceladas no cuentan). Al 80 % y al llegar, el negocio recibe un aviso en la campanita (sin duplicar). Crear un servicio o una cita por encima del tope falla con un mensaje claro (`TOPE_SERVICIOS` / `TOPE_CITAS`); reactivar un servicio también cuenta.
+
+**Panel.**
+- Configuración → **Mi negocio** (primera pestaña): qué hace el negocio, rubro, "cómo les decís a las cosas" (cita/turno/reserva/visita, profesional/estilista/asesor… se precargan con el rubro y se editan), zona horaria, país para feriados, reglas de agenda (cada cuántos minutos, anticipación, días adelante, feriados, si el cliente elige con quién) y botón "Cargar datos de ejemplo". Cambiar de modelo pide confirmación y **no borra nada**.
+- Configuración → Mi agente: **"¿Cómo trata a tus clientes?"** (vos / tú), que ya usa el catálogo de mensajes.
+- Menú lateral según el modelo: con citas desaparecen Pedidos, Productos, Categorías, Inventario y Reportes y aparece **Mi negocio → Servicios / Equipo (con el vocabulario del negocio) / Horarios**. Con productos el menú es el de siempre (verificado).
+- **Servicios** (barra de uso del plan, alta/edición/desactivar/eliminar solo si no tiene historial), **Equipo** (persona o sala/mesa, capacidad, qué servicios atiende; vacío = todos) y **Horarios** (horario general y propio por persona, con "+ Turno" para turnos partidos; cierres por días u horas, de todo el negocio o de una persona; feriados nacionales con casilla "trabajamos ese día"). Ver: cualquier rol; cambiar: dueño y administradores.
+- **Rubros de ejemplo** (clínica, salón, restaurante, inmobiliaria, otro): son registros comunes, **totalmente editables**; se cargan solo donde el negocio no tiene nada y sin pasarse del tope de servicios del plan (con un plan de 3 servicios el salón carga 3 de 4 y lo avisa).
+- "Primeros pasos" del inicio según el modelo: servicios → equipo → horarios → WhatsApp → agente.
+
+**Todavía NO** (siguen las fases del plan): el bot de Citas por WhatsApp con listas y botones (fase 3), la pantalla de Agenda, el inicio con indicadores de citas, el pipeline y los recordatorios (fases 3 a 5). Un negocio en modo citas ya puede configurarse completo, pero su agente todavía no agenda.
+
+**Pendiente de decisión:** los topes de planes que dejé (3/30, 10/200, 30/1000, 100/5000) son una propuesta mía; hay que confirmarlos con los precios reales de cada plan.

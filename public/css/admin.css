@@ -897,3 +897,29 @@ select option:hover {
 /* ---------- Conversacion: mensaje que la IA no pudo contestar ---------- */
 .pendiente-ia { display: flex; align-items: center; justify-content: space-between; gap: 1rem; flex-wrap: wrap; }
 .pendiente-ia p { margin: .25rem 0 0; font-size: .9rem; opacity: .9; }
+
+/* ---------- Configuracion: Mi negocio ---------- */
+.pf-opcion { align-items: flex-start; gap: .6rem; padding: .7rem .9rem; border: 1px solid var(--border); border-radius: 12px; margin-bottom: .5rem; }
+.pf-opcion small { color: var(--muted); }
+.cfg-vocab { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .6rem .9rem; margin-bottom: .6rem; }
+.cfg-vocab label { display: grid; gap: .25rem; font-size: .88rem; color: var(--muted); }
+@media (max-width: 560px) { .cfg-vocab { grid-template-columns: 1fr; } }
+
+/* ---------- Atencion (modelo de citas): servicios, equipo y horarios ---------- */
+.atn-limite { display: grid; gap: .5rem; margin-bottom: 1rem; }
+.atn-item { margin-bottom: .8rem; }
+.atn-item.atn-inactivo { opacity: .65; }
+.atn-resumen { display: flex; align-items: center; justify-content: space-between; gap: 1rem; flex-wrap: wrap; }
+.atn-acciones { display: flex; gap: .5rem; flex-wrap: wrap; }
+.atn-editar { margin-top: .6rem; border-top: 1px solid var(--border); padding-top: .6rem; }
+.atn-editar > summary { cursor: pointer; color: var(--primary-2); font-weight: 600; }
+.atn-form { display: grid; gap: .8rem; margin-top: .7rem; }
+.hs { display: grid; gap: .5rem; }
+.hs-dia { display: grid; grid-template-columns: 6.5rem 1fr auto; align-items: center; gap: .6rem; padding: .4rem 0; border-bottom: 1px solid rgba(255,255,255,.05); }
+.hs-nombre { font-weight: 600; }
+.hs-tramos { display: flex; flex-wrap: wrap; gap: .5rem; align-items: center; }
+.hs-tramo { display: inline-flex; align-items: center; gap: .35rem; }
+.hs-tramo input[type="time"] { width: 7.2rem; }
+.hs-quitar { background: none; border: 0; color: var(--muted); font-size: 1.2rem; cursor: pointer; line-height: 1; padding: 0 .3rem; }
+.hs-quitar:hover { color: #fb7185; }
+@media (max-width: 560px) { .hs-dia { grid-template-columns: 1fr auto; } .hs-nombre { grid-column: 1 / -1; } }

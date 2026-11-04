@@ -93,6 +93,25 @@
     </div>
   </div>
 
+  <h3 class="form-section-title">Topes para negocios que agendan citas y mensajes del agente</h3>
+  <div class="field-row">
+    <div class="field">
+      <label for="maxServicios">Máximo de servicios activos</label>
+      <input id="maxServicios" name="maxServicios" type="number" min="1"
+             value="<%= plan ? plan.maxServicios : 10 %>" />
+    </div>
+    <div class="field">
+      <label for="maxCitasMes">Máximo de citas por período</label>
+      <input id="maxCitasMes" name="maxCitasMes" type="number" min="1"
+             value="<%= plan ? plan.maxCitasMes : 200 %>" />
+    </div>
+    <div class="field">
+      <label for="maxMensajesPropios">Máximo de mensajes propios del agente</label>
+      <input id="maxMensajesPropios" name="maxMensajesPropios" type="number" min="0"
+             value="<%= plan ? plan.maxMensajesPropios : 30 %>" />
+    </div>
+  </div>
+
   <h3 class="form-section-title">Configuración avanzada</h3>
   <div class="field-row">
     <div class="field">

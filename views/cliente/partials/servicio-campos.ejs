@@ -1,0 +1,30 @@
+<%#
+  Campos de un servicio (alta y edicion). Parametros: s = servicio existente o null.
+%>
+<div class="field">
+  <label>Nombre</label>
+  <input type="text" name="nombre" required maxlength="80" value="<%= s ? s.nombre : '' %>" placeholder="Ej: Corte de cabello" autocomplete="off" />
+</div>
+<div class="field-row">
+  <div class="field">
+    <label>Duración (minutos)</label>
+    <input type="number" name="duracionMin" min="5" max="720" required value="<%= s ? s.duracionMin : 30 %>" />
+  </div>
+  <div class="field">
+    <label>Descanso después <em class="opcional">(minutos)</em></label>
+    <input type="number" name="bufferMin" min="0" max="240" value="<%= s ? s.bufferMin : 0 %>" />
+  </div>
+  <div class="field">
+    <label>Precio <em class="opcional">(opcional)</em></label>
+    <input type="text" name="precio" inputmode="decimal" value="<%= s && s.precio !== null ? Number(s.precio).toFixed(2) : '' %>" placeholder="0.00" />
+  </div>
+</div>
+<div class="field">
+  <label>Descripción <em class="opcional">(opcional)</em></label>
+  <input type="text" name="descripcion" maxlength="300" value="<%= s ? (s.descripcion || '') : '' %>" placeholder="Qué incluye, para quién es..." />
+</div>
+<label class="pf-check"><input type="checkbox" class="atn-personas" name="usaPersonas" value="1" <%= s && s.usaPersonas ? 'checked' : '' %> /> Se reserva por cantidad de personas (mesas, grupos)</label>
+<div class="field atn-max-personas" hidden>
+  <label>Máximo de personas por reserva</label>
+  <input type="number" name="maxPersonas" min="1" max="500" value="<%= s && s.maxPersonas ? s.maxPersonas : 12 %>" />
+</div>
