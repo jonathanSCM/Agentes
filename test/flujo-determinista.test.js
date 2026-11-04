@@ -2,7 +2,7 @@
 // "¿algo mas?", edicion de carrito y cierre por plantillas y botones, SIN
 // llamar a la IA. Se prueba contra la base real con una IA inyectada que
 // CUENTA sus llamadas: si el flujo funciona, el contador queda en 0.
-const { test, describe, before, after, beforeEach } = require('node:test');
+const { test, describe, before, after, beforeEach, afterEach } = require('node:test');
 const assert = require('node:assert/strict');
 
 const { prisma } = require('../lib/db');
@@ -254,6 +254,70 @@ describe('flujo determinista: cierre del pedido', () => {
     const pedido = await prisma.pedido.findFirst({ where: { empresaId }, include: { items: true } });
     assert.equal(pedido.items.length, 2);
     assert.equal((await leadActual()).contexto.carrito, null, 'el carrito se vacia al comprar');
+  });
+
+  describe('seguir comprando despues de confirmar', () => {
+    // Estos tests compran de verdad: se devuelve el stock para no afectar a los demas.
+    afterEach(async () => {
+      await prisma.variante.updateMany({ where: { producto: { empresaId } }, data: { stock: 5 } });
+      await prisma.pedido.deleteMany({ where: { empresaId } });
+    });
+
+    async function conPedidoNuevo(estado = 'NUEVO') {
+      await prisma.pedido.deleteMany({ where: { empresaId } });
+      const l = await lead(CIERRE_COMPLETO, [itemDe(zapatillas[0])]);
+      const ia = iaContada();
+      await toque('pago:EFECTIVO', 'Efectivo', ia);
+      await toque('cierre:confirmar', 'Confirmar ✅', ia);
+      const primero = await prisma.pedido.findFirst({ where: { empresaId } });
+      if (estado !== 'NUEVO') await prisma.pedido.update({ where: { id: primero.id }, data: { estado } });
+      // Vuelve a comprar: carrito nuevo, mismos datos de entrega y pago.
+      await prisma.clienteFinal.update({
+        where: { id: l.id },
+        data: { contexto: { carrito: { conversacionId: null, items: [itemDe(zapatillas[1])], actualizadoEn: new Date().toISOString() } } },
+      });
+      await toque('pago:EFECTIVO', 'Efectivo', ia);
+      return { ia, primero };
+    }
+
+    test('con un pedido todavia NUEVO se pregunta: sumar al pedido o hacer uno nuevo (no crea otro sin preguntar)', async () => {
+      const { ia, primero } = await conPedidoNuevo();
+      const r = await toque('cierre:confirmar', 'Confirmar ✅', ia);
+      assert.match(r.respuesta, new RegExp(`#${primero.id}`));
+      assert.ok(r.botones.some((b) => b.id === 'cierre:sumar') && r.botones.some((b) => b.id === 'cierre:nuevo'));
+      assert.equal(await prisma.pedido.count({ where: { empresaId } }), 1, 'todavia no se creo otro pedido');
+      assert.equal(ia.llamadas(), 0);
+    });
+
+    test('"Sumar al pedido" agrega los items al mismo pedido, suma el total y descuenta stock', async () => {
+      const { ia, primero } = await conPedidoNuevo();
+      const antes = await prisma.variante.findUnique({ where: { id: zapatillas[1].variantes[0].id } });
+      await toque('cierre:confirmar', 'Confirmar ✅', ia);
+      const r = await toque('cierre:sumar', 'Sumar al pedido', ia);
+      assert.match(r.respuesta, /Sumé tus productos al pedido/);
+      assert.equal(await prisma.pedido.count({ where: { empresaId } }), 1);
+      const pedido = await prisma.pedido.findUnique({ where: { id: primero.id }, include: { items: true } });
+      assert.equal(pedido.items.length, 2);
+      assert.equal(Number(pedido.total), Number(primero.total) + Number(zapatillas[1].precio));
+      const despues = await prisma.variante.findUnique({ where: { id: zapatillas[1].variantes[0].id } });
+      assert.equal(despues.stock, antes.stock - 1);
+      assert.equal((await leadActual()).contexto.carrito, null);
+    });
+
+    test('"Pedido nuevo" crea otro pedido', async () => {
+      const { ia } = await conPedidoNuevo();
+      await toque('cierre:confirmar', 'Confirmar ✅', ia);
+      const r = await toque('cierre:nuevo', 'Pedido nuevo', ia);
+      assert.match(r.respuesta, /quedó registrado/);
+      assert.equal(await prisma.pedido.count({ where: { empresaId } }), 2);
+    });
+
+    test('si el negocio ya tomo el pedido (CONFIRMADO) no se pregunta: se crea uno nuevo', async () => {
+      const { ia } = await conPedidoNuevo('CONFIRMADO');
+      const r = await toque('cierre:confirmar', 'Confirmar ✅', ia);
+      assert.match(r.respuesta, /quedó registrado/);
+      assert.equal(await prisma.pedido.count({ where: { empresaId } }), 2);
+    });
   });
 
   test('un boton "Confirmar" viejo con el carrito ya cambiado NO crea el pedido: muestra el resumen nuevo', async () => {

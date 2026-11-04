@@ -923,3 +923,12 @@ Segunda parte de `docs/10-plan-mensajes-prefabricados.md`. El negocio controla q
 - Tests: `mensajes-panel` (11).
 
 **Pendiente:** migrar las preguntas frecuentes (FAQ) a mensajes propios; elegir el registro (vos/tú) también desde esta pantalla (hoy está en Configuración → Mi agente).
+
+
+## 44. Seguir comprando después de confirmar: sumar al pedido en revisión
+
+Bug real: el cliente confirmaba un pedido, pedía "una cosa más" y el sistema abría un segundo pedido.
+- Con el flujo de botones, al confirmar un carrito nuevo, si el cliente tiene un pedido en estado `NUEVO` de las últimas 24 h (el negocio todavía no lo tomó), `crear_pedido` devuelve `PEDIDO_ABIERTO` y el flujo pregunta con botones: **Sumar al pedido** / **Pedido nuevo** (`cierre:sumar` / `cierre:nuevo`).
+- Sumar agrega los items al mismo pedido, suma el total y descuenta stock en una transacción; si el negocio lo tomó mientras tanto (ya no es `NUEVO`), crea uno nuevo. Con el pedido en `CONFIRMADO` o posterior nunca se pregunta.
+- Mensajes nuevos: `pedido_abierto_pregunta`, `pedido_ampliado`. Solo agentes con `flujoDeterminista`; el camino de IA libre queda igual.
+- Tests: 4 nuevos en `flujo-determinista`.
