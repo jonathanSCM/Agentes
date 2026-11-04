@@ -149,6 +149,12 @@
         Este dato es solo informativo: para conectar el número de verdad andá a <a href="/panel/whatsapp">WhatsApp</a>.</p>
       <% if (!agente.numeroWhatsapp) { %><p class="pf-aviso">Todavía no cargaste tu número.</p><% } %>
     </div>
+
+    <div class="field">
+      <label class="pf-check"><input type="checkbox" name="flujoDeterminista" value="1" <%= config.flujoDeterminista ? 'checked' : '' %> /> Menús y cierre con botones (sin IA)</label>
+      <label class="pf-check"><input type="checkbox" name="mensajesPrefabricados" value="1" <%= config.mensajesPrefabricados ? 'checked' : '' %> /> La IA solo elige mensajes preparados (no escribe texto) <em class="opcional">(necesita los botones)</em></label>
+      <p class="pf-ayuda">Las categorías, el “¿algo más?”, el carrito y el cierre del pedido (nombre, entrega, pago y confirmación) se resuelven con listas y botones de WhatsApp, sin usar IA. La IA sigue respondiendo las preguntas abiertas. Apagalo para volver al comportamiento anterior.</p>
+    </div>
   </section>
 
   <!-- ===== Preguntas y horario ===== -->
@@ -412,12 +418,6 @@
       <input id="preguntasIniciales" name="preguntasIniciales" type="text" maxlength="120"
              value="<%= (config.preguntasIniciales || []).join(', ') %>" placeholder="Genero" />
       <p class="pf-ayuda">Sugerencia: solo <code>Genero</code>. La talla conviene configurarla dentro de cada categoría, porque la talla de un calzado (42) no es la de una prenda (M).</p>
-    </div>
-
-    <div class="field">
-      <label class="pf-check"><input type="checkbox" name="flujoDeterminista" value="1" <%= config.flujoDeterminista ? 'checked' : '' %> /> Menús y cierre con botones (sin IA)</label>
-      <label class="pf-check"><input type="checkbox" name="mensajesPrefabricados" value="1" <%= config.mensajesPrefabricados ? 'checked' : '' %> /> La IA solo elige mensajes preparados (no escribe texto) <em class="opcional">(necesita los botones)</em></label>
-      <p class="pf-ayuda">Las categorías, el “¿algo más?”, el carrito y el cierre del pedido (nombre, entrega, pago y confirmación) se resuelven con listas y botones de WhatsApp, sin usar IA. La IA sigue respondiendo las preguntas abiertas. Apagalo para volver al comportamiento anterior.</p>
     </div>
   </section>
 
