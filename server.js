@@ -2696,7 +2696,7 @@ app.get('/panel/configuracion', requireCliente, requireRol('OWNER', 'ADMIN'), as
 const MONEDAS_CATALOGO = ['BOB', 'USD', 'PEN'];
 
 app.post('/panel/configuracion', requireCliente, requireRol('OWNER', 'ADMIN'), upload.fields([{ name: 'qr', maxCount: 1 }, { name: 'logo', maxCount: 1 }]), async (req, res, next) => {
-  const { nombre, numeroWhatsapp, mensajeBienvenida, tono, estado, instrucciones, derivarAHumano, aceptaEfectivo, aceptaTarjeta, aceptaQr, flujoDeterminista, quitarQr, moneda, direccionTienda, tiendaLat, tiendaLng, preguntasIniciales, colorPrimario, colorSecundario, quitarLogo, plantillaCatalogo, temaProducto } = req.body || {};
+  const { nombre, numeroWhatsapp, mensajeBienvenida, tono, estado, instrucciones, derivarAHumano, aceptaEfectivo, aceptaTarjeta, aceptaQr, flujoDeterminista, mensajesPrefabricados, quitarQr, moneda, direccionTienda, tiendaLat, tiendaLng, preguntasIniciales, colorPrimario, colorSecundario, quitarLogo, plantillaCatalogo, temaProducto } = req.body || {};
   try {
     const agente = await obtenerAgente(req.session.empresaId);
 
@@ -2759,6 +2759,8 @@ app.post('/panel/configuracion', requireCliente, requireRol('OWNER', 'ADMIN'), u
         aceptaTarjeta: aceptaTarjeta === '1',
         aceptaQr: aceptaQr === '1',
         flujoDeterminista: flujoDeterminista === '1',
+        // La IA solo elige mensajes del catalogo (M1); exige el flujo con botones.
+        mensajesPrefabricados: flujoDeterminista === '1' && mensajesPrefabricados === '1',
         // Como habla el agente (vos / tu): ver lib/services/mensajes.js
         ...(negocio && negocio.registro ? { registro: negocio.registro } : {}),
         qrCobroUrl,

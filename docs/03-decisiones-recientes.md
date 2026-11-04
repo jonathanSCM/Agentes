@@ -888,3 +888,14 @@ Plan en `docs/09-plan-modelo-citas-y-mejoras-agendabot.md`. Cada empresa elige q
 **Todavía NO** (siguen las fases del plan): el bot de Citas por WhatsApp con listas y botones (fase 3), la pantalla de Agenda, el inicio con indicadores de citas, el pipeline y los recordatorios (fases 3 a 5). Un negocio en modo citas ya puede configurarse completo, pero su agente todavía no agenda.
 
 **Pendiente de decisión:** los topes de planes que dejé (3/30, 10/200, 30/1000, 100/5000) son una propuesta mía; hay que confirmarlos con los precios reales de cada plan.
+
+
+## 42. M1 — "La IA elige": el agente deja de escribir texto
+
+Plan en `docs/10-plan-mensajes-prefabricados.md`. Detrás del flag por agente `mensajesPrefabricados` (Configuración → Mi agente; exige `flujoDeterminista`) la IA ya no redacta: ve un prompt compacto con la lista de mensajes del catálogo y UNA herramienta de hablar, `responder`, con la clave en una lista cerrada (`enum`) y datos de listas cerradas (`producto_id`, `atributo`, `falta`, `faq_id`).
+
+- `lib/services/turnoPrefab.js` (puro): `mensajesElegibles`, `herramientaResponder`, `armarSystem` (parte fija cacheable + parte variable), `resolverEleccion` (valida y arma el texto con `mensajes.js`; precio, stock y nombre salen de la base, nunca de la IA; sin dato cargado cae a "no lo tengo cargado"/asesor).
+- 15 mensajes nuevos en el catálogo (categoría "Conversación").
+- `agente.js`: bloque `if (prefab)` en el bucle. Texto libre o clave inválida: se descarta, un reintento, y si no hay elección válida → `no_entendi_derivar` + derivación a un asesor. Las herramientas de acción (buscar, mostrar, carrito) se ejecutan igual; si dejan una respuesta armada por el backend, se usa tal cual.
+- Pendiente (M3): quitar los detectores/correcciones de texto libre que este modo vuelve innecesarios; medir tokens y llamadas con los evals (línea base: ≈3 llamadas / 19–21 mil tokens por turno de texto libre; objetivo ≤4 mil, ~1 llamada).
+- Tests: `turno-prefab` (8) y `prefab-agente` (6). Suite: 804 en verde.
