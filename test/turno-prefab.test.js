@@ -60,3 +60,25 @@ test('el system compacto lista claves y productos, sin textos para copiar', () =
   assert.match(s, /\[1\] Zapatilla Runner/);
   assert.ok(s.length < 6000, `system demasiado largo: ${s.length}`);
 });
+
+test('no se afirma lo que los datos no respaldan (agotado, ya en el carrito, variantes)', () => {
+  assert.equal(tp.resolverEleccion({ mensaje: 'producto_agotado', producto_id: 1 }, base).motivo, 'el_producto_tiene_stock');
+  assert.match(tp.resolverEleccion({ mensaje: 'producto_agotado', producto_id: 2 }, base).texto, /agotado/);
+  assert.equal(tp.resolverEleccion({ mensaje: 'ya_en_carrito', producto_id: 1 }, base).motivo, 'el_producto_no_esta_en_el_carrito');
+  assert.match(tp.resolverEleccion({ mensaje: 'ya_en_carrito', producto_id: 1 }, { ...base, carrito: [{ productoId: 1 }] }).texto, /ya está en tu carrito/);
+  assert.equal(tp.resolverEleccion({ mensaje: 'pedir_variante', producto_id: 1, falta: 'la talla' }, base).motivo, 'el_producto_no_tiene_variantes');
+});
+
+test('el stock cuenta las variantes (un producto con stock 0 propio pero variantes con stock NO esta agotado)', () => {
+  const conVariantes = { id: 5, nombre: 'Zapatilla V', precio: 100, stock: 0, variantes: [{ activa: true, stock: 3, atributos: { Talla: '42' } }] };
+  assert.equal(tp.stockTotal(conVariantes), 3);
+  const r = tp.resolverEleccion({ mensaje: 'producto_agotado', producto_id: 5 }, { ...base, productos: [conVariantes] });
+  assert.equal(r.ok, false);
+});
+
+test('si se mostró UNA sola tarjeta, el mensaje nombra ese producto aunque la IA elija el genérico', () => {
+  const r = tp.resolverEleccion({ mensaje: 'productos_mostrados' }, { ...base, mostrados: [1, 1] });
+  assert.match(r.texto, /Zapatilla Runner/);
+  const varios = tp.resolverEleccion({ mensaje: 'productos_mostrados' }, { ...base, mostrados: [1, 2] });
+  assert.match(varios.texto, /2 opción/);
+});

@@ -6,6 +6,7 @@
 //   npm run eval -- --sin-ia                  IA "caída": solo lo que el bot hace sin IA (gratis)
 //   npm run eval -- --solo conversacion-145   un escenario
 //   npm run eval -- --tipo seguridad          solo los de seguridad
+//   npm run eval -- --prefab                  todos los agentes usan mensajes prefabricados (M1; activa tambien el flujo con botones)
 //   npm run eval -- --juez                    además, una IA califica tono, alcance y cierre (1-5)
 //
 // Corre sobre una empresa propia ("eval-tienda") que se crea y se borra sola: no
@@ -27,6 +28,7 @@ const SIN_IA = Boolean(arg('sin-ia', false));
 const SOLO = arg('solo', null);
 const TIPO = arg('tipo', null);
 const JUEZ = Boolean(arg('juez', false));
+const PREFAB = Boolean(arg('prefab', false)); // el agente con flujo elige mensajes prefabricados (M1)
 
 // Sin IA: la clave puede ser falsa porque la llamada nunca sale (la caída se simula antes).
 if (SIN_IA && !process.env.OPENAI_API_KEY && !process.env.ANTHROPIC_API_KEY) process.env.OPENAI_API_KEY = 'eval-sin-ia';
@@ -161,6 +163,7 @@ async function juzgar(esc, transcripcion) {
   console.log(`\nEvaluación: ${lista.length} escenario(s) × ${K} · ${modoTxt}${omitidos.length ? ` · ${omitidos.length} omitido(s) por el modo` : ''}\n`);
 
   const fx = await fixture.crear();
+  if (PREFAB) await prisma.agenteConfig.updateMany({ where: { agenteId: { in: [fx.agentes.flujo, fx.agentes.ia] } }, data: { flujoDeterminista: true, mensajesPrefabricados: true } });
   const productos = await prisma.producto.findMany({ where: { empresaId: fx.empresaId }, select: { precio: true } });
   const preciosCatalogo = productos.map((p) => Number(p.precio));
   const reporte = [];

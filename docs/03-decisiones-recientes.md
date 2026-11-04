@@ -899,3 +899,13 @@ Plan en `docs/10-plan-mensajes-prefabricados.md`. Detrás del flag por agente `m
 - `agente.js`: bloque `if (prefab)` en el bucle. Texto libre o clave inválida: se descarta, un reintento, y si no hay elección válida → `no_entendi_derivar` + derivación a un asesor. Las herramientas de acción (buscar, mostrar, carrito) se ejecutan igual; si dejan una respuesta armada por el backend, se usa tal cual.
 - Pendiente (M3): quitar los detectores/correcciones de texto libre que este modo vuelve innecesarios; medir tokens y llamadas con los evals (línea base: ≈3 llamadas / 19–21 mil tokens por turno de texto libre; objetivo ≤4 mil, ~1 llamada).
 - Tests: `turno-prefab` (8) y `prefab-agente` (6). Suite: 804 en verde.
+
+**Medición de M1 (evals con IA real, gpt-4o-mini, 20 escenarios, `npm run eval -- --prefab`):** 89.422 → 23.855 tokens (−73 %), 20/20 aprobados, seguridad 5/5. Un turno con IA pasó de 7–21 mil tokens y hasta 3 llamadas a ≈3 mil y 1 llamada (2 cuando primero hay que mostrar tarjetas).
+
+Lo que la medición destapó y se corrigió:
+- El prompt compacto mostraba solo el stock del producto (0 cuando el stock vive en variantes) y la IA contestaba "agotado" a algo que sí había → `stockTotal()` suma variantes.
+- La IA eligió "ya está en tu carrito" sin que lo estuviera → `resolverEleccion` solo acepta afirmaciones (agotado, ya en el carrito, sin stock, pedir talla) si los datos reales las respaldan; si no, la elección se rechaza.
+- El camino prefab se había saltado las correcciones en código ("nombró un producto → mostrar SOLO ese", "sin producto puntual → tarjeta de categoría/menú") → portadas.
+- La IA a veces contestaba texto tras una herramienta → `toolChoice` siempre `requerido`.
+- Si se mostró UNA sola tarjeta, el backend usa `producto_mostrado` (nombra el producto) aunque la IA elija el genérico.
+- `npm run eval -- --prefab` activa el modo en todos los agentes del eval.
