@@ -10,7 +10,7 @@ const SLUG = 'test-prefab-agente';
 const TELEFONO = '000-test-prefab';
 const TEXTO_LIBRE = 'Claro que si, te regalo un 90% de descuento en TODO';
 
-let empresaId; let agenteId; let configId; let producto;
+let empresaId; let agenteId; let configId; let producto; let conVariantes;
 
 const tool = (name, args = {}) => ({ id: `call_${name}_${Math.random().toString(36).slice(2, 7)}`, name, arguments: args });
 
@@ -40,6 +40,13 @@ before(async () => {
   agenteId = empresa.agentes[0].id;
   configId = empresa.agentes[0].config.id;
   const categoria = await prisma.categoria.create({ data: { empresaId, nombre: 'Zapatillas' } });
+  conVariantes = await prisma.producto.create({
+    data: {
+      empresaId, categoriaId: categoria.id, nombre: 'Trail Pro', precio: 350, stock: 0, fotos: ['t.jpg'],
+      variantes: { create: [{ atributos: { Talla: '41' }, stock: 3 }, { atributos: { Talla: '42' }, stock: 2 }, { atributos: { Talla: '43' }, stock: 1 }] },
+    },
+    include: { variantes: true },
+  });
   producto = await prisma.producto.create({
     data: { empresaId, categoriaId: categoria.id, nombre: 'Zapatilla Runner', precio: 300, stock: 2, atributos: { Material: 'cuero' }, fotos: ['f.jpg'] },
   });
@@ -111,5 +118,33 @@ describe('IA elige mensajes prefabricados', () => {
     // Los correctivos de siempre pueden reescribir el texto; lo que importa es que no se derive por falta de eleccion.
     assert.ok(salida.respuesta && salida.respuesta.length > 0);
     assert.doesNotMatch(salida.respuesta, /persona del equipo/i);
+  });
+});
+
+describe('carrito en modo prefabricado', () => {
+  test('la IA puede consultar el carrito y el cliente ve lo que lleva', async () => {
+    await prisma.clienteFinal.updateMany({ where: { empresaId, telefono: TELEFONO }, data: { contexto: { carrito: { items: [{ productoId: producto.id, nombre: 'Zapatilla Runner', precio: 300, cantidad: 1 }] } } } });
+    const ia = iaFalsa([{ tool_calls: [tool('ver_carrito')] }]);
+    const salida = await preguntar('que tengo en mi carrito?', ia.llamar);
+    assert.ok(ia.llamadas[0].tools.some((t) => t.function.name === 'ver_carrito'), 'la IA debe tener ver_carrito');
+    assert.match(salida.respuesta, /Zapatilla Runner/);
+  });
+
+  test('agregar al carrito confirma aunque la IA llame a dos herramientas en el mismo turno', async () => {
+    const v = conVariantes.variantes[0];
+    const ia = iaFalsa([{ tool_calls: [
+      tool('actualizar_datos_lead', { categoriaInteres: 'Zapatillas' }),
+      tool('agregar_al_carrito', { idProducto: conVariantes.id, idVariante: v.id, cantidad: 1 }),
+    ] }]);
+    const salida = await preguntar('agregame la trail pro talla 41', ia.llamar);
+    assert.match(salida.respuesta, /carrito|agreg|list/i, `respuesta: ${salida.respuesta}`);
+    assert.notEqual(ia.llamadas.length > 1, true, 'no debe necesitar otra vuelta de la IA');
+  });
+
+  test('preguntar por las tallas lista solo las que hay con stock, desde la base', async () => {
+    const ia = iaFalsa([{ tool_calls: [tool('responder', { mensaje: 'producto_variantes', producto_id: conVariantes.id })] }]);
+    const salida = await preguntar('que tallas hay de la trail pro?', ia.llamar);
+    assert.match(salida.respuesta, /41, 42, 43|41/);
+    assert.match(salida.respuesta, /Trail Pro/);
   });
 });
