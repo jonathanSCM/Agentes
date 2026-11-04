@@ -102,6 +102,8 @@ Todo medido con los evals de la fase 0 (tokens antes y después).
 - **Plantillas opcionales:** al activar los recordatorios, una ventana explica qué son las plantillas y por qué hacen falta para avisar fuera de las 24 h, con ejemplos; la plantilla se crea y se envía a Meta desde el panel, y se muestra su estado. Sin plantilla, solo se avisa dentro de las 24 h.
 
 ### Fase 6 — Motor estructurado para Productos, medido (1 semana + medición)
+> **Reemplazada por el plan `docs/10-plan-mensajes-prefabricados.md`** (la IA no escribe: elige mensajes prefabricados con datos añadibles). Las fases 3 y 5 pasan a usar ese catálogo de mensajes.
+
 Prototipo detrás de un interruptor por agente (`motorEstructurado`): intérprete con formato fijo → motor de reglas → redactora con revisor. Se compara con el motor actual con los evals de la fase 0 (tokens, llamadas, aprobación). **Solo se adopta si no empeora la calidad.** Aquí también se prueba el adelgazamiento del prompt fijo con A/B real.
 
 ### Fase 7 — Coexistencia y alta con Facebook (1–2 semanas + trámites con Meta)
