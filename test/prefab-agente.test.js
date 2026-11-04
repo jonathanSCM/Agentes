@@ -102,7 +102,7 @@ describe('IA elige mensajes prefabricados', () => {
   });
 
   test('la IA solo ve la herramienta de hablar con claves cerradas y un prompt compacto', async () => {
-    const ia = iaFalsa([{ tool_calls: [tool('responder', { mensaje: 'saludo' })] }]);
+    const ia = iaFalsa([{ tool_calls: [tool('responder', { mensaje: 'producto_precio', producto_id: producto.id })] }]);
     await preguntar('cuanto sale la runner?', ia.llamar);
     const p = ia.llamadas[0];
     const responder = p.tools.find((t) => t.function.name === 'responder');

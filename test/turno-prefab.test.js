@@ -82,3 +82,12 @@ test('si se mostró UNA sola tarjeta, el mensaje nombra ese producto aunque la I
   const varios = tp.resolverEleccion({ mensaje: 'productos_mostrados' }, { ...base, mostrados: [1, 2] });
   assert.match(varios.texto, /2 opción/);
 });
+
+test('no se acepta "ya te mostré" si no se mostró nada, ni un saludo a mitad de la compra', () => {
+  const sinTarjetas = tp.resolverEleccion({ mensaje: 'productos_mostrados' }, { ...base, mostrados: [], mensajeCliente: 'Quiero añadir productos' });
+  assert.equal(sinTarjetas.ok, false);
+  assert.match(sinTarjetas.motivo, /mostrar_categorias/);
+  const saludoFuera = tp.resolverEleccion({ mensaje: 'saludo' }, { ...base, mensajeCliente: 'Mostrame qué tienes' });
+  assert.equal(saludoFuera.ok, false);
+  assert.equal(tp.resolverEleccion({ mensaje: 'saludo' }, { ...base, mensajeCliente: 'Hola buenas' }).ok, true);
+});
