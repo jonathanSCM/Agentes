@@ -2835,6 +2835,33 @@ const volver = (res, ruta, { ok, err }) => res.redirect(`${ruta}?${ok ? 'ok=' + 
 const idDe = (req) => Number(req.params.id);
 
 // ---- Servicios
+// ---------------------------------------------------------------- mensajes del agente (M2)
+const mensajesPanel = require('./lib/services/mensajesPanel');
+app.get('/panel/mensajes', requireCliente, async (req, res, next) => {
+  try {
+    const datos = await mensajesPanel.listar(req.session.empresaId);
+    res.render('cliente/mensajes', {
+      title: 'Mensajes - Proshop', tituloPagina: 'Mensajes', activo: 'mensajes', ...datos,
+      mensaje: req.query.ok || null, error: req.query.err || null, puedeEditar: ['OWNER', 'ADMIN'].includes(req.session.clienteRol),
+    });
+  } catch (err) { next(err); }
+});
+const accionMensajes = (okTexto, fn) => async (req, res, next) => {
+  try { await fn(req.session.empresaId, req); volver(res, '/panel/mensajes', { ok: okTexto }); } catch (err) { if (err.codigo) return volver(res, '/panel/mensajes', { err: err.message }); return next(err); }
+};
+app.post('/panel/mensajes/texto', requireCliente, puedeEditarAtencion, accionMensajes('Mensaje guardado.', (e, r) => mensajesPanel.guardarTexto(e, r.body.clave, r.body.texto)));
+app.post('/panel/mensajes/restaurar', requireCliente, puedeEditarAtencion, accionMensajes('Volvió al mensaje original.', (e, r) => mensajesPanel.restaurar(e, r.body.clave)));
+app.post('/panel/mensajes/propios', requireCliente, puedeEditarAtencion, accionMensajes('Mensaje creado.', (e, r) => mensajesPanel.crearPropio(e, r.body)));
+app.post('/panel/mensajes/propios/:clave', requireCliente, puedeEditarAtencion, accionMensajes('Mensaje guardado.', (e, r) => mensajesPanel.editarPropio(e, r.params.clave, { descripcion: r.body.descripcion, texto: r.body.texto, activo: r.body.activo === '1' })));
+app.post('/panel/mensajes/propios/:clave/eliminar', requireCliente, puedeEditarAtencion, accionMensajes('Mensaje borrado.', (e, r) => mensajesPanel.eliminarPropio(e, r.params.clave)));
+app.post('/panel/mensajes/datos', requireCliente, puedeEditarAtencion, accionMensajes('Dato guardado.', (e, r) => mensajesPanel.guardarDato(e, r.body)));
+app.post('/panel/mensajes/datos/:clave/eliminar', requireCliente, puedeEditarAtencion, accionMensajes('Dato borrado.', (e, r) => mensajesPanel.eliminarDato(e, r.params.clave)));
+app.get('/panel/sin-respuesta', requireCliente, async (req, res, next) => {
+  try {
+    res.render('cliente/sin-respuesta', { title: 'Sin respuesta - Proshop', tituloPagina: 'Sin respuesta', activo: 'sin-respuesta', items: await mensajesPanel.sinRespuesta(req.session.empresaId) });
+  } catch (err) { next(err); }
+});
+
 app.get('/panel/atencion/servicios', requireCliente, soloCitas, async (req, res, next) => {
   try {
     const empresaId = req.session.empresaId;

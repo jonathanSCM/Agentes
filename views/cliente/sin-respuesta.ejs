@@ -1,0 +1,24 @@
+<%- include('partials/inicio') %>
+
+<div class="page-head">
+  <h2>Lo que el agente no supo contestar</h2>
+  <p>Cuando un cliente pregunta algo que ningún mensaje cubre, tu agente no inventa: avisa a una persona. Acá ves esas preguntas para que cargues un mensaje propio o un dato y la próxima vez lo conteste solo.</p>
+</div>
+
+<% if (!items.length) { %>
+  <div class="pf-card"><p class="muted">Todavía no hay preguntas sin respuesta.</p></div>
+<% } else { %>
+  <div class="pf-card">
+    <div class="table-wrap"><table class="leads-table">
+      <thead><tr><th>Cuándo</th><th>Cliente y pregunta</th></tr></thead>
+      <tbody>
+        <% items.forEach(function (n) { %>
+          <tr><td class="muted"><%= new Date(n.createdAt).toLocaleString('es') %></td><td><%= n.mensaje %></td></tr>
+        <% }); %>
+      </tbody>
+    </table></div>
+    <p><a class="btn btn-primary" href="/panel/mensajes">Crear un mensaje propio</a></p>
+  </div>
+<% } %>
+
+<%- include('partials/fin') %>

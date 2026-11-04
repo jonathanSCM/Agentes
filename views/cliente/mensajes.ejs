@@ -1,0 +1,104 @@
+<%- include('partials/inicio') %>
+
+<div class="page-head">
+  <h2>Mensajes del agente</h2>
+  <p>Tu agente <strong>no inventa frases</strong>: elige uno de estos mensajes y el sistema completa precios, stock y nombres con datos reales. Acá cambiás cómo suenan, creás los tuyos y cargás datos de tu negocio.</p>
+</div>
+
+<% if (mensaje) { %><div class="alert-ok"><%= mensaje %></div><% } %>
+<% if (error) { %><div class="alert-err" role="alert"><%= error %></div><% } %>
+
+<div class="pf-card">
+  <h3 class="pf-titulo">Datos de mi negocio</h3>
+  <p class="muted">Datos que podés usar dentro de cualquier mensaje escribiendo <code>{{dato.garantia}}</code> (con el nombre que le pongas). Ej: garantía, política de cambios, promociones.</p>
+  <% if (datos.length) { %>
+    <div class="table-wrap"><table class="leads-table">
+      <thead><tr><th>Dato</th><th>Cómo se escribe</th><th>Valor</th><th></th></tr></thead>
+      <tbody>
+        <% datos.forEach(function (d) { %>
+        <tr>
+          <td><%= d.etiqueta %></td>
+          <td><code>{{dato.<%= d.clave %>}}</code></td>
+          <td class="muted"><%= d.valor %></td>
+          <td class="actions-cell">
+            <% if (puedeEditar) { %>
+            <details class="atn-editar"><summary>Editar</summary>
+              <form method="POST" action="/panel/mensajes/datos" class="atn-form">
+                <input type="hidden" name="clave" value="<%= d.clave %>" />
+                <div class="field"><label>Nombre</label><input type="text" name="etiqueta" required maxlength="60" value="<%= d.etiqueta %>" /></div>
+                <div class="field"><label>Valor</label><input type="text" name="valor" required maxlength="500" value="<%= d.valor %>" /></div>
+                <button class="btn btn-primary btn-chico" type="submit">Guardar</button>
+              </form>
+            </details>
+            <form method="POST" action="/panel/mensajes/datos/<%= d.clave %>/eliminar" class="inline-form" onsubmit="return confirm('¿Borrar este dato?');"><button class="btn btn-ghost btn-chico" type="submit">Borrar</button></form>
+            <% } %>
+          </td>
+        </tr>
+        <% }); %>
+      </tbody>
+    </table></div>
+  <% } else { %><p class="muted">Todavía no cargaste datos.</p><% } %>
+  <% if (puedeEditar) { %>
+  <form method="POST" action="/panel/mensajes/datos" class="atn-form">
+    <div class="field-row">
+      <div class="field"><label>Nombre del dato</label><input type="text" name="etiqueta" required maxlength="60" placeholder="Ej: Garantía" /></div>
+      <div class="field"><label>Valor</label><input type="text" name="valor" required maxlength="500" placeholder="Ej: 30 días por defectos de fábrica" /></div>
+    </div>
+    <button class="btn btn-ghost" type="submit">Agregar dato</button>
+  </form>
+  <% } %>
+</div>
+
+<div class="pf-card">
+  <h3 class="pf-titulo">Mis mensajes propios</h3>
+  <% var llenoP = limite.usados >= limite.tope; %>
+  <p class="muted"><strong><%= limite.usados %> de <%= limite.tope %></strong> mensajes propios en tu plan. Tu agente los puede elegir cuando la descripción coincide con lo que pregunta el cliente.</p>
+  <% propios.forEach(function (m) { %>
+    <details class="atn-editar">
+      <summary><%= m.clave.replace('propio_', '').replace(/_/g, ' ') %> <%= m.activo ? '' : '· desactivado' %></summary>
+      <% if (puedeEditar) { %>
+      <form method="POST" action="/panel/mensajes/propios/<%= m.clave %>" class="atn-form">
+        <div class="field"><label>Cuándo se usa</label><input type="text" name="descripcion" required maxlength="300" value="<%= m.descripcion || '' %>" /></div>
+        <div class="field"><label>Texto</label><textarea name="texto" rows="3" required maxlength="1000"><%= m.texto %></textarea></div>
+        <label class="pf-check"><input type="checkbox" name="activo" value="1" <%= m.activo ? 'checked' : '' %> /> Activo</label>
+        <button class="btn btn-primary btn-chico" type="submit">Guardar</button>
+      </form>
+      <form method="POST" action="/panel/mensajes/propios/<%= m.clave %>/eliminar" class="inline-form" onsubmit="return confirm('¿Borrar este mensaje?');"><button class="btn btn-ghost btn-chico" type="submit">Borrar</button></form>
+      <% } else { %><p><%= m.texto %></p><% } %>
+    </details>
+  <% }); %>
+  <% if (puedeEditar && !llenoP) { %>
+  <form method="POST" action="/panel/mensajes/propios" class="atn-form">
+    <div class="field"><label>Nombre</label><input type="text" name="nombre" required maxlength="60" placeholder="Ej: Política de cambios" /></div>
+    <div class="field"><label>Cuándo se usa</label><input type="text" name="descripcion" required maxlength="300" placeholder="Ej: El cliente pregunta si puede cambiar o devolver un producto" /></div>
+    <div class="field"><label>Texto</label><textarea name="texto" rows="3" required maxlength="1000" placeholder="Ej: Aceptamos cambios hasta 7 días después, con el producto sin uso."></textarea>
+      <p class="pf-ayuda">Podés usar <code>{{negocio}}</code> y tus datos, como <code>{{dato.garantia}}</code>.</p></div>
+    <button class="btn btn-primary" type="submit">Crear mensaje</button>
+  </form>
+  <% } else if (llenoP) { %><p class="muted">Llegaste al tope. Borrá alguno o <a href="/panel/consumo">mejorá tu plan</a>.</p><% } %>
+</div>
+
+<% grupos.forEach(function (g) { %>
+<div class="pf-card">
+  <h3 class="pf-titulo"><%= g.categoria %></h3>
+  <% g.mensajes.forEach(function (m) { %>
+    <details class="atn-editar">
+      <summary><%= m.descripcion %> <%= m.personalizado ? '· personalizado' : '' %></summary>
+      <p class="muted">Ahora dice: <em><%= m.textoActual %></em></p>
+      <% if (puedeEditar) { %>
+      <form method="POST" action="/panel/mensajes/texto" class="atn-form">
+        <input type="hidden" name="clave" value="<%= m.clave %>" />
+        <div class="field"><textarea name="texto" rows="3" required maxlength="1000"><%= m.textoActual %></textarea>
+          <% if (m.variables.length) { %><p class="pf-ayuda">El sistema completa: <% m.variables.forEach(function (v) { %><code>{{<%= v %>}}</code> <% }); %>. Dejalas tal cual. También podés usar <code>{{negocio}}</code> y tus datos.</p><% } %></div>
+        <button class="btn btn-primary btn-chico" type="submit">Guardar</button>
+      </form>
+      <% if (m.personalizado) { %>
+      <form method="POST" action="/panel/mensajes/restaurar" class="inline-form"><input type="hidden" name="clave" value="<%= m.clave %>" /><button class="btn btn-ghost btn-chico" type="submit">Volver al original</button></form>
+      <% } %>
+      <% } %>
+    </details>
+  <% }); %>
+</div>
+<% }); %>
+
+<%- include('partials/fin') %>

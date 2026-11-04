@@ -909,3 +909,17 @@ Lo que la medición destapó y se corrigió:
 - La IA a veces contestaba texto tras una herramienta → `toolChoice` siempre `requerido`.
 - Si se mostró UNA sola tarjeta, el backend usa `producto_mostrado` (nombra el producto) aunque la IA elija el genérico.
 - `npm run eval -- --prefab` activa el modo en todos los agentes del eval.
+
+
+## 43. M2 — Panel "Mensajes del agente", datos del negocio y "Sin respuesta"
+
+Segunda parte de `docs/10-plan-mensajes-prefabricados.md`. El negocio controla qué dice su agente, sin tocar código.
+
+- **Mensajes** (`/panel/mensajes`, `lib/services/mensajesPanel.js`): cambiar el texto de cualquiera de los mensajes de fábrica (se valida: solo variables que ese mensaje tiene, `{{dato.x}}` solo si el dato existe, bloques cerrados, 1000 caracteres) y "Volver al original". Si el texto guardado alguna vez no sirviera, el motor sigue cayendo al de fábrica.
+- **Mensajes propios**: nombre + "cuándo se usa" (lo que lee la IA para elegirlo) + texto, con tope por plan (`planes.maxMensajesPropios`, 30 por defecto). Solo pueden usar `{{negocio}}`, `{{vocab.x}}` y datos del negocio (la IA no puede rellenar variables libres). Con el flag de M1, `turnoPrefab.mensajesElegibles` los ofrece a la IA; desactivarlos los saca.
+- **Datos de mi negocio**: `{{dato.garantia}}` etc. (hasta 60); no se puede borrar un dato que algún mensaje usa.
+- **Sin respuesta** (`/panel/sin-respuesta`): cuando la IA no logra elegir un mensaje válido, el cliente pasa con una persona y queda una notificación `SIN_RESPUESTA` con su pregunta, para que el negocio cargue un mensaje o dato.
+- Menú lateral: "Mensajes" y "Sin respuesta" (productos y citas). Editar requiere OWNER/ADMIN.
+- Tests: `mensajes-panel` (11).
+
+**Pendiente:** migrar las preguntas frecuentes (FAQ) a mensajes propios; elegir el registro (vos/tú) también desde esta pantalla (hoy está en Configuración → Mi agente).

@@ -70,6 +70,12 @@
       <a href="/panel/whatsapp" class="<%= activo === 'whatsapp' ? 'is-active' : '' %>">
         <span class="si"><svg viewBox="0 0 24 24"><path d="M6.3 17.7 3 21l3.4-1a8.9 8.9 0 1 0-3.3-3.4Z"/><path d="M8.5 8.7c.2-.5.5-.5.8-.5h.6c.2 0 .4 0 .6.4.2.5.7 1.7.7 1.8.1.2.1.3 0 .5-.4.6-.9.9-.6 1.4.7 1.2 1.4 1.7 2.5 2.2.2.1.3.1.5-.1.2-.2.7-.8.9-1.1.2-.2.3-.2.6-.1.2.1 1.5.7 1.8.9.2.1.3.1.4.3 0 .2 0 1-.4 1.5-.4.5-1.3.9-2 .9-.6 0-2-.2-3.8-1.6-1.8-1.5-2.9-3.4-3-3.6-.2-.2-.9-1.2-.9-2.3 0-1.1.5-1.6.7-1.8Z"/></svg></span> WhatsApp
       </a>
+      <a href="/panel/mensajes" class="<%= activo === 'mensajes' ? 'is-active' : '' %>">
+        <span class="si"><svg viewBox="0 0 24 24"><path d="M4 5h16v11H9l-5 4V5Z"/></svg></span> Mensajes
+      </a>
+      <a href="/panel/sin-respuesta" class="<%= activo === 'sin-respuesta' ? 'is-active' : '' %>">
+        <span class="si"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.7.3-1 .8-1 1.5M12 16.5v.1"/></svg></span> Sin respuesta
+      </a>
       <% if (esOwnerOAdmin) { %>
       <a href="/panel/configuracion" class="<%= activo === 'configuracion' ? 'is-active' : '' %>">
         <span class="si"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 13.5a7.4 7.4 0 0 0 0-3l1.8-1.4-2-3.4-2.1.6a7.4 7.4 0 0 0-2.6-1.5L14 2.5h-4l-.5 2.3a7.4 7.4 0 0 0-2.6 1.5l-2.1-.6-2 3.4L4.6 10.5a7.4 7.4 0 0 0 0 3L2.8 15l2 3.4 2.1-.6c.8.7 1.6 1.2 2.6 1.5l.5 2.3h4l.5-2.3a7.4 7.4 0 0 0 2.6-1.5l2.1.6 2-3.4-1.8-1.5Z"/></svg></span> Configuración
