@@ -52,6 +52,8 @@ const sharp = require('sharp');
 
 const leads = require('./lib/leads');
 const { prisma } = require('./lib/db');
+const { enviarSalidaPorWhatsApp } = require('./lib/services/salidaWhatsApp');
+const pendientes = require('./lib/services/pendientes');
 const { Prisma } = require('./lib/generated/prisma');
 const { faqDesdeFormulario, horarioDesdeFormulario } = require('./lib/services/faq');
 const {
@@ -1148,8 +1150,29 @@ app.get('/panel/conversaciones/:telefono', requireCliente, async (req, res, next
     res.render('cliente/conversacion-detalle', {
       title: 'Conversación - Proshop', tituloPagina: 'Conversación', activo: 'conversaciones',
       conversaciones, ultimaConversacion, itemsUnificados, totalMensajes, cliente, direccionLink,
+      pendiente: ultimaConversacion.modo === 'HUMANO' ? null : await pendientes.pendienteDe(ultimaConversacion.id),
       mensaje: req.query.ok || null, error: req.query.err || null,
     });
+  } catch (err) { next(err); }
+});
+
+// "Que el agente responda": contesta lo que la IA no pudo entender (ver lib/services/pendientes.js).
+app.post('/panel/conversaciones/:telefono/responder-pendiente', requireCliente, async (req, res, next) => {
+  try {
+    const conversaciones = await cargarConversacionesDelCliente(req);
+    if (!conversaciones.length) return res.redirect('/panel/conversaciones');
+    const conversacion = conversaciones[conversaciones.length - 1];
+    const r = await pendientes.recuperar({ conversacionId: conversacion.id, baseUrl: `${req.protocol}://${req.get('host')}`, forzar: true });
+    const textos = {
+      NADA_PENDIENTE: 'No hay nada pendiente en este chat.',
+      EN_MANOS_HUMANAS: 'Este chat lo tiene una persona del equipo: devolvelo al agente primero.',
+      SIN_WHATSAPP: 'WhatsApp no está conectado, no se puede enviar.',
+      IA_NO_DISPONIBLE: 'La IA todavía no responde. En cuanto vuelva, el agente contesta solo; también podés escribirle vos al cliente.',
+      ENVIO_FALLIDO: 'WhatsApp rechazó el mensaje. Probá de nuevo o escribile vos.',
+      NO_EXISTE: 'No se encontró la conversación.',
+    };
+    const base = `/panel/conversaciones/${req.params.telefono}`;
+    res.redirect(r.ok ? `${base}?ok=` + encodeURIComponent('Listo: el agente le contestó.') : `${base}?err=` + encodeURIComponent(textos[r.motivo] || 'No se pudo responder.'));
   } catch (err) { next(err); }
 });
 
@@ -3049,24 +3072,7 @@ app.get('/webhooks/whatsapp', (req, res) => {
 // o texto. Si WhatsApp rechaza un mensaje interactivo (titulo demasiado largo,
 // etc.) se cae a texto plano con las opciones, para que el cliente nunca se
 // quede sin respuesta.
-async function enviarSalidaPorWhatsApp(conexion, telefonoCliente, salida) {
-  const textoPlano = salida.textoRegistro || salida.respuesta;
-  let envio;
-  if (salida.lista) {
-    envio = await wa.enviarLista(conexion, telefonoCliente, salida.respuesta, salida.lista);
-  } else if (salida.solicitarUbicacion) {
-    envio = await wa.enviarSolicitudUbicacion(conexion, telefonoCliente, salida.respuesta);
-  } else if (salida.botones && salida.botones.length) {
-    envio = await wa.enviarBotones(conexion, telefonoCliente, salida.respuesta, salida.botones);
-  } else {
-    return wa.enviarTexto(conexion, telefonoCliente, salida.respuesta);
-  }
-  if (!envio.ok) {
-    console.error(`--- webhook: fallo el mensaje interactivo a ${telefonoCliente}, se manda como texto: ${envio.error}`);
-    envio = await wa.enviarTexto(conexion, telefonoCliente, textoPlano);
-  }
-  return envio;
-}
+// (enviarSalidaPorWhatsApp vive en lib/services/salidaWhatsApp.js: tambien lo usa la recuperacion de mensajes pendientes)
 
 async function interpretarMensajeEntrante(mensaje, conexion, telefonoCliente) {
   if (mensaje.text?.body?.trim()) return mensaje.text.body.trim();
@@ -4321,6 +4327,9 @@ app.use((req, res) => {
 const http = require('http');
 const httpServer = http.createServer(app);
 initSocket(httpServer, sessionMiddleware);
+
+// Cada pocos minutos, si la IA ya volvio, contesta lo que quedo pendiente (lib/services/pendientes.js).
+pendientes.iniciarJobPendientes();
 
 httpServer.listen(PORT, '0.0.0.0', () => {
   console.log(`\n  ${site.name} corriendo en http://0.0.0.0:${PORT}`);

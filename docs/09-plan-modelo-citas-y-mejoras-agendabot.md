@@ -1,6 +1,6 @@
 # Plan: modelo de negocio configurable (productos / citas) y mejoras tomadas de AgendaBot
 
-Fecha: 4-nov-2026. Estado: **plan aprobado el 4-nov-2026 (con las decisiones de la sección 6). Fase 0 en curso.**
+Fecha: 4-nov-2026. Estado: **plan aprobado el 4-nov-2026 (con las decisiones de la sección 6). Fase 0 y fase 1 terminadas (ver `docs/03-decisiones-recientes.md` #38 y #39). Sigue la fase 2.**
 Origen: revisión de `D:\Trabajo\Habitad Mejorado\Bots-whatsapp\AgendaBot` (README, COEXISTENCIA.md, agente, motor/intérprete/redactora, guardia, evals, recordatorios, mensajería, motor de agenda, esquema SQL, panel React y sus estilos). No se leyó `.env`, `whatsappWeb.js` ni los tests.
 
 ## 0. Decisiones del dueño (ya tomadas)

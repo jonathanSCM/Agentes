@@ -39,6 +39,18 @@
 
 <p style="margin:0 0 1rem"><a href="/panel/conversaciones" style="color:var(--primary-2)">← Volver a conversaciones</a></p>
 
+<% if (typeof pendiente !== 'undefined' && pendiente) { %>
+  <div class="alert-err pendiente-ia" role="status">
+    <div>
+      <strong>El agente no pudo contestar este mensaje</strong>
+      <p>El cliente escribió: «<%= pendiente.texto %>». Solo recibió el menú. Cuando la IA vuelva, el agente le contesta solo; si no querés esperar, tocá el botón (o escribile vos).</p>
+    </div>
+    <form method="POST" action="<%= hrefBase %>/responder-pendiente" class="inline-form">
+      <button class="btn btn-primary" type="submit">Que el agente responda ahora</button>
+    </form>
+  </div>
+<% } %>
+
 <% if (mensaje) { %><div class="alert-ok"><%= mensaje %></div><% } %>
 <% if (error) { %><div class="alert-err"><%= error %></div><% } %>
 

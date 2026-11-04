@@ -10,6 +10,11 @@
 const { prisma } = require('../../lib/db');
 
 const SLUG = 'eval-tienda';
+const FAQ = [
+  { pregunta: '¿Hacen envíos a otras ciudades?', respuesta: 'Sí, enviamos por flota a todo el país. El costo del envío lo paga el cliente.' },
+  { pregunta: '¿Tienen garantía?', respuesta: '30 días por falla de fábrica con la caja y la etiqueta.' },
+];
+const HORARIO = { dias: [0, 1, 2, 3, 4, 5, 6].map((d) => (d >= 1 && d <= 5 ? { dia: d, abre: '09:00', cierra: '18:00', cerrado: false } : { dia: d, abre: '', cierra: '', cerrado: true })) };
 const TELEFONO_OTRO_CLIENTE = '59170000099';
 
 async function limpiar() {
@@ -28,7 +33,7 @@ async function crear() {
       nombre: 'Tienda Eval', slug: SLUG, moneda: 'BOB',
       agentes: {
         create: [
-          { nombre: 'Ana', estado: 'ACTIVO', config: { create: { aceptaEfectivo: true, aceptaQr: true, preguntasIniciales: [], flujoDeterminista: true, direccionTienda: 'Av. Siempre Viva 123' } } },
+          { nombre: 'Ana', estado: 'ACTIVO', config: { create: { aceptaEfectivo: true, aceptaQr: true, preguntasIniciales: [], flujoDeterminista: true, direccionTienda: 'Av. Siempre Viva 123', faq: FAQ, horarioAtencion: HORARIO } } },
           { nombre: 'Beto', estado: 'ACTIVO', config: { create: { aceptaEfectivo: true, aceptaQr: true, preguntasIniciales: [], flujoDeterminista: false, direccionTienda: 'Av. Siempre Viva 123' } } },
         ],
       },
@@ -74,7 +79,7 @@ async function reiniciar(empresaId) {
 
 /**
  * Deja al cliente en el estado que pide el escenario.
- *   cliente: { carrito: [{ producto, talla, cantidad }], datos: {...campos de ClienteFinal}, categoria, tarjetaMostrada }
+ *   cliente: { carrito: [{ producto, talla, cantidad }], datos: {...campos de ClienteFinal}, categoria, tarjetaMostrada, mostrados: [nombres] }
  */
 async function prepararCliente(empresaId, telefono, cliente = {}) {
   const items = [];
@@ -89,9 +94,14 @@ async function prepararCliente(empresaId, telefono, cliente = {}) {
   const enCompra = items.length ? { estadoConversacion: 'INTENCION_DE_COMPRA', productoFavoritoId: items[0].productoId } : {};
   const cat = cliente.categoria ? await prisma.categoria.findFirst({ where: { empresaId, nombre: cliente.categoria } }) : null;
   const conCategoria = cat ? { categoriaId: cat.id, categoriaInteres: cat.nombre } : {};
+  const mostrados = [];
+  for (const nombre of cliente.mostrados || []) {
+    const p = await prisma.producto.findFirst({ where: { empresaId, nombre }, select: { id: true } });
+    if (p) mostrados.push(p.id);
+  }
   return prisma.clienteFinal.create({
     data: {
-      empresaId, telefono, ...enCompra, ...conCategoria, ...(cliente.datos || {}),
+      empresaId, telefono, ...enCompra, ...conCategoria, ...(mostrados.length ? { productosMostrados: mostrados } : {}), ...(cliente.datos || {}),
       // Una categoria elegida ya tuvo su tarjeta (estado real de una conversacion en curso); sin eso el
       // motor la manda de nuevo por su cuenta y tapa lo que el cliente acaba de pedir.
       contexto: {

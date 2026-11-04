@@ -893,3 +893,7 @@ select option:hover {
   .cfg-horario-fila .cfg-horario-dia { grid-column: 1 / -1; }
   .cfg-horario-fila span { display: none; }
 }
+
+/* ---------- Conversacion: mensaje que la IA no pudo contestar ---------- */
+.pendiente-ia { display: flex; align-items: center; justify-content: space-between; gap: 1rem; flex-wrap: wrap; }
+.pendiente-ia p { margin: .25rem 0 0; font-size: .9rem; opacity: .9; }

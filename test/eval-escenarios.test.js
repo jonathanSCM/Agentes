@@ -21,8 +21,8 @@ describe('escenarios de evaluación: definición', () => {
     }
   });
 
-  test('los de seguridad exigen IA real (sin IA pasarían "de casualidad")', () => {
-    for (const e of ESCENARIOS.filter((x) => x.tipo === 'seguridad')) assert.equal(e.requiereIA, true, e.id);
+  test('los de seguridad que dependen de la IA la exigen (sin IA pasarían "de casualidad"); los que resuelve el código lo verifican', () => {
+    for (const e of ESCENARIOS.filter((x) => x.tipo === 'seguridad')) assert.ok(e.requiereIA === true || (e.esperado.sinIA === true && e.esperado.contiene && e.esperado.contiene.length), e.id);
   });
 });
 
