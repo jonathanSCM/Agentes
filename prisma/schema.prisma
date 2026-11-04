@@ -55,6 +55,9 @@ model Plan {
   maxUsuarios      Int
   // Mensajes propios que el negocio puede crear sobre los de fabrica (docs/10).
   maxMensajesPropios Int    @default(30)
+  // Topes del modelo de citas (docs/09).
+  maxServicios     Int      @default(10)
+  maxCitasMes      Int      @default(200)
   modeloIa         String   @default("claude-haiku-4-5") // modelo de IA segun el plan
   marcaBlanca      Boolean  @default(false)
   recomendado      Boolean  @default(false)
@@ -201,6 +204,18 @@ model Empresa {
   // antes la ficha mostraba "370.00" pelado y el modelo elegia si escribir
   // "Bs" o "$" segun le pareciera (ver docs/02, regla de moneda del backend).
   moneda    String   @default("BOB")
+  // Que vende o agenda este negocio: PRODUCTOS (catalogo, carrito, pedidos) o
+  // CITAS (servicios, equipo, horarios, citas). Ver docs/09.
+  modeloNegocio ModeloNegocio @default(PRODUCTOS)
+  // Rubro de arranque (clinica, salon, restaurante, inmobiliaria, otro): solo
+  // vocabulario y datos de ejemplo, todo editable.
+  rubro       String?
+  zonaHoraria String   @default("America/La_Paz")
+  pais        String?
+  // Palabras del negocio: { cita: "turno", profesional: "estilista", ... } (usables como {{vocab.cita}}).
+  vocabulario Json     @default("{}")
+  // Reglas de la agenda: intervaloMin, anticipacionMin, diasMaximos, permiteElegirRecurso, cerrarFeriados, feriadosAbiertos.
+  configAgenda Json    @default("{}")
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -218,8 +233,163 @@ model Empresa {
   usosIA         UsoIA[]
   mensajesAgente MensajeAgente[]
   datosNegocio   DatoNegocio[]
+  servicios      Servicio[]
+  recursos       Recurso[]
+  horariosAtencion HorarioAtencion[]
+  bloqueosAgenda BloqueoAgenda[]
+  citas          Cita[]
 
   @@map("empresas")
+}
+
+enum ModeloNegocio {
+  PRODUCTOS
+  CITAS
+}
+
+enum EstadoCita {
+  PENDIENTE
+  CONFIRMADA
+  COMPLETADA
+  NO_ASISTIO
+  CANCELADA
+}
+
+// ============================ CITAS ============================
+
+// Lo que se agenda: consulta, corte, reserva de mesa, visita a una propiedad...
+model Servicio {
+  id          Int      @id @default(autoincrement())
+  empresaId   Int
+  empresa     Empresa  @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  nombre      String
+  descripcion String?
+  duracionMin Int      @default(30)
+  // Tiempo muerto despues (limpieza, traslado).
+  bufferMin   Int      @default(0)
+  precio      Decimal? @db.Decimal(10, 2)
+  // Restaurante: la cita ocupa N lugares de la capacidad del recurso.
+  usaPersonas Boolean  @default(false)
+  maxPersonas Int?
+  color       String?
+  orden       Int      @default(0)
+  activo      Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @default(now()) @updatedAt
+
+  recursos RecursoServicio[]
+  citas    Cita[]
+
+  @@index([empresaId, activo])
+  @@map("servicios")
+}
+
+// Quien o que atiende: una persona o un recurso fisico (salon, terraza,
+// consultorio). capacidad = cuantas "cargas" simultaneas soporta (una persona
+// atiende 1 cita; un salon 40 comensales).
+model Recurso {
+  id           Int      @id @default(autoincrement())
+  empresaId    Int
+  empresa      Empresa  @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  nombre       String
+  tipo         String   @default("persona") // persona | recurso
+  especialidad String?
+  capacidad    Int      @default(1)
+  color        String?
+  activo       Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @default(now()) @updatedAt
+
+  servicios RecursoServicio[]
+  horarios  HorarioAtencion[]
+  bloqueos  BloqueoAgenda[]
+  citas     Cita[]
+
+  @@index([empresaId, activo])
+  @@map("recursos")
+}
+
+// Sin filas para un recurso = atiende todos los servicios.
+model RecursoServicio {
+  recursoId  Int
+  recurso    Recurso  @relation(fields: [recursoId], references: [id], onDelete: Cascade)
+  servicioId Int
+  servicio   Servicio @relation(fields: [servicioId], references: [id], onDelete: Cascade)
+
+  @@id([recursoId, servicioId])
+  @@map("recurso_servicios")
+}
+
+// recursoId null = horario general del negocio. Varias filas por dia = turno
+// partido. Un recurso sin filas propias usa el horario general.
+model HorarioAtencion {
+  id         Int      @id @default(autoincrement())
+  empresaId  Int
+  empresa    Empresa  @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  recursoId  Int?
+  recurso    Recurso? @relation(fields: [recursoId], references: [id], onDelete: Cascade)
+  diaSemana  Int // 0 = domingo
+  horaInicio String // 'HH:MM' en la zona horaria del negocio
+  horaFin    String
+
+  @@index([empresaId])
+  @@map("horarios_atencion")
+}
+
+// Vacaciones, almuerzos puntuales, feriados propios. recursoId null = cierra todo el negocio.
+model BloqueoAgenda {
+  id        Int      @id @default(autoincrement())
+  empresaId Int
+  empresa   Empresa  @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  recursoId Int?
+  recurso   Recurso? @relation(fields: [recursoId], references: [id], onDelete: Cascade)
+  inicio    DateTime
+  fin       DateTime
+  motivo    String?
+
+  @@index([empresaId, inicio])
+  @@map("bloqueos_agenda")
+}
+
+model Cita {
+  id         Int          @id @default(autoincrement())
+  empresaId  Int
+  empresa    Empresa      @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  clienteId  Int
+  cliente    ClienteFinal @relation(fields: [clienteId], references: [id], onDelete: Cascade)
+  servicioId Int?
+  servicio   Servicio?    @relation(fields: [servicioId], references: [id], onDelete: SetNull)
+  recursoId  Int?
+  recurso    Recurso?     @relation(fields: [recursoId], references: [id], onDelete: SetNull)
+  inicio     DateTime
+  fin        DateTime
+  bufferMin  Int          @default(0)
+  personas   Int          @default(1)
+  // Capacidad que consume (las personas si el servicio usa personas, si no 1).
+  carga      Int          @default(1)
+  estado     EstadoCita   @default(CONFIRMADA)
+  origen     String       @default("whatsapp") // whatsapp | web | panel | simulador
+  notas      String?
+  // Recordatorios ya enviados: { "24h": "2026-...", "2h": "..." }
+  recordatorios Json      @default("{}")
+  createdAt  DateTime     @default(now())
+  updatedAt  DateTime     @default(now()) @updatedAt
+
+  @@index([empresaId, inicio])
+  @@index([clienteId])
+  @@index([recursoId, inicio])
+  @@map("citas")
+}
+
+// Feriados nacionales descargados de internet (Nager.Date), por pais y año.
+model FeriadoCache {
+  pais          String
+  anio          Int
+  datos         Json     @default("[]")
+  actualizadoEn DateTime @default(now())
+
+  @@id([pais, anio])
+  @@map("feriados_cache")
 }
 
 // Lo que el negocio cambia o crea sobre los mensajes de fabrica del agente
@@ -698,6 +868,8 @@ model Variante {
 }
 
 model ClienteFinal {
+  citas Cita[]
+
   id        Int      @id @default(autoincrement())
   empresaId Int
   empresa   Empresa  @relation(fields: [empresaId], references: [id], onDelete: Cascade)
