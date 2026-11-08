@@ -220,14 +220,6 @@
                 <%= variantes.length > 1 ? 'Elegí una opción' : (stockBase === 0 ? 'Sin stock' : 'Agregar al carrito') %>
               </button>
             </form>
-            <% if (numeroWhatsapp) { %>
-              <% if (aviso) { %>
-                <%# Ya le mandamos el detalle por WhatsApp: el link abre el chat sin mensaje prellenado (si no, el bot confirmaria dos veces) %>
-                <a class="btn btn-whatsapp" href="https://wa.me/<%= numeroWhatsapp %>" target="_blank" rel="noopener">Volver al chat</a>
-              <% } else { %>
-                <a class="btn btn-whatsapp" href="https://wa.me/<%= numeroWhatsapp %>?text=<%= encodeURIComponent(mensajeWhatsapp) %>" target="_blank" rel="noopener">Volver a WhatsApp</a>
-              <% } %>
-            <% } %>
           <% } %>
         </div>
 
