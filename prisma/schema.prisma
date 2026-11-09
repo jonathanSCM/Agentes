@@ -267,6 +267,7 @@ model Empresa {
   movimientosStock MovimientoStock[]
   sesionesCaja     SesionCaja[]
   ventas           Venta[]
+  auditorias       Auditoria[]
   usosIA         UsoIA[]
   mensajesAgente MensajeAgente[]
   datosNegocio   DatoNegocio[]
@@ -1335,4 +1336,23 @@ model LinkCorto {
   createdAt DateTime @default(now())
 
   @@map("links_cortos")
+}
+
+// Quién hizo qué (anulaciones, caja, ajustes de stock, equipo...). Solo se agrega; un trigger impide editarla.
+model Auditoria {
+  id            Int      @id @default(autoincrement())
+  empresaId     Int
+  empresa       Empresa  @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  usuarioId     Int?
+  usuarioNombre String
+  usuarioRol    String?
+  accion        String
+  entidad       String?
+  entidadId     Int?
+  detalle       Json?
+  createdAt     DateTime @default(now())
+
+  @@index([empresaId, createdAt])
+  @@index([empresaId, accion])
+  @@map("auditoria")
 }

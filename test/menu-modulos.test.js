@@ -15,7 +15,7 @@ describe('menú lateral', () => {
     const g = construirMenu({ rol: 'OWNER', modulos: ['AGENTE'] });
     for (const c of ['inicio', 'conversaciones', 'pedidos', 'productos', 'agente', 'configuracion', 'consumo', 'paquetes', 'mensajes']) assert.ok(claves(g).includes(c), c);
     const panel = items(g).filter((i) => i.modulo === 'PANEL');
-    assert.deepEqual(panel.map((i) => i.clave).sort(), ['inteligencia', 'reportes', 'resumen']);
+    assert.deepEqual(panel.map((i) => i.clave).sort(), ['auditoria', 'inteligencia', 'reportes', 'resumen']);
     assert.ok(panel.every((i) => i.bloqueado));
   });
 

@@ -1,0 +1,58 @@
+<%- include('partials/inicio') %>
+<%
+  var cuando = function (f) { return new Date(f).toLocaleString('es-BO', { timeZone: zona, dateStyle: 'short', timeStyle: 'short' }); };
+  var rolTxt = { OWNER: 'Dueño', ADMIN: 'Administrador', STAFF: 'Colaborador', CAJERO: 'Cajero', PROSHOP_ADMIN: 'Proshop' };
+  var qs = function (p) {
+    var o = { grupo: filtros.grupo, usuario: filtros.usuario, desde: filtros.desde, hasta: filtros.hasta, pagina: p };
+    return Object.keys(o).filter(function (k) { return o[k]; }).map(function (k) { return k + '=' + encodeURIComponent(o[k]); }).join('&');
+  };
+%>
+
+<div class="page-head">
+  <h2>Auditoría</h2>
+  <p>Quién hizo qué en tu negocio: anulaciones, caja, ajustes de stock, equipo y cambios de plan. Es un registro que no se puede editar.</p>
+</div>
+
+<form method="GET" action="/panel/auditoria" class="filtros-ventas">
+  <select name="grupo" aria-label="Tipo de acción">
+    <option value="">Todas las acciones</option>
+    <% grupos.forEach(function (g) { %><option value="<%= g %>" <%= filtros.grupo === g ? 'selected' : '' %>><%= g %></option><% }); %>
+  </select>
+  <select name="usuario" aria-label="Persona">
+    <option value="">Todas las personas</option>
+    <% usuarios.forEach(function (u) { %><option value="<%= u.id %>" <%= filtros.usuario === String(u.id) ? 'selected' : '' %>><%= u.nombre %></option><% }); %>
+  </select>
+  <input type="date" name="desde" value="<%= filtros.desde %>" aria-label="Desde" />
+  <input type="date" name="hasta" value="<%= filtros.hasta %>" aria-label="Hasta" />
+  <button class="btn btn-ghost" type="submit">Filtrar</button>
+  <% if (filtros.grupo || filtros.usuario || filtros.desde || filtros.hasta) { %><a class="btn btn-ghost" href="/panel/auditoria">Quitar filtros</a><% } %>
+</form>
+
+<% if (!lista.filas.length) { %>
+  <div class="empty-state"><h3>Sin movimientos</h3><p>Cuando alguien anule una venta, cierre la caja o ajuste el stock, va a quedar registrado acá.</p></div>
+<% } else { %>
+  <div class="table-wrap">
+    <table class="leads-table">
+      <thead><tr><th>Cuándo</th><th>Quién</th><th>Acción</th><th>Detalle</th></tr></thead>
+      <tbody>
+        <% lista.filas.forEach(function (f) { var a = acciones[f.accion] || { etiqueta: f.accion }; %>
+          <tr>
+            <td class="nowrap muted"><%= cuando(f.createdAt) %></td>
+            <td><strong><%= f.usuarioNombre %></strong><% if (f.usuarioRol) { %><br><span class="muted" style="font-size:.78rem"><%= rolTxt[f.usuarioRol] || f.usuarioRol %></span><% } %></td>
+            <td><span class="badge <%= a.grave ? 'badge-anulada' : 'badge-new' %>"><%= a.etiqueta %></span></td>
+            <td><%= resumenDe(f) %></td>
+          </tr>
+        <% }); %>
+      </tbody>
+    </table>
+  </div>
+  <% if (lista.paginas > 1) { %>
+    <p class="muted" style="margin-top:1rem;display:flex;gap:.8rem;align-items:center;flex-wrap:wrap">
+      <% if (lista.pagina > 1) { %><a class="btn btn-ghost" href="/panel/auditoria?<%= qs(lista.pagina - 1) %>">← Más nuevos</a><% } %>
+      <span>Página <%= lista.pagina %> de <%= lista.paginas %> · <%= lista.total %> registros</span>
+      <% if (lista.pagina < lista.paginas) { %><a class="btn btn-ghost" href="/panel/auditoria?<%= qs(lista.pagina + 1) %>">Más antiguos →</a><% } %>
+    </p>
+  <% } %>
+<% } %>
+
+<%- include('partials/fin') %>

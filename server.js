@@ -1537,6 +1537,9 @@ app.post('/panel/pedidos/:id/estado', requireCliente, async (req, res, next) => 
         // Se "reclama" el cambio de estado: si dos personas cancelan a la vez, solo una repone el stock.
         const reclamo = await tx.pedido.updateMany({ where: { id: pedido.id, estado: pedido.estado }, data: { estado: estadoNuevo } });
         if (reclamo.count === 0) throw Object.assign(new Error('Ese pedido ya cambió de estado. Actualizá la página.'), { codigo: 'PEDIDO_CAMBIO' });
+        if (estadoNuevo === 'CANCELADO') {
+          await auditoriaSrv.registrar(tx, { empresaId, actor: { id: req.session.clienteId }, accion: 'PEDIDO_CANCELADO', entidad: 'Pedido', entidadId: pedido.id, detalle: { total: Number(pedido.total), estadoAnterior: pedido.estado } });
+        }
         if (requiereRestock(pedido.estado, estadoNuevo)) {
           const lineas = pedido.items.filter((i) => i.productoId || i.varianteId).map((i) => ({ productoId: i.productoId, varianteId: i.varianteId, cantidad: i.cantidad }));
           if (lineas.length) {
@@ -1674,7 +1677,12 @@ app.post('/panel/inventario/:id', requireCliente, async (req, res, next) => {
       return res.redirect(`/panel/productos/${producto.id}/editar?err=` + encodeURIComponent('Este producto tiene variantes: ajusta el stock de cada combinación ahí abajo, no un número único.'));
     }
     const stock = Math.max(0, parseInt(req.body.stock, 10) || 0);
-    await prisma.$transaction((tx) => stockSrv.fijar(tx, { empresaId: req.session.empresaId, productoId: producto.id, stock, tipo: 'AJUSTE', usuarioId: req.session.clienteId, nota: 'Desde Inventario' }));
+    await prisma.$transaction(async (tx) => {
+      await stockSrv.fijar(tx, { empresaId: req.session.empresaId, productoId: producto.id, stock, tipo: 'AJUSTE', usuarioId: req.session.clienteId, nota: 'Desde Inventario' });
+      if (stock !== producto.stock) {
+        await auditoriaSrv.registrar(tx, { empresaId: req.session.empresaId, actor: { id: req.session.clienteId }, accion: 'STOCK_AJUSTADO', entidad: 'Producto', entidadId: producto.id, detalle: { producto: producto.nombre, antes: producto.stock, despues: stock } });
+      }
+    });
     res.redirect('/panel/inventario?ok=' + encodeURIComponent('Stock actualizado.'));
   } catch (err) { next(err); }
 });
@@ -1682,6 +1690,7 @@ app.post('/panel/inventario/:id', requireCliente, async (req, res, next) => {
 // ===== Resumen comercial (módulo PANEL) =====
 // Ventas, utilidad y canales con datos reales. Solo dueño/admin: muestra costos y márgenes.
 const resumenSrv = require('./lib/services/resumenComercial');
+const auditoriaSrv = require('./lib/services/auditoria');
 app.get('/panel/resumen', requireCliente, requireModulo('PANEL'), requireRol('OWNER', 'ADMIN'), async (req, res, next) => {
   try {
     const empresa = await prisma.empresa.findUnique({ where: { id: req.session.empresaId }, select: { moneda: true } });
@@ -1714,6 +1723,34 @@ app.get('/panel/resumen/ventas.xlsx', requireCliente, requireModulo('PANEL'), re
     res.setHeader('Content-Disposition', `attachment; filename="ventas-${rango.periodo}.xlsx"`);
     await libro.xlsx.write(res);
     res.end();
+  } catch (err) { next(err); }
+});
+
+// ===== Auditoría (módulo PANEL): quién hizo qué =====
+app.get('/panel/auditoria', requireCliente, requireModulo('PANEL'), requireRol('OWNER', 'ADMIN'), async (req, res, next) => {
+  try {
+    const empresaId = req.session.empresaId;
+    const T = require('./lib/services/tiempo');
+    const empresa = await prisma.empresa.findUnique({ where: { id: empresaId }, select: { moneda: true, zonaHoraria: true } });
+    const zona = empresa.zonaHoraria || 'America/La_Paz';
+    const dia = (v) => (T.esFecha(String(v || '')) ? String(v) : '');
+    const desde = dia(req.query.desde); const hasta = dia(req.query.hasta);
+    const lista = await auditoriaSrv.listar(empresaId, {
+      grupo: String(req.query.grupo || ''),
+      usuarioId: req.query.usuario ? Number(req.query.usuario) : null,
+      desde: desde ? T.aInstante(desde, '00:00', zona) : null,
+      hasta: hasta ? T.aInstante(T.sumarDias(hasta, 1), '00:00', zona) : null,
+      pagina: req.query.pagina,
+    });
+    const usuarios = await prisma.usuario.findMany({ where: { empresaId }, select: { id: true, nombre: true }, orderBy: { nombre: 'asc' } });
+    const simbolo = simboloMoneda(empresa.moneda);
+    res.render('cliente/auditoria', {
+      title: 'Auditoría - Proshop', tituloPagina: 'Auditoría', activo: 'auditoria',
+      lista, usuarios, zona, acciones: auditoriaSrv.ACCIONES,
+      grupos: [...new Set(Object.values(auditoriaSrv.ACCIONES).map((a) => a.grupo))],
+      filtros: { grupo: String(req.query.grupo || ''), usuario: String(req.query.usuario || ''), desde, hasta },
+      resumenDe: (f) => auditoriaSrv.resumenDe(f, simbolo),
+    });
   } catch (err) { next(err); }
 });
 
@@ -2709,9 +2746,11 @@ app.post('/panel/productos/:id', requireCliente, upload.array('fotos', 8), async
 
 app.post('/panel/productos/:id/eliminar', requireCliente, async (req, res, next) => {
   try {
+    const existente = await prisma.producto.findFirst({ where: { id: Number(req.params.id), empresaId: req.session.empresaId }, select: { id: true, nombre: true } });
     await prisma.producto.deleteMany({
       where: { id: Number(req.params.id), empresaId: req.session.empresaId },
     });
+    if (existente) await auditoriaSrv.registrarSinRiesgo({ empresaId: req.session.empresaId, actor: { id: req.session.clienteId }, accion: 'PRODUCTO_ELIMINADO', entidad: 'Producto', entidadId: existente.id, detalle: { producto: existente.nombre } });
     res.redirect('/panel/productos?ok=' + encodeURIComponent('Producto eliminado.'));
   } catch (err) { next(err); }
 });
@@ -3275,6 +3314,7 @@ app.post('/panel/equipo/invitar', requireCliente, requireRol('OWNER'), async (re
       return res.redirect('/panel/equipo?err=' + encodeURIComponent('Ingresa un correo.'));
     }
     const invitacion = await crearInvitacion({ empresaId: req.session.empresaId, email, rol });
+    await auditoriaSrv.registrarSinRiesgo({ empresaId: req.session.empresaId, actor: { id: req.session.clienteId }, accion: 'EQUIPO_INVITADO', entidad: 'Invitacion', entidadId: invitacion.id, detalle: { email: String(email).trim().toLowerCase(), rol: invitacion.rol || rol } });
     const link = `${req.protocol}://${req.get('host')}/invitacion/${invitacion.token}`;
     res.redirect('/panel/equipo?ok=' + encodeURIComponent('Invitación creada. Compártele este link a la persona:') + '&link=' + encodeURIComponent(link));
   } catch (err) {
@@ -3287,7 +3327,9 @@ app.post('/panel/equipo/invitar', requireCliente, requireRol('OWNER'), async (re
 
 app.post('/panel/equipo/invitaciones/:id/revocar', requireCliente, requireRol('OWNER'), async (req, res, next) => {
   try {
+    const inv = await prisma.invitacion.findFirst({ where: { id: Number(req.params.id), empresaId: req.session.empresaId }, select: { id: true, email: true } });
     await prisma.invitacion.deleteMany({ where: { id: Number(req.params.id), empresaId: req.session.empresaId } });
+    if (inv) await auditoriaSrv.registrarSinRiesgo({ empresaId: req.session.empresaId, actor: { id: req.session.clienteId }, accion: 'EQUIPO_INVITACION_REVOCADA', entidad: 'Invitacion', entidadId: inv.id, detalle: { email: inv.email } });
     res.redirect('/panel/equipo?ok=' + encodeURIComponent('Invitación revocada.'));
   } catch (err) { next(err); }
 });
@@ -3298,7 +3340,9 @@ app.post('/panel/equipo/:id/eliminar', requireCliente, requireRol('OWNER'), asyn
     if (id === req.session.clienteId) {
       return res.redirect('/panel/equipo?err=' + encodeURIComponent('No puedes quitarte a ti mismo del equipo.'));
     }
+    const quitado = await prisma.usuario.findFirst({ where: { id, empresaId: req.session.empresaId, rol: { not: 'OWNER' } }, select: { id: true, nombre: true, rol: true } });
     await prisma.usuario.deleteMany({ where: { id, empresaId: req.session.empresaId, rol: { not: 'OWNER' } } });
+    if (quitado) await auditoriaSrv.registrarSinRiesgo({ empresaId: req.session.empresaId, actor: { id: req.session.clienteId }, accion: 'EQUIPO_ELIMINADO', entidad: 'Usuario', entidadId: quitado.id, detalle: { nombre: quitado.nombre, rol: quitado.rol } });
     res.redirect('/panel/equipo?ok=' + encodeURIComponent('Se quitó a la persona del equipo.'));
   } catch (err) { next(err); }
 });
@@ -4008,18 +4052,23 @@ app.post('/admin/registrados/:id', requireAuth, async (req, res, next) => {
 });
 
 // Acciones de plan: devuelven al mismo formulario con el resultado.
-const accionPlan = (okTexto, fn) => async (req, res, next) => {
+const accionPlan = (okTexto, fn, accionAuditoria = 'PLAN_EDITADO') => async (req, res, next) => {
   const id = Number(req.params.id);
   try {
     await fn(id, req.body || {});
+    const sub = await prisma.suscripcion.findUnique({ where: { empresaId: id }, select: { planNombre: true, planFin: true } });
+    await auditoriaSrv.registrarSinRiesgo({
+      empresaId: id, actor: { nombre: 'Proshop (administración)', rol: 'PROSHOP_ADMIN' }, accion: accionAuditoria, entidad: 'Suscripcion',
+      detalle: { plan: sub && sub.planNombre, hasta: sub && sub.planFin ? sub.planFin.toISOString().slice(0, 10) : null },
+    });
     res.redirect(`/admin/registrados/${id}/editar?ok=` + encodeURIComponent(okTexto));
   } catch (err) {
     if (err.codigo === 'PLAN') return res.redirect(`/admin/registrados/${id}/editar?err=` + encodeURIComponent(err.message));
     next(err);
   }
 };
-app.post('/admin/registrados/:id/plan', requireAuth, accionPlan('Plan asignado: se copiaron sus valores y empieza hoy.', (id, b) => planesCliente.asignarPlan(id, Number(b.planId), duracionDeForm(b))));
-app.post('/admin/registrados/:id/renovar', requireAuth, accionPlan('Plan renovado.', (id, b) => planesCliente.renovar(id, Number(b.meses))));
+app.post('/admin/registrados/:id/plan', requireAuth, accionPlan('Plan asignado: se copiaron sus valores y empieza hoy.', (id, b) => planesCliente.asignarPlan(id, Number(b.planId), duracionDeForm(b)), 'PLAN_ASIGNADO'));
+app.post('/admin/registrados/:id/renovar', requireAuth, accionPlan('Plan renovado.', (id, b) => planesCliente.renovar(id, Number(b.meses)), 'PLAN_RENOVADO'));
 app.post('/admin/registrados/:id/valores', requireAuth, accionPlan('Valores de este cliente guardados.', (id, b) => planesCliente.editarCopia(id, {
   modulos: [].concat(b.modulos || []), ilimitado: b.ilimitado === '1',
   convIncluidas: b.convIncluidas, maxProductos: b.maxProductos, maxUsuarios: b.maxUsuarios,

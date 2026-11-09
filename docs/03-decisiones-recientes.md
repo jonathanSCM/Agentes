@@ -1017,3 +1017,15 @@ Primera pieza del módulo PANEL (`/panel/resumen`, solo dueño/admin porque mues
 - Menú: "Resumen" encabeza el grupo Panel comercial (con candado si el plan no trae PANEL); la tarjeta del módulo en Inicio abre el resumen. Reportes e Inteligencia siguen donde estaban.
 - Verificado: 11 pruebas nuevas (zona horaria, doble conteo, costo, comparación, aislamiento entre empresas, Excel) y barrido en el navegador (plan Agente 403, cajero redirigido, anónimo al login). Suite: 964.
 - **Pendiente del Panel**: Auditoría (quién anuló, ajustó stock, cerró caja), reporte de utilidad por producto/categoría, alertas, y conectar la maqueta de Inteligencia a datos reales.
+
+
+## 52. Auditoría (F7): quién hizo qué
+
+Pantalla `/panel/auditoria` (módulo PANEL, solo dueño/admin) sobre la tabla nueva `auditoria` (migración `20261111100000`, aditiva).
+- **Qué se registra** (`lib/services/auditoria.js`, catálogo cerrado: una acción que no está en la lista se rechaza): venta anulada (con motivo y total), caja abierta / entrada o salida / cerrada (con esperado, contado y diferencia), stock ajustado a mano (antes → después), producto eliminado, pedido cancelado, invitación al equipo (creada y revocada), persona quitada del equipo, y plan asignado / renovado / editado por Proshop.
+- **Atómico donde importa**: anular venta, cancelar pedido y ajustar stock registran dentro de la misma transacción (si no se puede registrar, la acción tampoco ocurre). Caja, equipo, producto eliminado y plan son "de mejor esfuerzo": si falla el registro se anota en el log del servidor, pero no se le niega al usuario algo que ya hizo.
+- **No se edita**: un trigger de la base rechaza cualquier `UPDATE`. Borrar solo ocurre por cascada al eliminar toda la empresa.
+- Se guarda el nombre y rol de la persona **al momento**, para que el historial se lea aunque después salga del equipo. El detalle se recorta (textos largos, sin datos sensibles).
+- Pantalla: filtros por tipo, persona y fechas (en la zona horaria del negocio), paginada de 50, lo más nuevo primero; las acciones graves se marcan en rojo.
+- Verificado: 10 pruebas nuevas (atomicidad, inmutabilidad por ORM y SQL crudo, aislamiento entre empresas, caja y anulación) y barrido en el navegador (acciones hechas por la web aparecen; filtros raros no rompen ni inyectan; plan Agente 403; cajero redirigido; anónimo al login). Suite: 974.
+- **Pendiente**: auditar también cambios de precio/costo, cambios de rol y devoluciones (cuando existan), y el desbloqueo de ventas; exportar la auditoría a Excel.
