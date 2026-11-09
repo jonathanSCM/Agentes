@@ -740,6 +740,8 @@ model Conversacion {
   tomadaPorId     Int?
   tomadaPor       Usuario?  @relation(fields: [tomadaPorId], references: [id], onDelete: SetNull)
   ultimoMensajeAt DateTime  @default(now())
+  // Hasta cuando leyo el equipo esta conversacion ("no leidos" = mensajes del cliente posteriores).
+  leidoAt         DateTime?
   createdAt       DateTime  @default(now())
 
   // Atribucion a anuncios de Meta (Click to WhatsApp): WhatsApp manda estos

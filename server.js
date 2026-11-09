@@ -65,6 +65,7 @@ const {
 const planesCliente = require('./lib/services/planesCliente');
 const solicitudesConv = require('./lib/services/solicitudesConv');
 const menuPanel = require('./lib/services/menuPanel');
+const bandeja = require('./lib/services/bandeja');
 const { requireModulo } = require('./lib/services/modulos');
 const { registrarCliente, autenticar } = require('./lib/services/auth');
 const { procesarMensajeEntrante, atenderMensaje, generarYRegistrarRespuesta, conversacionParaCarritoWeb, conBloqueoDeCliente } = require('./lib/services/conversaciones');
@@ -920,14 +921,16 @@ app.use('/panel', async (req, res, next) => {
     res.locals.notificaciones = notificaciones;
     res.locals.notifCount = notifCount;
     // Menu lateral: depende del modelo de negocio, del rol y de los MODULOS del plan.
-    const [valoresPlan, pedidosNuevos] = await Promise.all([
+    const agenteIdsMenu = await agenteIdsDe(req.session.empresaId);
+    const [valoresPlan, pedidosNuevos, noLeidosMenu] = await Promise.all([
       planesCliente.valoresDe(req.session.empresaId),
       prisma.pedido.count({ where: { empresaId: req.session.empresaId, estado: 'NUEVO' } }),
+      bandeja.contarNoLeidos(agenteIdsMenu),
     ]);
     res.locals.modulos = valoresPlan.modulos;
     res.locals.menu = menuPanel.construirMenu({
       esCitas: res.locals.modeloNegocio === 'CITAS', rol: req.session.clienteRol,
-      modulos: valoresPlan.modulos, vocab: res.locals.vocab, badges: { pedidos: pedidosNuevos },
+      modulos: valoresPlan.modulos, vocab: res.locals.vocab, badges: { pedidos: pedidosNuevos, conversaciones: noLeidosMenu },
     });
     res.locals.menuPlan = {
       nombre: valoresPlan.planNombre,
@@ -1065,69 +1068,48 @@ app.get('/panel/consumo', requireCliente, requireRol('OWNER'), async (req, res, 
 });
 
 // ===== Conversaciones =====
+// ---- Bandeja de conversaciones (CRM): lista | chat | ficha ----
+function opcionesDeLista(req) {
+  const filtro = bandeja.FILTROS.includes(String(req.query.filtro || '')) ? String(req.query.filtro) : 'todas';
+  const q = String(req.query.q || '').slice(0, 80);
+  return { filtro, q };
+}
+
 app.get('/panel/conversaciones', requireCliente, async (req, res, next) => {
   try {
     const agenteIds = await agenteIdsDe(req.session.empresaId);
     const hoy = inicioDeHoy();
-    const [conversaciones, total, hoyCount, mensajes] = await Promise.all([
-      prisma.conversacion.findMany({
-        where: { agenteId: { in: agenteIds } },
-        include: { _count: { select: { mensajes: true } } },
-        orderBy: { ultimoMensajeAt: 'desc' }, take: 100,
-      }),
+    const { filtro, q } = opcionesDeLista(req);
+    const [lista, total, hoyCount, mensajes] = await Promise.all([
+      bandeja.listar(req.session.empresaId, agenteIds, { filtro, q }),
       prisma.conversacion.count({ where: { agenteId: { in: agenteIds } } }),
       prisma.conversacion.count({ where: { agenteId: { in: agenteIds }, createdAt: { gte: hoy } } }),
       prisma.mensaje.count({ where: { conversacion: { agenteId: { in: agenteIds } } } }),
     ]);
-
-    // El nombre del cliente (si ya lo dio) se muestra en vez del telefono en
-    // la lista - el telefono sigue guardado tal cual, solo cambia que se ve
-    // primero. Una sola consulta extra, batch por telefono.
-    const telefonos = [...new Set(conversaciones.map((c) => c.telefonoCliente))];
-    const clientesFinales = telefonos.length
-      ? await prisma.clienteFinal.findMany({
-          where: { empresaId: req.session.empresaId, telefono: { in: telefonos } },
-          select: { telefono: true, nombre: true, nombrePerfil: true },
-        })
-      : [];
-    const nombrePorTelefono = new Map(clientesFinales.map((c) => [c.telefono, c.nombre || c.nombrePerfil]));
-
-    // Un mismo cliente que vuelve a escribir despues de la ventana de
-    // agrupacion (6h) genera una Conversacion nueva (se cobra aparte) - se
-    // agrupan por telefono para la lista, para que se vea una fila por
-    // cliente en vez de una por cada regreso. Como la query ya viene
-    // ordenada por ultimoMensajeAt desc, la primera aparicion de cada
-    // telefono ya es la sesion mas reciente (no hace falta comparar fechas).
-    const porTelefono = new Map();
-    for (const c of conversaciones) {
-      if (!porTelefono.has(c.telefonoCliente)) {
-        porTelefono.set(c.telefonoCliente, {
-          telefonoCliente: c.telefonoCliente,
-          nombreCliente: nombrePorTelefono.get(c.telefonoCliente) || null,
-          modo: c.modo,
-          ultimoMensajeAt: c.ultimoMensajeAt,
-          sesiones: 0,
-          mensajes: 0,
-        });
-      }
-      const g = porTelefono.get(c.telefonoCliente);
-      g.sesiones += 1;
-      g.mensajes += c._count.mensajes;
-    }
-    const clientesAgrupados = [...porTelefono.values()];
-
-    res.render('cliente/conversaciones', {
-      title: 'Conversaciones - Proshop', tituloPagina: 'Conversaciones', activo: 'conversaciones',
-      clientes: clientesAgrupados, stats: { total, hoy: hoyCount, mensajes }, mensaje: req.query.ok || null,
+    res.render('cliente/bandeja', {
+      title: 'Conversaciones - Proshop', tituloPagina: 'Conversaciones', activo: 'conversaciones', hojas: ['/css/bandeja.css'],
+      lista, filtro, q, abierta: null, stats: { total, hoy: hoyCount, mensajes }, mensaje: req.query.ok || null, error: req.query.err || null,
     });
   } catch (err) { next(err); }
 });
 
-// Todas las sesiones (Conversacion) de un mismo telefono, no solo una: un
-// cliente que vuelve a escribir despues de la ventana de agrupacion (6h)
-// genera una Conversacion nueva (se cobra aparte), pero en el panel se ven
-// todas juntas como un solo historial continuo. Ordenadas de la mas vieja a
-// la mas nueva para poder mostrarlas en orden cronologico real.
+// Solo las filas de la lista (la bandeja las pide de nuevo cuando llega un mensaje en vivo).
+app.get('/panel/conversaciones/lista', requireCliente, async (req, res, next) => {
+  try {
+    const agenteIds = await agenteIdsDe(req.session.empresaId);
+    const { filtro, q } = opcionesDeLista(req);
+    const lista = await bandeja.listar(req.session.empresaId, agenteIds, { filtro, q });
+    res.render('cliente/partials/conv-lista', { lista, filtro, q, abierta: String(req.query.abierta || '') });
+  } catch (err) { next(err); }
+});
+
+app.post('/panel/conversaciones/:telefono/leido', requireCliente, async (req, res, next) => {
+  try {
+    await bandeja.marcarLeida(await agenteIdsDe(req.session.empresaId), decodeURIComponent(req.params.telefono));
+    res.status(204).end();
+  } catch (err) { next(err); }
+});
+
 async function cargarConversacionesDelCliente(req) {
   const agenteIds = await agenteIdsDe(req.session.empresaId);
   const telefono = decodeURIComponent(req.params.telefono);
@@ -1166,8 +1148,23 @@ app.get('/panel/conversaciones/:telefono', requireCliente, async (req, res, next
     });
     const totalMensajes = conversaciones.reduce((n, c) => n + c.mensajes.length, 0);
 
-    res.render('cliente/conversacion-detalle', {
-      title: 'Conversación - Proshop', tituloPagina: 'Conversación', activo: 'conversaciones',
+    // Abrir el chat lo marca como leido para todo el equipo.
+    const agenteIds = await agenteIdsDe(req.session.empresaId);
+    await bandeja.marcarLeida(agenteIds, ultimaConversacion.telefonoCliente);
+    // El contador del menu se calcula antes de abrir el chat: se actualiza con lo que queda sin leer.
+    const itemConversaciones = (res.locals.menu || []).flatMap((g) => g.items).find((i) => i.clave === 'conversaciones');
+    if (itemConversaciones) itemConversaciones.badge = await bandeja.contarNoLeidos(agenteIds);
+    const { filtro, q } = opcionesDeLista(req);
+    const [lista, ficha] = await Promise.all([
+      bandeja.listar(req.session.empresaId, agenteIds, { filtro, q }),
+      bandeja.ficha(req.session.empresaId, ultimaConversacion.telefonoCliente),
+    ]);
+    const filaAbierta = lista.find((f) => f.telefono === ultimaConversacion.telefonoCliente)
+      || (await bandeja.listar(req.session.empresaId, agenteIds)).find((f) => f.telefono === ultimaConversacion.telefonoCliente) || null;
+
+    res.render('cliente/bandeja', {
+      title: 'Conversación - Proshop', tituloPagina: 'Conversaciones', activo: 'conversaciones', hojas: ['/css/bandeja.css'],
+      lista, filtro, q, abierta: ultimaConversacion.telefonoCliente, filaAbierta, ficha, stats: null,
       conversaciones, ultimaConversacion, itemsUnificados, totalMensajes, cliente, direccionLink,
       pendiente: ultimaConversacion.modo === 'HUMANO' ? null : await pendientes.pendienteDe(ultimaConversacion.id),
       mensaje: req.query.ok || null, error: req.query.err || null,

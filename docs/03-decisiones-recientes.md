@@ -957,3 +957,16 @@ Plan completo en `docs/11-plan-planes-pos-panel-y-rediseno.md` (§11). Reemplaza
 - `scripts/demo-panel.js` (solo desarrollo): crea dos clientes de prueba locales (plan Agente y Acceso total) para revisar el panel a ojo; las credenciales se guardan fuera del repo.
 - Verificado con un barrido real contra el servidor: con plan Agente, Reportes/Inteligencia → 403 y las otras 16 pantallas → 200; con Acceso total, todas 200.
 - Tests: `menu-modulos` (11). Suite: 883.
+
+
+## 47. Conversaciones tipo CRM (bandeja de tres zonas)
+
+`/panel/conversaciones` pasa a ser una bandeja como la de la barbería, con la paleta actual:
+- **Lista** (izquierda): una fila por cliente, avatar con iniciales y color estable, último mensaje (con su tipo), hora, **contador de no leídas**, etiquetas "Atiende una persona" / "Pidió una persona", **buscador** (nombre, teléfono o texto) y filtros *Todas · No leídas · Con persona*.
+- **Chat** (centro): burbujas con hora y separadores de día, tomar el control / devolver al agente, escribir como persona, enviar producto, aviso de "el agente no pudo contestar".
+- **Ficha** (derecha): lo que se sabe del cliente (estado, interés, presupuesto, entrega), pedidos con total comprado, sesiones, origen del anuncio y las acciones destructivas (reiniciar memoria, borrar) dentro de "Más acciones".
+- **No leídas reales**: columna `conversaciones.leidoAt` (migración `20261108180000`); abrir un chat lo marca como leído para todo el equipo; el menú lateral muestra el total.
+- **Tiempo real**: reutiliza Socket.IO; ante un mensaje o un cambio de control la lista se vuelve a pedir (`/panel/conversaciones/lista`) y el chat abierto agrega la burbuja.
+- **Foto de perfil**: WhatsApp no entrega la foto del cliente, por eso es avatar con iniciales.
+- Celular: lista primero; el chat con flecha para volver. Todo filtrado por empresa (probado con dos empresas).
+- Código: `lib/services/bandeja.js`, `views/cliente/bandeja.ejs`, `partials/conv-lista.ejs`, `public/css/bandeja.css`. Se eliminaron las vistas viejas de lista y detalle. Tests: `bandeja` (7). Suite: 890.

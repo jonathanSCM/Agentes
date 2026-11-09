@@ -50,13 +50,26 @@ async function datosDeEjemplo(empresaId) {
     for (let i = 0; i < nombres.length; i += 1) {
       const tel = `59170000${100 + i}`;
       await prisma.clienteFinal.create({ data: { empresaId, telefono: tel, nombre: nombres[i] } }).catch(() => {});
-      const conv = await prisma.conversacion.create({ data: { agenteId: agente.id, telefonoCliente: tel } });
+      // 0: leida · 1: la atiende una persona · 2: pidio un asesor y tiene mensajes sin leer
+      const conv = await prisma.conversacion.create({
+        data: { agenteId: agente.id, telefonoCliente: tel, modo: i === 1 ? 'HUMANO' : 'IA', leidoAt: i === 0 ? new Date(Date.now() + 60000) : null, ultimoMensajeAt: new Date(Date.now() - i * 3600000) },
+      });
+      const base = Date.now() - (i + 1) * 3600000;
       await prisma.mensaje.createMany({
         data: [
-          { conversacionId: conv.id, rol: 'CLIENTE', contenido: 'Hola, ¿qué zapatillas tienen?' },
-          { conversacionId: conv.id, rol: 'AGENTE', contenido: 'Esto es lo que tenemos, ¿cuál te interesa?' },
+          { conversacionId: conv.id, rol: 'CLIENTE', contenido: 'Hola, ¿qué zapatillas tienen?', createdAt: new Date(base) },
+          { conversacionId: conv.id, rol: 'AGENTE', contenido: 'Esto es lo que tenemos, ¿cuál te interesa?', createdAt: new Date(base + 1000) },
+          ...(i === 2 ? [
+            { conversacionId: conv.id, rol: 'CLIENTE', contenido: 'Quiero hablar con un asesor por favor', createdAt: new Date(base + 60000) },
+            { conversacionId: conv.id, rol: 'CLIENTE', contenido: '¿Hacen envíos a Montero?', createdAt: new Date(base + 90000) },
+          ] : []),
         ],
       });
+      if (i === 2) await prisma.clienteFinal.updateMany({ where: { empresaId, telefono: tel }, data: { estadoLead: 'DERIVADO_A_ASESOR', categoriaInteres: 'Calzado', presupuesto: 'Bs 300' } });
+      if (i === 0) {
+        const cf = await prisma.clienteFinal.findFirst({ where: { empresaId, telefono: tel } });
+        if (cf) await prisma.pedido.create({ data: { empresaId, clienteId: cf.id, total: 300, estado: 'ENTREGADO' } });
+      }
     }
   }
   return creados;

@@ -1,0 +1,129 @@
+/* =========================================================
+   Proshop - bandeja de conversaciones (CRM): lista | chat | ficha
+   Estructura de la barbería con la paleta actual del panel.
+   ========================================================= */
+
+/* La bandeja ocupa todo el alto bajo la barra superior, sin el relleno normal de la pagina. */
+.admin-main:has(.bandeja) { padding: 0; display: flex; flex-direction: column; }
+.bandeja {
+  --alto-barra: 58px;
+  flex: 1; display: grid; grid-template-columns: 340px minmax(0, 1fr) 300px;
+  height: calc(100vh - var(--alto-barra)); min-height: 420px; overflow: hidden;
+}
+
+/* ---------------- Lista ---------------- */
+.bandeja-lista { display: flex; flex-direction: column; min-height: 0; border-right: 1px solid var(--border); background: rgba(0, 0, 0, .12); }
+.bandeja-cab { padding: .9rem .9rem .6rem; display: grid; gap: .65rem; border-bottom: 1px solid var(--border); }
+.bandeja-buscar input {
+  width: 100%; padding: .55rem .8rem; border-radius: 10px; border: 1px solid var(--border);
+  background: rgba(255, 255, 255, .06); color: var(--text); font: inherit; font-size: .88rem;
+}
+.bandeja-buscar input:focus { outline: 2px solid rgba(47, 227, 166, .45); outline-offset: 1px; }
+.bandeja .segmentos { display: flex; background: rgba(255, 255, 255, .06); border-radius: 10px; padding: 3px; gap: 2px; }
+.bandeja .segmentos a { flex: 1; text-align: center; padding: .38rem .3rem; border-radius: 8px; font-size: .8rem; font-weight: 600; color: var(--muted); }
+.bandeja .segmentos a:hover { color: var(--text); }
+.bandeja .segmentos a.activo { background: rgba(47, 227, 166, .16); color: var(--primary-2); }
+
+.conv-lista { list-style: none; margin: 0; padding: 0; overflow-y: auto; flex: 1; scrollbar-width: thin; scrollbar-color: rgba(255, 255, 255, .2) transparent; }
+.conv {
+  display: flex; gap: .7rem; align-items: flex-start; padding: .75rem .9rem; color: inherit;
+  border-bottom: 1px solid rgba(255, 255, 255, .06); border-left: 3px solid transparent;
+}
+.conv:hover { background: rgba(255, 255, 255, .05); }
+.conv.activa { background: rgba(139, 92, 246, .16); border-left-color: var(--primary-2); }
+.conv-info { display: grid; gap: 2px; min-width: 0; flex: 1; }
+.conv-fila { display: flex; align-items: center; justify-content: space-between; gap: .5rem; min-width: 0; }
+.conv-fila strong { font-size: .9rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.conv-fila small { color: var(--muted); font-size: .72rem; flex-shrink: 0; }
+.conv-fila .hora-nueva { color: var(--primary-2); font-weight: 700; }
+.conv-texto { color: var(--muted); font-size: .82rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.conv-autor { opacity: .8; }
+.conv.sin-leer .conv-texto { color: var(--text); }
+.contador {
+  background: var(--primary-2); color: #06231a; border-radius: 999px; font-size: .68rem; font-weight: 800;
+  min-width: 19px; height: 19px; display: inline-flex; align-items: center; justify-content: center; padding: 0 5px; flex-shrink: 0;
+}
+.conv-vacio { padding: 1.5rem 1.1rem; color: var(--muted); font-size: .88rem; text-align: center; }
+
+.etiqueta { display: inline-block; width: fit-content; padding: 1px 8px; border-radius: 999px; font-size: .68rem; font-weight: 700; margin-top: 2px; }
+.etiqueta-persona { background: rgba(245, 158, 11, .18); color: #fbbf24; }
+.etiqueta-espera { background: rgba(251, 113, 133, .18); color: #fda4af; }
+.etiqueta-ia { background: rgba(47, 227, 166, .14); color: var(--primary-2); }
+
+/* Avatar con iniciales (WhatsApp no entrega la foto de perfil del cliente) */
+.avatar {
+  width: 40px; height: 40px; flex-shrink: 0; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center;
+  background: color-mix(in srgb, var(--av, #8b5cf6) 28%, transparent); color: var(--av, #8b5cf6);
+  border: 1px solid color-mix(in srgb, var(--av, #8b5cf6) 45%, transparent); font-weight: 700; font-size: .85rem;
+}
+.avatar-grande { width: 72px; height: 72px; font-size: 1.4rem; }
+
+/* ---------------- Chat ---------------- */
+.bandeja-chat { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
+.chat-cab {
+  display: flex; align-items: center; gap: .75rem; padding: .7rem 1rem; border-bottom: 1px solid var(--border);
+  background: rgba(0, 0, 0, .14);
+}
+.chat-volver { display: none; font-size: 1.3rem; color: var(--muted); padding: 0 .3rem; }
+.chat-quien { min-width: 0; flex: 1; }
+.chat-quien strong, .chat-quien small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.chat-quien small { color: var(--muted); font-size: .76rem; }
+.chat-acciones { display: flex; align-items: center; gap: .5rem; flex-wrap: wrap; justify-content: flex-end; }
+.chat-acciones .btn { padding: .4rem .8rem; font-size: .82rem; }
+
+.bandeja .conv-body {
+  flex: 1; min-height: 0; max-height: none; overflow-y: auto; padding: 1rem 6%; display: flex; flex-direction: column; gap: 2px;
+  background-image: radial-gradient(rgba(255, 255, 255, .035) 1px, transparent 1px); background-size: 18px 18px;
+  scrollbar-width: thin; scrollbar-color: rgba(255, 255, 255, .2) transparent;
+}
+.bandeja .conv-msg { max-width: min(520px, 78%); margin-top: 6px; border-radius: 12px; }
+.bandeja .conv-msg.cliente { border-top-left-radius: 3px; }
+.bandeja .conv-msg.bot, .bandeja .conv-msg.humano { border-top-right-radius: 3px; }
+.bandeja .conv-msg-hora { margin: 1px 4px 0; }
+.separador-dia { display: flex; justify-content: center; margin: 12px 0 6px; position: sticky; top: 0; z-index: 2; }
+.separador-dia span {
+  display: inline-block; background: rgba(25, 15, 40, .92); color: var(--muted); font-size: .72rem; font-weight: 700; padding: 3px 12px;
+  border-radius: 8px; border: 1px solid var(--border);
+}
+.separador-dia span::first-letter { text-transform: uppercase; }
+
+.bandeja .conv-foot { padding: .7rem 1rem; border-top: 1px solid var(--border); background: rgba(0, 0, 0, .14); }
+.bandeja .conv-foot-sin-control { margin: 0; padding: .8rem 1rem; border-top: 1px solid var(--border); background: rgba(0, 0, 0, .14); text-align: center; font-size: .85rem; color: var(--muted); }
+.bandeja .pendiente-ia { margin: .6rem 1rem 0; }
+
+.bandeja-vacio { margin: auto; max-width: 560px; padding: 2rem 1.5rem; display: grid; justify-items: center; text-align: center; gap: .4rem; }
+.vacio-icono {
+  width: 64px; height: 64px; border-radius: 20px; display: inline-flex; align-items: center; justify-content: center;
+  background: rgba(139, 92, 246, .18); color: var(--accent);
+}
+.bandeja-vacio h2 { margin: .5rem 0 0; }
+
+/* ---------------- Ficha del contacto ---------------- */
+.bandeja-ficha { border-left: 1px solid var(--border); background: rgba(0, 0, 0, .12); overflow-y: auto; min-height: 0; padding: 1.1rem 1rem; display: grid; gap: 1rem; align-content: start; scrollbar-width: thin; }
+.ficha-cab { display: grid; justify-items: center; gap: .3rem; text-align: center; }
+.ficha-cab strong { font-size: 1rem; }
+.ficha-cab small { color: var(--muted); }
+.ficha-cab .btn { margin-top: .5rem; }
+.ficha-bloque h3 { font-size: .72rem; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); margin: 0 0 .5rem; }
+.ficha-lista { list-style: none; margin: 0; padding: 0; display: grid; gap: .45rem; font-size: .85rem; }
+.ficha-lista li { display: flex; justify-content: space-between; gap: .6rem; align-items: baseline; }
+.ficha-lista li > span:first-child, .ficha-lista li > a { color: var(--muted); }
+.ficha-lista li > span:last-child { text-align: right; min-width: 0; overflow-wrap: anywhere; }
+.ficha-mas { font-size: .85rem; }
+.ficha-mas summary { cursor: pointer; color: var(--muted); padding: .3rem 0; }
+.ficha-mas form { margin-top: .5rem; }
+
+/* ---------------- Pantallas medianas y celular ---------------- */
+@media (max-width: 1180px) {
+  .bandeja { grid-template-columns: 300px minmax(0, 1fr); }
+  .bandeja-ficha { display: none; }
+}
+@media (max-width: 900px) {
+  .bandeja { grid-template-columns: 1fr; --alto-barra: 56px; }
+  /* Sin chat abierto se ve la lista; con chat abierto, solo el chat (con flecha para volver). */
+  .bandeja.con-chat .bandeja-lista { display: none; }
+  .bandeja:not(.con-chat) .bandeja-chat { display: none; }
+  .chat-volver { display: inline-block; }
+  .bandeja .conv-body { padding: .8rem; }
+  .chat-acciones .etiqueta { display: none; }
+}

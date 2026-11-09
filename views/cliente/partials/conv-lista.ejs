@@ -1,0 +1,48 @@
+<%#
+  Filas de la lista de conversaciones (una por cliente). Se usa en la bandeja y en /panel/conversaciones/lista.
+  Parametros: lista, filtro, q, abierta (telefono abierto o '').
+%>
+<%
+  function horaCorta(f) {
+    var d = new Date(f); var ahora = new Date();
+    var mismoDia = d.toDateString() === ahora.toDateString();
+    var ayer = new Date(ahora.getTime() - 86400000);
+    if (mismoDia) return d.toLocaleTimeString('es-BO', { hour: '2-digit', minute: '2-digit' });
+    if (d.toDateString() === ayer.toDateString()) return 'Ayer';
+    return d.toLocaleDateString('es-BO', { day: '2-digit', month: '2-digit' });
+  }
+  var qs = '';
+  if (filtro && filtro !== 'todas') qs += (qs ? '&' : '?') + 'filtro=' + encodeURIComponent(filtro);
+  if (q) qs += (qs ? '&' : '?') + 'q=' + encodeURIComponent(q);
+%>
+<% if (!lista.length) { %>
+  <li class="conv-vacio">
+    <% if (q) { %>Ninguna conversación coincide con «<%= q %>».
+    <% } else if (filtro === 'no_leidas') { %>No tenés conversaciones sin leer. 🎉
+    <% } else if (filtro === 'persona') { %>Nadie espera a una persona ahora.
+    <% } else { %>Todavía no hay conversaciones. Cuando un cliente le escriba a tu agente, va a aparecer acá.<% } %>
+  </li>
+<% } %>
+<% lista.forEach(function (c) { %>
+  <li>
+    <a class="conv <%= String(abierta) === c.telefono ? 'activa' : '' %> <%= c.noLeidos ? 'sin-leer' : '' %>"
+       href="/panel/conversaciones/<%= encodeURIComponent(c.telefono) %><%= qs %>" data-telefono="<%= c.telefono %>">
+      <span class="avatar" style="--av: <%= c.color %>" aria-hidden="true"><%= c.iniciales %></span>
+      <span class="conv-info">
+        <span class="conv-fila">
+          <strong><%= c.titulo %></strong>
+          <small class="<%= c.noLeidos ? 'hora-nueva' : '' %>"><%= horaCorta(c.ultimoAt) %></small>
+        </span>
+        <span class="conv-fila">
+          <span class="conv-texto">
+            <% if (c.ultimoAutor === 'AGENTE') { %><span class="conv-autor"><%= c.humano ? 'Equipo: ' : 'Agente: ' %></span><% } %>
+            <% if (c.ultimoTipo === 'imagen') { %>📷 <% } else if (c.ultimoTipo === 'audio') { %>🎤 <% } %><%= c.ultimoTexto %>
+          </span>
+          <% if (c.noLeidos) { %><span class="contador"><%= c.noLeidos %></span><% } %>
+        </span>
+        <% if (c.humano) { %><span class="etiqueta etiqueta-persona">Atiende una persona</span>
+        <% } else if (c.pidioPersona) { %><span class="etiqueta etiqueta-espera">Pidió una persona</span><% } %>
+      </span>
+    </a>
+  </li>
+<% }); %>

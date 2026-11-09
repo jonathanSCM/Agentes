@@ -1,0 +1,331 @@
+<%- include('partials/inicio') %>
+
+<%
+  var abiertaTel = abierta || '';
+  var hrefBase = abierta ? '/panel/conversaciones/' + encodeURIComponent(abierta) : '';
+  var fa = (typeof filaAbierta !== 'undefined' && filaAbierta) ? filaAbierta : null;
+  var nombreAbierta = abierta ? ((cliente && (cliente.nombre || cliente.nombrePerfil)) || abierta) : '';
+  var inicialesAbierta = fa ? fa.iniciales : '#';
+  var colorAbierta = fa ? fa.color : '#8b5cf6';
+  var qsBase = '';
+  if (filtro && filtro !== 'todas') qsBase += (qsBase ? '&' : '?') + 'filtro=' + encodeURIComponent(filtro);
+  if (q) qsBase += (qsBase ? '&' : '?') + 'q=' + encodeURIComponent(q);
+%>
+
+<div class="bandeja <%= abierta ? 'con-chat' : '' %>" id="bandeja" data-filtro="<%= filtro %>" data-q="<%= q %>" data-abierta="<%= abiertaTel %>">
+
+  <%# ================= Lista ================= %>
+  <aside class="bandeja-lista">
+    <div class="bandeja-cab">
+      <form method="GET" action="/panel/conversaciones" class="bandeja-buscar" role="search">
+        <% if (filtro && filtro !== 'todas') { %><input type="hidden" name="filtro" value="<%= filtro %>" /><% } %>
+        <input type="search" name="q" value="<%= q %>" placeholder="Buscar por nombre, teléfono o mensaje" aria-label="Buscar conversaciones" autocomplete="off" />
+      </form>
+      <div class="segmentos" role="tablist" aria-label="Filtrar conversaciones">
+        <% [['todas', 'Todas'], ['no_leidas', 'No leídas'], ['persona', 'Con persona']].forEach(function (f) { %>
+          <a class="<%= filtro === f[0] ? 'activo' : '' %>" href="/panel/conversaciones<%= abierta ? '/' + encodeURIComponent(abierta) : '' %>?<%= f[0] === 'todas' ? '' : 'filtro=' + f[0] + '&' %><%= q ? 'q=' + encodeURIComponent(q) : '' %>" role="tab"><%= f[1] %></a>
+        <% }); %>
+      </div>
+    </div>
+    <ul class="conv-lista" id="convLista"><%- include('partials/conv-lista', { lista: lista, filtro: filtro, q: q, abierta: abiertaTel }) %></ul>
+  </aside>
+
+  <%# ================= Chat ================= %>
+  <section class="bandeja-chat">
+    <% if (!abierta) { %>
+      <div class="bandeja-vacio">
+        <span class="vacio-icono" aria-hidden="true"><svg viewBox="0 0 24 24" width="30" height="30" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16v11H8l-4 4V4Z"/></svg></span>
+        <h2>Elegí una conversación</h2>
+        <p class="muted">Tocá un cliente de la lista para ver el chat, tomar el control o escribirle.</p>
+        <% if (mensaje) { %><div class="alert-ok"><%= mensaje %></div><% } %>
+        <% if (error) { %><div class="alert-err"><%= error %></div><% } %>
+        <% if (stats) { %>
+        <div class="admin-stats" style="margin-top:1.2rem;max-width:520px">
+          <div class="stat-card"><span class="stat-num"><%= stats.total %></span><span class="stat-label">Conversaciones</span></div>
+          <div class="stat-card stat-new"><span class="stat-num"><%= stats.hoy %></span><span class="stat-label">Hoy</span></div>
+          <div class="stat-card stat-done"><span class="stat-num"><%= stats.mensajes %></span><span class="stat-label">Mensajes</span></div>
+        </div>
+        <% if (lista.length || stats.total) { %>
+        <form method="POST" action="/panel/conversaciones/reiniciar-todas" class="inline-form" style="margin-top:1rem"
+              onsubmit="return confirm('¿Reiniciar la memoria de TODOS los clientes? El agente va a tratar cada charla como nueva desde el próximo mensaje. El historial de mensajes NO se borra.');">
+          <button class="btn btn-ghost" type="submit" title="Herramienta para pruebas: borra lo que el agente recuerda de TODOS los clientes, sin borrar el historial">↺ Reiniciar memoria de todos</button>
+        </form>
+        <% } %>
+        <% } %>
+      </div>
+    <% } else { %>
+      <header class="chat-cab">
+        <a class="chat-volver" href="/panel/conversaciones<%= qsBase %>" aria-label="Volver a la lista">←</a>
+        <span class="avatar" style="--av: <%= colorAbierta %>" aria-hidden="true"><%= inicialesAbierta %></span>
+        <div class="chat-quien">
+          <strong><%= nombreAbierta %></strong>
+          <small id="chatStatus"><%= abierta %> · <%= totalMensajes %> mensajes</small>
+        </div>
+        <div class="chat-acciones">
+          <% if (ultimaConversacion.modo === 'HUMANO') { %>
+            <span class="etiqueta etiqueta-persona">Tomada por <%= ultimaConversacion.tomadaPor ? ultimaConversacion.tomadaPor.nombre : 'un humano' %></span>
+            <form method="POST" action="<%= hrefBase %>/liberar" class="inline-form"><button class="btn btn-ghost" type="submit">Devolver al agente</button></form>
+          <% } else { %>
+            <span class="etiqueta etiqueta-ia">Atiende el agente IA</span>
+            <form method="POST" action="<%= hrefBase %>/control" class="inline-form"><button class="btn btn-primary" type="submit">Tomar control</button></form>
+          <% } %>
+        </div>
+      </header>
+
+      <% if (typeof pendiente !== 'undefined' && pendiente) { %>
+        <div class="alert-err pendiente-ia" role="status">
+          <div>
+            <strong>El agente no pudo contestar este mensaje</strong>
+            <p>El cliente escribió: «<%= pendiente.texto %>». Solo recibió el menú. Cuando la IA vuelva, el agente le contesta solo; si no querés esperar, tocá el botón (o escribile vos).</p>
+          </div>
+          <form method="POST" action="<%= hrefBase %>/responder-pendiente" class="inline-form"><button class="btn btn-primary" type="submit">Que el agente responda ahora</button></form>
+        </div>
+      <% } %>
+      <% if (mensaje) { %><div class="alert-ok" style="margin:.5rem 1rem 0"><%= mensaje %></div><% } %>
+      <% if (error) { %><div class="alert-err" style="margin:.5rem 1rem 0"><%= error %></div><% } %>
+
+      <div class="conv-body" id="chatMensajes">
+        <% if (totalMensajes === 0) { %><p class="dash-empty" id="chatVacio">Todavía no hay mensajes en esta conversación.</p><% } %>
+        <%
+          function claseDe(m) { if (m.rol === 'CLIENTE') return 'cliente'; return m.usuario ? 'humano' : 'bot'; }
+          function quienDe(m) { if (m.rol === 'CLIENTE') return null; return m.usuario ? ('✋ ' + m.usuario.nombre) : '🤖 Agente IA'; }
+          var ultimoDia = '';
+        %>
+        <% itemsUnificados.forEach(function (item) { %>
+          <% if (item.tipo === 'divisor') { %>
+            <div class="conv-divisor"><span>
+              <%= item.esPrimera ? 'Conversación iniciada' : '↺ Nueva conversación cobrada' %>
+              — <%= new Date(item.createdAt).toLocaleString('es-BO', { dateStyle: 'short', timeStyle: 'short' }) %>
+              <% if (!item.esPrimera) { %>· <%= item.origen === 'INCLUIDA' ? 'Plan' : 'Paquete' %><% } %>
+            </span></div>
+          <% } else { %>
+            <% var m = item.mensaje; var clase = claseDe(m); var quien = quienDe(m);
+               var dia = new Date(m.createdAt).toLocaleDateString('es-BO', { weekday: 'long', day: 'numeric', month: 'long' }); %>
+            <% if (dia !== ultimoDia) { ultimoDia = dia; %><div class="separador-dia"><span><%= dia %></span></div><% } %>
+            <% if (m.mediaTipo === 'imagen' && m.mediaUrl) { %>
+              <div class="conv-msg foto <%= clase %>">
+                <img src="<%= m.mediaUrl %>" alt="" />
+                <% if (quien || m.contenido) { %><div class="conv-msg-foto-caption"><% if (quien) { %><div class="conv-msg-quien"><%= quien %></div><% } %><%= m.contenido %></div><% } %>
+              </div>
+            <% } else if (m.mediaTipo === 'audio' && m.mediaUrl) { %>
+              <div class="conv-msg <%= clase %>">
+                <% if (quien) { %><div class="conv-msg-quien"><%= quien %></div><% } %>
+                <audio controls src="<%= m.mediaUrl %>"></audio>
+                <% if (m.contenido) { %><div style="margin-top:.4rem;font-size:.82rem"><%= m.contenido %></div><% } %>
+              </div>
+            <% } else { %>
+              <div class="conv-msg <%= clase %>"><% if (quien) { %><div class="conv-msg-quien"><%= quien %></div><% } %><%= m.contenido %></div>
+            <% } %>
+            <div class="conv-msg-hora <%= clase %>"><%= new Date(m.createdAt).toLocaleTimeString('es-BO', { hour: '2-digit', minute: '2-digit' }) %></div>
+          <% } %>
+        <% }); %>
+      </div>
+
+      <% if (ultimaConversacion.modo === 'HUMANO') { %>
+        <form method="POST" action="<%= hrefBase %>/mensaje" id="formMensajeHumano" class="conv-foot">
+          <input type="text" name="texto" autocomplete="off" placeholder="Escribí tu respuesta..." />
+          <button class="btn btn-ghost" type="button" id="btnAbrirProducto">📦 Producto</button>
+          <button class="btn btn-primary" type="submit">Enviar</button>
+        </form>
+      <% } else { %>
+        <p class="conv-foot-sin-control">Tomá el control del chat para poder escribirle directo al cliente.</p>
+      <% } %>
+    <% } %>
+  </section>
+
+  <%# ================= Ficha del contacto ================= %>
+  <% if (abierta) { %>
+  <aside class="bandeja-ficha">
+    <div class="ficha-cab">
+      <span class="avatar avatar-grande" style="--av: <%= colorAbierta %>" aria-hidden="true"><%= inicialesAbierta %></span>
+      <strong><%= nombreAbierta %></strong>
+      <small><%= abierta %></small>
+      <a class="btn btn-ghost btn-block" href="https://wa.me/<%= abierta.replace(/\D/g,'') %>" target="_blank" rel="noopener">Abrir en WhatsApp</a>
+    </div>
+
+    <% if (cliente) { %>
+    <section class="ficha-bloque">
+      <h3>Lo que se sabe</h3>
+      <ul class="ficha-lista">
+        <li><span>Estado</span><span class="badge badge-done"><%= cliente.estadoLead.replace(/_/g,' ').toLowerCase() %></span></li>
+        <li><span>Interés</span><span><%= cliente.categoriaInteres || '—' %></span></li>
+        <li><span>Presupuesto</span><span><%= cliente.presupuesto || '—' %></span></li>
+        <li><span>Entrega</span><span><% if (direccionLink) { %><a href="<%= direccionLink %>" target="_blank" rel="noopener" class="conv-direccion-link">📍 Ver ubicación</a><% } else { %><%= cliente.direccionEntrega || '—' %><% } %></span></li>
+      </ul>
+    </section>
+    <% } %>
+
+    <section class="ficha-bloque">
+      <h3>Pedidos</h3>
+      <% if (!ficha.pedidos.length) { %><p class="muted" style="font-size:.85rem;margin:0">Todavía no hizo pedidos.</p>
+      <% } else { %>
+        <ul class="ficha-lista">
+          <% ficha.pedidos.forEach(function (p) { %>
+            <li><a href="/panel/pedidos/<%= p.id %>">#<%= p.id %> · <%= new Date(p.createdAt).toLocaleDateString('es-BO', { day: '2-digit', month: '2-digit' }) %></a>
+              <span><%= simboloCatalogo %> <%= Number(p.total).toFixed(2) %> <span class="badge"><%= p.estado.toLowerCase() %></span></span></li>
+          <% }); %>
+        </ul>
+        <p class="muted" style="font-size:.8rem;margin:.4rem 0 0">Total comprado: <strong><%= simboloCatalogo %> <%= ficha.totalComprado.toFixed(2) %></strong></p>
+      <% } %>
+    </section>
+
+    <section class="ficha-bloque">
+      <h3>Conversación</h3>
+      <ul class="ficha-lista">
+        <li><span>Sesiones cobradas</span><span><%= conversaciones.length %></span></li>
+        <li><span>Mensajes</span><span><%= totalMensajes %></span></li>
+        <% if (ultimaConversacion.anuncioTitulo) { %><li><span>Vino de un anuncio</span><span><%= ultimaConversacion.anuncioTitulo %></span></li><% } %>
+      </ul>
+    </section>
+
+    <details class="ficha-mas">
+      <summary>Más acciones</summary>
+      <form method="POST" action="<%= hrefBase %>/reiniciar" class="inline-form"
+            onsubmit="return confirm('¿Reiniciar la memoria de este cliente? El agente olvidará categoría, presupuesto, favorito y productos ya mostrados, y lo tratará como una charla nueva desde el próximo mensaje. El historial de mensajes NO se borra.');">
+        <button class="btn btn-ghost btn-block" type="submit" title="Borra lo que el agente recuerda de este cliente, sin borrar el historial ni afectar tu consumo">↺ Reiniciar cliente</button>
+      </form>
+      <form method="POST" action="<%= hrefBase %>/eliminar" class="inline-form"
+            onsubmit="return confirm('¿Borrar POR COMPLETO esta conversación? Se eliminan todos los mensajes de TODAS sus sesiones, toda la memoria del cliente y el registro del cliente en la base. Los pedidos ya creados no se borran. Esto NO se puede deshacer.');">
+        <button class="btn btn-danger btn-block" type="submit" title="Borra por completo la conversación y los datos de este cliente">🗑 Borrar todo</button>
+      </form>
+    </details>
+  </aside>
+  <% } %>
+</div>
+
+<% if (abierta && ultimaConversacion.modo === 'HUMANO') { %>
+<div class="prod-overlay" id="prodOverlay" hidden>
+  <div class="prod-card">
+    <button type="button" class="prod-cerrar" id="prodCerrar" aria-label="Cerrar">✕</button>
+    <h3>Enviar producto</h3>
+    <input type="text" class="prod-buscar" id="prodBuscar" placeholder="Buscar por nombre..." autocomplete="off" />
+    <div class="prod-lista" id="prodLista"></div>
+  </div>
+</div>
+<form method="POST" action="<%= hrefBase %>/producto" id="formEnviarProducto" style="display:none">
+  <input type="hidden" name="productoId" id="prodIdSeleccionado" />
+</form>
+<% } %>
+
+<script src="/socket.io/socket.io.js"></script>
+<script>
+  (function () {
+    var raiz = document.getElementById('bandeja');
+    var lista = document.getElementById('convLista');
+    var filtro = raiz.getAttribute('data-filtro');
+    var q = raiz.getAttribute('data-q');
+    var abierta = raiz.getAttribute('data-abierta');
+
+    // ---- La lista se vuelve a pedir cuando algo cambia (mensaje nuevo, chat tomado o devuelto) ----
+    var pendiente = null;
+    function refrescarLista() {
+      clearTimeout(pendiente);
+      pendiente = setTimeout(function () {
+        var url = '/panel/conversaciones/lista?filtro=' + encodeURIComponent(filtro) + '&q=' + encodeURIComponent(q) + '&abierta=' + encodeURIComponent(abierta);
+        fetch(url, { credentials: 'same-origin' }).then(function (r) { return r.ok ? r.text() : null; }).then(function (html) {
+          if (html !== null) lista.innerHTML = html;
+        }).catch(function () { /* sin red: queda como estaba */ });
+      }, 350);
+    }
+
+    var socket = io();
+    var CONV_IDS = <%- JSON.stringify(abierta ? conversaciones.map(function (c) { return c.id; }) : []) %>;
+    var body = document.getElementById('chatMensajes');
+    var status = document.getElementById('chatStatus');
+    var total = <%- abierta ? totalMensajes : 0 %>;
+
+    // Si hay un chat abierto, al entrar se ve el ULTIMO mensaje, no el primero.
+    if (body) body.scrollTop = body.scrollHeight;
+
+    function fmtHora(iso) { return new Date(iso).toLocaleTimeString('es-BO', { hour: '2-digit', minute: '2-digit' }); }
+    function claseDe(m) { if (m.rol === 'CLIENTE') return 'cliente'; return m.usuarioNombre ? 'humano' : 'bot'; }
+    function quienDe(m) { if (m.rol === 'CLIENTE') return null; return m.usuarioNombre ? ('✋ ' + m.usuarioNombre) : '🤖 Agente IA'; }
+
+    function agregarBurbuja(m) {
+      var vacio = document.getElementById('chatVacio'); if (vacio) vacio.remove();
+      var clase = claseDe(m);
+      var quien = quienDe(m);
+      var wrap = document.createElement('div');
+      wrap.className = 'conv-msg ' + clase + (m.mediaTipo === 'imagen' && m.mediaUrl ? ' foto' : '');
+      function conQuien(contenedor) {
+        if (!quien) return;
+        var q1 = document.createElement('div'); q1.className = 'conv-msg-quien'; q1.textContent = quien; contenedor.appendChild(q1);
+      }
+      if (m.mediaTipo === 'imagen' && m.mediaUrl) {
+        var img = document.createElement('img'); img.src = m.mediaUrl; wrap.appendChild(img);
+        if (quien || m.contenido) {
+          var cap = document.createElement('div'); cap.className = 'conv-msg-foto-caption';
+          conQuien(cap); cap.appendChild(document.createTextNode(m.contenido || '')); wrap.appendChild(cap);
+        }
+      } else if (m.mediaTipo === 'audio' && m.mediaUrl) {
+        conQuien(wrap);
+        var audio = document.createElement('audio'); audio.controls = true; audio.src = m.mediaUrl; wrap.appendChild(audio);
+        if (m.contenido) { var nota = document.createElement('div'); nota.style.cssText = 'margin-top:.4rem;font-size:.82rem'; nota.textContent = m.contenido; wrap.appendChild(nota); }
+      } else {
+        conQuien(wrap);
+        wrap.appendChild(document.createTextNode(m.contenido));
+      }
+      body.appendChild(wrap);
+      var hora = document.createElement('div'); hora.className = 'conv-msg-hora ' + clase; hora.textContent = fmtHora(m.createdAt); body.appendChild(hora);
+      body.scrollTop = body.scrollHeight;
+      total++;
+      if (status) status.textContent = abierta + ' · ' + total + ' mensajes';
+    }
+
+    socket.on('mensaje:nuevo', function (payload) {
+      if (body && CONV_IDS.indexOf(payload.conversacionId) !== -1) {
+        agregarBurbuja(payload);
+        // Lo estoy viendo: queda leido para el equipo.
+        fetch('/panel/conversaciones/' + encodeURIComponent(abierta) + '/leido', { method: 'POST', credentials: 'same-origin' }).catch(function () {});
+      }
+      refrescarLista();
+    });
+    socket.on('conversacion:actualizada', function (payload) {
+      // Otra persona tomo/devolvio el control del chat abierto: se recarga para mostrar el estado real
+      // (evita que dos personas escriban a la vez sin saberlo).
+      if (body && CONV_IDS.indexOf(payload.conversacionId) !== -1) { location.reload(); return; }
+      refrescarLista();
+    });
+
+    // ---- Modal de "enviar producto" ----
+    var btnAbrir = document.getElementById('btnAbrirProducto');
+    var overlay = document.getElementById('prodOverlay');
+    if (!btnAbrir || !overlay) return;
+    var btnCerrar = document.getElementById('prodCerrar');
+    var buscar = document.getElementById('prodBuscar');
+    var listaProd = document.getElementById('prodLista');
+    var form = document.getElementById('formEnviarProducto');
+    var inputId = document.getElementById('prodIdSeleccionado');
+    var debounce = null;
+
+    function abrir() { overlay.hidden = false; buscar.value = ''; buscar.focus(); cargar(''); }
+    function cerrar() { overlay.hidden = true; }
+    function cargar(texto) {
+      listaProd.innerHTML = '<p class="prod-vacio">Buscando...</p>';
+      fetch('<%= hrefBase %>/productos-buscar?q=' + encodeURIComponent(texto))
+        .then(function (r) { return r.json(); })
+        .then(function (productos) {
+          if (!productos.length) { listaProd.innerHTML = '<p class="prod-vacio">Sin resultados.</p>'; return; }
+          listaProd.innerHTML = '';
+          productos.forEach(function (p) {
+            var btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = 'prod-item';
+            var miniatura = p.foto ? '<img src="' + p.foto + '" alt="" />' : '<div class="prod-item-sin-foto">📦</div>';
+            btn.innerHTML = miniatura + '<div><div class="prod-item-nombre"></div><div class="prod-item-precio"></div></div>';
+            btn.querySelector('.prod-item-nombre').textContent = p.nombre;
+            btn.querySelector('.prod-item-precio').textContent = 'Bs ' + Number(p.precio).toFixed(2);
+            btn.addEventListener('click', function () { inputId.value = p.id; form.submit(); });
+            listaProd.appendChild(btn);
+          });
+        })
+        .catch(function () { listaProd.innerHTML = '<p class="prod-vacio">No se pudo buscar. Intentá de nuevo.</p>'; });
+    }
+    btnAbrir.addEventListener('click', abrir);
+    btnCerrar.addEventListener('click', cerrar);
+    overlay.addEventListener('click', function (e) { if (e.target === overlay) cerrar(); });
+    buscar.addEventListener('input', function () { clearTimeout(debounce); var v = buscar.value; debounce = setTimeout(function () { cargar(v); }, 300); });
+  })();
+</script>
+
+<%- include('partials/fin') %>
