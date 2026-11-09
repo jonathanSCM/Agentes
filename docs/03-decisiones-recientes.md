@@ -990,3 +990,17 @@ Base del punto de venta (`docs/11`): el bot, el mostrador y el panel descuentan 
 - **Costo y código de barras** (opcionales) en productos y variantes: el costo alimentará el margen del panel comercial; el código se valida único por empresa (`codigosBarras.js`, con `buscar` para el lector del POS: por código o SKU exacto, solo activos).
 - Prueba clave: **20 ventas simultáneas por 5 unidades → pasan exactamente 5**. Tests: `stock` (13), `codigos-barras` (6) y uno del historial en `flujo-determinista`. Suite: 910.
 - **Pendiente para el POS**: tipos `VENTA`, `ANULACION_VENTA` y `DEVOLUCION_VENTA` ya están permitidos en el historial; el POS los usará.
+
+
+## 50. Punto de venta (F5): caja, ventas, recibo, rol Cajero
+
+Módulo POS del plan (`docs/11`, `docs/12-pos-impresora-y-lector.md`). Todo protegido en el servidor con `requireModulo('POS')` y por rol.
+- **Datos** (migraciones `20261110100000` rol `CAJERO` y `20261110110000`): `sesiones_caja` (una abierta por empresa, índice único parcial), `movimientos_caja`, `ventas` (número por empresa, clave de idempotencia, token de recibo), `venta_items` (con costo del momento), `venta_pagos`; restricciones `CHECK` de montos.
+- **Reglas de dinero** (`ventaCalculo.js`, puras, en centavos enteros): el servidor recalcula todo desde los precios de la base (el navegador solo manda producto, opción, cantidad, descuento y pagos); la suma de pagos debe ser exactamente el total; solo el efectivo da vuelto; el efectivo esperado = inicial + cobros en efectivo (sin vuelto) + entradas − salidas, sin contar ventas anuladas.
+- **Cobrar** (`ventas.js`): exige caja abierta; descuenta el stock en la misma transacción con el servicio de stock (sin sobreventa); **idempotente** (doble clic o reintento no cobra dos veces, ni siquiera en paralelo); numeración correlativa sin saltos aunque se cobre en paralelo.
+- **Anular**: solo dueño/admin, solo con la caja de esa venta abierta, con reclamo atómico (dos anulaciones simultáneas devuelven el stock una vez); queda en el historial de stock.
+- **Caja** (`caja.js`): abrir (una sola, aunque la abran a la vez), entradas/salidas manuales (una salida no puede dejar la caja negativa), cierre con conteo y diferencia. El cajero no ve el efectivo esperado antes de contar.
+- **Pantallas**: Punto de venta (buscador siempre enfocado para el **lector**, grilla táctil, opciones talla/color, carrito, descuento, cobro con pagos mixtos y vuelto, atajos F2/F4, cámara si el navegador la soporta, carrito que sobrevive a recargar), Caja, Ventas (+ detalle y anulación) y **recibo público** `/recibo/:token` (ticket 80 mm y A4, nota de venta, no factura).
+- **Rol CAJERO**: invitable desde Mi equipo; ve solo Punto de venta, Caja y Ventas; el servidor redirige o niega todo lo demás.
+- Verificado: 24 pruebas de caja/ventas contra Postgres (incluye 12 cobros simultáneos por 5 unidades, doble anulación, aperturas simultáneas) y una prueba de punta a punta en el navegador y por la API (lector simulado, talla, descuento, vuelto, ticket, doble clic, anulación). Suite: 953.
+- **Pendiente**: probar con una impresora térmica y un lector reales; devoluciones parciales; cobrar pedidos del bot en el mostrador; cliente asociado a la venta; panel comercial (F7).

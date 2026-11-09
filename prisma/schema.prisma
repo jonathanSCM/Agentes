@@ -265,6 +265,8 @@ model Empresa {
   suscripcion    Suscripcion?
   solicitudesConversaciones SolicitudConversaciones[]
   movimientosStock MovimientoStock[]
+  sesionesCaja     SesionCaja[]
+  ventas           Venta[]
   usosIA         UsoIA[]
   mensajesAgente MensajeAgente[]
   datosNegocio   DatoNegocio[]
@@ -504,6 +506,11 @@ model Usuario {
   conversacionesTomadas Conversacion[]
   mensajes              Mensaje[]
   movimientosStock      MovimientoStock[]
+  cajasAbiertas         SesionCaja[]      @relation("CajaAbiertaPor")
+  cajasCerradas         SesionCaja[]      @relation("CajaCerradaPor")
+  movimientosCaja       MovimientoCaja[]
+  ventasCobradas        Venta[]           @relation("VentaCajero")
+  ventasAnuladas        Venta[]           @relation("VentaAnuladaPor")
 
   @@index([empresaId])
   @@map("usuarios")
@@ -534,6 +541,7 @@ enum Rol {
   OWNER         // dueno de la empresa cliente
   ADMIN         // administrador de la empresa
   STAFF         // colaborador
+  CAJERO        // mostrador: solo punto de venta, caja y ventas
 }
 
 // ============================ SUSCRIPCION Y CONSUMO ============================
@@ -957,6 +965,122 @@ model MovimientoStock {
   @@index([empresaId, createdAt])
   @@index([productoId, createdAt])
   @@map("movimientos_stock")
+}
+
+// ============================ PUNTO DE VENTA ============================
+// Caja del mostrador: una sola abierta por empresa (indice unico parcial en la base).
+model SesionCaja {
+  id               Int       @id @default(autoincrement())
+  empresaId        Int
+  empresa          Empresa   @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  abiertaPorId     Int?
+  abiertaPor       Usuario?  @relation("CajaAbiertaPor", fields: [abiertaPorId], references: [id], onDelete: SetNull)
+  cerradaPorId     Int?
+  cerradaPor       Usuario?  @relation("CajaCerradaPor", fields: [cerradaPorId], references: [id], onDelete: SetNull)
+  // ABIERTA | CERRADA
+  estado           String    @default("ABIERTA")
+  efectivoInicial  Decimal   @default(0) @db.Decimal(12, 2)
+  // Al cerrar: lo que el sistema calcula, lo que se conto y la diferencia.
+  efectivoEsperado Decimal?  @db.Decimal(12, 2)
+  efectivoContado  Decimal?  @db.Decimal(12, 2)
+  diferencia       Decimal?  @db.Decimal(12, 2)
+  notas            String?
+  abiertaAt        DateTime  @default(now())
+  cerradaAt        DateTime?
+
+  movimientos MovimientoCaja[]
+  ventas      Venta[]
+
+  @@index([empresaId, abiertaAt])
+  @@map("sesiones_caja")
+}
+
+// Entradas y salidas manuales de efectivo (ej. pagar a un proveedor desde la caja).
+model MovimientoCaja {
+  id        Int        @id @default(autoincrement())
+  sesionId  Int
+  sesion    SesionCaja @relation(fields: [sesionId], references: [id], onDelete: Cascade)
+  // ENTRADA | SALIDA
+  tipo      String
+  monto     Decimal    @db.Decimal(12, 2)
+  nota      String?
+  usuarioId Int?
+  usuario   Usuario?   @relation(fields: [usuarioId], references: [id], onDelete: SetNull)
+  createdAt DateTime   @default(now())
+
+  @@index([sesionId])
+  @@map("movimientos_caja")
+}
+
+model Venta {
+  id                Int         @id @default(autoincrement())
+  empresaId         Int
+  empresa           Empresa     @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  // Numero correlativo por empresa (V-0001...).
+  numero            Int
+  sesionCajaId      Int?
+  sesionCaja        SesionCaja? @relation(fields: [sesionCajaId], references: [id], onDelete: SetNull)
+  cajeroId          Int?
+  cajero            Usuario?    @relation("VentaCajero", fields: [cajeroId], references: [id], onDelete: SetNull)
+  clienteId         Int?
+  clienteNombre     String?
+  subtotal          Decimal     @db.Decimal(12, 2)
+  descuento         Decimal     @default(0) @db.Decimal(12, 2)
+  total             Decimal     @db.Decimal(12, 2)
+  // COMPLETADA | ANULADA
+  estado            String      @default("COMPLETADA")
+  // Una por intento de cobro: un doble clic o un reintento no cobra dos veces.
+  claveIdempotencia String?
+  // Recibo publico (sin login): /recibo/:token
+  tokenRecibo       String      @unique
+  pedidoId          Int?
+  anuladaAt         DateTime?
+  anuladaPorId      Int?
+  anuladaPor        Usuario?    @relation("VentaAnuladaPor", fields: [anuladaPorId], references: [id], onDelete: SetNull)
+  motivoAnulacion   String?
+  createdAt         DateTime    @default(now())
+
+  items VentaItem[]
+  pagos VentaPago[]
+
+  @@unique([empresaId, numero])
+  @@index([empresaId, createdAt])
+  @@index([sesionCajaId])
+  @@map("ventas")
+}
+
+model VentaItem {
+  id             Int       @id @default(autoincrement())
+  ventaId        Int
+  venta          Venta     @relation(fields: [ventaId], references: [id], onDelete: Cascade)
+  productoId     Int?
+  varianteId     Int?
+  nombre         String
+  cantidad       Int
+  precioUnitario Decimal   @db.Decimal(12, 2)
+  descuento      Decimal   @default(0) @db.Decimal(12, 2)
+  total          Decimal   @db.Decimal(12, 2)
+  // Costo al momento de vender: asi el margen no cambia si despues cambia el costo.
+  costoUnitario  Decimal?  @db.Decimal(12, 2)
+
+  @@index([ventaId])
+  @@index([productoId])
+  @@map("venta_items")
+}
+
+model VentaPago {
+  id         Int     @id @default(autoincrement())
+  ventaId    Int
+  venta      Venta   @relation(fields: [ventaId], references: [id], onDelete: Cascade)
+  // EFECTIVO | QR | TARJETA | TRANSFERENCIA
+  metodo     String
+  monto      Decimal @db.Decimal(12, 2)
+  recibido   Decimal? @db.Decimal(12, 2)
+  vuelto     Decimal? @db.Decimal(12, 2)
+  referencia String?
+
+  @@index([ventaId])
+  @@map("venta_pagos")
 }
 
 model ClienteFinal {

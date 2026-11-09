@@ -68,6 +68,10 @@ const menuPanel = require('./lib/services/menuPanel');
 const bandeja = require('./lib/services/bandeja');
 const stockSrv = require('./lib/services/stock');
 const codigosBarras = require('./lib/services/codigosBarras');
+const caja = require('./lib/services/caja');
+const ventasSrv = require('./lib/services/ventas');
+const ventaCalculo = require('./lib/services/ventaCalculo');
+const posCatalogo = require('./lib/services/posCatalogo');
 const { requireModulo } = require('./lib/services/modulos');
 const { registrarCliente, autenticar } = require('./lib/services/auth');
 const { procesarMensajeEntrante, atenderMensaje, generarYRegistrarRespuesta, conversacionParaCarritoWeb, conBloqueoDeCliente } = require('./lib/services/conversaciones');
@@ -942,6 +946,16 @@ app.use('/panel', async (req, res, next) => {
     res.locals.menuUsuario = { iniciales: menuPanel.iniciales(req.session.clienteNombre), rol: menuPanel.etiquetaRol(req.session.clienteRol) };
     next();
   } catch (err) { next(err); }
+});
+
+// El CAJERO solo ve el punto de venta, la caja y las ventas. Se aplica en el SERVIDOR (no solo en el menu).
+const RUTAS_DEL_CAJERO = ['/pos', '/caja', '/ventas', '/salir', '/notificaciones'];
+app.use('/panel', (req, res, next) => {
+  if (!req.session || req.session.clienteRol !== 'CAJERO') return next();
+  if (req.path === '/') return res.redirect('/panel/pos');
+  if (RUTAS_DEL_CAJERO.some((r) => req.path === r || req.path.startsWith(`${r}/`))) return next();
+  if (req.method === 'GET') return res.redirect('/panel/pos');
+  return res.status(403).render('403', { title: 'Sin permiso - Proshop' });
 });
 
 // Marcar una / todas como leidas
@@ -2845,6 +2859,152 @@ const idDe = (req) => Number(req.params.id);
 
 // ---- Servicios
 // ---------------------------------------------------------------- mensajes del agente (M2)
+// ===================== PUNTO DE VENTA (docs/11 F5) =====================
+// Todas las rutas exigen el modulo POS en el plan (en el servidor). Los errores de negocio
+// (caja, venta, stock) llegan como mensajes claros; el cajero siempre sale de la sesion.
+const POS = [requireCliente, requireModulo('POS')];
+const usuarioPos = (req) => ({ id: req.session.clienteId, rol: req.session.clienteRol });
+const esErrorDeNegocio = (err) => err && ['VENTA', 'CAJA', 'STOCK'].includes(err.codigo);
+
+app.get('/panel/pos', ...POS, async (req, res, next) => {
+  try {
+    const empresaId = req.session.empresaId;
+    const sesion = await caja.sesionAbierta(empresaId);
+    res.render('cliente/pos', {
+      title: 'Punto de venta - Proshop', tituloPagina: 'Punto de venta', activo: 'pos', hojas: ['/css/pos.css'],
+      sesion, empresaId, mensaje: req.query.ok || null, error: req.query.err || null,
+      metodos: ventaCalculo.METODOS.map((m) => ({ clave: m, etiqueta: ventaCalculo.ETIQUETAS_METODO[m] })),
+    });
+  } catch (err) { next(err); }
+});
+
+app.post('/panel/pos/caja/abrir', ...POS, async (req, res, next) => {
+  try {
+    await caja.abrir(req.session.empresaId, req.session.clienteId, req.body.efectivoInicial, req.body.notas);
+    res.redirect(`${req.body.volver === 'caja' ? '/panel/caja' : '/panel/pos'}?ok=` + encodeURIComponent('Caja abierta. ¡A vender!'));
+  } catch (err) {
+    if (esErrorDeNegocio(err)) return res.redirect(`${req.body.volver === 'caja' ? '/panel/caja' : '/panel/pos'}?err=` + encodeURIComponent(err.message));
+    next(err);
+  }
+});
+
+// Busqueda del POS (nombre, SKU o codigo de barras): devuelve JSON.
+app.get('/panel/pos/buscar', ...POS, async (req, res, next) => {
+  try { res.json(await posCatalogo.buscar(req.session.empresaId, req.query.q)); } catch (err) { next(err); }
+});
+
+// Cobrar una venta. El navegador manda producto, opcion, cantidad, descuento y pagos; el servidor recalcula todo.
+app.post('/panel/pos/venta', ...POS, async (req, res) => {
+  try {
+    const b = req.body || {};
+    const lineas = (Array.isArray(b.lineas) ? b.lineas : []).map((l) => ({ productoId: l.productoId, varianteId: l.varianteId || null, cantidad: l.cantidad, descuento: l.descuento }));
+    const pagos = (Array.isArray(b.pagos) ? b.pagos : []).map((p) => ({ metodo: p.metodo, monto: p.monto, recibido: p.recibido, referencia: p.referencia }));
+    const { venta, repetida } = await ventasSrv.crear(req.session.empresaId, usuarioPos(req), {
+      lineas, pagos, descuento: b.descuento, clienteNombre: b.clienteNombre, claveIdempotencia: b.claveIdempotencia,
+    });
+    const vuelto = venta.pagos.reduce((t, p) => t + Number(p.vuelto || 0), 0);
+    res.json({ ok: true, repetida, venta: { id: venta.id, numero: venta.numero, total: Number(venta.total), vuelto, token: venta.tokenRecibo, reciboUrl: `/recibo/${venta.tokenRecibo}` } });
+  } catch (err) {
+    if (esErrorDeNegocio(err)) return res.status(400).json({ ok: false, error: err.message });
+    console.error('[pos] error al cobrar:', err);
+    res.status(500).json({ ok: false, error: 'No se pudo cobrar por un problema técnico. Probá de nuevo: si ya se cobró, no se cobra dos veces.' });
+  }
+});
+
+// ---- Caja ----
+async function datosDeCaja(empresaId) {
+  const sesion = await caja.sesionAbierta(empresaId);
+  return { sesion, resumen: sesion ? await caja.resumen(sesion.id) : null, historial: await caja.historial(empresaId, 20) };
+}
+
+app.get('/panel/caja', ...POS, async (req, res, next) => {
+  try {
+    res.render('cliente/caja', {
+      title: 'Caja - Proshop', tituloPagina: 'Caja', activo: 'caja', hojas: ['/css/pos.css'],
+      ...(await datosDeCaja(req.session.empresaId)), detalle: null, mensaje: req.query.ok || null, error: req.query.err || null, formato: ventaCalculo.formatoMonto,
+    });
+  } catch (err) { next(err); }
+});
+
+app.get('/panel/caja/:id(\\d+)', ...POS, async (req, res, next) => {
+  try {
+    const sesion = await prisma.sesionCaja.findFirst({ where: { id: Number(req.params.id), empresaId: req.session.empresaId } });
+    if (!sesion) return res.redirect('/panel/caja');
+    // El cajero solo ve la caja que acaba de cerrar él mismo (las de otros turnos son del dueño/admin).
+    if (req.session.clienteRol === 'CAJERO' && sesion.cerradaPorId !== req.session.clienteId) return res.redirect('/panel/caja');
+    const [resumen, ventas, historial] = await Promise.all([caja.resumen(sesion.id), ventasSrv.listar(req.session.empresaId, { sesionId: sesion.id, limite: 500 }), caja.historial(req.session.empresaId, 20)]);
+    res.render('cliente/caja', {
+      title: 'Caja - Proshop', tituloPagina: 'Caja', activo: 'caja', hojas: ['/css/pos.css'],
+      sesion: null, resumen: null, historial, detalle: { sesion, resumen, ventas }, mensaje: req.query.ok || null, error: req.query.err || null, formato: ventaCalculo.formatoMonto,
+    });
+  } catch (err) { next(err); }
+});
+
+const accionCaja = (okTexto, fn, destino = () => '/panel/caja') => async (req, res, next) => {
+  try {
+    const r = await fn(req);
+    res.redirect(`${destino(r)}?ok=` + encodeURIComponent(okTexto));
+  } catch (err) {
+    if (esErrorDeNegocio(err)) return res.redirect('/panel/caja?err=' + encodeURIComponent(err.message));
+    next(err);
+  }
+};
+app.post('/panel/caja/movimiento', ...POS, accionCaja('Movimiento registrado.', (req) => caja.registrarMovimiento(req.session.empresaId, req.session.clienteId, { tipo: req.body.tipo, monto: req.body.monto, nota: req.body.nota })));
+app.post('/panel/caja/cerrar', ...POS, accionCaja('Caja cerrada.', (req) => caja.cerrar(req.session.empresaId, req.session.clienteId, { efectivoContado: req.body.efectivoContado, notas: req.body.notas }), (r) => `/panel/caja/${r.sesion.id}`));
+
+// ---- Ventas ----
+app.get('/panel/ventas', ...POS, async (req, res, next) => {
+  try {
+    const estado = ['COMPLETADA', 'ANULADA'].includes(String(req.query.estado)) ? String(req.query.estado) : '';
+    const dia = /^\d{4}-\d{2}-\d{2}$/.test(String(req.query.dia || '')) ? String(req.query.dia) : '';
+    const desde = dia ? new Date(`${dia}T00:00:00`) : null;
+    const hasta = dia ? new Date(new Date(`${dia}T00:00:00`).getTime() + 24 * 3600 * 1000) : null;
+    const ventas = await ventasSrv.listar(req.session.empresaId, { estado: estado || null, desde, hasta, limite: 200 });
+    const completadas = ventas.filter((v) => v.estado === 'COMPLETADA');
+    res.render('cliente/ventas', {
+      title: 'Ventas - Proshop', tituloPagina: 'Ventas', activo: 'ventas', hojas: ['/css/pos.css'],
+      ventas, estado, dia, totalVendido: completadas.reduce((t, v) => t + Number(v.total), 0), cantidad: completadas.length,
+      etiquetas: ventaCalculo.ETIQUETAS_METODO, mensaje: req.query.ok || null, error: req.query.err || null,
+    });
+  } catch (err) { next(err); }
+});
+
+app.get('/panel/ventas/:id(\\d+)', ...POS, async (req, res, next) => {
+  try {
+    const venta = await ventasSrv.detalle(req.session.empresaId, req.params.id);
+    if (!venta) return res.redirect('/panel/ventas');
+    res.render('cliente/venta-detalle', {
+      title: `Venta #${venta.numero} - Proshop`, tituloPagina: 'Venta', activo: 'ventas', hojas: ['/css/pos.css'],
+      venta, etiquetas: ventaCalculo.ETIQUETAS_METODO, puedeAnular: ventasSrv.ROLES_QUE_ANULAN.includes(req.session.clienteRol),
+      mensaje: req.query.ok || null, error: req.query.err || null,
+    });
+  } catch (err) { next(err); }
+});
+
+app.post('/panel/ventas/:id(\\d+)/anular', ...POS, async (req, res, next) => {
+  try {
+    await ventasSrv.anular(req.session.empresaId, usuarioPos(req), req.params.id, req.body.motivo);
+    catalogoCache.invalidarEmpresa(req.session.empresaId);
+    res.redirect(`/panel/ventas/${req.params.id}?ok=` + encodeURIComponent('Venta anulada: se devolvió el stock.'));
+  } catch (err) {
+    if (esErrorDeNegocio(err)) return res.redirect(`/panel/ventas/${req.params.id}?err=` + encodeURIComponent(err.message));
+    next(err);
+  }
+});
+
+// ---- Recibo publico (sin login): solo se abre con el token de la venta ----
+app.get('/recibo/:token', async (req, res, next) => {
+  try {
+    const datos = await ventasSrv.reciboPorToken(req.params.token);
+    if (!datos) return res.status(404).render('404', { title: 'Recibo no encontrado' });
+    res.set('Cache-Control', 'private, no-store');
+    res.render('recibo', {
+      ...datos, simbolo: simboloMoneda(datos.empresa.moneda), etiquetas: ventaCalculo.ETIQUETAS_METODO,
+      formato: req.query.formato === 'a4' ? 'a4' : 'termico', imprimir: req.query.imprimir === '1', title: `Recibo V-${String(datos.venta.numero).padStart(4, '0')}`,
+    });
+  } catch (err) { next(err); }
+});
+
 const mensajesPanel = require('./lib/services/mensajesPanel');
 app.get('/panel/mensajes', requireCliente, async (req, res, next) => {
   try {

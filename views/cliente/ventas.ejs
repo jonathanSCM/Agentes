@@ -1,0 +1,53 @@
+<%- include('partials/inicio') %>
+
+<div class="page-head page-head-row">
+  <div>
+    <h2>Ventas</h2>
+    <p>Las ventas del mostrador. Tocá una para ver el detalle, reimprimir el recibo o anularla.</p>
+  </div>
+  <a class="btn btn-primary" href="/panel/pos">Nueva venta</a>
+</div>
+
+<% if (mensaje) { %><div class="alert-ok"><%= mensaje %></div><% } %>
+<% if (error) { %><div class="alert-err" role="alert"><%= error %></div><% } %>
+
+<div class="admin-stats">
+  <div class="stat-card"><span class="stat-num"><%= cantidad %></span><span class="stat-label">Ventas cobradas</span></div>
+  <div class="stat-card stat-new"><span class="stat-num"><%= simboloCatalogo %> <%= totalVendido.toFixed(2) %></span><span class="stat-label">Total vendido</span></div>
+</div>
+
+<form method="GET" action="/panel/ventas" class="filtros-ventas">
+  <input type="date" name="dia" value="<%= dia %>" aria-label="Día" />
+  <select name="estado" aria-label="Estado">
+    <option value="">Todas</option>
+    <option value="COMPLETADA" <%= estado === 'COMPLETADA' ? 'selected' : '' %>>Cobradas</option>
+    <option value="ANULADA" <%= estado === 'ANULADA' ? 'selected' : '' %>>Anuladas</option>
+  </select>
+  <button class="btn btn-ghost" type="submit">Filtrar</button>
+  <% if (dia || estado) { %><a class="btn btn-ghost" href="/panel/ventas">Quitar filtros</a><% } %>
+</form>
+
+<% if (!ventas.length) { %>
+  <div class="empty-state"><h3>No hay ventas</h3><p>Cuando cobres en el punto de venta, van a aparecer acá.</p></div>
+<% } else { %>
+  <div class="table-wrap">
+    <table class="leads-table">
+      <thead><tr><th>N°</th><th>Fecha</th><th>Cajero</th><th>Cliente</th><th>Pago</th><th class="num">Total</th><th>Estado</th></tr></thead>
+      <tbody>
+        <% ventas.forEach(function (v) { %>
+          <tr class="<%= v.estado === 'ANULADA' ? 'is-done' : '' %> row-link" onclick="window.location='/panel/ventas/<%= v.id %>'" style="cursor:pointer">
+            <td><a href="/panel/ventas/<%= v.id %>"><strong>V-<%= String(v.numero).padStart(4, '0') %></strong></a></td>
+            <td class="nowrap muted"><%= new Date(v.createdAt).toLocaleString('es-BO', { dateStyle: 'short', timeStyle: 'short' }) %></td>
+            <td><%= v.cajero ? v.cajero.nombre : '—' %></td>
+            <td><%= v.clienteNombre || '—' %></td>
+            <td><%= v.pagos.map(function (p) { return etiquetas[p.metodo]; }).join(' + ') %></td>
+            <td class="num"><strong><%= simboloCatalogo %> <%= Number(v.total).toFixed(2) %></strong></td>
+            <td><span class="badge <%= v.estado === 'ANULADA' ? 'badge-anulada' : 'badge-new' %>"><%= v.estado === 'ANULADA' ? 'Anulada' : 'Cobrada' %></span></td>
+          </tr>
+        <% }); %>
+      </tbody>
+    </table>
+  </div>
+<% } %>
+
+<%- include('partials/fin') %>

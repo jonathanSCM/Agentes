@@ -119,3 +119,24 @@ describe('requireModulo (bloqueo en el servidor)', () => {
     for (const m of ['AGENTE', 'POS', 'PANEL']) assert.equal((await pasar(m)).siguio, true, m);
   });
 });
+
+describe('menú del punto de venta', () => {
+  test('el dueño ve el grupo Punto de venta; bloqueado si el plan no trae POS', () => {
+    const sin = items(construirMenu({ rol: 'OWNER', modulos: ['AGENTE'] })).filter((i) => i.modulo === 'POS');
+    assert.deepEqual(sin.map((i) => i.clave), ['pos', 'caja', 'ventas']);
+    assert.ok(sin.every((i) => i.bloqueado));
+    const con = items(construirMenu({ rol: 'OWNER', modulos: ['AGENTE', 'POS'] })).filter((i) => i.modulo === 'POS');
+    assert.ok(con.every((i) => !i.bloqueado));
+  });
+
+  test('el cajero ve SOLO el mostrador (punto de venta, caja y ventas)', () => {
+    const g = construirMenu({ rol: 'CAJERO', modulos: ['AGENTE', 'POS'] });
+    assert.deepEqual(claves(g), ['pos', 'caja', 'ventas']);
+    assert.equal(etiquetaRol('CAJERO'), 'Cajero');
+  });
+
+  test('un colaborador no ve el punto de venta; con citas tampoco aparece', () => {
+    assert.ok(!claves(construirMenu({ rol: 'STAFF', modulos: ['AGENTE', 'POS'] })).includes('pos'));
+    assert.ok(!claves(construirMenu({ esCitas: true, modulos: ['AGENTE', 'POS'] })).includes('pos'));
+  });
+});

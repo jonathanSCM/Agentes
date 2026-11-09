@@ -16,7 +16,7 @@ const fs = require('fs');
 if (process.env.NODE_ENV === 'production') { console.error('No se corre en produccion.'); process.exit(1); }
 
 const { prisma } = require('../lib/db');
-const { registrarCliente } = require('../lib/services/auth');
+const { registrarCliente, hashPassword } = require('../lib/services/auth');
 const P = require('../lib/services/planesCliente');
 
 const destino = process.argv[2];
@@ -41,9 +41,19 @@ async function datosDeEjemplo(empresaId) {
     ['Polera Rayada', ropa.id, 135, 20], ['Camisa de Vestir', ropa.id, 380, 6],
   ];
   const creados = [];
+  let n = 0;
   for (const [nombre, categoriaId, precio, stock] of productos) {
-    creados.push(await prisma.producto.create({ data: { empresaId, categoriaId, nombre, precio, stock, fotos: [] } }));
+    n += 1;
+    creados.push(await prisma.producto.create({ data: { empresaId, categoriaId, nombre, precio, stock, costo: precio * 0.6, codigoBarras: `775000${n}`, fotos: [] } }));
   }
+  // Un producto con tallas (para probar las opciones) y uno barato de mostrador.
+  await prisma.producto.create({
+    data: {
+      empresaId, categoriaId: ropa.id, nombre: 'Casaca Impermeable', precio: 420, stock: 0, fotos: [],
+      variantes: { create: [{ atributos: { Talla: 'M' }, stock: 5, codigoBarras: '7750101' }, { atributos: { Talla: 'L' }, stock: 3, precio: 450, codigoBarras: '7750102' }, { atributos: { Talla: 'XL' }, stock: 0 }] },
+    },
+  });
+  await prisma.producto.create({ data: { empresaId, categoriaId: ropa.id, nombre: 'Medias Deportivas', precio: 25, stock: 40, codigoBarras: '7750201', fotos: [] } });
   const agente = await prisma.agente.findFirst({ where: { empresaId } });
   if (agente) {
     const nombres = ['Ana Pérez', 'Beto Rojas', 'Carla Méndez'];
@@ -85,6 +95,14 @@ async function datosDeEjemplo(empresaId) {
     await P.asignarPlan(empresa.id, plan.id, c.meses ? { meses: c.meses } : {});
     await datosDeEjemplo(empresa.id);
     lineas.push(`${c.empresa}: ${c.email} / ${password}`);
+    // Un cajero en la cuenta con el modulo POS (para probar que solo ve el mostrador).
+    if (c.plan === 'ACCESO_TOTAL') {
+      const emailCajero = 'cajero-demo@proshop.test';
+      await prisma.usuario.deleteMany({ where: { email: emailCajero } });
+      const passCajero = crypto.randomBytes(9).toString('base64url');
+      await prisma.usuario.create({ data: { empresaId: empresa.id, email: emailCajero, passwordHash: hashPassword(passCajero), nombre: 'Cajero Demo', rol: 'CAJERO' } });
+      lineas.push(`Demo Cajero: ${emailCajero} / ${passCajero}`);
+    }
   }
   fs.writeFileSync(destino, lineas.join('\n') + '\n');
   console.log(`Listo. Credenciales guardadas en ${destino}`);

@@ -1,0 +1,115 @@
+<%- include('partials/inicio') %>
+
+<% if (mensaje) { %><div class="alert-ok"><%= mensaje %></div><% } %>
+<% if (error) { %><div class="alert-err" role="alert"><%= error %></div><% } %>
+
+<% if (!sesion) { %>
+  <div class="page-head">
+    <h2>Punto de venta</h2>
+    <p>Para vender, primero abrí la caja con el efectivo que tenés para dar vuelto.</p>
+  </div>
+  <form method="POST" action="/panel/pos/caja/abrir" class="form-card pos-abrir">
+    <h3>Abrir la caja</h3>
+    <div class="field">
+      <label for="efectivoInicial">Efectivo inicial (<%= simboloCatalogo %>)</label>
+      <input id="efectivoInicial" name="efectivoInicial" type="number" min="0" step="0.01" inputmode="decimal" value="0" autofocus />
+      <p class="pf-ayuda">Lo que hay en la caja antes de la primera venta. Puede ser 0.</p>
+    </div>
+    <div class="field">
+      <label for="notas">Nota <em class="opcional">(opcional)</em></label>
+      <input id="notas" name="notas" type="text" maxlength="300" placeholder="Ej: turno mañana" />
+    </div>
+    <div class="form-actions"><button class="btn btn-primary" type="submit">Abrir caja</button></div>
+  </form>
+<% } else { %>
+
+<div class="pos" id="pos" data-simbolo="<%= simboloCatalogo %>" data-empresa="<%= empresaId %>">
+
+  <%# ---------- Catalogo ---------- %>
+  <section class="pos-catalogo" aria-label="Productos">
+    <div class="pos-buscar">
+      <input id="posBuscar" type="search" placeholder="Escaneá un código de barras o buscá por nombre…" autocomplete="off" autofocus aria-label="Buscar o escanear un producto" />
+      <button type="button" class="btn btn-ghost" id="posCamara" hidden title="Escanear con la cámara">📷</button>
+    </div>
+    <div class="pos-aviso" id="posAviso" role="status" hidden></div>
+    <div class="pos-grilla" id="posGrilla" aria-live="polite"></div>
+  </section>
+
+  <%# ---------- Carrito ---------- %>
+  <aside class="pos-carrito" aria-label="Venta actual">
+    <header class="pos-carrito-cab">
+      <h3>Venta actual</h3>
+      <button type="button" class="btn btn-ghost btn-chico" id="posVaciar">Vaciar</button>
+    </header>
+    <ul class="pos-lineas" id="posLineas"></ul>
+    <div class="pos-vacio" id="posVacio">Escaneá o tocá un producto para empezar.</div>
+    <div class="pos-totales">
+      <div class="pos-fila"><span>Subtotal</span><strong id="posSubtotal"></strong></div>
+      <div class="pos-fila pos-fila-desc">
+        <label for="posDescuento">Descuento</label>
+        <input id="posDescuento" type="number" min="0" step="0.01" inputmode="decimal" placeholder="0.00" />
+      </div>
+      <div class="pos-fila pos-total"><span>Total</span><strong id="posTotal"></strong></div>
+    </div>
+    <button type="button" class="btn btn-primary btn-block pos-cobrar" id="posCobrar" disabled>Cobrar <kbd>F4</kbd></button>
+    <label class="pos-auto"><input type="checkbox" id="posAutoImprimir" /> Imprimir el recibo al cobrar</label>
+  </aside>
+</div>
+
+<%# ---------- Modal: elegir opcion (talla, color) ---------- %>
+<div class="pos-modal" id="modalOpciones" hidden>
+  <div class="pos-modal-caja" role="dialog" aria-modal="true" aria-labelledby="opcionesTitulo">
+    <button type="button" class="pos-cerrar" data-cerrar aria-label="Cerrar">✕</button>
+    <h3 id="opcionesTitulo">Elegí la opción</h3>
+    <div class="pos-opciones" id="opcionesLista"></div>
+  </div>
+</div>
+
+<%# ---------- Modal: cobrar ---------- %>
+<div class="pos-modal" id="modalCobro" hidden>
+  <div class="pos-modal-caja" role="dialog" aria-modal="true" aria-labelledby="cobroTitulo">
+    <button type="button" class="pos-cerrar" data-cerrar aria-label="Cerrar">✕</button>
+    <h3 id="cobroTitulo">Cobrar</h3>
+    <p class="pos-cobro-total">Total a cobrar <strong id="cobroTotal"></strong></p>
+    <div id="cobroPagos"></div>
+    <button type="button" class="btn btn-ghost btn-chico" id="cobroDividir">+ Dividir el pago</button>
+    <div class="field" style="margin-top:.8rem">
+      <label for="cobroCliente">Cliente <em class="opcional">(opcional)</em></label>
+      <input id="cobroCliente" type="text" maxlength="80" placeholder="Nombre para el recibo" autocomplete="off" />
+    </div>
+    <p class="pos-cobro-estado" id="cobroEstado" role="status"></p>
+    <p class="pos-error" id="cobroError" role="alert" hidden></p>
+    <button type="button" class="btn btn-primary btn-block pos-confirmar" id="cobroConfirmar">Confirmar cobro</button>
+  </div>
+</div>
+
+<%# ---------- Modal: venta cobrada ---------- %>
+<div class="pos-modal" id="modalExito" hidden>
+  <div class="pos-modal-caja pos-exito" role="dialog" aria-modal="true" aria-labelledby="exitoTitulo">
+    <span class="pos-exito-icono" aria-hidden="true">✓</span>
+    <h3 id="exitoTitulo">Venta cobrada</h3>
+    <p class="pos-exito-numero" id="exitoNumero"></p>
+    <p class="pos-exito-vuelto" id="exitoVuelto" hidden></p>
+    <div class="pos-exito-acciones">
+      <button type="button" class="btn btn-ghost" id="exitoImprimir">🖨 Imprimir recibo</button>
+      <a class="btn btn-ghost" id="exitoVer" href="#" target="_blank" rel="noopener">Ver recibo</a>
+      <button type="button" class="btn btn-primary" id="exitoNueva">Nueva venta <kbd>Enter</kbd></button>
+    </div>
+  </div>
+</div>
+
+<%# ---------- Modal: camara ---------- %>
+<div class="pos-modal" id="modalCamara" hidden>
+  <div class="pos-modal-caja" role="dialog" aria-modal="true" aria-label="Escanear con la cámara">
+    <button type="button" class="pos-cerrar" data-cerrar aria-label="Cerrar">✕</button>
+    <h3>Escanear con la cámara</h3>
+    <video id="camaraVideo" playsinline muted></video>
+    <p class="muted" style="font-size:.82rem">Apuntá al código de barras.</p>
+  </div>
+</div>
+
+<script>window.POS_METODOS = <%- JSON.stringify(metodos) %>;</script>
+<script src="/js/pos.js"></script>
+<% } %>
+
+<%- include('partials/fin') %>

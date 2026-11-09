@@ -1,0 +1,66 @@
+<%- include('partials/inicio') %>
+
+<%
+  var m = function (n) { return simboloCatalogo + ' ' + Number(n).toFixed(2); };
+  var num = 'V-' + String(venta.numero).padStart(4, '0');
+%>
+
+<div class="page-head page-head-row">
+  <div>
+    <h2>Venta <%= num %> <span class="badge <%= venta.estado === 'ANULADA' ? 'badge-anulada' : 'badge-new' %>"><%= venta.estado === 'ANULADA' ? 'Anulada' : 'Cobrada' %></span></h2>
+    <p><%= new Date(venta.createdAt).toLocaleString('es-BO', { dateStyle: 'long', timeStyle: 'short' }) %> · Cajero: <%= venta.cajero ? venta.cajero.nombre : '—' %><% if (venta.clienteNombre) { %> · Cliente: <%= venta.clienteNombre %><% } %></p>
+  </div>
+  <div style="display:flex;gap:.5rem;flex-wrap:wrap">
+    <a class="btn btn-ghost" href="/recibo/<%= venta.tokenRecibo %>" target="_blank" rel="noopener">Ver recibo</a>
+    <a class="btn btn-ghost" href="/recibo/<%= venta.tokenRecibo %>?imprimir=1" target="_blank" rel="noopener">🖨 Reimprimir</a>
+    <a class="btn btn-ghost" href="/panel/ventas">← Ventas</a>
+  </div>
+</div>
+
+<% if (mensaje) { %><div class="alert-ok"><%= mensaje %></div><% } %>
+<% if (error) { %><div class="alert-err" role="alert"><%= error %></div><% } %>
+
+<% if (venta.estado === 'ANULADA') { %>
+  <div class="alert-err">Anulada <%= venta.anuladaAt ? new Date(venta.anuladaAt).toLocaleString('es-BO', { dateStyle: 'short', timeStyle: 'short' }) : '' %><%= venta.anuladaPor ? ' por ' + venta.anuladaPor.nombre : '' %>. Motivo: <%= venta.motivoAnulacion %></div>
+<% } %>
+
+<div class="table-wrap">
+  <table class="leads-table">
+    <thead><tr><th>Producto</th><th class="num">Cant.</th><th class="num">Precio</th><th class="num">Desc.</th><th class="num">Total</th></tr></thead>
+    <tbody>
+      <% venta.items.forEach(function (i) { %>
+        <tr><td><%= i.nombre %></td><td class="num"><%= i.cantidad %></td><td class="num"><%= m(i.precioUnitario) %></td><td class="num"><%= Number(i.descuento) ? m(i.descuento) : '—' %></td><td class="num"><%= m(i.total) %></td></tr>
+      <% }); %>
+    </tbody>
+  </table>
+</div>
+
+<div class="caja-grid" style="margin-top:1rem">
+  <div class="caja-dato"><small>Subtotal</small><strong><%= m(venta.subtotal) %></strong></div>
+  <div class="caja-dato"><small>Descuento</small><strong><%= m(venta.descuento) %></strong></div>
+  <div class="caja-dato destacado"><small>Total</small><strong><%= m(venta.total) %></strong></div>
+</div>
+
+<h3>Pagos</h3>
+<div class="table-wrap">
+  <table class="leads-table">
+    <thead><tr><th>Forma</th><th class="num">Cobrado</th><th class="num">Recibido</th><th class="num">Vuelto</th></tr></thead>
+    <tbody>
+      <% venta.pagos.forEach(function (p) { %>
+        <tr><td><%= etiquetas[p.metodo] %></td><td class="num"><%= m(p.monto) %></td><td class="num"><%= p.metodo === 'EFECTIVO' ? m(p.recibido) : '—' %></td><td class="num"><%= p.metodo === 'EFECTIVO' ? m(p.vuelto) : '—' %></td></tr>
+      <% }); %>
+    </tbody>
+  </table>
+</div>
+
+<% if (venta.estado === 'COMPLETADA' && puedeAnular) { %>
+  <form method="POST" action="/panel/ventas/<%= venta.id %>/anular" class="form-card" style="max-width:520px;margin-top:1.4rem"
+        onsubmit="return confirm('¿Anular esta venta? Se devuelve el stock y deja de contar en la caja. No se puede deshacer.');">
+    <h3>Anular esta venta</h3>
+    <p class="muted" style="font-size:.84rem">Solo se puede mientras la caja de esta venta siga abierta. Se devuelve el stock.</p>
+    <div class="field"><label for="motivo">Motivo *</label><input id="motivo" name="motivo" type="text" required minlength="5" maxlength="200" placeholder="Ej: el cliente se arrepintió" /></div>
+    <div class="form-actions"><button class="btn btn-danger" type="submit">Anular venta</button></div>
+  </form>
+<% } %>
+
+<%- include('partials/fin') %>

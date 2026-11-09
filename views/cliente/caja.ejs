@@ -1,0 +1,131 @@
+<%- include('partials/inicio') %>
+
+<%
+  var m = function (n) { return simboloCatalogo + ' ' + Number(n).toFixed(2); };
+  var c = function (cent) { return simboloCatalogo + ' ' + (cent / 100).toFixed(2); };
+  var esCajero = (typeof usuarioRol !== 'undefined' && usuarioRol === 'CAJERO');
+  var fecha = function (f) { return new Date(f).toLocaleString('es-BO', { dateStyle: 'short', timeStyle: 'short' }); };
+%>
+
+<div class="page-head page-head-row">
+  <div>
+    <h2>Caja</h2>
+    <p>La caja del mostrador: abrís con el efectivo inicial, vendés y al final contás lo que hay. El sistema te dice si cuadra.</p>
+  </div>
+  <a class="btn btn-primary" href="/panel/pos">Ir al punto de venta</a>
+</div>
+
+<% if (mensaje) { %><div class="alert-ok"><%= mensaje %></div><% } %>
+<% if (error) { %><div class="alert-err" role="alert"><%= error %></div><% } %>
+
+<% if (detalle) { %>
+  <%# ================= Detalle de una caja (cerrada o abierta) ================= %>
+  <% var r = detalle.resumen, s = detalle.sesion; %>
+  <h3>Caja #<%= s.id %> · <%= s.estado === 'CERRADA' ? 'cerrada' : 'abierta' %></h3>
+  <p class="muted">Abierta <%= fecha(s.abiertaAt) %><% if (s.cerradaAt) { %> · cerrada <%= fecha(s.cerradaAt) %><% } %></p>
+  <div class="caja-grid">
+    <div class="caja-dato"><small>Efectivo inicial</small><strong><%= m(s.efectivoInicial) %></strong></div>
+    <div class="caja-dato"><small>Vendido (<%= r.cantidadVentas %> ventas)</small><strong><%= c(r.vendidoCentavos) %></strong></div>
+    <% if (s.estado === 'CERRADA') { %>
+      <div class="caja-dato"><small>Efectivo esperado</small><strong><%= m(s.efectivoEsperado) %></strong></div>
+      <div class="caja-dato"><small>Efectivo contado</small><strong><%= m(s.efectivoContado) %></strong></div>
+      <div class="caja-dato destacado"><small>Diferencia</small><strong class="<%= Number(s.diferencia) === 0 ? 'dif-ok' : 'dif-mal' %>"><%= Number(s.diferencia) > 0 ? '+' : '' %><%= m(s.diferencia) %></strong></div>
+    <% } %>
+  </div>
+  <div class="caja-grid">
+    <% Object.keys(r.porMetodoCentavos).forEach(function (k) { %>
+      <div class="caja-dato"><small><%= { EFECTIVO: 'Efectivo', QR: 'QR', TARJETA: 'Tarjeta', TRANSFERENCIA: 'Transferencia' }[k] %></small><strong><%= c(r.porMetodoCentavos[k]) %></strong></div>
+    <% }); %>
+  </div>
+  <% if (r.movimientos.length) { %>
+    <h3>Movimientos de efectivo</h3>
+    <div class="table-wrap"><table class="leads-table"><thead><tr><th>Cuándo</th><th>Tipo</th><th class="num">Monto</th><th>Motivo</th></tr></thead><tbody>
+      <% r.movimientos.forEach(function (mv) { %><tr><td class="nowrap muted"><%= fecha(mv.createdAt) %></td><td><%= mv.tipo === 'ENTRADA' ? 'Entra efectivo' : 'Sale efectivo' %></td><td class="num"><%= m(mv.monto) %></td><td><%= mv.nota %></td></tr><% }); %>
+    </tbody></table></div>
+  <% } %>
+  <h3 style="margin-top:1.2rem">Ventas de esta caja</h3>
+  <% if (!detalle.ventas.length) { %><p class="muted">No hubo ventas.</p><% } else { %>
+    <div class="table-wrap"><table class="leads-table"><thead><tr><th>N°</th><th>Hora</th><th>Cajero</th><th class="num">Total</th><th>Estado</th></tr></thead><tbody>
+      <% detalle.ventas.forEach(function (v) { %>
+        <tr><td><a href="/panel/ventas/<%= v.id %>">V-<%= String(v.numero).padStart(4, '0') %></a></td><td class="nowrap muted"><%= fecha(v.createdAt) %></td><td><%= v.cajero ? v.cajero.nombre : '—' %></td><td class="num"><%= m(v.total) %></td><td><span class="badge <%= v.estado === 'ANULADA' ? 'badge-anulada' : 'badge-new' %>"><%= v.estado === 'ANULADA' ? 'Anulada' : 'Cobrada' %></span></td></tr>
+      <% }); %>
+    </tbody></table></div>
+  <% } %>
+  <p style="margin-top:1rem"><a class="btn btn-ghost" href="/panel/caja">← Volver a Caja</a></p>
+
+<% } else if (sesion) { %>
+  <%# ================= Caja abierta ================= %>
+  <div class="caja-grid">
+    <div class="caja-dato"><small>Caja abierta desde</small><strong style="font-size:1rem"><%= fecha(sesion.abiertaAt) %></strong></div>
+    <div class="caja-dato"><small>Efectivo inicial</small><strong><%= m(sesion.efectivoInicial) %></strong></div>
+    <div class="caja-dato"><small>Vendido (<%= resumen.cantidadVentas %> ventas)</small><strong><%= c(resumen.vendidoCentavos) %></strong></div>
+    <% if (!esCajero) { %><div class="caja-dato destacado"><small>Efectivo que debería haber</small><strong><%= c(resumen.efectivoEsperadoCentavos) %></strong></div><% } %>
+  </div>
+  <div class="caja-grid">
+    <% Object.keys(resumen.porMetodoCentavos).forEach(function (k) { %>
+      <div class="caja-dato"><small><%= { EFECTIVO: 'Efectivo', QR: 'QR', TARJETA: 'Tarjeta', TRANSFERENCIA: 'Transferencia' }[k] %></small><strong><%= c(resumen.porMetodoCentavos[k]) %></strong></div>
+    <% }); %>
+  </div>
+
+  <div class="caja-forms">
+    <form method="POST" action="/panel/caja/movimiento" class="form-card">
+      <h3>Entrada o salida de efectivo</h3>
+      <p class="muted" style="font-size:.82rem">Por ejemplo, pagar a un proveedor desde la caja o sumar cambio.</p>
+      <div class="field-row">
+        <div class="field"><label for="mvTipo">Qué pasó</label>
+          <select id="mvTipo" name="tipo"><option value="SALIDA">Sale efectivo</option><option value="ENTRADA">Entra efectivo</option></select></div>
+        <div class="field"><label for="mvMonto">Monto (<%= simboloCatalogo %>)</label><input id="mvMonto" name="monto" type="number" min="0.01" step="0.01" required inputmode="decimal" /></div>
+      </div>
+      <div class="field"><label for="mvNota">Motivo</label><input id="mvNota" name="nota" type="text" required minlength="3" maxlength="200" placeholder="Ej: pago a proveedor" /></div>
+      <div class="form-actions"><button class="btn btn-ghost" type="submit">Registrar</button></div>
+    </form>
+
+    <form method="POST" action="/panel/caja/cerrar" class="form-card" onsubmit="return confirm('¿Cerrar la caja? Ya no se podrá vender hasta abrir una nueva.');">
+      <h3>Cerrar la caja</h3>
+      <p class="muted" style="font-size:.82rem">Contá el efectivo que hay en la caja y escribilo. El sistema calcula la diferencia.</p>
+      <div class="field"><label for="contado">Efectivo contado (<%= simboloCatalogo %>)</label><input id="contado" name="efectivoContado" type="number" min="0" step="0.01" required inputmode="decimal" /></div>
+      <div class="field"><label for="cierreNotas">Nota <em class="opcional">(opcional)</em></label><input id="cierreNotas" name="notas" type="text" maxlength="300" /></div>
+      <div class="form-actions"><button class="btn btn-primary" type="submit">Cerrar caja</button></div>
+    </form>
+  </div>
+
+  <% if (resumen.movimientos.length) { %>
+    <h3>Movimientos de efectivo</h3>
+    <div class="table-wrap"><table class="leads-table"><thead><tr><th>Cuándo</th><th>Tipo</th><th class="num">Monto</th><th>Motivo</th></tr></thead><tbody>
+      <% resumen.movimientos.forEach(function (mv) { %><tr><td class="nowrap muted"><%= fecha(mv.createdAt) %></td><td><%= mv.tipo === 'ENTRADA' ? 'Entra efectivo' : 'Sale efectivo' %></td><td class="num"><%= m(mv.monto) %></td><td><%= mv.nota %></td></tr><% }); %>
+    </tbody></table></div>
+  <% } %>
+
+<% } else { %>
+  <%# ================= Sin caja abierta ================= %>
+  <form method="POST" action="/panel/pos/caja/abrir" class="form-card pos-abrir">
+    <input type="hidden" name="volver" value="caja" />
+    <h3>Abrir la caja</h3>
+    <div class="field"><label for="efectivoInicial">Efectivo inicial (<%= simboloCatalogo %>)</label><input id="efectivoInicial" name="efectivoInicial" type="number" min="0" step="0.01" value="0" inputmode="decimal" /></div>
+    <div class="field"><label for="notas">Nota <em class="opcional">(opcional)</em></label><input id="notas" name="notas" type="text" maxlength="300" placeholder="Ej: turno mañana" /></div>
+    <div class="form-actions"><button class="btn btn-primary" type="submit">Abrir caja</button></div>
+  </form>
+<% } %>
+
+<% if (!detalle && historial.length && !esCajero) { %>
+  <h3 style="margin-top:1.5rem">Cajas anteriores</h3>
+  <div class="table-wrap"><table class="leads-table">
+    <thead><tr><th>Caja</th><th>Abrió</th><th>Desde</th><th>Hasta</th><th class="num">Ventas</th><th class="num">Esperado</th><th class="num">Contado</th><th class="num">Diferencia</th></tr></thead>
+    <tbody>
+      <% historial.forEach(function (h) { %>
+        <tr>
+          <td><a href="/panel/caja/<%= h.id %>">#<%= h.id %></a><% if (h.estado === 'ABIERTA') { %> <span class="badge badge-new">abierta</span><% } %></td>
+          <td><%= h.abiertaPor ? h.abiertaPor.nombre : '—' %></td>
+          <td class="nowrap muted"><%= fecha(h.abiertaAt) %></td>
+          <td class="nowrap muted"><%= h.cerradaAt ? fecha(h.cerradaAt) : '—' %></td>
+          <td class="num"><%= h._count.ventas %></td>
+          <td class="num"><%= h.efectivoEsperado !== null ? m(h.efectivoEsperado) : '—' %></td>
+          <td class="num"><%= h.efectivoContado !== null ? m(h.efectivoContado) : '—' %></td>
+          <td class="num"><% if (h.diferencia !== null) { %><strong class="<%= Number(h.diferencia) === 0 ? 'dif-ok' : 'dif-mal' %>"><%= Number(h.diferencia) > 0 ? '+' : '' %><%= m(h.diferencia) %></strong><% } else { %>—<% } %></td>
+        </tr>
+      <% }); %>
+    </tbody>
+  </table></div>
+<% } %>
+
+<%- include('partials/fin') %>

@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="robots" content="noindex, nofollow" />
+  <title><%= title %></title>
+  <%
+    var m = function (n) { return simbolo + ' ' + Number(n).toFixed(2); };
+    var num = 'V-' + String(venta.numero).padStart(4, '0');
+    var nombre = empresa.marca || empresa.nombre;
+    var fecha = new Date(venta.createdAt).toLocaleString('es-BO', { dateStyle: 'short', timeStyle: 'short' });
+    var termico = formato !== 'a4';
+  %>
+  <style>
+    * { box-sizing: border-box; }
+    body { margin: 0; background: #f2f2f2; color: #111; font-family: 'Courier New', ui-monospace, monospace; }
+    .barra { display: flex; gap: .5rem; justify-content: center; padding: .7rem; background: #fff; border-bottom: 1px solid #ddd; font-family: system-ui, sans-serif; }
+    .barra a, .barra button { padding: .5rem .9rem; border: 1px solid #bbb; border-radius: 8px; background: #fafafa; color: #111; font: inherit; font-size: .85rem; text-decoration: none; cursor: pointer; }
+    .barra .activo { background: #111; color: #fff; border-color: #111; }
+    .hoja { background: #fff; margin: 1rem auto; padding: 5mm 4mm; position: relative; }
+    .hoja.termico { width: 80mm; font-size: 12px; line-height: 1.35; }
+    .hoja.a4 { width: 210mm; min-height: 148mm; padding: 14mm; font-size: 14px; line-height: 1.5; }
+    h1 { font-size: 1.25em; text-align: center; margin: 0 0 .2em; }
+    .centro { text-align: center; }
+    .chico { font-size: .85em; color: #333; }
+    hr { border: 0; border-top: 1px dashed #444; margin: .6em 0; }
+    table { width: 100%; border-collapse: collapse; }
+    td { vertical-align: top; padding: .12em 0; }
+    td.d { text-align: right; white-space: nowrap; padding-left: .5em; }
+    .tot td { font-weight: 700; font-size: 1.1em; }
+    .sello { position: absolute; inset: 35% 0 auto 0; text-align: center; font-size: 2.2em; font-weight: 800; color: rgba(200, 0, 0, .35); transform: rotate(-18deg); pointer-events: none; }
+    @page { size: <%= termico ? '80mm auto' : 'A4' %>; margin: <%= termico ? '2mm' : '10mm' %>; }
+    @media print {
+      body { background: #fff; }
+      .barra { display: none; }
+      .hoja { margin: 0; padding: <%= termico ? '0' : '4mm' %>; box-shadow: none; <%= termico ? 'width: 100%;' : '' %> }
+    }
+  </style>
+</head>
+<body>
+  <div class="barra">
+    <button type="button" onclick="window.print()">🖨 Imprimir</button>
+    <a href="?formato=termico" class="<%= termico ? 'activo' : '' %>">Ticket 80 mm</a>
+    <a href="?formato=a4" class="<%= termico ? '' : 'activo' %>">Hoja A4</a>
+  </div>
+
+  <div class="hoja <%= termico ? 'termico' : 'a4' %>">
+    <% if (venta.estado === 'ANULADA') { %><div class="sello">ANULADA</div><% } %>
+    <h1><%= nombre %></h1>
+    <% if (direccion) { %><div class="centro chico"><%= direccion %></div><% } %>
+    <hr />
+    <div class="centro"><strong>NOTA DE VENTA <%= num %></strong></div>
+    <div class="centro chico"><%= fecha %></div>
+    <div class="chico">Atendió: <%= venta.cajero ? venta.cajero.nombre : '—' %><% if (venta.clienteNombre) { %> · Cliente: <%= venta.clienteNombre %><% } %></div>
+    <hr />
+    <table>
+      <% venta.items.forEach(function (i) { %>
+        <tr><td colspan="2"><%= i.nombre %></td></tr>
+        <tr><td class="chico"><%= i.cantidad %> x <%= m(i.precioUnitario) %><% if (Number(i.descuento)) { %> (desc. <%= m(i.descuento) %>)<% } %></td><td class="d"><%= m(i.total) %></td></tr>
+      <% }); %>
+    </table>
+    <hr />
+    <table>
+      <tr><td>Subtotal</td><td class="d"><%= m(venta.subtotal) %></td></tr>
+      <% if (Number(venta.descuento)) { %><tr><td>Descuento</td><td class="d">- <%= m(venta.descuento) %></td></tr><% } %>
+      <tr class="tot"><td>TOTAL</td><td class="d"><%= m(venta.total) %></td></tr>
+    </table>
+    <hr />
+    <table>
+      <% venta.pagos.forEach(function (p) { %>
+        <tr><td><%= etiquetas[p.metodo] %></td><td class="d"><%= m(p.monto) %></td></tr>
+        <% if (p.metodo === 'EFECTIVO' && Number(p.vuelto) > 0) { %>
+          <tr><td class="chico">Recibido</td><td class="d chico"><%= m(p.recibido) %></td></tr>
+          <tr><td class="chico">Vuelto</td><td class="d chico"><%= m(p.vuelto) %></td></tr>
+        <% } %>
+      <% }); %>
+    </table>
+    <hr />
+    <div class="centro">¡Gracias por su compra!</div>
+    <div class="centro chico" style="margin-top:.4em">Nota de venta. No es una factura.</div>
+  </div>
+
+  <% if (imprimir) { %><script>window.addEventListener('load', function () { setTimeout(function () { window.print(); }, 250); });</script><% } %>
+</body>
+</html>
