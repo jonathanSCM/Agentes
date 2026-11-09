@@ -1679,6 +1679,44 @@ app.post('/panel/inventario/:id', requireCliente, async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
+// ===== Resumen comercial (módulo PANEL) =====
+// Ventas, utilidad y canales con datos reales. Solo dueño/admin: muestra costos y márgenes.
+const resumenSrv = require('./lib/services/resumenComercial');
+app.get('/panel/resumen', requireCliente, requireModulo('PANEL'), requireRol('OWNER', 'ADMIN'), async (req, res, next) => {
+  try {
+    const empresa = await prisma.empresa.findUnique({ where: { id: req.session.empresaId }, select: { moneda: true } });
+    const datos = await resumenSrv.resumen(req.session.empresaId, String(req.query.periodo || ''));
+    res.render('cliente/resumen', {
+      title: 'Resumen comercial - Proshop', tituloPagina: 'Resumen comercial', activo: 'resumen',
+      r: datos, periodos: resumenSrv.PERIODOS, simboloCatalogo: simboloMoneda(empresa.moneda),
+    });
+  } catch (err) { next(err); }
+});
+
+app.get('/panel/resumen/ventas.xlsx', requireCliente, requireModulo('PANEL'), requireRol('OWNER', 'ADMIN'), async (req, res, next) => {
+  try {
+    const ExcelJS = require('exceljs');
+    const { rango, filas } = await resumenSrv.filasParaExcel(req.session.empresaId, String(req.query.periodo || ''));
+    const libro = new ExcelJS.Workbook();
+    const hoja = libro.addWorksheet('Ventas');
+    hoja.columns = [
+      { header: 'Fecha', key: 'fecha', width: 18 }, { header: 'Canal', key: 'canal', width: 12 },
+      { header: 'Referencia', key: 'referencia', width: 14 }, { header: 'Producto', key: 'producto', width: 38 },
+      { header: 'Cantidad', key: 'cantidad', width: 10 }, { header: 'Ingreso', key: 'ingreso', width: 12 },
+      { header: 'Costo', key: 'costo', width: 12 }, { header: 'Utilidad', key: 'utilidad', width: 12 },
+    ];
+    hoja.getRow(1).font = { bold: true };
+    // Un texto que empieza con = + - @ se tomaría como fórmula al abrir el Excel: se neutraliza.
+    const seguro = (t) => (typeof t === 'string' && /^[=+\-@]/.test(t) ? `'${t}` : t);
+    for (const f of filas) hoja.addRow({ ...f, producto: seguro(f.producto) });
+    for (const col of ['ingreso', 'costo', 'utilidad']) hoja.getColumn(col).numFmt = '#,##0.00';
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', `attachment; filename="ventas-${rango.periodo}.xlsx"`);
+    await libro.xlsx.write(res);
+    res.end();
+  } catch (err) { next(err); }
+});
+
 // ===== Reportes =====
 app.get('/panel/reportes', requireCliente, requireModulo('PANEL'), async (req, res, next) => {
   try {

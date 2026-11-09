@@ -1004,3 +1004,16 @@ Módulo POS del plan (`docs/11`, `docs/12-pos-impresora-y-lector.md`). Todo prot
 - **Rol CAJERO**: invitable desde Mi equipo; ve solo Punto de venta, Caja y Ventas; el servidor redirige o niega todo lo demás.
 - Verificado: 24 pruebas de caja/ventas contra Postgres (incluye 12 cobros simultáneos por 5 unidades, doble anulación, aperturas simultáneas) y una prueba de punta a punta en el navegador y por la API (lector simulado, talla, descuento, vuelto, ticket, doble clic, anulación). Suite: 953.
 - **Pendiente**: probar con una impresora térmica y un lector reales; devoluciones parciales; cobrar pedidos del bot en el mostrador; cliente asociado a la venta; panel comercial (F7).
+
+
+## 51. Panel comercial (F7): Resumen comercial con datos reales
+
+Primera pieza del módulo PANEL (`/panel/resumen`, solo dueño/admin porque muestra costos y utilidad; también `/panel/resumen/ventas.xlsx`). Todo son consultas a la base, cero IA (`lib/services/resumenComercial.js`).
+- **Periodos** (hoy, 7 días, 30 días, este mes) medidos en la **zona horaria del negocio**, no la del servidor; cada uno se compara con el periodo anterior de igual duración (si no hay base de comparación no se inventa un porcentaje).
+- **Dos canales sumados sin doble conteo**: ventas del mostrador (completadas) y pedidos de WhatsApp (no cancelados). Un pedido ya cobrado en el mostrador (`ventas.pedidoId`) cuenta una sola vez. Las anuladas y canceladas no suman.
+- **Utilidad = ingreso − costo solo de las líneas con costo** (el mostrador guarda el costo del momento; el pedido de WhatsApp usa el costo actual de la opción/producto). Si falta el costo se informa cuánto se vendió "sin costo" y, si no hay ninguno cargado, la utilidad queda en "—" en vez de inventarse.
+- **Pantalla**: ventas, cantidad, ticket promedio, utilidad y margen; ventas por día apiladas por canal; por canal y por método de cobro; productos más vendidos; embudo conversaciones → pedidos → ventas; pedidos por cobrar, anuladas y stock bajo.
+- **Excel**: una fila por línea vendida (fecha, canal, referencia, producto, cantidad, ingreso, costo, utilidad); los textos que empiezan con `= + - @` se neutralizan para que no se ejecuten como fórmula.
+- Menú: "Resumen" encabeza el grupo Panel comercial (con candado si el plan no trae PANEL); la tarjeta del módulo en Inicio abre el resumen. Reportes e Inteligencia siguen donde estaban.
+- Verificado: 11 pruebas nuevas (zona horaria, doble conteo, costo, comparación, aislamiento entre empresas, Excel) y barrido en el navegador (plan Agente 403, cajero redirigido, anónimo al login). Suite: 964.
+- **Pendiente del Panel**: Auditoría (quién anuló, ajustó stock, cerró caja), reporte de utilidad por producto/categoría, alertas, y conectar la maqueta de Inteligencia a datos reales.

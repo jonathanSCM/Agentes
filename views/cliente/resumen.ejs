@@ -1,0 +1,132 @@
+<%- include('partials/inicio') %>
+<link rel="stylesheet" href="/css/resumen.css" />
+<%
+  var S = simboloCatalogo;
+  var m2 = function (n) { return Number(n || 0).toLocaleString('es-BO', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); };
+  var varTxt = function (v) { return v === null || v === undefined ? 'sin periodo anterior' : (v > 0 ? '▲ ' : v < 0 ? '▼ ' : '') + Math.abs(v) + '% vs. periodo anterior'; };
+  var varCls = function (v) { return v > 0 ? 'sube' : v < 0 ? 'baja' : ''; };
+  var etiquetaMetodo = { EFECTIVO: 'Efectivo', QR: 'QR', TARJETA: 'Tarjeta', TRANSFERENCIA: 'Transferencia' };
+  var totalCanal = (r.canal.mostrador.ingresos + r.canal.whatsapp.ingresos) || 1;
+  var maxDia = Math.max.apply(null, r.serie.map(function (d) { return d.total; }).concat([1]));
+%>
+
+<div class="page-head page-head-row">
+  <div>
+    <h2>Resumen comercial</h2>
+    <p>Cómo vende tu negocio, sumando WhatsApp y mostrador. <%= r.rango.etiqueta %>.</p>
+  </div>
+  <div class="rc-acciones">
+    <a class="btn btn-ghost" href="/panel/resumen/ventas.xlsx?periodo=<%= r.rango.periodo %>">Descargar Excel</a>
+  </div>
+</div>
+
+<nav class="rc-periodos" aria-label="Periodo">
+  <% Object.keys(periodos).forEach(function (k) { %>
+    <a href="/panel/resumen?periodo=<%= k %>" class="<%= k === r.rango.periodo ? 'on' : '' %>"><%= periodos[k] %></a>
+  <% }); %>
+</nav>
+
+<div class="admin-stats">
+  <div class="stat-card"><span class="stat-num"><%= S %> <%= m2(r.ingresos) %></span><span class="stat-label">Vendido</span>
+    <span class="rc-var <%= varCls(r.vsAnterior.ingresos) %>"><%= varTxt(r.vsAnterior.ingresos) %></span></div>
+  <div class="stat-card"><span class="stat-num"><%= r.ventas %></span><span class="stat-label">Ventas</span>
+    <span class="rc-var <%= varCls(r.vsAnterior.ventas) %>"><%= varTxt(r.vsAnterior.ventas) %></span></div>
+  <div class="stat-card"><span class="stat-num"><%= S %> <%= m2(r.ticketPromedio) %></span><span class="stat-label">Ticket promedio</span>
+    <span class="rc-var <%= varCls(r.vsAnterior.ticket) %>"><%= varTxt(r.vsAnterior.ticket) %></span></div>
+  <div class="stat-card stat-done">
+    <% if (r.utilidad === null) { %>
+      <span class="stat-num">—</span><span class="stat-label">Utilidad</span>
+      <span class="rc-var">Cargá el costo de tus productos para verla.</span>
+    <% } else { %>
+      <span class="stat-num"><%= S %> <%= m2(r.utilidad) %></span><span class="stat-label">Utilidad<% if (r.margen !== null) { %> · margen <%= r.margen %>%<% } %></span>
+    <% } %>
+  </div>
+</div>
+<% if (r.utilidad !== null && r.sinCosto > 0) { %>
+  <p class="rc-aviso">La utilidad solo cuenta los productos que tienen costo. Quedaron <%= S %> <%= m2(r.sinCosto) %> vendidos sin costo cargado.</p>
+<% } %>
+
+<div class="rc-grid">
+  <div class="dash-card">
+    <div class="dash-card-head"><h3>Ventas por día</h3></div>
+    <% if (!r.ventas) { %>
+      <p class="dash-empty">Todavía no hay ventas en este periodo.</p>
+    <% } else { %>
+      <div class="rc-barras">
+        <% r.serie.forEach(function (d) { %>
+          <div class="rc-dia" title="<%= d.dia %>: <%= S %> <%= m2(d.total) %>">
+            <div class="rc-pila">
+              <i class="w" style="height:<%= Math.round((d.whatsapp / maxDia) * 100) %>%"></i>
+              <i class="m" style="height:<%= Math.round((d.mostrador / maxDia) * 100) %>%"></i>
+            </div>
+            <% if (r.serie.length <= 10) { %><small><%= d.dia.slice(5) %></small><% } %>
+          </div>
+        <% }); %>
+      </div>
+      <div class="rc-leyenda"><span><b style="background:var(--primary)"></b>Mostrador</span><span><b style="background:var(--primary-2)"></b>WhatsApp</span></div>
+    <% } %>
+  </div>
+
+  <div class="dash-card">
+    <div class="dash-card-head"><h3>Por canal</h3></div>
+    <div class="rc-canal">
+      <div class="rc-canal-fila">
+        <div class="cab"><span>Mostrador · <%= r.canal.mostrador.ventas %> <%= r.canal.mostrador.ventas === 1 ? 'venta' : 'ventas' %></span><strong><%= S %> <%= m2(r.canal.mostrador.ingresos) %></strong></div>
+        <div class="riel"><i style="width:<%= Math.round((r.canal.mostrador.ingresos / totalCanal) * 100) %>%;background:var(--primary)"></i></div>
+      </div>
+      <div class="rc-canal-fila">
+        <div class="cab"><span>WhatsApp · <%= r.canal.whatsapp.ventas %> <%= r.canal.whatsapp.ventas === 1 ? 'pedido' : 'pedidos' %></span><strong><%= S %> <%= m2(r.canal.whatsapp.ingresos) %></strong></div>
+        <div class="riel"><i style="width:<%= Math.round((r.canal.whatsapp.ingresos / totalCanal) * 100) %>%;background:var(--primary-2)"></i></div>
+      </div>
+    </div>
+    <% if (r.porMetodo.length) { %>
+      <h4 style="margin:1.1rem 0 .5rem;font-size:.9rem">Cobros del mostrador por método</h4>
+      <ul class="rc-lista">
+        <% r.porMetodo.forEach(function (p) { %><li><span><%= etiquetaMetodo[p.metodo] || p.metodo %></span><strong><%= S %> <%= m2(p.monto) %></strong></li><% }); %>
+      </ul>
+    <% } %>
+  </div>
+</div>
+
+<div class="rc-grid">
+  <div class="dash-card">
+    <div class="dash-card-head"><h3>Productos más vendidos</h3></div>
+    <% if (!r.masVendidos.length) { %>
+      <p class="dash-empty">Sin ventas en este periodo.</p>
+    <% } else { %>
+      <ul class="rc-lista">
+        <% r.masVendidos.forEach(function (p) { %>
+          <li><span><%= p.nombre %><br><span class="sub"><%= p.unidades %> u.<% if (p.utilidad !== null) { %> · utilidad <%= S %> <%= m2(p.utilidad) %><% } else { %> · sin costo<% } %></span></span><strong><%= S %> <%= m2(p.ingresos) %></strong></li>
+        <% }); %>
+      </ul>
+    <% } %>
+  </div>
+
+  <div class="dash-card">
+    <div class="dash-card-head"><h3>Del chat a la venta</h3></div>
+    <div class="rc-embudo">
+      <div><span>Conversaciones nuevas</span><strong><%= r.embudo.conversaciones %></strong></div>
+      <div><span>Pedidos por WhatsApp</span><strong><%= r.embudo.pedidosWhatsapp %></strong></div>
+      <div><span>Ventas en el mostrador</span><strong><%= r.embudo.ventasMostrador %></strong></div>
+    </div>
+    <% if (r.embudo.conversaciones > 0) { %>
+      <p class="rc-aviso" style="margin-top:.8rem"><%= Math.round((r.embudo.pedidosWhatsapp / r.embudo.conversaciones) * 100) %>% de las conversaciones nuevas terminó en pedido.</p>
+    <% } %>
+  </div>
+
+  <div class="dash-card">
+    <div class="dash-card-head"><h3>Para atender</h3></div>
+    <ul class="rc-lista">
+      <li><span>Pedidos por cobrar o entregar</span><strong><%= r.porCobrar.pedidos %> · <%= S %> <%= m2(r.porCobrar.monto) %></strong></li>
+      <li><span>Ventas anuladas en el periodo</span><strong><%= r.ventasAnuladas %></strong></li>
+      <li><span>Productos con stock bajo</span><strong><%= r.stockBajoTotal %></strong></li>
+    </ul>
+    <% if (r.stockBajo.length) { %>
+      <ul class="rc-lista" style="margin-top:.8rem">
+        <% r.stockBajo.forEach(function (p) { %><li><a href="/panel/productos/<%= p.id %>/editar"><%= p.nombre %></a><strong><%= p.stock <= 0 ? 'Agotado' : p.stock + ' u.' %></strong></li><% }); %>
+      </ul>
+    <% } %>
+  </div>
+</div>
+
+<%- include('partials/fin') %>

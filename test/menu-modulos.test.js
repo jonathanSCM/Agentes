@@ -15,7 +15,7 @@ describe('menú lateral', () => {
     const g = construirMenu({ rol: 'OWNER', modulos: ['AGENTE'] });
     for (const c of ['inicio', 'conversaciones', 'pedidos', 'productos', 'agente', 'configuracion', 'consumo', 'paquetes', 'mensajes']) assert.ok(claves(g).includes(c), c);
     const panel = items(g).filter((i) => i.modulo === 'PANEL');
-    assert.deepEqual(panel.map((i) => i.clave).sort(), ['inteligencia', 'reportes']);
+    assert.deepEqual(panel.map((i) => i.clave).sort(), ['inteligencia', 'reportes', 'resumen']);
     assert.ok(panel.every((i) => i.bloqueado));
   });
 
@@ -138,5 +138,18 @@ describe('menú del punto de venta', () => {
   test('un colaborador no ve el punto de venta; con citas tampoco aparece', () => {
     assert.ok(!claves(construirMenu({ rol: 'STAFF', modulos: ['AGENTE', 'POS'] })).includes('pos'));
     assert.ok(!claves(construirMenu({ esCitas: true, modulos: ['AGENTE', 'POS'] })).includes('pos'));
+  });
+});
+
+describe('menú del resumen comercial', () => {
+  test('dueño y administrador ven Resumen (con candado si el plan no trae Panel); el colaborador no', () => {
+    for (const rol of ['OWNER', 'ADMIN']) {
+      const sin = items(construirMenu({ rol, modulos: ['AGENTE'] })).find((i) => i.clave === 'resumen');
+      assert.ok(sin && sin.bloqueado && sin.modulo === 'PANEL', rol);
+      const con = items(construirMenu({ rol, modulos: ['AGENTE', 'PANEL'] })).find((i) => i.clave === 'resumen');
+      assert.ok(con && !con.bloqueado, rol);
+    }
+    assert.ok(!claves(construirMenu({ rol: 'STAFF', modulos: ['AGENTE', 'PANEL'] })).includes('resumen'));
+    assert.ok(!claves(construirMenu({ rol: 'CAJERO', modulos: ['AGENTE', 'POS', 'PANEL'] })).includes('resumen'));
   });
 });
