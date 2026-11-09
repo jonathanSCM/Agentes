@@ -1,11 +1,16 @@
 <%- include('partials/inicio') %>
+<%
+  var S = simbolo;
+  var m2 = function (n) { return Number(n || 0).toLocaleString('es-BO', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); };
+  var K = d.kpis;
+  var serieConDatos = d.serieTicket.filter(function (x) { return x.ticket !== null; });
+  var maxT = Math.max.apply(null, serieConDatos.map(function (x) { return x.ticket; }).concat([1]));
+  var digitos = function (t) { return String(t || '').replace(/\D/g, ''); };
+%>
 
 <div class="page-head">
-  <h2>Inteligencia de negocio <span class="preview-pill">⚠ Vista previa</span></h2>
-  <p>Un resumen gerencial de cómo va tu negocio, riesgos a vigilar y qué clientes podrían estar por dejar de comprarte.</p>
-  <p class="muted" style="font-size:.9rem;margin:.3rem 0 0">
-    <strong>Estos números todavía son de ejemplo</strong>, no salen de tus pedidos reales — es una maqueta para que veas cómo va a quedar la pantalla. Los vamos a conectar a tus datos reales en el siguiente paso.
-  </p>
+  <h2>Inteligencia de negocio</h2>
+  <p>Cómo va tu negocio en los últimos 30 días contra los 30 anteriores, qué vigilar y qué clientes podrían estar por dejar de comprarte. Todo sale de tus ventas y pedidos reales.</p>
 </div>
 
 <nav class="subnav-tabs">
@@ -13,56 +18,92 @@
   <a href="/panel/inteligencia/comentarios" class="<%= subvista === 'comentarios' ? 'is-active' : '' %>">Buscador de comentarios</a>
 </nav>
 
+<% if (!d.hayDatos) { %>
+  <div class="empty-state">
+    <h3>Todavía no hay datos para analizar</h3>
+    <p>Cuando tengas pedidos por WhatsApp o ventas en el mostrador, acá vas a ver tendencias, riesgos y clientes que conviene recuperar.</p>
+  </div>
+<% } else { %>
+
 <div class="admin-stats">
-  <div class="stat-card stat-alerta">
-    <span class="stat-num"><%= kpis.tasaDevolucion.valor %>%</span>
-    <span class="stat-label">Tasa de devolución</span>
-    <div class="muted" style="font-size:.78rem;margin-top:.3rem"><%= kpis.tasaDevolucion.detalle %></div>
+  <div class="stat-card <%= K.tasaDevolucion.valor !== null && K.tasaDevolucion.valor >= 8 ? 'stat-alerta' : '' %>">
+    <span class="stat-num"><%= K.tasaDevolucion.valor === null ? '—' : K.tasaDevolucion.valor + '%' %></span>
+    <span class="stat-label">Devoluciones sobre lo vendido</span>
+    <div class="muted" style="font-size:.78rem;margin-top:.3rem"><%= K.tasaDevolucion.valor === null ? K.tasaDevolucion.detalle : S + ' ' + m2(K.tasaDevolucion.devuelto) + ' devueltos de ' + S + ' ' + m2(K.tasaDevolucion.vendido) %></div>
+  </div>
+  <div class="stat-card <%= K.cancelados.porcentaje !== null && K.cancelados.porcentaje >= 20 ? 'stat-alerta' : '' %>">
+    <span class="stat-num"><%= K.cancelados.porcentaje === null ? '—' : K.cancelados.porcentaje + '%' %></span>
+    <span class="stat-label">Pedidos cancelados</span>
+    <div class="muted" style="font-size:.78rem;margin-top:.3rem"><%= K.cancelados.total ? K.cancelados.cantidad + ' de ' + K.cancelados.total + ' pedidos' : 'Sin pedidos en el periodo' %></div>
   </div>
   <div class="stat-card stat-new">
-    <span class="stat-num"><%= kpis.categoriaTop.nombre %></span>
-    <span class="stat-label">Categoría más importante</span>
-    <div class="muted" style="font-size:.78rem;margin-top:.3rem">Genera el <%= kpis.categoriaTop.porcentaje %>% de tus ingresos</div>
+    <span class="stat-num" style="font-size:1.4rem"><%= K.categoriaTop ? K.categoriaTop.nombre : '—' %></span>
+    <span class="stat-label">Categoría que más vende</span>
+    <div class="muted" style="font-size:.78rem;margin-top:.3rem"><%= K.categoriaTop ? 'Genera el ' + K.categoriaTop.porcentaje + '% de tus ingresos' : 'Sin ventas en el periodo' %></div>
   </div>
-  <div class="stat-card <%= kpis.aov.variacion < 0 ? 'stat-alerta' : 'stat-done' %>">
-    <span class="stat-num"><%= kpis.aov.variacion > 0 ? '+' : '' %><%= kpis.aov.variacion %>%</span>
+  <div class="stat-card <%= K.ticket.variacion === null ? '' : (K.ticket.variacion < 0 ? 'stat-alerta' : 'stat-done') %>">
+    <span class="stat-num"><%= K.ticket.variacion === null ? '—' : (K.ticket.variacion > 0 ? '+' : '') + K.ticket.variacion + '%' %></span>
     <span class="stat-label">Variación del ticket promedio</span>
-    <div class="muted" style="font-size:.78rem;margin-top:.3rem">Bs <%= kpis.aov.anterior %> → Bs <%= kpis.aov.actual %></div>
+    <div class="muted" style="font-size:.78rem;margin-top:.3rem"><%= K.ticket.anterior ? S + ' ' + m2(K.ticket.anterior) + ' → ' + S + ' ' + m2(K.ticket.actual) : 'No hay periodo anterior para comparar' %></div>
   </div>
 </div>
 
-<div class="dash-card" style="margin-bottom:1.6rem">
-  <div class="dash-card-head"><h3>Tendencia del ticket promedio (últimos 6 meses)</h3></div>
-  <div class="mini-chart">
-    <% var maxAov = Math.max.apply(null, aovSerie); %>
-    <% var minAov = Math.min.apply(null, aovSerie); %>
-    <% aovSerie.forEach(function (v, i) { %>
-      <div class="mini-bar-wrap">
-        <div class="mini-bar" style="height:<%= Math.round(((v - minAov + 5) / (maxAov - minAov + 5)) * 100) %>%" title="Bs <%= v %>"></div>
-        <span class="mini-lbl">Bs <%= v %></span>
+<div class="dash-grid" style="margin-bottom:1.6rem">
+  <div class="dash-card">
+    <div class="dash-card-head"><h3>Ticket promedio por mes (últimos 6 meses)</h3></div>
+    <% if (!serieConDatos.length) { %>
+      <p class="dash-empty">Todavía no hay meses con ventas.</p>
+    <% } else { %>
+      <div class="mini-chart">
+        <% d.serieTicket.forEach(function (x) { %>
+          <div class="mini-bar-wrap">
+            <div class="mini-bar" style="height:<%= x.ticket === null ? 0 : Math.max(4, Math.round((x.ticket / maxT) * 100)) %>%" title="<%= x.ticket === null ? 'Sin ventas' : S + ' ' + m2(x.ticket) + ' · ' + x.ventas + ' ventas' %>"></div>
+            <span class="mini-lbl"><%= x.ticket === null ? '—' : m2(x.ticket) %></span>
+            <span class="mini-lbl" style="opacity:.7"><%= x.etiqueta %></span>
+          </div>
+        <% }); %>
       </div>
-    <% }); %>
+    <% } %>
+  </div>
+
+  <div class="dash-card">
+    <div class="dash-card-head"><h3>De qué categorías vienen tus ingresos</h3></div>
+    <% if (!d.rubros.length) { %>
+      <p class="dash-empty">Sin ventas en los últimos 30 días.</p>
+    <% } else { %>
+      <ul class="rc-lista" style="list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:.6rem">
+        <% d.rubros.forEach(function (r) { %>
+          <li>
+            <div style="display:flex;justify-content:space-between;font-size:.9rem"><span><%= r.nombre %></span><strong><%= r.porcentaje %>% · <%= S %> <%= m2(r.ingresos) %></strong></div>
+            <div style="height:6px;border-radius:999px;background:rgba(255,255,255,.08);margin-top:.3rem;overflow:hidden"><i style="display:block;height:100%;width:<%= r.porcentaje %>%;background:var(--primary)"></i></div>
+          </li>
+        <% }); %>
+      </ul>
+    <% } %>
   </div>
 </div>
 
 <div class="dash-card inteligencia-narrativa" style="margin-bottom:1.6rem">
   <div class="dash-card-head"><h3>Resumen del negocio</h3></div>
-  <h4>Riesgos a vigilar</h4>
-  <ul>
-    <% riesgos.forEach(function (r) { %><li><%= r %></li><% }); %>
-  </ul>
-  <h4>Acciones recomendadas</h4>
-  <ul>
-    <% acciones.forEach(function (a) { %><li><%= a %></li><% }); %>
-  </ul>
+  <% if (!d.riesgos.length) { %>
+    <p class="muted" style="margin:0">Con los datos de los últimos 30 días no detectamos riesgos. Seguí así y volvé a revisar cada semana.</p>
+  <% } else { %>
+    <h4>Riesgos a vigilar</h4>
+    <ul><% d.riesgos.forEach(function (r) { %><li><%= r %></li><% }); %></ul>
+    <h4>Acciones recomendadas</h4>
+    <ul><% d.acciones.forEach(function (a) { %><li><%= a %></li><% }); %></ul>
+  <% } %>
+  <p class="muted" style="font-size:.8rem;margin:.8rem 0 0">Estas conclusiones salen de reglas sobre tus números (sin inteligencia artificial), así que siempre se pueden rastrear a un dato.</p>
 </div>
+
+<% } %>
 
 <div class="dash-card" style="margin-bottom:1.6rem">
   <div class="dash-card-head">
     <h3>Buscador de comentarios</h3>
     <a href="/panel/inteligencia/comentarios">Abrir →</a>
   </div>
-  <p class="muted" style="margin:0">Buscá por tema ("mal embalaje", "talla chica") y encontrá los comentarios de clientes relacionados, aunque no usen las mismas palabras.</p>
+  <p class="muted" style="margin:0">Buscá por tema ("talla", "caro", "demora") y encontrá lo que tus clientes escribieron por WhatsApp sobre eso.</p>
 </div>
 
 <div class="dash-card">
@@ -70,61 +111,66 @@
     <h3>Clientes en riesgo de dejar de comprarte</h3>
   </div>
 
-  <div class="filtro-chips" id="filtrosRiesgo">
-    <button type="button" class="filtro-chip is-active" data-riesgo="TODOS">Todos</button>
-    <button type="button" class="filtro-chip" data-riesgo="HIGH">Alto</button>
-    <button type="button" class="filtro-chip" data-riesgo="MEDIUM">Medio</button>
-    <button type="button" class="filtro-chip" data-riesgo="LOW">Bajo</button>
-  </div>
+  <% if (!d.clientes.clientes.length) { %>
+    <p class="dash-empty">No hay clientes en riesgo con los datos actuales. Se evalúan los clientes que ya compraron y tienen su nombre y teléfono registrados.</p>
+  <% } else { %>
+    <p class="muted" style="font-size:.84rem;margin:0 0 .8rem">Comparamos hace cuánto no compra cada cliente con cada cuánto solía comprar.<% if (d.clientes.total > d.clientes.clientes.length) { %> Mostramos los <%= d.clientes.clientes.length %> más urgentes de <%= d.clientes.total %>.<% } %></p>
+    <div class="filtro-chips" id="filtrosRiesgo">
+      <button type="button" class="filtro-chip is-active" data-riesgo="TODOS">Todos (<%= d.clientes.total %>)</button>
+      <button type="button" class="filtro-chip" data-riesgo="HIGH">Alto (<%= d.clientes.cuenta.HIGH %>)</button>
+      <button type="button" class="filtro-chip" data-riesgo="MEDIUM">Medio (<%= d.clientes.cuenta.MEDIUM %>)</button>
+      <button type="button" class="filtro-chip" data-riesgo="LOW">Bajo (<%= d.clientes.cuenta.LOW %>)</button>
+    </div>
 
-  <div class="table-wrap">
-    <table class="leads-table">
-      <thead>
-        <tr><th>Cliente</th><th class="num">Días sin comprar</th><th>Riesgo</th><th>Motivo</th><th>Acción sugerida</th><th></th></tr>
-      </thead>
-      <tbody id="tablaRiesgo">
-        <% clientesEnRiesgo.forEach(function (c, i) { %>
-          <% var badge = c.riesgo === 'HIGH' ? 'badge-alerta' : c.riesgo === 'MEDIUM' ? 'badge-star' : 'badge-off'; %>
-          <% var etiqueta = c.riesgo === 'HIGH' ? 'Alto' : c.riesgo === 'MEDIUM' ? 'Medio' : 'Bajo'; %>
-          <% var iniciales = c.nombre.split(' ').map(function (p) { return p[0]; }).slice(0, 2).join('').toUpperCase(); %>
-          <tr data-riesgo="<%= c.riesgo %>">
-            <td>
-              <div class="cliente-riesgo-cell">
-                <span class="avatar-mini"><%= iniciales %></span>
-                <div><strong><%= c.nombre %></strong><div class="muted" style="font-size:.78rem"><%= c.telefono %></div></div>
-              </div>
-            </td>
-            <td class="num"><%= c.diasSinComprar %></td>
-            <td><span class="badge <%= badge %>"><%= etiqueta %></span></td>
-            <td class="muted" style="font-size:.86rem"><%= c.motivo %></td>
-            <td class="msg-cell"><%= c.accion %></td>
-            <td class="actions-cell">
-              <button class="btn btn-ghost btn-enviar-mensaje" style="padding:.4rem .8rem;font-size:.85rem" type="button"
-                      data-nombre="<%= c.nombre %>" data-accion="<%= c.accion %>">Enviar mensaje</button>
-            </td>
-          </tr>
-        <% }); %>
-      </tbody>
-    </table>
-  </div>
+    <div class="table-wrap">
+      <table class="leads-table">
+        <thead>
+          <tr><th>Cliente</th><th class="num">Días sin comprar</th><th class="num">Compras</th><th>Riesgo</th><th>Motivo</th><th>Acción sugerida</th><th></th></tr>
+        </thead>
+        <tbody id="tablaRiesgo">
+          <% d.clientes.clientes.forEach(function (c) { %>
+            <% var badge = c.riesgo === 'HIGH' ? 'badge-alerta' : c.riesgo === 'MEDIUM' ? 'badge-star' : 'badge-off'; %>
+            <% var etiqueta = c.riesgo === 'HIGH' ? 'Alto' : c.riesgo === 'MEDIUM' ? 'Medio' : 'Bajo'; %>
+            <% var iniciales = c.nombre.split(' ').map(function (p) { return p[0]; }).slice(0, 2).join('').toUpperCase(); %>
+            <tr data-riesgo="<%= c.riesgo %>">
+              <td>
+                <div class="cliente-riesgo-cell">
+                  <span class="avatar-mini"><%= iniciales %></span>
+                  <div><strong><%= c.nombre %></strong><div class="muted" style="font-size:.78rem"><%= c.telefono %></div></div>
+                </div>
+              </td>
+              <td class="num"><%= c.diasSinComprar %></td>
+              <td class="num"><%= c.compras %></td>
+              <td><span class="badge <%= badge %>"><%= etiqueta %></span></td>
+              <td class="muted" style="font-size:.86rem"><%= c.motivo %></td>
+              <td class="msg-cell"><%= c.accion %></td>
+              <td class="actions-cell">
+                <button class="btn btn-ghost btn-enviar-mensaje" style="padding:.4rem .8rem;font-size:.85rem" type="button"
+                        data-nombre="<%= c.nombre %>" data-mensaje="<%= c.mensaje %>" data-telefono="<%= digitos(c.telefono) %>">Escribirle</button>
+              </td>
+            </tr>
+          <% }); %>
+        </tbody>
+      </table>
+    </div>
+  <% } %>
 </div>
 
 <div class="prod-overlay" id="mensajeOverlay" hidden>
   <div class="prod-card">
     <button type="button" class="prod-cerrar" id="mensajeCerrar" aria-label="Cerrar">✕</button>
-    <h3>Enviar mensaje a <span id="mensajeCliente"></span></h3>
+    <h3>Escribirle a <span id="mensajeCliente"></span></h3>
     <textarea id="mensajeTexto" rows="5" style="width:100%;padding:.7rem;border-radius:10px;border:1px solid var(--border);background:var(--bg-2);color:var(--text);font:inherit;resize:vertical"></textarea>
-    <p class="muted" style="font-size:.82rem;margin:.7rem 0 0">⚠ Vista previa: esto todavía no está conectado a WhatsApp. Se va a poder mandar de verdad cuando el Churn Risk use clientes reales.</p>
-    <div class="form-actions" style="border-top:none;padding-top:.9rem">
-      <button class="btn btn-primary" type="button" disabled title="Todavía no conectado">Enviar</button>
+    <p class="muted" style="font-size:.82rem;margin:.7rem 0 0">Editá el texto y tocá "Abrir en WhatsApp": se abre la conversación con el mensaje listo y lo mandás vos. No se envía nada solo.</p>
+    <div class="form-actions" style="border-top:none;padding-top:.9rem;gap:.5rem;display:flex;flex-wrap:wrap">
+      <a class="btn btn-primary" id="mensajeWa" target="_blank" rel="noopener noreferrer">Abrir en WhatsApp</a>
+      <a class="btn btn-ghost" id="mensajeConv">Ver la conversación</a>
     </div>
   </div>
 </div>
 
 <script>
   (function () {
-    // Filtro de severidad: puro cliente, sin recargar - los datos siguen
-    // siendo de ejemplo, esto solo demuestra la interaccion real.
     var chips = document.querySelectorAll('#filtrosRiesgo .filtro-chip');
     var filas = document.querySelectorAll('#tablaRiesgo tr');
     chips.forEach(function (chip) {
@@ -132,26 +178,28 @@
         chips.forEach(function (c) { c.classList.remove('is-active'); });
         chip.classList.add('is-active');
         var filtro = chip.getAttribute('data-riesgo');
-        filas.forEach(function (fila) {
-          fila.hidden = filtro !== 'TODOS' && fila.getAttribute('data-riesgo') !== filtro;
-        });
+        filas.forEach(function (fila) { fila.hidden = filtro !== 'TODOS' && fila.getAttribute('data-riesgo') !== filtro; });
       });
     });
 
-    // Modal de "enviar mensaje": precarga la accion sugerida, editable.
-    // Nunca envia de verdad - el boton queda deshabilitado a proposito.
     var overlay = document.getElementById('mensajeOverlay');
-    var cerrar = document.getElementById('mensajeCerrar');
-    var tituloCliente = document.getElementById('mensajeCliente');
     var texto = document.getElementById('mensajeTexto');
+    var wa = document.getElementById('mensajeWa');
+    var conv = document.getElementById('mensajeConv');
+    var telefono = '';
+    function enlazar() { wa.href = 'https://wa.me/' + telefono + '?text=' + encodeURIComponent(texto.value); }
     document.querySelectorAll('.btn-enviar-mensaje').forEach(function (btn) {
       btn.addEventListener('click', function () {
-        tituloCliente.textContent = btn.getAttribute('data-nombre');
-        texto.value = btn.getAttribute('data-accion');
+        document.getElementById('mensajeCliente').textContent = btn.getAttribute('data-nombre');
+        texto.value = btn.getAttribute('data-mensaje');
+        telefono = btn.getAttribute('data-telefono');
+        conv.href = '/panel/conversaciones/' + telefono;
+        enlazar();
         overlay.hidden = false;
       });
     });
-    cerrar.addEventListener('click', function () { overlay.hidden = true; });
+    texto.addEventListener('input', enlazar);
+    document.getElementById('mensajeCerrar').addEventListener('click', function () { overlay.hidden = true; });
     overlay.addEventListener('click', function (e) { if (e.target === overlay) overlay.hidden = true; });
   })();
 </script>

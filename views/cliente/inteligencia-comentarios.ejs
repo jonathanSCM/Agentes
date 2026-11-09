@@ -1,10 +1,10 @@
 <%- include('partials/inicio') %>
 
 <div class="page-head">
-  <h2>Buscador de comentarios <span class="preview-pill">⚠ Vista previa</span></h2>
-  <p>Buscá por tema (ej. "mal embalaje", "talla chica") y encontrá los comentarios de clientes relacionados, aunque no usen las mismas palabras.</p>
+  <h2>Buscador de comentarios</h2>
+  <p>Buscá por tema (ej. "talla", "caro", "demora") y encontrá lo que tus clientes escribieron por WhatsApp en los últimos 4 meses.</p>
   <p class="muted" style="font-size:.9rem;margin:.3rem 0 0">
-    <strong>Esto todavía es una maqueta</strong>: los comentarios de abajo son inventados (Proshop hoy no junta reseñas de producto, solo mensajes de WhatsApp) y el % de coincidencia es un cálculo simple de palabras compartidas, no una búsqueda semántica real todavía. Sirve para ver cómo va a quedar la pantalla.
+    Es una búsqueda por palabras: no distingue tildes ni singular o plural, pero no entiende sinónimos (si buscás "caro" no va a encontrar "costoso"). Probá con dos o tres palabras relacionadas.
   </p>
 </div>
 
@@ -16,7 +16,7 @@
 <form method="GET" action="/panel/inteligencia/comentarios" class="form-card" style="max-width:640px;margin-bottom:1.4rem">
   <div class="field">
     <label for="q">¿Qué querés buscar?</label>
-    <input id="q" name="q" type="text" value="<%= q %>" placeholder='Ej: "mal embalaje"' autocomplete="off" />
+    <input id="q" name="q" type="text" value="<%= q %>" maxlength="80" placeholder='Ej: "talla" o "demora entrega"' autocomplete="off" />
   </div>
   <div class="form-actions" style="justify-content:flex-start;border-top:none;padding-top:0;margin-top:.8rem">
     <button class="btn btn-primary" type="submit">Buscar</button>
@@ -24,55 +24,62 @@
 </form>
 
 <%
-  var ETIQUETAS = ['mal empacado', 'rayones', 'cajas rotas', 'envío pésimo'];
-  function normalizarSimpleVista(t) {
-    return String(t || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
-  }
-  var qNormalizada = normalizarSimpleVista(q);
+  var SUGERIDAS = ['talla', 'caro', 'demora', 'roto', 'no llegó', 'descuento', 'garantía'];
+  var norm = function (t) { return String(t || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, ''); };
+  var resaltar = function (texto) {
+    // Se escapa TODO el texto del cliente y recién después se marcan las palabras: nada del mensaje se interpreta como HTML.
+    var seguro = String(texto).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    palabras.forEach(function (p) {
+      var plano = norm(seguro);
+      // Mismo largo antes y después de quitar tildes (NFD + marcas combinantes se normalizan por carácter).
+      if (plano.length === seguro.length) {
+        var salida = ''; var ultimo = 0; var m;
+        var reN = new RegExp('(' + p.raiz.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '[a-z]*)', 'gi');
+        while ((m = reN.exec(plano)) !== null) {
+          salida += seguro.slice(ultimo, m.index) + '<mark>' + seguro.slice(m.index, m.index + m[0].length) + '</mark>';
+          ultimo = m.index + m[0].length;
+          if (m[0].length === 0) reN.lastIndex++;
+        }
+        seguro = salida + seguro.slice(ultimo);
+      }
+    });
+    return seguro;
+  };
 %>
 <div style="margin-bottom:1rem">
-  <% ETIQUETAS.forEach(function (etiqueta) { %>
-    <% var activa = qNormalizada === normalizarSimpleVista(etiqueta); %>
+  <% SUGERIDAS.forEach(function (etiqueta) { %>
     <a href="/panel/inteligencia/comentarios?q=<%= encodeURIComponent(etiqueta) %>"
-       class="badge <%= activa ? 'badge-alerta' : 'badge-off' %>" style="margin-right:.5rem;text-decoration:none">#<%= etiqueta %></a>
+       class="badge <%= norm(q) === norm(etiqueta) ? 'badge-alerta' : 'badge-off' %>" style="margin-right:.5rem;text-decoration:none">#<%= etiqueta %></a>
   <% }); %>
 </div>
 
-<p class="muted" style="font-size:.86rem;margin:0 0 1rem">
-  <%= resultados.length %> comentarios analizados para "<%= q %>" · <%= resultados.filter(function (r) { return r.porcentaje >= 70; }).length %> con alta coincidencia
-</p>
+<% if (!q) { %>
+  <div class="empty-state"><h3>Elegí un tema para buscar</h3><p>Escribí una palabra arriba o tocá una de las sugeridas.</p></div>
+<% } else if (!palabras.length) { %>
+  <div class="empty-state"><h3>Escribí una palabra más específica</h3><p>Las palabras muy cortas o comunes ("que", "con") se ignoran.</p></div>
+<% } else if (!resultados.length) { %>
+  <div class="empty-state"><h3>No encontramos mensajes con "<%= q %>"</h3><p>Probá con otra palabra o con la raíz (por ejemplo "descuent" en vez de "descuentos").</p></div>
+<% } else { %>
+  <p class="muted" style="font-size:.86rem;margin:0 0 1rem">
+    <%= resultados.length %> mensaje<%= resultados.length === 1 ? '' : 's' %> de clientes para "<%= q %>"<% if (palabras.length > 1) { %> · los primeros coinciden con más de tus palabras<% } %>
+  </p>
 
-<div class="table-wrap">
-  <table class="leads-table">
-    <thead><tr><th>Producto</th><th>Estrellas</th><th>Comentario</th><th class="num">Coincidencia</th></tr></thead>
-    <tbody>
-      <% resultados.forEach(function (r) { %>
-        <%
-          var comentarioResaltado = r.comentario;
-          palabras.forEach(function (p) {
-            // Raiz de la palabra (sin los ultimos 2 caracteres si es larga) +
-            // \w* para que singular/plural igual se resalten (la busqueda
-            // "rayones" tiene que poder resaltar "rayon" en el comentario,
-            // aunque no sean la misma palabra exacta).
-            var base = p.length > 5 ? p.slice(0, p.length - 2) : p;
-            var re = new RegExp('\\b(' + base.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\w*)', 'gi');
-            comentarioResaltado = comentarioResaltado.replace(re, '<mark>$1</mark>');
-          });
-        %>
-        <tr>
-          <td><strong><%= r.producto %></strong></td>
-          <td class="nowrap"><%= '★'.repeat(r.estrellas) %><span class="muted"><%= '★'.repeat(5 - r.estrellas) %></span></td>
-          <td class="msg-cell comentario-resaltado"><%- comentarioResaltado %></td>
-          <td class="num">
-            <div class="match-bar-wrap">
-              <div class="bar"><span style="width:<%= r.porcentaje %>%<% if (r.porcentaje < 70) { %>;background:var(--muted)<% } %>"></span></div>
-              <span class="match-bar-num"><%= r.porcentaje %>%</span>
-            </div>
-          </td>
-        </tr>
-      <% }); %>
-    </tbody>
-  </table>
-</div>
+  <div class="table-wrap">
+    <table class="leads-table">
+      <thead><tr><th>Cliente</th><th>Cuándo</th><th>Lo que escribió</th><% if (palabras.length > 1) { %><th class="num">Palabras</th><% } %><th></th></tr></thead>
+      <tbody>
+        <% resultados.forEach(function (r) { %>
+          <tr>
+            <td><strong><%= r.nombre || 'Cliente' %></strong><div class="muted" style="font-size:.78rem"><%= r.telefono %></div></td>
+            <td class="nowrap muted"><%= new Date(r.fecha).toLocaleString('es-BO', { dateStyle: 'short', timeStyle: 'short' }) %></td>
+            <td class="msg-cell comentario-resaltado"><%- resaltar(r.contenido) %></td>
+            <% if (palabras.length > 1) { %><td class="num"><%= r.coincidencias %> de <%= palabras.length %></td><% } %>
+            <td><a class="btn btn-ghost btn-chico" href="/panel/conversaciones/<%= encodeURIComponent(r.telefono) %>">Ver chat</a></td>
+          </tr>
+        <% }); %>
+      </tbody>
+    </table>
+  </div>
+<% } %>
 
 <%- include('partials/fin') %>
