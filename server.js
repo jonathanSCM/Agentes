@@ -66,6 +66,8 @@ const planesCliente = require('./lib/services/planesCliente');
 const solicitudesConv = require('./lib/services/solicitudesConv');
 const menuPanel = require('./lib/services/menuPanel');
 const bandeja = require('./lib/services/bandeja');
+const stockSrv = require('./lib/services/stock');
+const codigosBarras = require('./lib/services/codigosBarras');
 const { requireModulo } = require('./lib/services/modulos');
 const { registrarCliente, autenticar } = require('./lib/services/auth');
 const { procesarMensajeEntrante, atenderMensaje, generarYRegistrarRespuesta, conversacionParaCarritoWeb, conBloqueoDeCliente } = require('./lib/services/conversaciones');
@@ -1516,18 +1518,22 @@ app.post('/panel/pedidos/:id/estado', requireCliente, async (req, res, next) => 
       return res.redirect(`${volverA}?err=` + encodeURIComponent('Ese cambio de estado no es válido.'));
     }
 
-    await prisma.$transaction(async (tx) => {
-      if (requiereRestock(pedido.estado, estadoNuevo)) {
-        for (const item of pedido.items) {
-          if (item.varianteId) {
-            await tx.variante.update({ where: { id: item.varianteId }, data: { stock: { increment: item.cantidad } } });
-          } else if (item.productoId) {
-            await tx.producto.update({ where: { id: item.productoId }, data: { stock: { increment: item.cantidad } } });
+    try {
+      await prisma.$transaction(async (tx) => {
+        // Se "reclama" el cambio de estado: si dos personas cancelan a la vez, solo una repone el stock.
+        const reclamo = await tx.pedido.updateMany({ where: { id: pedido.id, estado: pedido.estado }, data: { estado: estadoNuevo } });
+        if (reclamo.count === 0) throw Object.assign(new Error('Ese pedido ya cambió de estado. Actualizá la página.'), { codigo: 'PEDIDO_CAMBIO' });
+        if (requiereRestock(pedido.estado, estadoNuevo)) {
+          const lineas = pedido.items.filter((i) => i.productoId || i.varianteId).map((i) => ({ productoId: i.productoId, varianteId: i.varianteId, cantidad: i.cantidad }));
+          if (lineas.length) {
+            await stockSrv.reponer(tx, { empresaId, lineas, tipo: 'CANCELACION_PEDIDO', referenciaTipo: 'Pedido', referenciaId: pedido.id, usuarioId: req.session.clienteId });
           }
         }
-      }
-      await tx.pedido.update({ where: { id: pedido.id }, data: { estado: estadoNuevo } });
-    });
+      });
+    } catch (err) {
+      if (err.codigo === 'PEDIDO_CAMBIO') return res.redirect(`${volverA}?err=` + encodeURIComponent(err.message));
+      throw err;
+    }
 
     let mensajeOk = 'Pedido actualizado.';
     if (TEXTOS_CAMBIO_DE_ESTADO[estadoNuevo]) {
@@ -1623,6 +1629,24 @@ app.get('/panel/inventario', requireCliente, async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
+// Historial de stock (kardex): todo lo que entro y salio, con antes y despues.
+app.get('/panel/inventario/movimientos', requireCliente, async (req, res, next) => {
+  try {
+    const empresaId = req.session.empresaId;
+    const tipo = stockSrv.TIPOS.includes(String(req.query.tipo || '')) ? String(req.query.tipo) : '';
+    const productoId = Number(req.query.productoId) || '';
+    const [movimientos, productos] = await Promise.all([
+      stockSrv.listarMovimientos(empresaId, { tipo: tipo || null, productoId: productoId || null, limite: 200 }),
+      prisma.producto.findMany({ where: { empresaId }, select: { id: true, nombre: true }, orderBy: { nombre: 'asc' } }),
+    ]);
+    res.render('cliente/inventario-movimientos', {
+      title: 'Historial de stock - Proshop', tituloPagina: 'Historial de stock', activo: 'inventario',
+      movimientos, productos, tipo, productoId, etiquetas: stockSrv.ETIQUETAS,
+      tipos: stockSrv.TIPOS.map((clave) => ({ clave, etiqueta: stockSrv.ETIQUETAS[clave] })),
+    });
+  } catch (err) { next(err); }
+});
+
 app.post('/panel/inventario/:id', requireCliente, async (req, res, next) => {
   try {
     const producto = await prisma.producto.findFirst({
@@ -1636,7 +1660,7 @@ app.post('/panel/inventario/:id', requireCliente, async (req, res, next) => {
       return res.redirect(`/panel/productos/${producto.id}/editar?err=` + encodeURIComponent('Este producto tiene variantes: ajusta el stock de cada combinación ahí abajo, no un número único.'));
     }
     const stock = Math.max(0, parseInt(req.body.stock, 10) || 0);
-    await prisma.producto.update({ where: { id: producto.id }, data: { stock } });
+    await prisma.$transaction((tx) => stockSrv.fijar(tx, { empresaId: req.session.empresaId, productoId: producto.id, stock, tipo: 'AJUSTE', usuarioId: req.session.clienteId, nota: 'Desde Inventario' }));
     res.redirect('/panel/inventario?ok=' + encodeURIComponent('Stock actualizado.'));
   } catch (err) { next(err); }
 });
@@ -2251,6 +2275,8 @@ function datosCatalogoDesdeForm(body) {
   return {
     categoriaId: body.categoriaId ? Number(body.categoriaId) : null,
     sku: body.sku ? String(body.sku).trim().slice(0, 60) : null,
+    costo: body.costo !== undefined && String(body.costo).trim() !== '' && Number(body.costo) >= 0 ? Number(body.costo) : null,
+    codigoBarras: codigosBarras.normalizar(body.codigoBarras),
     caracteristicas,
     atributos: atributosDesdeForm(body),
   };
@@ -2320,7 +2346,8 @@ app.post('/panel/productos', requireCliente, upload.array('fotos', 8), async (re
       });
     }
     const datosCatalogo = datosCatalogoDesdeForm(req.body || {});
-    const errorOpciones = errorPorOpcionesSueltas(datosCatalogo.atributos);
+    const errorBarras = await codigosBarras.duplicado(req.session.empresaId, datosCatalogo.codigoBarras);
+    const errorOpciones = errorPorOpcionesSueltas(datosCatalogo.atributos) || errorBarras;
     if (errorOpciones) {
       return res.status(400).render('cliente/producto-form', {
         title: 'Agregar producto - Proshop', tituloPagina: 'Agregar producto', activo: 'productos',
@@ -2359,6 +2386,7 @@ app.post('/panel/productos', requireCliente, upload.array('fotos', 8), async (re
         } : {}),
       },
     });
+    await prisma.$transaction((tx) => stockSrv.registrarInicialDeProducto(tx, { empresaId: req.session.empresaId, productoId: nuevoProducto.id, usuarioId: req.session.clienteId }));
     // No se espera (no bloquea el guardado ni tarda la respuesta): si falla
     // (sin API key, red caida), el producto queda igual guardado, solo sin
     // busqueda semantica hasta el proximo backfill.
@@ -2457,6 +2485,7 @@ app.post('/panel/productos/:id/variantes', requireCliente, upload.array('fotos',
       await prisma.variante.createMany({
         data: nuevas.map((v) => ({ productoId: producto.id, atributos: v.atributos, stock: v.stock, precio: v.precio, fotos: [] })),
       });
+      await prisma.$transaction((tx) => stockSrv.registrarInicialDeProducto(tx, { empresaId: req.session.empresaId, productoId: producto.id, usuarioId: req.session.clienteId }));
       // El stock del producto pasa a vivir en las variantes (queda en 0).
       // Si la talla/color estaban guardados como datos sueltos del producto
       // (producto viejo), ya quedaron convertidos en variantes: se sacan de
@@ -2485,6 +2514,7 @@ app.post('/panel/productos/:id/variantes', requireCliente, upload.array('fotos',
     await prisma.variante.createMany({
       data: combinaciones.map((atrib) => ({ productoId: producto.id, atributos: atrib, precio, stock, fotos })),
     });
+    await prisma.$transaction((tx) => stockSrv.registrarInicialDeProducto(tx, { empresaId: req.session.empresaId, productoId: producto.id, usuarioId: req.session.clienteId }));
 
     const mensaje = combinaciones.length > 1 ? `${combinaciones.length} variantes agregadas.` : 'Variante agregada.';
     res.redirect(`/panel/productos/${producto.id}/editar?ok=` + encodeURIComponent(mensaje));
@@ -2504,15 +2534,19 @@ app.post('/panel/productos/:id/variantes/:varianteId', requireCliente, upload.ar
     const fotosExistentes = req.body.quitarFotos === '1' ? [] : varianteActual.fotos;
     const fotos = [...fotosExistentes, ...fotosNuevas];
 
+    const codigoVariante = codigosBarras.normalizar(req.body.codigoBarras);
+    const errorCodigo = await codigosBarras.duplicado(req.session.empresaId, codigoVariante, { excluirVarianteId: varianteActual.id });
+    if (errorCodigo) return res.redirect(`/panel/productos/${producto.id}/editar?err=` + encodeURIComponent(errorCodigo));
     await prisma.variante.updateMany({
       where: { id: Number(req.params.varianteId), productoId: producto.id },
       data: {
         atributos: atributosDesdeForm(req.body || {}),
         precio: req.body.precio ? Number(req.body.precio) : null,
-        stock: parseInt(req.body.stock, 10) || 0,
+        codigoBarras: codigoVariante,
         fotos,
       },
     });
+    await prisma.$transaction((tx) => stockSrv.fijar(tx, { empresaId: req.session.empresaId, productoId: producto.id, varianteId: varianteActual.id, stock: Math.max(0, parseInt(req.body.stock, 10) || 0), tipo: 'AJUSTE', usuarioId: req.session.clienteId, nota: 'Editar variante' }));
     res.redirect(`/panel/productos/${producto.id}/editar?ok=` + encodeURIComponent('Variante actualizada.'));
   } catch (err) { next(err); }
 });
@@ -2565,7 +2599,8 @@ app.post('/panel/productos/:id', requireCliente, upload.array('fotos', 8), async
     if (!producto) return res.redirect('/panel/productos');
 
     const datosCatalogo = datosCatalogoDesdeForm(req.body || {});
-    const errorOpciones = errorPorOpcionesSueltas(datosCatalogo.atributos);
+    const errorBarras = await codigosBarras.duplicado(req.session.empresaId, datosCatalogo.codigoBarras, { excluirProductoId: producto.id });
+    const errorOpciones = errorPorOpcionesSueltas(datosCatalogo.atributos) || errorBarras;
     if (errorOpciones) {
       return res.status(400).render('cliente/producto-form', {
         title: 'Editar producto - Proshop', tituloPagina: 'Editar producto', activo: 'productos',
@@ -2601,7 +2636,6 @@ app.post('/panel/productos/:id', requireCliente, upload.array('fotos', 8), async
       nombre: String(nombre).trim().slice(0, 120),
       descripcion: descripcion ? String(descripcion).trim().slice(0, 200) : null,
       precio: Number(precio) || 0,
-      stock: parseInt(stock, 10) || 0,
       activo: activo === '1',
       fotos,
       ...datosCatalogo,
@@ -2610,6 +2644,10 @@ app.post('/panel/productos/:id', requireCliente, upload.array('fotos', 8), async
       where: { id: Number(req.params.id), empresaId: req.session.empresaId },
       data: datosActualizados,
     });
+    // El stock se cambia por el servicio (queda en el historial). Con variantes, el stock vive en cada una.
+    if (!(await prisma.variante.count({ where: { productoId: Number(req.params.id) } }))) {
+      await prisma.$transaction((tx) => stockSrv.fijar(tx, { empresaId: req.session.empresaId, productoId: Number(req.params.id), stock: Math.max(0, parseInt(stock, 10) || 0), tipo: 'AJUSTE', usuarioId: req.session.clienteId, nota: 'Editar producto' }));
+    }
     // Se re-genera porque nombre/descripcion/atributos pudieron cambiar; no
     // se espera, mismo motivo que al crear.
     guardarEmbeddingDeProducto(Number(req.params.id), textoParaEmbedding({ ...producto, ...datosActualizados })).catch(() => {});

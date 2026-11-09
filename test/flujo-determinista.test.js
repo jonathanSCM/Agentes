@@ -280,6 +280,15 @@ describe('flujo determinista: cierre del pedido', () => {
       return { ia, primero };
     }
 
+    test('el pedido del bot descuenta con historial: queda un movimiento PEDIDO con antes y después', async () => {
+      const { primero } = await conPedidoNuevo();
+      const movs = await prisma.movimientoStock.findMany({ where: { empresaId, referenciaTipo: 'Pedido', referenciaId: primero.id } });
+      assert.equal(movs.length, 1);
+      assert.equal(movs[0].tipo, 'PEDIDO');
+      assert.equal(movs[0].cantidad, -1);
+      assert.equal(movs[0].stockAntes - 1, movs[0].stockDespues);
+    });
+
     test('con un pedido todavia NUEVO se pregunta: sumar al pedido o hacer uno nuevo (no crea otro sin preguntar)', async () => {
       const { ia, primero } = await conPedidoNuevo();
       const r = await toque('cierre:confirmar', 'Confirmar ✅', ia);

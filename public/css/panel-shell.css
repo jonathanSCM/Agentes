@@ -105,3 +105,11 @@
 
 /* Un solo titulo por pantalla: si la pagina ya trae su encabezado, la barra superior no lo repite */
 .admin-body:has(.page-head) .topbar-title { display: none; }
+
+/* Filtros del historial de stock */
+.filtros-historial { display: flex; gap: .5rem; flex-wrap: wrap; align-items: center; margin: 0 0 1rem; }
+.filtros-historial select { min-width: 190px; }
+.filtros-historial select {
+  background: rgba(255, 255, 255, .06); color: var(--text); border: 1px solid var(--border);
+  border-radius: 10px; padding: .5rem .7rem; font: inherit; font-size: .88rem;
+}

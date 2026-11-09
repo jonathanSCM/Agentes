@@ -1,0 +1,57 @@
+<%- include('partials/inicio') %>
+
+<div class="page-head page-head-row">
+  <div>
+    <h2>Historial de stock</h2>
+    <p>Todo lo que entró y salió de tu inventario: pedidos de WhatsApp, cancelaciones, ajustes e importaciones, con el stock de antes y de después.</p>
+  </div>
+  <a class="btn btn-ghost" href="/panel/inventario">← Volver a Inventario</a>
+</div>
+
+<form method="GET" action="/panel/inventario/movimientos" class="filtros-historial">
+  <select name="tipo" aria-label="Tipo de movimiento">
+    <option value="">Todos los tipos</option>
+    <% tipos.forEach(function (t) { %><option value="<%= t.clave %>" <%= tipo === t.clave ? 'selected' : '' %>><%= t.etiqueta %></option><% }); %>
+  </select>
+  <select name="productoId" aria-label="Producto">
+    <option value="">Todos los productos</option>
+    <% productos.forEach(function (p) { %><option value="<%= p.id %>" <%= String(productoId) === String(p.id) ? 'selected' : '' %>><%= p.nombre %></option><% }); %>
+  </select>
+  <button class="btn btn-ghost" type="submit">Filtrar</button>
+  <% if (tipo || productoId) { %><a class="btn btn-ghost" href="/panel/inventario/movimientos">Quitar filtros</a><% } %>
+</form>
+
+<% if (!movimientos.length) { %>
+  <div class="empty-state">
+    <h3>Todavía no hay movimientos</h3>
+    <p>Cuando se venda, se cancele un pedido o ajustes el stock, va a aparecer acá.</p>
+  </div>
+<% } else { %>
+  <div class="table-wrap">
+    <table class="leads-table">
+      <thead>
+        <tr><th>Cuándo</th><th>Producto</th><th>Qué pasó</th><th class="num">Cantidad</th><th class="num">Antes</th><th class="num">Después</th><th>Quién / referencia</th></tr>
+      </thead>
+      <tbody>
+        <% movimientos.forEach(function (m) { %>
+          <tr>
+            <td class="nowrap muted"><%= new Date(m.createdAt).toLocaleString('es-BO', { dateStyle: 'short', timeStyle: 'short' }) %></td>
+            <td><strong><%= m.nombre %></strong></td>
+            <td><span class="badge <%= m.cantidad < 0 ? 'badge-done' : 'badge-new' %>"><%= etiquetas[m.tipo] || m.tipo %></span></td>
+            <td class="num"><strong style="color:<%= m.cantidad < 0 ? '#fda4af' : 'var(--primary-2)' %>"><%= m.cantidad > 0 ? '+' : '' %><%= m.cantidad %></strong></td>
+            <td class="num muted"><%= m.stockAntes %></td>
+            <td class="num"><%= m.stockDespues %></td>
+            <td class="muted">
+              <%= m.usuario ? m.usuario.nombre : (m.referenciaTipo === 'Pedido' ? 'Automático' : '—') %>
+              <% if (m.referenciaTipo === 'Pedido' && m.referenciaId) { %> · <a href="/panel/pedidos/<%= m.referenciaId %>">Pedido #<%= m.referenciaId %></a><% } %>
+              <% if (m.nota) { %><br /><span style="font-size:.78rem"><%= m.nota %></span><% } %>
+            </td>
+          </tr>
+        <% }); %>
+      </tbody>
+    </table>
+  </div>
+  <p class="muted" style="font-size:.8rem;margin-top:.6rem">Se muestran los últimos <%= movimientos.length %> movimientos.</p>
+<% } %>
+
+<%- include('partials/fin') %>

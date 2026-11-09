@@ -5,7 +5,10 @@
     <h2>Inventario</h2>
     <p>Control de stock de tus productos. Ajusta las cantidades disponibles.</p>
   </div>
-  <a class="btn btn-ghost" href="/panel/productos">Gestionar productos</a>
+  <div style="display:flex;gap:.5rem;flex-wrap:wrap">
+    <a class="btn btn-ghost" href="/panel/inventario/movimientos">Historial de stock</a>
+    <a class="btn btn-ghost" href="/panel/productos">Gestionar productos</a>
+  </div>
 </div>
 
 <% if (mensaje) { %><div class="alert-ok"><%= mensaje %></div><% } %>

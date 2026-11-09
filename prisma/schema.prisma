@@ -264,6 +264,7 @@ model Empresa {
   notificaciones Notificacion[]
   suscripcion    Suscripcion?
   solicitudesConversaciones SolicitudConversaciones[]
+  movimientosStock MovimientoStock[]
   usosIA         UsoIA[]
   mensajesAgente MensajeAgente[]
   datosNegocio   DatoNegocio[]
@@ -502,6 +503,7 @@ model Usuario {
 
   conversacionesTomadas Conversacion[]
   mensajes              Mensaje[]
+  movimientosStock      MovimientoStock[]
 
   @@index([empresaId])
   @@map("usuarios")
@@ -803,6 +805,9 @@ model Producto {
   // Codigo interno del negocio para este producto. Las variantes tienen el
   // suyo propio (Variante.sku); este es el del producto padre.
   sku             String?
+  // Para el punto de venta y el margen (docs/11): ambos opcionales.
+  costo           Decimal?   @db.Decimal(10, 2)
+  codigoBarras    String?
   categoriaId     Int?
   categoria       Categoria? @relation(fields: [categoriaId], references: [id], onDelete: SetNull)
   descripcion     String?
@@ -826,6 +831,7 @@ model Producto {
 
   pedidoItems PedidoItem[]
   variantes   Variante[]
+  movimientosStock MovimientoStock[]
 
   @@index([empresaId])
   @@index([categoriaId])
@@ -903,6 +909,8 @@ model Variante {
   // define sus propios atributos (talla, color, modelo, sabor, etc.).
   atributos  Json
   sku        String?
+  costo      Decimal? @db.Decimal(10, 2)
+  codigoBarras String?
   // null = usa el precio del producto padre. Se sobreescribe solo si esa
   // combinacion puntual cuesta distinto.
   precio     Decimal? @db.Decimal(10, 2)
@@ -916,9 +924,39 @@ model Variante {
   fotos      String[] @default([])
 
   pedidoItems PedidoItem[]
+  movimientosStock MovimientoStock[]
 
   @@index([productoId])
+  @@index([codigoBarras])
   @@map("variantes")
+}
+
+// Historial de stock (kardex): todo cambio de stock queda registrado, con antes y despues.
+model MovimientoStock {
+  id             Int       @id @default(autoincrement())
+  empresaId      Int
+  empresa        Empresa   @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  productoId     Int?
+  producto       Producto? @relation(fields: [productoId], references: [id], onDelete: SetNull)
+  varianteId     Int?
+  variante       Variante? @relation(fields: [varianteId], references: [id], onDelete: SetNull)
+  nombre         String
+  // INICIAL | PEDIDO | CANCELACION_PEDIDO | AJUSTE | IMPORTACION | VENTA | ANULACION_VENTA | DEVOLUCION_VENTA | COMPRA
+  tipo           String
+  // Con signo: negativo = salio, positivo = entro.
+  cantidad       Int
+  stockAntes     Int
+  stockDespues   Int
+  referenciaTipo String?
+  referenciaId   Int?
+  usuarioId      Int?
+  usuario        Usuario?  @relation(fields: [usuarioId], references: [id], onDelete: SetNull)
+  nota           String?
+  createdAt      DateTime  @default(now())
+
+  @@index([empresaId, createdAt])
+  @@index([productoId, createdAt])
+  @@map("movimientos_stock")
 }
 
 model ClienteFinal {

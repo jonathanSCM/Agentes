@@ -146,6 +146,20 @@
         <input id="sku" name="sku" type="text" maxlength="60"
                value="<%= b.sku || '' %>" placeholder="Ej: ZAP-RUN-001" />
       </div>
+      <div class="field-row">
+        <div class="field">
+          <label for="codigoBarras">Código de barras <em class="opcional">(opcional)</em></label>
+          <input id="codigoBarras" name="codigoBarras" type="text" maxlength="60" inputmode="numeric" autocomplete="off"
+                 value="<%= b.codigoBarras || '' %>" placeholder="Escanealo o escribilo" />
+          <p class="pf-ayuda">Para vender con lector en el punto de venta. No se puede repetir.</p>
+        </div>
+        <div class="field">
+          <label for="costo">Costo <em class="opcional">(opcional)</em></label>
+          <input id="costo" name="costo" type="number" min="0" step="0.01" inputmode="decimal"
+                 value="<%= b.costo !== undefined && b.costo !== null && b.costo !== '' ? Number(b.costo).toFixed(2) : '' %>" placeholder="0.00" />
+          <p class="pf-ayuda">Lo que te cuesta a vos. Sirve para calcular tu ganancia.</p>
+        </div>
+      </div>
       <div class="field">
         <label for="caracteristicas">Características (separadas por coma)</label>
         <input id="caracteristicas" name="caracteristicas" type="text" maxlength="300"
@@ -249,7 +263,8 @@
                   <% } %>
                 </td>
                 <td class="num"><input form="<%= formId %>" type="number" name="precio" min="0" step="0.01" value="<%= v.precio ? Number(v.precio).toFixed(2) : '' %>" placeholder="Igual al producto" class="mini-in mini-in-precio" /></td>
-                <td class="num"><input form="<%= formId %>" type="number" name="stock" min="0" value="<%= v.stock %>" class="mini-in mini-in-stock" /></td>
+                <td class="num"><input form="<%= formId %>" type="number" name="stock" min="0" value="<%= v.stock %>" class="mini-in mini-in-stock" />
+                  <input form="<%= formId %>" type="text" name="codigoBarras" maxlength="60" value="<%= v.codigoBarras || '' %>" placeholder="Código de barras" class="mini-in" style="width:130px;margin-top:.3rem" autocomplete="off" /></td>
                 <td class="actions-cell">
                   <button form="<%= formId %>" class="btn btn-ghost btn-chico" type="submit">Guardar</button>
                   <form method="POST" action="/panel/productos/<%= producto.id %>/variantes/<%= v.id %>/eliminar" class="inline-form"

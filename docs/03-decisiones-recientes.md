@@ -978,3 +978,15 @@ Plan completo en `docs/11-plan-planes-pos-panel-y-rediseno.md` (§11). Reemplaza
 - **Un solo título por pantalla**: si la página ya trae su encabezado, la barra superior no lo repite (`.admin-body:has(.page-head)`).
 - **Topes ilimitados** (plan Acceso total): antes se mostraba "Límite: 1.000.000.000" en Productos, Mensajes, Servicios, Inicio y Pedir conversaciones. Ahora se lee "Ilimitado" (`topeTexto` disponible en todas las vistas del panel).
 - Verificado con un barrido real de las 19 rutas del panel con dos cuentas (plan Agente y Acceso total).
+
+
+## 49. Stock unificado (F4): un solo stock, historial y códigos de barras
+
+Base del punto de venta (`docs/11`): el bot, el mostrador y el panel descuentan del MISMO stock sin sobreventa.
+- **Servicio central** `lib/services/stock.js`: `descontar` (atómico y condicionado: `UPDATE … WHERE stock >= cantidad`, dentro de la transacción del que llama, líneas en orden fijo para evitar deadlocks, cantidades enteras y con tope, todo por empresa), `reponer`, `fijar` (ajuste a un valor exacto) y `registrarInicial`. Si no alcanza lanza `ErrorStock` y no queda nada a medias.
+- **Historial (kardex)** `movimientos_stock` (migración `20261109120000`): todo cambio queda con antes/después, tipo, referencia (pedido), usuario y nota; se conserva aunque se borre el producto. Pantalla **Inventario → Historial de stock** con filtros.
+- **Red de seguridad en la base**: `CHECK (stock >= 0)` en productos y variantes.
+- **Conectado**: pedidos del bot (nuevo y "sumar al pedido"), cancelación de pedidos (reclamo atómico del cambio de estado: dos cancelaciones simultáneas ya no reponen dos veces), ajuste desde Inventario, edición de producto y de variante, altas (stock inicial) e importación desde Excel. Si entre la confirmación y la creación alguien se lleva la última unidad, el pedido no se crea y se le avisa al cliente.
+- **Costo y código de barras** (opcionales) en productos y variantes: el costo alimentará el margen del panel comercial; el código se valida único por empresa (`codigosBarras.js`, con `buscar` para el lector del POS: por código o SKU exacto, solo activos).
+- Prueba clave: **20 ventas simultáneas por 5 unidades → pasan exactamente 5**. Tests: `stock` (13), `codigos-barras` (6) y uno del historial en `flujo-determinista`. Suite: 910.
+- **Pendiente para el POS**: tipos `VENTA`, `ANULACION_VENTA` y `DEVOLUCION_VENTA` ya están permitidos en el historial; el POS los usará.
