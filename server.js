@@ -62,6 +62,7 @@ const {
   registrarCompraPaquete,
   puedeEditarCatalogo,
 } = require('./lib/services/suscripciones');
+const planesCliente = require('./lib/services/planesCliente');
 const { registrarCliente, autenticar } = require('./lib/services/auth');
 const { procesarMensajeEntrante, atenderMensaje, generarYRegistrarRespuesta, conversacionParaCarritoWeb, conBloqueoDeCliente } = require('./lib/services/conversaciones');
 const { encolarRespuesta } = require('./lib/services/bufferMensajes');
@@ -2157,10 +2158,13 @@ app.post('/panel/categorias/:id/atributos/:atributoId/eliminar', requireCliente,
 
 // -------- Catalogo de productos del cliente (CRUD) --------
 async function planDeEmpresa(empresaId) {
-  const sub = await prisma.suscripcion.findUnique({
-    where: { empresaId }, include: { plan: true },
-  });
-  return sub ? sub.plan : null;
+  // Se rige por la copia del plan del cliente (o el estado base si no tiene plan).
+  const v = await planesCliente.valoresDe(empresaId);
+  return {
+    codigo: v.planCodigo, nombre: v.planNombre, modulos: v.modulos, ilimitado: v.ilimitado,
+    maxProductos: planesCliente.topeNumerico(v.limites.maxProductos),
+    maxUsuarios: planesCliente.topeNumerico(v.limites.maxUsuarios),
+  };
 }
 
 app.get('/panel/productos', requireCliente, async (req, res, next) => {

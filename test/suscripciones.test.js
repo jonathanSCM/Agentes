@@ -44,7 +44,7 @@ async function fijarSuscripcion(estado, { periodoFin } = {}) {
 
 describe('consumirConversacion - el saldo pagado manda, salvo CANCELADA', () => {
   test('MOROSA con saldo extra ya pagado: SI debe seguir respondiendo', async () => {
-    await fijarSuscripcion('MOROSA', { periodoFin: new Date(Date.now() - 1000) });
+    await fijarSuscripcion('MOROSA', { periodoFin: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000) });
     await registrarCompraPaquete({ empresaId, cantidad: 10, precioUsd: 5 });
 
     const r = await consumirConversacion(suscripcionId, 'test');
@@ -53,7 +53,7 @@ describe('consumirConversacion - el saldo pagado manda, salvo CANCELADA', () => 
   });
 
   test('MOROSA sin ningun saldo extra: no responde, motivo SUSCRIPCION_INACTIVA', async () => {
-    await fijarSuscripcion('MOROSA', { periodoFin: new Date(Date.now() - 1000) });
+    await fijarSuscripcion('MOROSA', { periodoFin: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000) });
     const r = await consumirConversacion(suscripcionId, 'test');
     assert.equal(r.ok, false);
     assert.equal(r.motivo, 'SUSCRIPCION_INACTIVA');
@@ -76,7 +76,7 @@ describe('consumirConversacion - el saldo pagado manda, salvo CANCELADA', () => 
   });
 
   test('periodo vencido pero estado ACTIVA, con saldo extra: sigue respondiendo del extra', async () => {
-    await fijarSuscripcion('ACTIVA', { periodoFin: new Date(Date.now() - 1000) });
+    await fijarSuscripcion('ACTIVA', { periodoFin: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000) });
     await registrarCompraPaquete({ empresaId, cantidad: 3, precioUsd: 5 });
     const r = await consumirConversacion(suscripcionId, 'test');
     assert.equal(r.ok, true);
@@ -86,7 +86,7 @@ describe('consumirConversacion - el saldo pagado manda, salvo CANCELADA', () => 
 
 describe('obtenerEstadoConsumo.puedeAtender - alineado con consumirConversacion', () => {
   test('MOROSA con saldo extra: puedeAtender true', async () => {
-    await fijarSuscripcion('MOROSA', { periodoFin: new Date(Date.now() - 1000) });
+    await fijarSuscripcion('MOROSA', { periodoFin: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000) });
     await registrarCompraPaquete({ empresaId, cantidad: 10, precioUsd: 5 });
     const consumo = await obtenerEstadoConsumo(suscripcionId);
     assert.equal(consumo.puedeAtender, true);
@@ -103,7 +103,7 @@ describe('obtenerEstadoConsumo.puedeAtender - alineado con consumirConversacion'
 
 describe('puedeEditarCatalogo - bloquea alta de productos/categorias si no esta al dia', () => {
   test('MOROSA no puede editar catalogo, aunque tenga saldo de conversaciones', async () => {
-    await fijarSuscripcion('MOROSA', { periodoFin: new Date(Date.now() - 1000) });
+    await fijarSuscripcion('MOROSA', { periodoFin: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000) });
     await registrarCompraPaquete({ empresaId, cantidad: 10, precioUsd: 5 });
     assert.equal(await puedeEditarCatalogo(empresaId), false);
   });

@@ -60,6 +60,12 @@ model Plan {
   maxCitasMes      Int      @default(200)
   modeloIa         String   @default("claude-haiku-4-5") // modelo de IA segun el plan
   marcaBlanca      Boolean  @default(false)
+  // Modulos que incluye: AGENTE | POS | PANEL (docs/11).
+  modulos          String[] @default(["AGENTE"])
+  // Plan oculto: no sale en la web ni en el registro; solo un superadmin lo asigna.
+  oculto           Boolean  @default(false)
+  // Acceso total sin topes (plan oculto de pruebas).
+  ilimitado        Boolean  @default(false)
   recomendado      Boolean  @default(false)
   activo           Boolean  @default(true)
   orden            Int      @default(0)
@@ -512,6 +518,24 @@ model Suscripcion {
   // Periodo de facturacion vigente: las conversaciones incluidas se reinician aqui.
   periodoInicio  DateTime           @default(now())
   periodoFin     DateTime
+  // COPIA de los valores del plan al asignarlo: el cliente se rige por esto y no
+  // consulta el plan en cada uso. El superadmin puede ajustarla por cliente.
+  planNombre         String?
+  modulos            String[] @default(["AGENTE"])
+  convIncluidas      Int?
+  maxProductos       Int?
+  maxUsuarios        Int?
+  maxMensajesPropios Int?
+  maxServicios       Int?
+  maxCitasMes        Int?
+  modeloIa           String?
+  marcaBlanca        Boolean  @default(false)
+  ilimitado          Boolean  @default(false)
+  // Vigencia del plan: empieza al asignarlo; planFin null = sin vencimiento.
+  planInicio         DateTime?
+  planFin            DateTime?
+  // Avisos ya enviados para este plan: { corte7, corte2, corte0, uso80, uso95 }.
+  avisosEnviados     Json     @default("{}")
   // Referencias de la pasarela de pago (se llenan al integrar Stripe / pasarela local)
   refClientePago String?
   refSuscripPago String?

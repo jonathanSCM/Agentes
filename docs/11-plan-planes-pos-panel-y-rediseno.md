@@ -25,7 +25,7 @@ Es la unión de dos apps: **POS** (Next.js 16 + Prisma + NextAuth, un solo negoc
 
 Lo que **sí** trae valor para Proshop:
 - **Módulos separados por menú y por rol** (hub "Menú principal" → POS / Agenda / Admin), aplicado **en el servidor**, no solo ocultando botones.
-- **Caja** (apertura con efectivo inicial, cierre con conteo y diferencia), **ventas** con varios métodos de pago, **recibo** público por token con QR, **anulaciones y devoluciones**, **fiado** (cuentas por cobrar con abonos), **kardex** de movimientos de stock, **proveedores/compras**, **auditoría**, **reportes** con Excel.
+- **Caja** (apertura con efectivo inicial, cierre con conteo y diferencia), **ventas** con varios métodos de pago, **recibo** público por token con QR, **anulaciones y devoluciones**, **kardex** de movimientos de stock, **proveedores/compras**, **auditoría**, **reportes** con Excel.
 - **Cobrar el pedido de WhatsApp en el mostrador** sin descontar stock dos veces ("Cobrar y entregar").
 - Una **auditoría de seguridad e integridad** muy valiosa (`AUDITORIA.md`): 16 hallazgos de seguridad y 11 de integridad que ya costaron arreglar una vez. Este plan los trata como lista de verificación (§8).
 
@@ -55,7 +55,7 @@ Lo que **no** se copia:
 | Módulo | Incluye (menú) | Roles que lo usan |
 |---|---|---|
 | **AGENTE** (base, siempre) | Inicio, Conversaciones (CRM), Agente IA, WhatsApp, **Mensajes** y **Sin respuesta**, Catálogo (Productos, Categorías), Pedidos de WhatsApp, Clientes, Configuración, Consumo/Paquetes, Mi equipo | Dueño, Admin, Staff |
-| **POS** | Menú principal del POS, **Punto de venta**, **Caja**, **Ventas** (historial, anular, devolver), **Fiado/Cuentas por cobrar**, Inventario con **kardex**, Proveedores y compras (fase tardía), recibos | Dueño, Admin, **Cajero** (rol nuevo) |
+| **POS** | Menú principal del POS, **Punto de venta**, **Caja**, **Ventas** (historial, anular, devolver), Inventario con **kardex**, Proveedores y compras (fase tardía), recibos | Dueño, Admin, **Cajero** (rol nuevo) |
 | **PANEL comercial** | **Panel gerencial** (ventas hoy/mes, ticket promedio, utilidad y margen, comparativa WhatsApp vs mostrador, embudo bot→pedido→venta), **Reportes** con Excel, **Inteligencia**, **Auditoría**, alertas (stock bajo, por cobrar, sin movimiento) | Dueño, Admin |
 
 > Hoy `Reportes` e `Inteligencia` los ven **todos** los clientes. Pasarlos al módulo PANEL **les quita funciones a clientes actuales**: ver §8-R14 (se les respeta con "congelado de derechos", no se les quita nada sin avisar).
@@ -89,7 +89,6 @@ Pregunta abierta para el jefe (§10-P1): los 4 planes actuales (Gratis/Standard/
 | `sesiones_caja`, `movimientos_caja` | Apertura/cierre de caja | **Una sola caja abierta por empresa** (índice único parcial) |
 | `movimientos_stock` | **Kardex**: todo cambio de stock (venta, pedido del bot, devolución, ajuste, compra) con stock antes/después | Hoy **no existe**: es la base para auditar y para evitar el doble descuento |
 | `devoluciones`, `devolucion_items` | Devolver parcial o total | Reponen stock y caja una sola vez (bloqueo `FOR UPDATE`) |
-| `abonos_cliente` + `clientes_finales.saldo` | Fiado (cuentas por cobrar) | Solo a clientes identificados; sin crédito para ventas anónimas |
 | `proveedores`, `compras`, `compra_items`, `pagos_proveedor` | Compras (fase tardía) | Recepción con reclamo atómico (no se recibe dos veces) |
 | `auditoria` | Quién hizo qué (anulaciones, ajustes, cierres, cambios de plan) | Solo lectura |
 | `productos.costo`, `variantes.costo`, `productos.codigo_barras` | Margen y lector de códigos | Opcionales; sin costo el panel muestra "sin costo" en vez de inventar utilidad |
@@ -107,7 +106,7 @@ Reglas de dinero (copiadas): montos en `Decimal(10,2)`; **el servidor recalcula 
 
 **POS — P1 (mínimo vendible)**: abrir caja → vender (buscar por nombre/SKU/código de barras, elegir variante, cantidad, descuento por línea y total) → cobrar (efectivo con vuelto, QR, tarjeta, transferencia) → recibo imprimible (80 mm y A4) y por link/WhatsApp → historial → anular (con motivo, solo Admin) → cerrar caja con conteo. Tests de concurrencia desde el primer día.
 
-**POS — P2**: devoluciones, fiado con abonos, **cobrar pedidos de WhatsApp**, venta ligada a cliente, ventas "en espera".
+**POS — P2**: devoluciones, **cobrar pedidos de WhatsApp**, venta ligada a cliente, ventas "en espera".
 
 **POS — P3** (más adelante, a pedido): proveedores y compras con recepción, kardex avanzado, productos sin movimiento, alertas de reposición.
 
@@ -128,7 +127,7 @@ Bloque de marca arriba (logo + **tarjeta del negocio**), navegación en **grupos
 Grupos propuestos:
 - **Agente**: Conversaciones · Pedidos · Clientes · Agente IA · Mensajes · Sin respuesta · WhatsApp
 - **Catálogo**: Productos · Categorías (· Inventario si no hay POS)
-- **POS** (si el plan lo trae): Punto de venta · Caja · Ventas · Fiado · Inventario/Kardex
+- **POS** (si el plan lo trae): Punto de venta · Caja · Ventas · Inventario/Kardex
 - **Panel comercial** (si el plan lo trae): Resumen · Reportes · Inteligencia · Auditoría
 - **Mi cuenta**: Equipo · Consumo · Paquetes · Configuración
 
@@ -174,7 +173,7 @@ Diseño (idéntico en espíritu a productos):
 | R9 | Sesión con rol viejo | Seguir entrando tras bajarle el rol (S-03) | Rol y "activo" se leen de la base en cada petición (o caché de 30 s), no del token de sesión |
 | R10 | Eventos en vivo filtran datos | Cajero ve contenido de chats (S-05) | SSE filtrado por empresa **y** por rol/módulo |
 | R11 | **Dos cajas abiertas** o cierre sin contar | Descuadre | Índice único parcial (1 sesión abierta por empresa); cierre exige conteo; el sistema calcula esperado y diferencia; si bajan de plan con caja abierta, se bloquea |
-| R12 | Caja mal calculada (devoluciones, fiado, propinas) | Descuadre | Reglas escritas y probadas: efectivo esperado = inicial + cobros en efectivo − devoluciones en efectivo ± movimientos manuales; fiado no entra a caja |
+| R12 | Caja mal calculada (devoluciones, propinas) | Descuadre | Reglas escritas y probadas: efectivo esperado = inicial + cobros en efectivo − devoluciones en efectivo ± movimientos manuales |
 | R13 | Redondeos | Centavos que no cuadran | `Decimal` en todo, redondeo único por línea, prueba de invariantes (suma de pagos = total) |
 | R14 | **Quitarle funciones a clientes actuales** al mover Reportes/Inteligencia al módulo PANEL | Clientes enojados | "Congelado de derechos": los clientes actuales conservan lo que ya veían hasta que se les migre con aviso; el backfill es explícito y reversible |
 | R15 | Cambio de plan a mitad de periodo | Accesos inconsistentes, cobros | Sube = inmediato; baja = solo lectura (datos intactos); reglas de periodo definidas en una sola función `estadoDeAcceso(empresa)` con pruebas |
@@ -208,7 +207,7 @@ Orden recomendado (cada fase termina verde y se puede detener ahí):
 | **F3** | **Módulos y planes**: `planes.modulos`, `requireModulo`, hub con candados, admin de planes, backfill "congelado de derechos", página `/planes` | Medio | 3–4 d | Prueba que recorre todas las rutas × planes × roles; ningún cliente actual pierde acceso |
 | **F4** | **Stock unificado**: descuento atómico, `movimientos_stock` (kardex), `CHECK`, `costo`, `codigo_barras`; el bot y el panel ya lo usan | **Alto (toca el dinero y el stock)** | 3–4 d | Pruebas de concurrencia (50 ventas simultáneas del último producto → solo 1 pasa); suite y evals sin regresión |
 | **F5** | **POS P1**: caja, venta, pagos, recibo, historial, anular | Alto | 6–8 d | Prueba de punta a punta: abrir caja → vender → cobrar → recibo → cerrar con diferencia 0 |
-| **F6** | **POS P2**: devoluciones, fiado, cobrar pedidos del bot, clientes | Alto | 5–7 d | Invariantes de caja/stock/saldos con pruebas por cada flujo |
+| **F6** | **POS P2**: devoluciones, cobrar pedidos del bot, clientes | Alto | 5–7 d | Invariantes de caja y stock con pruebas por cada flujo |
 | **F7** | **Panel comercial**: resumen, canal, embudo, utilidad, reportes, auditoría | Medio | 4–6 d | Cifras del panel coinciden con la suma de ventas/pedidos de la base (prueba cruzada) |
 | **F8** | **Bot de citas** + cobrar cita | Medio | 6–9 d | Evals de citas en verde con la meta de tokens; 0 llamadas en el menú |
 
@@ -233,5 +232,43 @@ Cómo se evita romper cosas en **todas** las fases:
 - **P4.** ¿Cuántos locales/sucursales debe soportar el POS al inicio? (recomendado: **uno**, como la barbería; sucursales después)
 - **P5.** Hardware: ¿impresora térmica de 80 mm y lector de códigos de barras desde el día 1? (afecta pruebas y diseño de recibo)
 - **P6.** ¿Facturación fiscal (factura/NIT)? (recomendado: fuera de alcance; solo recibo)
-- **P7.** Métodos de pago del mostrador: efectivo, QR, tarjeta, transferencia, ¿crédito/fiado desde P1 o P2? (recomendado: fiado en P2)
+- **P7.** ~~Fiado~~ (resuelto: no existe). Métodos de pago del mostrador: efectivo, QR, tarjeta, transferencia.
 - **P8.** ¿Orden de las fases como está en §9, o se adelanta el bot de citas?
+
+
+---
+
+## 11. Decisiones confirmadas (2026-11-08) — mandan sobre lo anterior
+
+| Tema | Decisión |
+|---|---|
+| Planes | Se **borran los planes actuales**. Quedan 3 planes de módulos (Agente · Agente + POS · Agente + POS + Panel), cada uno con **sus propias conversaciones y límites**, más un **plan oculto "Acceso total"** (todo ilimitado) que **solo un superadmin** puede asignar, para pruebas |
+| Prueba gratis | Incluye **un solo módulo: el Agente** |
+| Estado base | Una empresa **sin suscripción** funciona solo con el módulo **Agente** |
+| Clientes actuales | **No hay clientes en producción**: sin "congelado de derechos" |
+| Locales | **Uno** |
+| Hardware | **Impresora térmica 80 mm y lector de códigos de barras desde el día 1** (obligatorio) |
+| Factura fiscal | Fuera: **solo recibo** |
+| **Fiado** | **Eliminado**: no existe (ni abonos, ni saldo, ni crédito) |
+| Orden de fases | Se mantiene, y **ninguna fase puede bloquear o congelar a otra**: cada una se entrega funcionando por sí sola |
+
+### 11.1 Cómo funcionan los planes (modelo copiado del otro sistema que se mostró como ejemplo)
+
+- **Un plan es una plantilla**: nombre, precio, moneda, módulos, conversaciones incluidas por mes y topes (productos, usuarios, mensajes propios, servicios, citas, modelo de IA).
+- **El superadmin asigna un plan a un cliente**: se **copian los valores** al cliente y el cliente se **rige por su copia** (no consulta el plan en cada uso). El superadmin puede **cambiar los valores de esa copia** para un cliente puntual.
+- **Vigencia**: la primera vez que se asigna empieza **hoy**; duración **1, 2, 3, 6 o 12 meses, o una fecha personalizada**. **Renovar suma meses** a la fecha de vencimiento (si ya venció, cuenta desde hoy).
+- **Conversaciones**: la bolsa incluida se **reinicia cada mes** (el mismo día en que empezó el plan).
+- **Avisos al cliente**: del **corte** — 7 días antes, 2 días antes y el mismo día; del **uso de conversaciones** — al 80 % y al 95 %. Cada aviso se manda una sola vez.
+- **Al vencer**: 5 días de gracia con todo funcionando; pasada la gracia **se corta el agente** (atención por WhatsApp); el panel y el POS siguen (el cobro del mostrador no se detiene).
+- **Más conversaciones**: el cliente **no compra un plan nuevo**; pide una cantidad y escribe una **nota** ("voy a pagar…"). Eso llega a un **buzón del superadmin**, que aprueba y carga el paquete a mano (hasta tener pasarela de pago).
+- **Plan oculto**: no aparece en la web pública ni en el registro; solo el superadmin lo asigna.
+
+### 11.2 Pasos de implementación (cada uno termina verde y es independiente)
+
+1. **Motor de planes** (copia, vigencia, módulos, estado base) + lectura de límites desde la copia.
+2. **Superadmin**: crear/editar plantillas, asignar plan a cliente con duración, editar la copia, renovar.
+3. Planes nuevos (se borran los viejos) + registro con prueba gratis solo-Agente.
+4. **Avisos** (corte y 80/95 %) y **buzón** de pedidos de conversaciones.
+5. Módulos: `requireModulo` en todas las rutas + menú con candados.
+6. Rediseño del panel (shell + hub) y conversaciones tipo CRM.
+7. Stock unificado → POS → Panel comercial → Bot de citas (según §9).
