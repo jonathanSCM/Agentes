@@ -26,13 +26,15 @@
       <small><%= menuPlan.nombre %><%= menuPlan.vence ? ' · vence ' + menuPlan.vence : '' %></small>
     </<%= puedeVerPlan ? 'a' : 'div' %>>
 
-    <nav class="sidebar-nav" aria-label="Menu de mi negocio">
-      <% menu.forEach(function (grupo) { %>
-        <div class="nav-grupo">
-          <% if (grupo.titulo) { %><span class="sidebar-section"><%= grupo.titulo %></span><% } %>
-          <% grupo.items.forEach(function (it) { %>
+    <nav class="sidebar-nav" id="sidebarNav" aria-label="Menu de mi negocio">
+      <%
+        // Cada grupo es una SECCION (Agente, Punto de venta, Panel comercial...). Se abre solo la del modulo en que estas;
+        // en Inicio (o en una pantalla que no esta en el menu) se abre la primera. Tocar otra seccion la abre y cierra la anterior.
+        var haySeccionActiva = menu.some(function (g) { return g.titulo && g.items.some(function (it) { return it.clave === activo; }); });
+        var primeraSeccion = (menu.filter(function (g) { return g.titulo; })[0] || {}).clave;
+        var linkMenu = function (it) { %>
             <a href="<%= it.href %>" title="<%= it.etiqueta %><%= it.bloqueado ? ' (no está en tu plan)' : '' %>"
-               class="<%= activo === it.clave ? 'is-active' : '' %> <%= it.bloqueado ? 'is-bloqueado' : '' %>">
+               class="<%= activo === it.clave ? 'is-active' : '' %> <%= it.bloqueado ? 'is-bloqueado' : '' %>" <%- activo === it.clave ? 'aria-current="page"' : '' %>>
               <span class="si"><svg viewBox="0 0 24 24"><%- it.icono %></svg></span>
               <span class="nav-texto"><%= it.etiqueta %></span>
               <% if (it.bloqueado) { %>
@@ -41,10 +43,30 @@
                 <span class="nav-badge"><%= it.badge %></span>
               <% } %>
             </a>
-          <% }); %>
-        </div>
+        <% }; %>
+      <% menu.forEach(function (grupo) { %>
+        <% if (!grupo.titulo) { %>
+          <div class="nav-suelto"><% grupo.items.forEach(linkMenu); %></div>
+        <% } else {
+             var tieneActivo = grupo.items.some(function (it) { return it.clave === activo; });
+             var abierto = tieneActivo || (!haySeccionActiva && grupo.clave === primeraSeccion);
+             var avisos = grupo.items.reduce(function (n, it) { return n + (it.bloqueado ? 0 : (it.badge || 0)); }, 0);
+             var todoBloqueado = grupo.items.length > 0 && grupo.items.every(function (it) { return it.bloqueado; });
+        %>
+          <div class="nav-grupo <%= abierto ? 'is-abierto' : '' %> <%= tieneActivo ? 'tiene-activo' : '' %>" data-grupo="<%= grupo.clave %>">
+            <button type="button" class="nav-grupo-cab" aria-expanded="<%= abierto ? 'true' : 'false' %>" aria-controls="nav-<%= grupo.clave %>" title="<%= grupo.titulo %>">
+              <span class="si"><svg viewBox="0 0 24 24"><%- grupo.icono || '' %></svg></span>
+              <span class="nav-texto"><%= grupo.titulo %></span>
+              <% if (avisos) { %><span class="nav-badge nav-badge-grupo"><%= avisos %></span><% } %>
+              <% if (todoBloqueado) { %><span class="nav-candado" aria-label="No está en tu plan"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg></span><% } %>
+              <span class="nav-flecha" aria-hidden="true"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 6 6 6-6 6"/></svg></span>
+            </button>
+            <div class="nav-grupo-items" id="nav-<%= grupo.clave %>"><% grupo.items.forEach(linkMenu); %></div>
+          </div>
+        <% } %>
       <% }); %>
     </nav>
+
 
     <div class="usuario">
       <span class="usuario-avatar" aria-hidden="true"><%= menuUsuario.iniciales %></span>

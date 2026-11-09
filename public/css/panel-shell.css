@@ -113,3 +113,32 @@
   background: rgba(255, 255, 255, .06); color: var(--text); border: 1px solid var(--border);
   border-radius: 10px; padding: .5rem .7rem; font: inherit; font-size: .88rem;
 }
+
+/* Secciones desplegables del menu (cada grupo es un modulo). Solo se abre la del modulo actual. */
+.nav-suelto { display: flex; flex-direction: column; gap: 2px; }
+.nav-grupo { display: flex; flex-direction: column; gap: 2px; margin-top: 2px; }
+.nav-grupo + .nav-grupo { margin-top: 2px; }
+.nav-grupo-cab {
+  display: flex; align-items: center; gap: .65rem; width: 100%; padding: .55rem .7rem; border: 0; border-radius: 10px; cursor: pointer;
+  background: none; color: var(--muted); font: inherit; font-size: .88rem; font-weight: 700; text-align: left;
+}
+.nav-grupo-cab:hover { background: rgba(255, 255, 255, .06); color: var(--text); }
+.nav-grupo-cab:focus-visible { outline: 2px solid rgba(47, 227, 166, .55); outline-offset: 1px; }
+.nav-grupo-cab .si { opacity: .9; }
+.nav-grupo-cab .nav-texto { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.nav-grupo.tiene-activo > .nav-grupo-cab { color: var(--primary-2); }
+.nav-flecha { display: inline-flex; opacity: .6; transition: transform .15s ease; }
+.nav-grupo.is-abierto > .nav-grupo-cab .nav-flecha { transform: rotate(90deg); }
+.nav-grupo-cab .nav-badge, .nav-grupo-cab .nav-candado { margin-left: 0; }
+/* Con la seccion abierta el numerito de avisos ya se ve en cada opcion: no se repite en la cabecera. */
+.nav-grupo.is-abierto > .nav-grupo-cab .nav-badge-grupo { display: none; }
+.nav-grupo-items { display: none; flex-direction: column; gap: 2px; padding: 0 0 .35rem .55rem; margin-left: .85rem; border-left: 1px solid var(--border); }
+.nav-grupo.is-abierto > .nav-grupo-items { display: flex; }
+.nav-grupo-items a { padding: .48rem .65rem; font-size: .87rem; }
+
+/* Menu plegado a solo iconos: todas las opciones a la vista (sin cabeceras ni cierres) separadas por una linea. */
+@media (min-width: 901px) {
+  .sidebar.is-collapsed .nav-grupo-cab { display: none; }
+  .sidebar.is-collapsed .nav-grupo-items { display: flex; padding: 0; margin: 0; border-left: 0; }
+  .sidebar.is-collapsed .nav-grupo { border-top: 1px solid var(--border); margin-top: .35rem; padding-top: .35rem; }
+}

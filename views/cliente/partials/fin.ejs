@@ -37,6 +37,33 @@
     over.addEventListener('click', function () { abrir(false); });
   })();
 
+  // Menu lateral: secciones desplegables (una abierta a la vez) y memoria del desplazamiento.
+  (function () {
+    var nav = document.getElementById('sidebarNav');
+    if (!nav) return;
+    nav.querySelectorAll('.nav-grupo-cab').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        var grupo = btn.parentNode;
+        var abrir = !grupo.classList.contains('is-abierto');
+        nav.querySelectorAll('.nav-grupo.is-abierto').forEach(function (g) {
+          g.classList.remove('is-abierto');
+          g.querySelector('.nav-grupo-cab').setAttribute('aria-expanded', 'false');
+        });
+        if (abrir) { grupo.classList.add('is-abierto'); btn.setAttribute('aria-expanded', 'true'); }
+      });
+    });
+    // Al cambiar de pantalla el menu no vuelve arriba: se recupera donde estaba (aca, con el menu ya armado, el alto es el real)
+    // y se deja a la vista la opcion actual.
+    try { var y = sessionStorage.getItem('panel-nav-scroll'); if (y !== null) nav.scrollTop = Number(y) || 0; } catch (e) { /* sin almacenamiento */ }
+    var actual = nav.querySelector('a.is-active');
+    if (actual) { var r = actual.getBoundingClientRect(); var c = nav.getBoundingClientRect(); if (r.top < c.top || r.bottom > c.bottom) actual.scrollIntoView({ block: 'nearest' }); }
+    var espera = null;
+    function guardar() { try { sessionStorage.setItem('panel-nav-scroll', String(nav.scrollTop)); } catch (e) { /* no pasa nada */ } }
+    nav.addEventListener('scroll', function () { clearTimeout(espera); espera = setTimeout(guardar, 80); });
+    window.addEventListener('pagehide', guardar);
+    nav.addEventListener('click', function (e) { if (e.target.closest && e.target.closest('a')) guardar(); });
+  })();
+
   // Campanita de notificaciones
   (function () {
     var bell = document.getElementById('notifBell');
