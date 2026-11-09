@@ -63,6 +63,7 @@ const {
   puedeEditarCatalogo,
 } = require('./lib/services/suscripciones');
 const planesCliente = require('./lib/services/planesCliente');
+const solicitudesConv = require('./lib/services/solicitudesConv');
 const { registrarCliente, autenticar } = require('./lib/services/auth');
 const { procesarMensajeEntrante, atenderMensaje, generarYRegistrarRespuesta, conversacionParaCarritoWeb, conBloqueoDeCliente } = require('./lib/services/conversaciones');
 const { encolarRespuesta } = require('./lib/services/bufferMensajes');
@@ -1040,6 +1041,7 @@ app.get('/panel/consumo', requireCliente, requireRol('OWNER'), async (req, res, 
     res.render('cliente/consumo', {
       title: 'Mi consumo - Proshop', tituloPagina: 'Mi consumo', activo: 'consumo',
       plan: resumen.plan, suscripcion: resumen.suscripcion, consumo: resumen.consumo,
+      valores: resumen.valores, nombresModulo: planesCliente.NOMBRES_MODULO, topeTexto: planesCliente.topeTexto,
       mensaje: req.query.ok || null,
     });
   } catch (err) { next(err); }
@@ -1781,70 +1783,35 @@ app.get('/panel/inteligencia/comentarios', requireCliente, async (req, res, next
   } catch (err) { next(err); }
 });
 
+async function renderPaquetes(req, res, { error = null, datos = null, status = 200 } = {}) {
+  const [resumen, paquetesDb, solicitudes] = await Promise.all([
+    obtenerResumenEmpresa(req.session.empresaId),
+    prisma.paquete.findMany({ where: { activo: true }, orderBy: { cantidad: 'asc' }, include: { preciosPais: true } }),
+    solicitudesConv.delCliente(req.session.empresaId),
+  ]);
+  const pais = detectarPais(req.ip);
+  const paquetes = paquetesDb.map((p) => ({ ...p, precio: precioPaqueteParaPais(p, pais, p.preciosPais) }));
+  res.status(status).render('cliente/paquetes', {
+    title: 'Pedir conversaciones - Proshop', tituloPagina: 'Pedir conversaciones', activo: 'paquetes',
+    paquetes, consumo: resumen.consumo, simboloMoneda, solicitudes, minimo: solicitudesConv.MIN_CANTIDAD,
+    mensaje: req.query.ok || null, error: error || req.query.err || null, datos,
+  });
+}
+
 app.get('/panel/paquetes', requireCliente, requireRol('OWNER'), async (req, res, next) => {
-  try {
-    const [resumen, paquetesDb] = await Promise.all([
-      obtenerResumenEmpresa(req.session.empresaId),
-      prisma.paquete.findMany({ where: { activo: true }, orderBy: { cantidad: 'asc' }, include: { preciosPais: true } }),
-    ]);
-    const pais = detectarPais(req.ip);
-    const paquetes = paquetesDb.map((p) => ({ ...p, precio: precioPaqueteParaPais(p, pais, p.preciosPais) }));
-    res.render('cliente/paquetes', {
-      title: 'Comprar paquete - Proshop', tituloPagina: 'Comprar paquete', activo: 'paquetes',
-      paquetes, consumo: resumen.consumo, simboloMoneda,
-    });
-  } catch (err) { next(err); }
+  try { await renderPaquetes(req, res); } catch (err) { next(err); }
 });
 
-// Compra de un paquete: registra la compra + el pago, y acredita el saldo.
-app.post('/panel/paquetes/:id/comprar', requireCliente, requireRol('OWNER'), async (req, res, next) => {
+// El cliente pide una cantidad con una nota; llega al buzon del superadmin (/admin/solicitudes).
+// Pedir NO da saldo: se acredita cuando el superadmin aprueba.
+app.post('/panel/paquetes/pedir', requireCliente, requireRol('OWNER'), async (req, res, next) => {
   try {
-    const paquete = await prisma.paquete.findUnique({ where: { id: Number(req.params.id) }, include: { preciosPais: true } });
-    if (!paquete || !paquete.activo) {
-      return res.redirect('/panel/paquetes');
-    }
-
-    // Mismo precio que se le mostro en pantalla (se detecta la IP de esta
-    // misma request, no se confia en nada que haya mandado el cliente): si
-    // no, se corre el riesgo de mostrar un precio y cobrar otro.
-    const pais = detectarPais(req.ip);
-    const precio = precioPaqueteParaPais(paquete, pais, paquete.preciosPais);
-
-    const empresaId = req.session.empresaId;
-    // PENDIENTE: todavia NO da saldo usable. Se activa recien cuando Proshop
-    // confirma el pago en /admin/pagos (antes esto se acreditaba de
-    // inmediato, sin ninguna relacion real con si se pago o no).
-    const compra = await registrarCompraPaquete({
-      empresaId,
-      paqueteId: paquete.id,
-      cantidad: paquete.cantidad,
-      // precioUsd del registro de compra queda como referencia interna en
-      // USD (para reportes/comparaciones consistentes), independiente de en
-      // que moneda se le cobro realmente al cliente (ver Pago abajo).
-      precioUsd: Number(paquete.precioUsd),
-      nota: 'Comprado desde el panel del cliente',
-      estado: 'PENDIENTE',
-    });
-
-    // Queda registrado el pago (pendiente de confirmar por Proshop), en la
-    // moneda/monto real que se le mostro y se le va a cobrar.
-    await prisma.pago.create({
-      data: {
-        empresaId,
-        tipo: 'PAQUETE',
-        monto: precio.precio,
-        moneda: precio.moneda,
-        estado: 'PENDIENTE',
-        referencia: `Paquete de ${paquete.cantidad} conversaciones`,
-        paqueteId: paquete.id,
-        compraPaqueteId: compra.id,
-      },
-    });
-
-    res.redirect('/panel/compras?ok=' + encodeURIComponent(
-      `Compra registrada: quedara disponible apenas confirmemos tu pago de ${paquete.cantidad.toLocaleString('es-BO')} conversaciones.`
-    ));
-  } catch (err) { next(err); }
+    await solicitudesConv.crear(req.session.empresaId, { cantidad: req.body.cantidad, nota: req.body.nota });
+    res.redirect('/panel/paquetes?ok=' + encodeURIComponent('Pedido enviado. Apenas confirmemos tu pago, las conversaciones se cargan a tu saldo.'));
+  } catch (err) {
+    if (err.codigo === 'SOLICITUD') return renderPaquetes(req, res, { error: err.message, datos: req.body, status: 400 });
+    next(err);
+  }
 });
 
 app.get('/panel/compras', requireCliente, requireRol('OWNER'), async (req, res, next) => {
@@ -4217,6 +4184,10 @@ function datosPlanDesdeForm(body) {
     maxMensajesPropios: Number.isFinite(parseInt(body.maxMensajesPropios, 10)) ? parseInt(body.maxMensajesPropios, 10) : 30,
     modeloIa: String(body.modeloIa || 'claude-haiku-4-5').trim().slice(0, 60),
     marcaBlanca: body.marcaBlanca === '1',
+    // Modulos que incluye (Agente siempre), plan oculto (solo superadmin) y acceso total sin topes.
+    modulos: [...new Set(['AGENTE', ...[].concat(body.modulos || []).map(String).filter((m) => planesCliente.MODULOS.includes(m))])],
+    oculto: body.oculto === '1',
+    ilimitado: body.ilimitado === '1',
     recomendado: body.recomendado === '1',
     orden: parseInt(body.orden, 10) || 0,
     features: (body.features || '').split('\n').map((f) => f.trim()).filter(Boolean),
@@ -4267,8 +4238,15 @@ app.get('/admin/planes/:id/editar', requireAuth, async (req, res, next) => {
 
 app.post('/admin/planes/:id', requireAuth, async (req, res, next) => {
   try {
-    await prisma.plan.update({ where: { id: Number(req.params.id) }, data: datosPlanDesdeForm(req.body || {}) });
-    res.redirect('/admin/planes?ok=' + encodeURIComponent('Plan actualizado.'));
+    const id = Number(req.params.id);
+    await prisma.plan.update({ where: { id }, data: datosPlanDesdeForm(req.body || {}) });
+    // Opcional: llevar los cambios a los clientes que ya tienen este plan (cada dueno recibe un aviso).
+    let extra = '';
+    if (req.body && req.body.propagar === '1') {
+      const r = await planesCliente.propagarCambiosDePlan(id);
+      extra = ` Se aplicó a ${r.actualizados} cliente(s) y se les avisó.`;
+    }
+    res.redirect('/admin/planes?ok=' + encodeURIComponent('Plan actualizado.' + extra));
   } catch (err) { next(err); }
 });
 
@@ -4491,6 +4469,27 @@ app.post('/admin/paquetes/:id/activo', requireAuth, async (req, res, next) => {
 });
 
 // --- Pagos ---
+// ---- Buzon de pedidos de conversaciones ----
+app.get('/admin/solicitudes', requireAuth, async (req, res, next) => {
+  try {
+    res.render('admin/solicitudes', {
+      title: 'Panel Proshop - Pedidos de conversaciones', tituloPagina: 'Pedidos de conversaciones', activo: 'solicitudes',
+      solicitudes: await solicitudesConv.listar(), mensaje: req.query.ok || null, error: req.query.err || null,
+    });
+  } catch (err) { next(err); }
+});
+const accionSolicitud = (okTexto, fn) => async (req, res, next) => {
+  try {
+    await fn(Number(req.params.id), req.body || {});
+    res.redirect('/admin/solicitudes?ok=' + encodeURIComponent(okTexto));
+  } catch (err) {
+    if (err.codigo === 'SOLICITUD') return res.redirect('/admin/solicitudes?err=' + encodeURIComponent(err.message));
+    next(err);
+  }
+};
+app.post('/admin/solicitudes/:id/aprobar', requireAuth, accionSolicitud('Pedido aprobado: se cargaron las conversaciones al cliente.', (id, b) => solicitudesConv.aprobar(id, { cantidad: b.cantidad, vigenciaDias: b.vigenciaDias || undefined, respuesta: b.respuesta })));
+app.post('/admin/solicitudes/:id/rechazar', requireAuth, accionSolicitud('Pedido rechazado.', (id, b) => solicitudesConv.rechazar(id, { respuesta: b.respuesta })));
+
 app.get('/admin/pagos', requireAuth, async (req, res, next) => {
   try {
     const pagos = await prisma.pago.findMany({

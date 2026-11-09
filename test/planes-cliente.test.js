@@ -7,7 +7,7 @@ const P = require('../lib/services/planesCliente');
 const { consumirConversacion, obtenerEstadoConsumo } = require('../lib/services/suscripciones');
 
 const SLUG = 'test-planes-cliente';
-const COD = ['TEST_PC_AGENTE', 'TEST_PC_FULL', 'PRUEBA'];
+const COD = ['TEST_PC_AGENTE', 'TEST_PC_FULL']; // la plantilla PRUEBA es la sembrada: no se borra (otros tests la usan)
 let empresaId;
 let planAgente;
 let planFull;
@@ -136,5 +136,31 @@ describe('prueba gratis', () => {
     assert.equal(r.suscripcion.estado, 'PRUEBA');
     assert.deepEqual(r.valores.modulos, ['AGENTE']);
     assert.equal(r.valores.planFin.toISOString().slice(0, 10), '2026-11-22');
+  });
+});
+
+describe('llevar los cambios del plan a los clientes (opcional)', () => {
+  test('solo cambia lo que cambió, avisa al dueño y no toca las fechas', async () => {
+    const ahora = new Date('2026-11-08T12:00:00Z');
+    await prisma.notificacion.deleteMany({ where: { empresaId } });
+    await P.asignarPlan(empresaId, planAgente.id, { meses: 3, ahora });
+    const antes = await prisma.suscripcion.findUnique({ where: { empresaId } });
+
+    // Sin cambios en el plan: no se actualiza a nadie ni se avisa.
+    let r = await P.propagarCambiosDePlan(planAgente.id);
+    assert.equal(r.actualizados, 0);
+    assert.equal(await prisma.notificacion.count({ where: { empresaId, tipo: 'PLAN_CAMBIO' } }), 0);
+
+    await prisma.plan.update({ where: { id: planAgente.id }, data: { convIncluidas: 10, modulos: ['AGENTE', 'POS'] } });
+    r = await P.propagarCambiosDePlan(planAgente.id);
+    assert.equal(r.actualizados, 1);
+    const despues = await prisma.suscripcion.findUnique({ where: { empresaId } });
+    assert.equal(despues.convIncluidas, 10);
+    assert.deepEqual(despues.modulos, ['AGENTE', 'POS']);
+    assert.equal(despues.planFin.toISOString(), antes.planFin.toISOString(), 'las fechas no se tocan');
+    const aviso = await prisma.notificacion.findFirst({ where: { empresaId, tipo: 'PLAN_CAMBIO' } });
+    assert.match(aviso.mensaje, /Conversaciones por mes: 3 → 10/);
+    assert.match(aviso.mensaje, /Agente → Agente \+ Punto de venta/);
+    await prisma.plan.update({ where: { id: planAgente.id }, data: { convIncluidas: 3, modulos: ['AGENTE'] } });
   });
 });

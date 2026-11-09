@@ -184,9 +184,36 @@ model CompraPaquete {
   nota            String?
 
   pagos Pago[]
+  solicitudes SolicitudConversaciones[]
 
   @@index([empresaId, estado])
   @@map("compras_paquete")
+}
+
+// Pedido de mas conversaciones: llega al buzon del superadmin, que aprueba y carga el paquete.
+model SolicitudConversaciones {
+  id               Int             @id @default(autoincrement())
+  empresaId        Int
+  empresa          Empresa         @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  cantidad         Int
+  nota             String?
+  estado           EstadoSolicitud @default(PENDIENTE)
+  cantidadAprobada Int?
+  respuesta        String?
+  compraPaqueteId  Int?
+  compraPaquete    CompraPaquete?  @relation(fields: [compraPaqueteId], references: [id], onDelete: SetNull)
+  createdAt        DateTime        @default(now())
+  resueltaAt       DateTime?
+
+  @@index([estado, createdAt])
+  @@index([empresaId])
+  @@map("solicitudes_conversaciones")
+}
+
+enum EstadoSolicitud {
+  PENDIENTE
+  APROBADA
+  RECHAZADA
 }
 
 enum EstadoCompra {
@@ -236,6 +263,7 @@ model Empresa {
   comprasPaquete CompraPaquete[]
   notificaciones Notificacion[]
   suscripcion    Suscripcion?
+  solicitudesConversaciones SolicitudConversaciones[]
   usosIA         UsoIA[]
   mensajesAgente MensajeAgente[]
   datosNegocio   DatoNegocio[]

@@ -137,6 +137,18 @@ Agente de ventas con IA
   <div class="field-row">
     <label style="display:flex;align-items:center;gap:.5rem"><input type="checkbox" name="marcaBlanca" value="1" style="width:auto" <%= plan && plan.marcaBlanca ? 'checked' : '' %> /> Marca blanca</label>
     <label style="display:flex;align-items:center;gap:.5rem"><input type="checkbox" name="recomendado" value="1" style="width:auto" <%= plan && plan.recomendado ? 'checked' : '' %> /> Marcar como recomendado</label>
+    <div class="field" style="margin-top:.8rem">
+      <label>Módulos que incluye</label>
+      <label style="display:flex;align-items:center;gap:.5rem"><input type="checkbox" checked disabled style="width:auto" /> Agente (siempre)</label>
+      <label style="display:flex;align-items:center;gap:.5rem"><input type="checkbox" name="modulos" value="POS" style="width:auto" <%= plan && plan.modulos && plan.modulos.includes('POS') ? 'checked' : '' %> /> Punto de venta</label>
+      <label style="display:flex;align-items:center;gap:.5rem"><input type="checkbox" name="modulos" value="PANEL" style="width:auto" <%= plan && plan.modulos && plan.modulos.includes('PANEL') ? 'checked' : '' %> /> Panel comercial</label>
+    </div>
+    <label style="display:flex;align-items:center;gap:.5rem"><input type="checkbox" name="oculto" value="1" style="width:auto" <%= plan && plan.oculto ? 'checked' : '' %> /> Plan oculto (no sale en la web ni en el registro; solo un superadmin lo asigna)</label>
+    <label style="display:flex;align-items:center;gap:.5rem"><input type="checkbox" name="ilimitado" value="1" style="width:auto" <%= plan && plan.ilimitado ? 'checked' : '' %> /> Acceso total (todos los módulos, sin topes ni vencimiento)</label>
+    <% if (plan && plan.id) { %>
+    <label style="display:flex;align-items:center;gap:.5rem;margin-top:.6rem"><input type="checkbox" name="propagar" value="1" style="width:auto" /> Aplicar estos cambios también a los clientes que ya tienen este plan (se les avisa)</label>
+    <p class="muted" style="font-size:.8rem;margin:.2rem 0 0">Si no lo marcás, los clientes actuales conservan sus valores y solo los nuevos reciben los cambios.</p>
+    <% } %>
   </div>
 
   <div class="form-actions">

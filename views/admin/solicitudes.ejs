@@ -1,0 +1,55 @@
+<%- include('partials/inicio') %>
+
+<div class="page-head">
+  <h2>Pedidos de conversaciones</h2>
+  <p>Lo que piden los clientes con su nota. Al <strong>aprobar</strong> se carga el paquete a su saldo; al <strong>rechazar</strong> no se carga nada y el cliente recibe el motivo.</p>
+</div>
+
+<% if (mensaje) { %><div class="alert-ok"><%= mensaje %></div><% } %>
+<% if (error) { %><div class="alert-err"><%= error %></div><% } %>
+
+<% if (!solicitudes.length) { %>
+  <div class="empty-state">
+    <h3>No hay pedidos</h3>
+    <p>Cuando un cliente pida más conversaciones, va a aparecer acá.</p>
+  </div>
+<% } else { %>
+  <div class="table-wrap">
+    <table class="leads-table">
+      <thead>
+        <tr><th>Fecha</th><th>Cliente</th><th class="num">Pidió</th><th>Nota del cliente</th><th>Estado</th><th>Acciones</th></tr>
+      </thead>
+      <tbody>
+        <% solicitudes.forEach(function (s) { %>
+          <tr class="<%= s.estado !== 'PENDIENTE' ? 'is-done' : '' %>">
+            <td class="nowrap muted"><%= new Date(s.createdAt).toLocaleString('es-BO') %></td>
+            <td><a href="/admin/registrados/<%= s.empresa.id %>/editar"><strong><%= s.empresa.nombre %></strong></a></td>
+            <td class="num"><strong><%= s.cantidad.toLocaleString('es-BO') %></strong></td>
+            <td style="max-width:320px"><%= s.nota %></td>
+            <td>
+              <span class="badge <%= s.estado === 'APROBADA' ? 'badge-new' : (s.estado === 'RECHAZADA' ? 'badge-off' : 'badge-done') %>"><%= s.estado %></span>
+              <% if (s.estado === 'APROBADA') { %><br /><span class="muted"><%= s.cantidadAprobada.toLocaleString('es-BO') %> cargadas</span><% } %>
+              <% if (s.respuesta) { %><br /><span class="muted"><%= s.respuesta %></span><% } %>
+            </td>
+            <td class="actions-cell" style="min-width:260px">
+              <% if (s.estado === 'PENDIENTE') { %>
+                <form method="POST" action="/admin/solicitudes/<%= s.id %>/aprobar" class="inline-form" style="display:flex;gap:.3rem;flex-wrap:wrap;align-items:center;margin-bottom:.4rem">
+                  <input name="cantidad" type="number" min="1" value="<%= s.cantidad %>" style="width:90px" aria-label="Cantidad a cargar" />
+                  <input name="vigenciaDias" type="number" min="1" value="90" style="width:64px" aria-label="Vigencia en días" title="Vigencia en días" />
+                  <input name="respuesta" type="text" maxlength="300" placeholder="Mensaje al cliente (opcional)" style="flex:1;min-width:140px" />
+                  <button class="btn btn-primary" style="padding:.35rem .7rem;font-size:.8rem" type="submit">Aprobar y cargar</button>
+                </form>
+                <form method="POST" action="/admin/solicitudes/<%= s.id %>/rechazar" class="inline-form" style="display:flex;gap:.3rem;flex-wrap:wrap">
+                  <input name="respuesta" type="text" maxlength="300" placeholder="Motivo (opcional)" style="flex:1;min-width:140px" />
+                  <button class="btn btn-ghost" style="padding:.35rem .7rem;font-size:.8rem" type="submit">Rechazar</button>
+                </form>
+              <% } %>
+            </td>
+          </tr>
+        <% }); %>
+      </tbody>
+    </table>
+  </div>
+<% } %>
+
+<%- include('partials/fin') %>

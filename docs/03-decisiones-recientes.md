@@ -932,3 +932,19 @@ Bug real: el cliente confirmaba un pedido, pedía "una cosa más" y el sistema a
 - Sumar agrega los items al mismo pedido, suma el total y descuenta stock en una transacción; si el negocio lo tomó mientras tanto (ya no es `NUEVO`), crea uno nuevo. Con el pedido en `CONFIRMADO` o posterior nunca se pregunta.
 - Mensajes nuevos: `pedido_abierto_pregunta`, `pedido_ampliado`. Solo agentes con `flujoDeterminista`; el camino de IA libre queda igual.
 - Tests: 4 nuevos en `flujo-determinista`.
+
+
+## 45. Planes por módulos: copia por cliente, vigencia, avisos y pedidos de conversaciones
+
+Plan completo en `docs/11-plan-planes-pos-panel-y-rediseno.md` (§11). Reemplaza el sistema de planes anterior (Gratis/Standard/Pro/Premium, que se retiran).
+
+- **Planes nuevos** (`prisma/seed.js`, editables en `/admin/planes`): Agente · Agente + Punto de venta · Agente + POS + Panel comercial, cada uno con sus conversaciones y topes; **Prueba gratis** (oculta, solo Agente, 14 días) y **Acceso total** (oculto, ilimitado, solo lo asigna un superadmin). Los precios son una propuesta inicial. Los planes viejos se borran en el seed (o se ocultan si un cliente de prueba aún los usa).
+- **Copia por cliente** (`lib/services/planesCliente.js`, migración `20261108100000`): al asignar un plan se **copian sus valores** a la suscripción y el cliente se rige por su copia (módulos, conversaciones, productos, usuarios, mensajes propios, servicios, citas, modelo de IA). Un tope `null` = sin límite. Sin suscripción: **estado base** = solo módulo Agente, sin conversaciones incluidas.
+- **Vigencia** (`vigenciaPlan.js`, puro): empieza hoy al asignar; 1/2/3/6/12 meses o fecha personalizada; renovar suma al fin vigente (o desde hoy si ya venció); las conversaciones se reinician cada mes el mismo día; 7 días "por vencer"; **5 días de gracia** con todo funcionando; pasada la gracia se corta el agente (MOROSA) y el panel/POS siguen.
+- **Superadmin** (`/admin/registrados/:id/editar`): asignar/cambiar plan con duración, renovar, ajustar la copia de ese cliente, y al editar un plan puede **aplicar los cambios a los clientes que lo tienen** (cada dueño recibe un aviso solo si le cambia algo).
+- **Avisos** (`avisosPlan.js`, job horario + chequeo tras cada conversación cobrada): corte a 7 días, 2 días y el mismo día; gracia; vencimiento; uso de conversaciones al 80 % y 95 %. Cada aviso se manda una sola vez.
+- **Pedir más conversaciones** (`solicitudesConv.js`, migración `20261108120000`): el cliente pide una cantidad con una nota; llega al buzón `/admin/solicitudes`; el superadmin **aprueba** (carga el paquete, vigencia 90 días por defecto, ajustable) o **rechaza**. Pedir no da saldo; aprobar es atómico (dos clics no cargan dos veces).
+- **Registro**: ya no se elige plan; el cliente nuevo entra en prueba gratis solo-Agente. Se quitó el pago "primer pago" automático.
+- Tests: `vigencia-plan`, `planes-cliente`, `avisos-plan`, `solicitudes-conv`, `registro-prueba` (suite: 872).
+
+**Falta (siguientes pasos):** `requireModulo` en todas las rutas + menú con candados (módulos POS y Panel todavía no existen como pantallas), rediseño del panel lateral y de conversaciones, stock unificado, POS, panel comercial, bot de citas.

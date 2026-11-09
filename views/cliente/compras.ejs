@@ -5,9 +5,7 @@
   <p>Paquetes que has adquirido, con su saldo y fecha de renovación.</p>
 </div>
 
-<% if (compras.some(function(c){ return c.estado === 'PENDIENTE'; })) { %>
-  <div class="alert-ok">Tienes una compra <strong>pendiente de confirmación</strong>: el saldo se activa apenas nuestro equipo confirme tu pago.</div>
-<% } %>
+<p><a class="btn btn-primary" href="/panel/paquetes">Pedir más conversaciones</a> <a class="btn btn-ghost" href="/panel/paquetes#historial">Ver mis pedidos</a></p>
 
 <% if (compras.length === 0) { %>
   <div class="empty-state">
