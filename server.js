@@ -2901,6 +2901,33 @@ function soloCitas(req, res, next) {
   return res.redirect('/panel/configuracion?err=' + encodeURIComponent('Para usar esta sección elegí "Agendo citas" en Mi negocio.'));
 }
 const puedeEditarAtencion = requireRol('OWNER', 'ADMIN');
+
+// ===== Agenda (citas del negocio) =====
+const citasPanel = require('./lib/services/citasPanel');
+app.get('/panel/citas', requireCliente, soloCitas, async (req, res, next) => {
+  try {
+    const empresa = await prisma.empresa.findUnique({ where: { id: req.session.empresaId } });
+    const hoy = T.hoy(empresa.zonaHoraria);
+    const fecha = T.esFecha(String(req.query.fecha || '')) ? String(req.query.fecha) : hoy;
+    const [citas, ind] = await Promise.all([citasPanel.delDia(empresa, fecha), citasPanel.indicadores(empresa)]);
+    res.render('cliente/citas', {
+      title: 'Agenda - Proshop', tituloPagina: 'Agenda', activo: 'citas', fecha, anterior: T.sumarDias(fecha, -1), siguiente: T.sumarDias(fecha, 1),
+      diaLegible: (fecha === hoy ? 'Hoy, ' : '') + T.diaLegible(fecha, empresa.zonaHoraria), citas, ind, vocab: res.locals.vocab || require('./lib/services/rubros').vocabularioDe(empresa),
+      mensaje: req.query.ok || null, error: req.query.err || null,
+    });
+  } catch (err) { next(err); }
+});
+app.post('/panel/citas/:id(\\d+)/estado', requireCliente, soloCitas, async (req, res, next) => {
+  const fecha = T.esFecha(String(req.body.fecha || '')) ? `&fecha=${req.body.fecha}` : '';
+  try {
+    const empresa = await prisma.empresa.findUnique({ where: { id: req.session.empresaId } });
+    await citasPanel.cambiarEstado(empresa, req.params.id, String(req.body.estado || ''), { id: req.session.clienteId, rol: req.session.clienteRol });
+    res.redirect('/panel/citas?ok=' + encodeURIComponent('Listo, actualizado.') + fecha);
+  } catch (err) {
+    if (err.codigo === 'CITA') return res.redirect('/panel/citas?err=' + encodeURIComponent(err.message) + fecha);
+    next(err);
+  }
+});
 const volver = (res, ruta, { ok, err }) => res.redirect(`${ruta}?${ok ? 'ok=' + encodeURIComponent(ok) : 'err=' + encodeURIComponent(err)}`);
 const idDe = (req) => Number(req.params.id);
 

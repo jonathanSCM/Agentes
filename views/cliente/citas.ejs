@@ -1,0 +1,72 @@
+<%- include('partials/inicio') %>
+<%
+  var v = vocab;
+  var ETQ = { PENDIENTE: ['Por confirmar', 'badge-done'], CONFIRMADA: ['Confirmada', 'badge-new'], COMPLETADA: ['Completada', 'badge-new'], NO_ASISTIO: ['No asistió', 'badge-off'], CANCELADA: ['Cancelada', 'badge-off'] };
+  var ORIGEN = { whatsapp: 'WhatsApp', web: 'Web', panel: 'Panel', simulador: 'Prueba' };
+  var ACCION = { CONFIRMADA: ['Confirmar', 'btn-primary'], COMPLETADA: ['Completada', 'btn-primary'], NO_ASISTIO: ['No asistió', 'btn-ghost'], CANCELADA: ['Cancelar', 'btn-danger'] };
+%>
+
+<div class="page-head page-head-row">
+  <div>
+    <h2>Agenda</h2>
+    <p>Los <%= v.citas %> de tu negocio, los que agenda el agente por WhatsApp y los que cargues vos. <%= diaLegible %>.</p>
+  </div>
+  <div class="agenda-nav">
+    <a class="btn btn-ghost" href="/panel/citas?fecha=<%= anterior %>" aria-label="Día anterior">←</a>
+    <a class="btn btn-ghost" href="/panel/citas">Hoy</a>
+    <a class="btn btn-ghost" href="/panel/citas?fecha=<%= siguiente %>" aria-label="Día siguiente">→</a>
+    <form method="GET" action="/panel/citas" class="inline-form"><input type="date" name="fecha" value="<%= fecha %>" aria-label="Elegir un día" onchange="this.form.submit()" /></form>
+  </div>
+</div>
+
+<% if (mensaje) { %><div class="alert-ok"><%= mensaje %></div><% } %>
+<% if (error) { %><div class="alert-err" role="alert"><%= error %></div><% } %>
+
+<div class="admin-stats">
+  <div class="stat-card stat-new"><span class="stat-num"><%= ind.hoy %></span><span class="stat-label">Hoy</span></div>
+  <div class="stat-card"><span class="stat-num"><%= ind.proximas7 %></span><span class="stat-label">Próximos 7 días</span></div>
+  <div class="stat-card"><span class="stat-num"><%= ind.pendientes %></span><span class="stat-label">Por confirmar</span></div>
+  <div class="stat-card <%= ind.noAsistio30 ? 'stat-alerta' : '' %>"><span class="stat-num"><%= ind.noAsistio30 %></span><span class="stat-label">No asistieron (30 días)</span></div>
+</div>
+
+<% if (!citas.length) { %>
+  <div class="empty-state">
+    <h3>No hay <%= v.citas %> para este día</h3>
+    <p>Cuando alguien agende por WhatsApp, aparece acá. También podés mirar otro día con las flechas.</p>
+  </div>
+<% } else { %>
+  <div class="table-wrap">
+    <table class="leads-table">
+      <thead><tr><th>Hora</th><th>Cliente</th><th>Servicio</th><th><%= v.profesional.charAt(0).toUpperCase() + v.profesional.slice(1) %></th><th>Estado</th><th>Origen</th><th>Acciones</th></tr></thead>
+      <tbody>
+        <% citas.forEach(function (c) { var e = ETQ[c.estado] || [c.estado, 'badge-off']; %>
+          <tr class="<%= c.estado === 'CANCELADA' || c.estado === 'NO_ASISTIO' ? 'is-done' : '' %>">
+            <td class="nowrap"><strong><%= c.hora %></strong><br /><span class="muted" style="font-size:.78rem">hasta <%= c.horaFin %></span></td>
+            <td><strong><%= c.cliente %></strong><br /><a class="muted" style="font-size:.78rem" href="/panel/conversaciones/<%= encodeURIComponent(c.telefono) %>"><%= c.telefono %></a></td>
+            <td><%= c.servicio %><% if (c.personas > 1) { %><br /><span class="muted" style="font-size:.78rem"><%= c.personas %> personas</span><% } %></td>
+            <td><%= c.recurso || '—' %></td>
+            <td><span class="badge <%= e[1] %>"><%= e[0] %></span></td>
+            <td class="muted"><%= ORIGEN[c.origen] || c.origen %></td>
+            <td class="actions-cell" style="min-width:230px">
+              <% c.acciones.forEach(function (a) { var b = ACCION[a]; %>
+                <form method="POST" action="/panel/citas/<%= c.id %>/estado" class="inline-form"
+                      <% if (a === 'CANCELADA') { %>onsubmit="return confirm('¿Cancelar esta <%= v.cita %>? Se libera el horario. No se puede deshacer.');"<% } %>>
+                  <input type="hidden" name="estado" value="<%= a %>" />
+                  <input type="hidden" name="fecha" value="<%= fecha %>" />
+                  <button class="btn <%= b[1] %>" style="padding:.3rem .65rem;font-size:.78rem" type="submit"><%= b[0] %></button>
+                </form>
+              <% }); %>
+            </td>
+          </tr>
+        <% }); %>
+      </tbody>
+    </table>
+  </div>
+<% } %>
+
+<style>
+  .agenda-nav { display: flex; gap: .4rem; flex-wrap: wrap; align-items: center; }
+  .agenda-nav input[type=date] { background: rgba(255, 255, 255, .06); color: var(--text); border: 1px solid var(--border); border-radius: 10px; padding: .45rem .6rem; font: inherit; }
+</style>
+
+<%- include('partials/fin') %>
