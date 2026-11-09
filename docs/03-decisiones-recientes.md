@@ -948,3 +948,12 @@ Plan completo en `docs/11-plan-planes-pos-panel-y-rediseno.md` (§11). Reemplaza
 - Tests: `vigencia-plan`, `planes-cliente`, `avisos-plan`, `solicitudes-conv`, `registro-prueba` (suite: 872).
 
 **Falta (siguientes pasos):** `requireModulo` en todas las rutas + menú con candados (módulos POS y Panel todavía no existen como pantallas), rediseño del panel lateral y de conversaciones, stock unificado, POS, panel comercial, bot de citas.
+
+
+## 46. Bloqueo por módulo y menú lateral nuevo
+
+- **`requireModulo(modulo)`** (`lib/services/modulos.js`): middleware que protege CADA ruta (GET y POST) de un módulo; sin el módulo en el plan del cliente responde **403** (pantalla "este módulo no está en tu plan" con botón para pedirlo). Hoy protege **Reportes e Inteligencia** (módulo PANEL); el POS se protegerá cuando existan sus pantallas.
+- **Menú lateral** (`lib/services/menuPanel.js` + `views/cliente/partials/inicio.ejs` + `public/css/panel-shell.css`): estructura copiada de la barbería con la paleta actual — logo, tarjeta del negocio (con el plan y su vencimiento), grupos con título (Agente · Catálogo · Panel comercial · Mi cuenta), íconos, contador de pedidos nuevos, **candado** en lo que el plan no incluye, usuario con avatar y rol abajo, **plegable a solo íconos** (se recuerda) y cajón en celular. El menú es un dato (`construirMenu`) que se prueba solo.
+- `scripts/demo-panel.js` (solo desarrollo): crea dos clientes de prueba locales (plan Agente y Acceso total) para revisar el panel a ojo; las credenciales se guardan fuera del repo.
+- Verificado con un barrido real contra el servidor: con plan Agente, Reportes/Inteligencia → 403 y las otras 16 pantallas → 200; con Acceso total, todas 200.
+- Tests: `menu-modulos` (11). Suite: 883.

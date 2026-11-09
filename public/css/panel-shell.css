@@ -1,0 +1,88 @@
+/* =========================================================
+   Proshop - estructura del panel lateral (estilo de la barberia, paleta actual)
+   Va DESPUES de admin.css: solo reordena el menu, no cambia colores de marca.
+   ========================================================= */
+
+.sidebar { width: 252px; transition: width .18s ease, transform .25s ease; overflow: hidden; }
+
+.lateral-cab { display: flex; align-items: center; justify-content: space-between; gap: .4rem; padding-right: .7rem; border-bottom: 1px solid var(--border); }
+.lateral-cab .sidebar-brand { border-bottom: 0; flex: 1; min-width: 0; }
+.lateral-colapsar {
+  background: none; border: 0; color: var(--muted); cursor: pointer; padding: 6px; border-radius: 9px;
+  display: inline-flex; align-items: center; justify-content: center;
+}
+.lateral-colapsar:hover { background: rgba(255, 255, 255, .08); color: var(--text); }
+
+/* Tarjeta del negocio */
+.marca-negocio {
+  margin: .8rem .8rem .2rem; padding: .6rem .8rem; border-radius: 12px;
+  background: rgba(255, 255, 255, .06); border: 1px solid var(--border); min-width: 0;
+}
+.marca-negocio strong, .marca-negocio small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.marca-negocio strong { font-size: .88rem; color: #fff; }
+.marca-negocio small { color: var(--muted); font-size: .74rem; margin-top: 1px; }
+
+/* Grupos */
+.sidebar-nav { padding-top: .5rem; }
+.nav-grupo { display: flex; flex-direction: column; gap: 2px; }
+.nav-grupo + .nav-grupo { margin-top: .35rem; }
+.sidebar-section { font-size: .68rem; font-weight: 700; letter-spacing: .08em; padding: .8rem .6rem .3rem; }
+.sidebar-nav a { padding: .52rem .7rem; font-size: .9rem; }
+.sidebar-nav a .nav-texto { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sidebar-nav a .nav-badge { margin-left: auto; }
+.nav-candado { margin-left: auto; opacity: .55; display: inline-flex; }
+.sidebar-nav a.is-bloqueado { opacity: .62; }
+.sidebar-nav a.is-bloqueado:hover { opacity: 1; }
+
+/* Usuario abajo */
+.usuario { display: flex; align-items: center; gap: .6rem; padding: .8rem .9rem; border-top: 1px solid var(--border); margin-top: auto; }
+.usuario-avatar {
+  width: 34px; height: 34px; flex-shrink: 0; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center;
+  background: linear-gradient(135deg, var(--primary), var(--accent)); color: #fff; font-weight: 700; font-size: .78rem;
+}
+.usuario-datos { min-width: 0; flex: 1; }
+.usuario-datos strong, .usuario-datos small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.usuario-datos strong { font-size: .86rem; color: var(--text); }
+.usuario-datos small { font-size: .74rem; color: var(--muted); }
+.usuario-salir { margin: 0; }
+.btn-icono {
+  background: none; border: 0; padding: 6px; border-radius: 9px; cursor: pointer; color: var(--muted);
+  display: inline-flex; align-items: center; justify-content: center;
+}
+.btn-icono:hover { background: rgba(255, 255, 255, .08); color: var(--text); }
+.sidebar-sitio { display: block; padding: 0 1.1rem .8rem; font-size: .8rem; color: var(--muted); }
+.sidebar-sitio:hover { color: var(--text); }
+
+/* Plegado a solo iconos (escritorio) */
+@media (min-width: 901px) {
+  .sidebar.is-collapsed { width: 68px; }
+  .sidebar.is-collapsed .sidebar-brand-text,
+  .sidebar.is-collapsed .marca-negocio,
+  .sidebar.is-collapsed .nav-texto,
+  .sidebar.is-collapsed .usuario-datos,
+  .sidebar.is-collapsed .usuario-salir,
+  .sidebar.is-collapsed .sidebar-sitio { display: none; }
+  .sidebar.is-collapsed .lateral-cab { flex-direction: column; padding: .6rem 0; gap: .3rem; }
+  .sidebar.is-collapsed .lateral-cab .sidebar-brand { padding: .3rem 0; justify-content: center; }
+  .sidebar.is-collapsed .sidebar-section { font-size: 0; padding: .35rem .6rem; border-top: 1px solid var(--border); margin-top: .35rem; }
+  .sidebar.is-collapsed .nav-grupo:first-child .sidebar-section { display: none; }
+  .sidebar.is-collapsed .sidebar-nav a { justify-content: center; padding: .6rem 0; position: relative; }
+  .sidebar.is-collapsed .nav-badge { position: absolute; top: 2px; right: 8px; margin: 0; padding: 0 .3rem; font-size: .62rem; }
+  .sidebar.is-collapsed .nav-candado { position: absolute; top: 4px; right: 10px; margin: 0; }
+  .sidebar.is-collapsed .usuario { justify-content: center; padding: .8rem 0; }
+}
+
+/* Pantalla "modulo no incluido" */
+.modulo-bloqueado { max-width: 520px; margin: 3rem auto; text-align: center; display: grid; gap: .5rem; justify-items: center; }
+.modulo-candado {
+  width: 60px; height: 60px; border-radius: 18px; display: inline-flex; align-items: center; justify-content: center;
+  background: rgba(139, 92, 246, .18); color: var(--accent);
+}
+.modulo-bloqueado h2 { margin: .4rem 0 0; }
+.modulo-acciones { display: flex; gap: .6rem; flex-wrap: wrap; justify-content: center; margin-top: .6rem; }
+
+/* Barra de desplazamiento discreta (oscura) */
+.sidebar-nav { scrollbar-width: thin; scrollbar-color: rgba(255, 255, 255, .2) transparent; }
+.sidebar-nav::-webkit-scrollbar { width: 6px; }
+.sidebar-nav::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, .18); border-radius: 6px; }
+.sidebar-nav::-webkit-scrollbar-track { background: transparent; }

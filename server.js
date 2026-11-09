@@ -64,6 +64,8 @@ const {
 } = require('./lib/services/suscripciones');
 const planesCliente = require('./lib/services/planesCliente');
 const solicitudesConv = require('./lib/services/solicitudesConv');
+const menuPanel = require('./lib/services/menuPanel');
+const { requireModulo } = require('./lib/services/modulos');
 const { registrarCliente, autenticar } = require('./lib/services/auth');
 const { procesarMensajeEntrante, atenderMensaje, generarYRegistrarRespuesta, conversacionParaCarritoWeb, conBloqueoDeCliente } = require('./lib/services/conversaciones');
 const { encolarRespuesta } = require('./lib/services/bufferMensajes');
@@ -917,6 +919,21 @@ app.use('/panel', async (req, res, next) => {
     ]);
     res.locals.notificaciones = notificaciones;
     res.locals.notifCount = notifCount;
+    // Menu lateral: depende del modelo de negocio, del rol y de los MODULOS del plan.
+    const [valoresPlan, pedidosNuevos] = await Promise.all([
+      planesCliente.valoresDe(req.session.empresaId),
+      prisma.pedido.count({ where: { empresaId: req.session.empresaId, estado: 'NUEVO' } }),
+    ]);
+    res.locals.modulos = valoresPlan.modulos;
+    res.locals.menu = menuPanel.construirMenu({
+      esCitas: res.locals.modeloNegocio === 'CITAS', rol: req.session.clienteRol,
+      modulos: valoresPlan.modulos, vocab: res.locals.vocab, badges: { pedidos: pedidosNuevos },
+    });
+    res.locals.menuPlan = {
+      nombre: valoresPlan.planNombre,
+      vence: valoresPlan.planFin ? new Date(valoresPlan.planFin).toLocaleDateString('es-BO', { day: '2-digit', month: '2-digit' }) : null,
+    };
+    res.locals.menuUsuario = { iniciales: menuPanel.iniciales(req.session.clienteNombre), rol: menuPanel.etiquetaRol(req.session.clienteRol) };
     next();
   } catch (err) { next(err); }
 });
@@ -1627,7 +1644,7 @@ app.post('/panel/inventario/:id', requireCliente, async (req, res, next) => {
 });
 
 // ===== Reportes =====
-app.get('/panel/reportes', requireCliente, async (req, res, next) => {
+app.get('/panel/reportes', requireCliente, requireModulo('PANEL'), async (req, res, next) => {
   try {
     const empresaId = req.session.empresaId;
     const agenteIds = await agenteIdsDe(empresaId);
@@ -1695,7 +1712,7 @@ app.get('/panel/reportes', requireCliente, async (req, res, next) => {
 // PedidoItem/ClienteFinal via Prisma (agregacion pura, sin IA) - ver el plan
 // "Dashboard inteligente" ya escrito. Por ahora, NADA de esto debe leerse
 // como un dato real: por eso la vista muestra el aviso de "vista previa".
-app.get('/panel/inteligencia', requireCliente, async (req, res, next) => {
+app.get('/panel/inteligencia', requireCliente, requireModulo('PANEL'), async (req, res, next) => {
   try {
     const kpis = {
       tasaDevolucion: { valor: 8.3, detalle: '14 de 168 pedidos entregados' },
@@ -1760,7 +1777,7 @@ function normalizarBusqueda(t) {
   return String(t || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9\s]/g, ' ');
 }
 
-app.get('/panel/inteligencia/comentarios', requireCliente, async (req, res, next) => {
+app.get('/panel/inteligencia/comentarios', requireCliente, requireModulo('PANEL'), async (req, res, next) => {
   try {
     const q = req.query.q || 'mal embalaje';
     const palabras = normalizarBusqueda(q).split(/\s+/).filter((w) => w.length > 2);

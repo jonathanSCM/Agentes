@@ -1,0 +1,16 @@
+<%- include('partials/inicio') %>
+
+<div class="modulo-bloqueado">
+  <span class="modulo-candado" aria-hidden="true">
+    <svg viewBox="0 0 24 24" width="30" height="30" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>
+  </span>
+  <h2><%= nombreModulo %> no está en tu plan</h2>
+  <p><%= descripcion %></p>
+  <p class="muted">Tu plan actual: <strong><%= planNombre %></strong>.</p>
+  <div class="modulo-acciones">
+    <a class="btn btn-primary" href="<%= site.whatsappUrl %>?text=<%= encodeURIComponent('Hola Proshop, quiero sumar el módulo ' + nombreModulo + ' a mi plan (' + empresaNombre + ')') %>" target="_blank" rel="noopener">Pedir este módulo</a>
+    <a class="btn btn-ghost" href="/panel/consumo">Ver mi plan</a>
+  </div>
+</div>
+
+<%- include('partials/fin') %>

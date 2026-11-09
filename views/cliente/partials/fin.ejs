@@ -5,6 +5,25 @@
 <%- include('tour') %>
 
 <script>
+  // Menu lateral plegable a solo iconos (escritorio): se recuerda en este dispositivo.
+  (function () {
+    var side = document.getElementById('sidebar');
+    var btn = document.getElementById('lateralColapsar');
+    if (!side || !btn) return;
+    function aplicar(c) {
+      side.classList.toggle('is-collapsed', c);
+      btn.setAttribute('aria-label', c ? 'Mostrar el menú' : 'Ocultar el menú (solo iconos)');
+      btn.title = c ? 'Mostrar el menú' : 'Ocultar el menú (solo iconos)';
+    }
+    try { aplicar(localStorage.getItem('panel-lateral-colapsado') === '1'); } catch (e) { /* sin almacenamiento: queda abierto */ }
+    btn.addEventListener('click', function () {
+      var c = !side.classList.contains('is-collapsed');
+      aplicar(c);
+      try { localStorage.setItem('panel-lateral-colapsado', c ? '1' : '0'); } catch (e) { /* no pasa nada */ }
+    });
+  })();
+</script>
+<script>
   (function () {
     var btn = document.getElementById('sidebarToggle');
     var side = document.getElementById('sidebar');
