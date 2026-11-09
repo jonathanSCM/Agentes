@@ -38,7 +38,7 @@
         <% empresas.forEach(function (e) { %>
           <tr>
             <td><strong><%= e.nombre %></strong><br /><span class="muted"><%= e.slug %></span></td>
-            <td><%= e.suscripcion ? e.suscripcion.plan.nombre : '—' %></td>
+            <td><%= e.suscripcion ? (e.suscripcion.planNombre || e.suscripcion.plan.nombre) : '—' %><% if (e.suscripcion && e.suscripcion.planFin) { %><br /><span class="muted">vence <%= new Date(e.suscripcion.planFin).toLocaleDateString('es-BO') %></span><% } %></td>
             <td>
               <% if (e.suscripcion) { %>
                 <span class="badge <%= e.suscripcion.estado === 'ACTIVA' ? 'badge-new' : (e.suscripcion.estado === 'PRUEBA' ? 'badge-done' : 'badge-off') %>"><%= e.suscripcion.estado %></span>
@@ -47,7 +47,7 @@
             <td>
               <% if (e.consumo) { %>
                 <div class="bar"><span style="width:<%= e.consumo.porcentajeUsado %>%"></span></div>
-                <span class="muted"><%= e.consumo.incluidasUsadas %> / <%= e.consumo.incluidasTotal %></span>
+                <span class="muted"><%= e.consumo.incluidasUsadas %> / <%= e.consumo.ilimitado ? 'Ilimitado' : e.consumo.incluidasTotal %></span>
               <% } else { %>—<% } %>
             </td>
             <td class="num"><%= e.consumo ? e.consumo.extraDisponible.toLocaleString('es-BO') : '—' %></td>

@@ -2,57 +2,162 @@
 
 <div class="page-head">
   <h2><%= empresa ? 'Editar empresa' : 'Agregar empresa' %></h2>
-  <p><%= empresa ? 'Modifica los datos del cliente y su plan.' : 'Da de alta un nuevo cliente y asígnale un plan.' %></p>
+  <p><%= empresa ? 'Datos del cliente, su plan y los valores propios de su suscripción.' : 'Da de alta un nuevo cliente y asígnale un plan.' %></p>
 </div>
 
 <% if (error) { %><div class="alert-err"><%= error %></div><% } %>
+<% if (typeof mensaje !== 'undefined' && mensaje) { %><div class="alert-ok"><%= mensaje %></div><% } %>
 
-<form method="POST" action="<%= empresa ? '/admin/registrados/' + empresa.id : '/admin/registrados' %>" class="form-card">
-  <div class="field">
-    <label for="nombre">Nombre de la empresa *</label>
-    <input id="nombre" name="nombre" type="text" required maxlength="120"
-           value="<%= empresa ? empresa.nombre : '' %>" placeholder="Ej: Zapatería El Paso" />
-  </div>
-
+<%# Selector de duracion: 1, 2, 3, 6, 12 meses o una fecha personalizada %>
+<% function selectorDuracion(prefijo) { %>
   <div class="field-row">
     <div class="field">
-      <label for="planId">Plan contratado *</label>
+      <label for="<%= prefijo %>meses">Duración</label>
+      <select id="<%= prefijo %>meses" name="meses">
+        <% [1, 2, 3, 6, 12].forEach(function (m) { %><option value="<%= m %>"><%= m %> <%= m === 1 ? 'mes' : 'meses' %></option><% }); %>
+        <option value="personalizada">Fecha personalizada…</option>
+      </select>
+    </div>
+    <div class="field">
+      <label for="<%= prefijo %>fechaFin">Vence el <span class="muted">(solo si es personalizada)</span></label>
+      <input id="<%= prefijo %>fechaFin" name="fechaFin" type="date" />
+    </div>
+  </div>
+<% } %>
+
+<% if (!empresa) { %>
+<form method="POST" action="/admin/registrados" class="form-card">
+  <div class="field">
+    <label for="nombre">Nombre de la empresa *</label>
+    <input id="nombre" name="nombre" type="text" required maxlength="120" placeholder="Ej: Zapatería El Paso" />
+  </div>
+  <div class="field-row">
+    <div class="field">
+      <label for="planId">Plan *</label>
       <select id="planId" name="planId" required>
         <% planes.forEach(function (p) { %>
-          <option value="<%= p.id %>"
-            <%= empresa && empresa.suscripcion && empresa.suscripcion.planId === p.id ? 'selected' : '' %>>
-            <%= p.nombre %> — Bs <%= Number(p.mensualidadBs).toLocaleString('es-BO') %>/mes (<%= p.convIncluidas %> conv.)
-          </option>
+          <option value="<%= p.id %>"><%= p.nombre %><%= p.oculto ? ' (oculto)' : '' %> — <%= p.modulos.join(' + ') %></option>
         <% }); %>
       </select>
+    </div>
+    <div class="field">
+      <label for="marca">Marca (opcional)</label>
+      <input id="marca" name="marca" type="text" maxlength="120" placeholder="Para marca blanca" />
+    </div>
+  </div>
+  <% selectorDuracion('c') %>
+  <div class="form-actions">
+    <a class="btn btn-ghost" href="/admin/registrados">Cancelar</a>
+    <button class="btn btn-primary" type="submit">Crear empresa</button>
+  </div>
+</form>
+<% } else { %>
+
+<% var v = valores; var s = empresa.suscripcion; %>
+<div class="form-card">
+  <h3>Plan actual</h3>
+  <% if (v.origen === 'BASE') { %>
+    <p><strong>Sin plan (estado base)</strong>: solo el módulo Agente, sin conversaciones incluidas.</p>
+  <% } else { %>
+    <p><strong><%= v.planNombre %></strong>
+      · Módulos: <%= v.modulos.map(function (m) { return nombresModulo[m] || m; }).join(' + ') %>
+      <% if (v.ilimitado) { %> · <span class="badge badge-new">Acceso total, sin topes</span><% } %></p>
+    <p class="muted">
+      Empezó el <%= v.planInicio ? new Date(v.planInicio).toLocaleDateString('es-BO') : '—' %> ·
+      <% if (v.planFin) { %>vence el <strong><%= new Date(v.planFin).toLocaleDateString('es-BO') %></strong>
+        (<%= v.vigencia.estado === 'VIGENTE' ? 'vigente' : v.vigencia.estado === 'POR_VENCER' ? 'por vencer' : v.vigencia.estado === 'GRACIA' ? 'en gracia: todo funciona 5 días' : 'vencido: el agente está cortado' %><%= v.vigencia.diasRestantes !== null && v.vigencia.diasRestantes >= 0 ? ', faltan ' + v.vigencia.diasRestantes + ' días' : '' %>)
+      <% } else { %>no vence<% } %>
+    </p>
+    <ul class="muted" style="margin:.3rem 0 0;padding-left:1.1rem">
+      <% [['convIncluidas', 'Conversaciones por mes'], ['maxProductos', 'Productos'], ['maxUsuarios', 'Usuarios'], ['maxMensajesPropios', 'Mensajes propios'], ['maxServicios', 'Servicios (citas)'], ['maxCitasMes', 'Citas por mes']].forEach(function (k) { %>
+        <li><%= k[1] %>: <strong><%= topeTexto(v.limites[k[0]]) %></strong></li>
+      <% }); %>
+    </ul>
+    <% if (consumo) { %><p class="muted">Conversaciones usadas este mes: <strong><%= consumo.incluidasUsadas %></strong> de <%= consumo.ilimitado ? 'Ilimitado' : consumo.incluidasTotal %> · saldo extra: <strong><%= consumo.extraDisponible %></strong></p><% } %>
+  <% } %>
+</div>
+
+<form method="POST" action="/admin/registrados/<%= empresa.id %>" class="form-card">
+  <h3>Datos del cliente</h3>
+  <div class="field">
+    <label for="nombre">Nombre de la empresa *</label>
+    <input id="nombre" name="nombre" type="text" required maxlength="120" value="<%= empresa.nombre %>" />
+  </div>
+  <div class="field-row">
+    <div class="field">
+      <label for="marca">Marca (opcional)</label>
+      <input id="marca" name="marca" type="text" maxlength="120" value="<%= empresa.marca || '' %>" placeholder="Para marca blanca" />
     </div>
     <div class="field">
       <label for="estado">Estado</label>
       <select id="estado" name="estado">
-        <% ['PRUEBA','ACTIVA','MOROSA','CANCELADA'].forEach(function (s) { %>
-          <option value="<%= s %>" <%= empresa && empresa.suscripcion && empresa.suscripcion.estado === s ? 'selected' : '' %>><%= s %></option>
+        <% ['PRUEBA','ACTIVA','MOROSA','CANCELADA'].forEach(function (e) { %>
+          <option value="<%= e %>" <%= s && s.estado === e ? 'selected' : '' %>><%= e %></option>
         <% }); %>
       </select>
     </div>
   </div>
+  <div class="form-actions"><button class="btn btn-primary" type="submit">Guardar</button></div>
+</form>
 
+<form method="POST" action="/admin/registrados/<%= empresa.id %>/plan" class="form-card"
+      onsubmit="return confirm('Se copian los valores del plan al cliente y su vigencia empieza hoy. ¿Continuar?');">
+  <h3><%= v.origen === 'BASE' ? 'Asignar un plan' : 'Cambiar de plan' %></h3>
+  <p class="muted">Se copian los valores del plan a este cliente y empieza <strong>hoy</strong>. Después podés ajustar sus valores sin tocar el plan.</p>
+  <div class="field">
+    <label for="planAsignar">Plan</label>
+    <select id="planAsignar" name="planId" required>
+      <% planes.forEach(function (p) { %>
+        <option value="<%= p.id %>" <%= s && s.planId === p.id ? 'selected' : '' %>><%= p.nombre %><%= p.oculto ? ' (oculto)' : '' %> — <%= p.modulos.join(' + ') %></option>
+      <% }); %>
+    </select>
+  </div>
+  <% selectorDuracion('a') %>
+  <div class="form-actions"><button class="btn btn-primary" type="submit">Asignar plan</button></div>
+</form>
+
+<% if (s) { %>
+<form method="POST" action="/admin/registrados/<%= empresa.id %>/renovar" class="form-card">
+  <h3>Renovar</h3>
+  <p class="muted">Suma meses al vencimiento actual (si ya venció, cuenta desde hoy).</p>
   <div class="field-row">
     <div class="field">
-      <label for="marca">Marca (opcional)</label>
-      <input id="marca" name="marca" type="text" maxlength="120"
-             value="<%= empresa && empresa.marca ? empresa.marca : '' %>" placeholder="Para marca blanca" />
-    </div>
-    <div class="field">
-      <label for="periodoFin">Vence el</label>
-      <input id="periodoFin" name="periodoFin" type="date"
-             value="<%= periodoFinValor %>" />
+      <label for="renovarMeses">Sumar</label>
+      <select id="renovarMeses" name="meses">
+        <% [1, 2, 3, 6, 12].forEach(function (m) { %><option value="<%= m %>"><%= m %> <%= m === 1 ? 'mes' : 'meses' %></option><% }); %>
+      </select>
     </div>
   </div>
-
-  <div class="form-actions">
-    <a class="btn btn-ghost" href="/admin/registrados">Cancelar</a>
-    <button class="btn btn-primary" type="submit"><%= empresa ? 'Guardar cambios' : 'Crear empresa' %></button>
-  </div>
+  <div class="form-actions"><button class="btn btn-primary" type="submit">Renovar</button></div>
 </form>
+
+<form method="POST" action="/admin/registrados/<%= empresa.id %>/valores" class="form-card">
+  <h3>Valores de este cliente</h3>
+  <p class="muted">Solo cambian a <strong>este</strong> cliente (el plan y los demás clientes no se tocan). Dejá un tope vacío para <strong>sin límite</strong>.</p>
+  <div class="field">
+    <label>Módulos</label>
+    <% ['AGENTE', 'POS', 'PANEL'].forEach(function (m) { %>
+      <label class="check"><input type="checkbox" name="modulos" value="<%= m %>" <%= v.modulos.includes(m) ? 'checked' : '' %> <%= m === 'AGENTE' ? 'onclick="return false"' : '' %> /> <%= nombresModulo[m] %></label>
+    <% }); %>
+  </div>
+  <div class="field-row">
+    <% [['convIncluidas', 'Conversaciones por mes'], ['maxProductos', 'Máx. productos'], ['maxUsuarios', 'Máx. usuarios']].forEach(function (k) { %>
+      <div class="field"><label><%= k[1] %></label><input name="<%= k[0] %>" type="number" min="0" value="<%= v.limites[k[0]] === null ? '' : v.limites[k[0]] %>" placeholder="Sin límite" /></div>
+    <% }); %>
+  </div>
+  <div class="field-row">
+    <% [['maxMensajesPropios', 'Mensajes propios'], ['maxServicios', 'Servicios (citas)'], ['maxCitasMes', 'Citas por mes']].forEach(function (k) { %>
+      <div class="field"><label><%= k[1] %></label><input name="<%= k[0] %>" type="number" min="0" value="<%= v.limites[k[0]] === null ? '' : v.limites[k[0]] %>" placeholder="Sin límite" /></div>
+    <% }); %>
+  </div>
+  <div class="field">
+    <label class="check"><input type="checkbox" name="ilimitado" value="1" <%= v.ilimitado ? 'checked' : '' %> /> Acceso total (todos los módulos, sin topes, sin vencimiento)</label>
+  </div>
+  <div class="form-actions"><button class="btn btn-primary" type="submit">Guardar valores</button></div>
+</form>
+<% } %>
+
+<div class="form-actions"><a class="btn btn-ghost" href="/admin/registrados">← Volver a registrados</a></div>
+<% } %>
 
 <%- include('partials/fin') %>

@@ -15,7 +15,7 @@ let suscripcionId;
 
 before(async () => {
   await prisma.empresa.deleteMany({ where: { slug: SLUG } });
-  const plan = await prisma.plan.findFirst({ where: { codigo: 'PRO' } });
+  const plan = await prisma.plan.findFirst({ where: { codigo: 'AGENTE_POS' } });
   planId = plan.id;
   const empresa = await prisma.empresa.create({ data: { nombre: 'Test Suscripciones', slug: SLUG } });
   empresaId = empresa.id;

@@ -21,13 +21,13 @@ before(async () => {
   await prisma.clienteFinal.deleteMany({ where: { telefono: TELEFONO } });
   await prisma.empresa.deleteMany({ where: { slug: SLUG } });
 
-  // Se reusa el plan real "PRO" ya sembrado (prisma/seed.js) en vez de crear
-  // uno nuevo: modeloParaPlan matchea por el codigo EXACTO "PRO" para elegir
+  // Se reusa el plan real "AGENTE_POS" ya sembrado (prisma/seed.js) en vez de crear
+  // uno nuevo: modeloParaPlan matchea por el codigo EXACTO "AGENTE_POS" para elegir
   // gpt-4o (el modelo caro) en vez de caer directo en el economico - sin
   // esto no hay forma de probar el reintento por rate limit (el fallback y
   // el modelo original serian el mismo). El codigo es unico en la tabla, asi
   // que crear uno propio con el mismo codigo rompe el seed.
-  const planPro = await prisma.plan.findUnique({ where: { codigo: 'PRO' } });
+  const planPro = await prisma.plan.findUnique({ where: { codigo: 'AGENTE_POS' } });
 
   const empresa = await prisma.empresa.create({
     data: {

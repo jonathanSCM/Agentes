@@ -36,17 +36,9 @@
         <label for="password">Contraseña * <span class="muted">(mínimo 8 caracteres)</span></label>
         <input id="password" name="password" type="password" required minlength="8" autocomplete="new-password" />
       </div>
-      <div class="field">
-        <label for="planId">Plan *</label>
-        <select id="planId" name="planId" required>
-          <% planes.forEach(function (p) { %>
-            <option value="<%= p.id %>" <%= String(datos.planId) === String(p.id) ? 'selected' : '' %>>
-              <%= p.nombre %> — <%= p.precio.mensualidad === 0 ? 'Gratis' : simboloMoneda(p.precio.moneda) + ' ' + p.precio.mensualidad.toLocaleString('es-BO') + '/mes' %>
-              (<%= p.convIncluidas.toLocaleString('es-BO') %> conv.)
-            </option>
-          <% }); %>
-        </select>
-      </div>
+      <p class="muted" style="font-size:.85rem;margin:.2rem 0 1rem">
+        Empezás con <strong><%= diasPrueba %> días de prueba gratis</strong> del <strong>Agente de ventas</strong>. Después elegís el plan que te convenga.
+      </p>
 
       <button type="submit" class="btn btn-primary btn-lg btn-block">Crear mi cuenta</button>
       <p class="login-back">¿Ya tienes cuenta? <a href="/ingresar" style="color:var(--primary-2)">Ingresar</a></p>

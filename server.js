@@ -256,7 +256,7 @@ function requireAuth(req, res, next) {
 app.get('/', async (req, res, next) => {
   try {
     const [planesDb, paquetesDb, catalogoCaracteristicas] = await Promise.all([
-      prisma.plan.findMany({ where: { activo: true }, orderBy: { orden: 'asc' }, include: { preciosPais: true, caracteristicas: true } }),
+      prisma.plan.findMany({ where: { activo: true, oculto: false }, orderBy: { orden: 'asc' }, include: { preciosPais: true, caracteristicas: true } }),
       prisma.paquete.findMany({ where: { activo: true }, orderBy: { cantidad: 'asc' }, include: { preciosPais: true } }),
       prisma.caracteristica.findMany({ orderBy: { orden: 'asc' } }),
     ]);
@@ -719,7 +719,7 @@ app.get('/planes/:categoria', async (req, res, next) => {
     }
     const [planesDb, todasCaracteristicas] = await Promise.all([
       prisma.plan.findMany({
-        where: { activo: true, categoria },
+        where: { activo: true, oculto: false, categoria },
         orderBy: { orden: 'asc' },
         include: { preciosPais: true, caracteristicas: true },
       }),
@@ -781,35 +781,22 @@ app.post('/api/contacto', (req, res) => {
 });
 
 // ==================== REGISTRO E INGRESO DE CLIENTES ====================
-async function planesConPrecio(pais) {
-  const planesDb = await prisma.plan.findMany({ where: { activo: true }, orderBy: { orden: 'asc' }, include: { preciosPais: true } });
-  return planesDb.map((p) => ({ ...p, precio: precioPlanParaPais(p, pais, p.preciosPais) }));
-}
-
 app.get('/registro', async (req, res, next) => {
   try {
     if (req.session && req.session.clienteId) return res.redirect('/panel');
-    const pais = detectarPais(req.ip);
-    const planes = await planesConPrecio(pais);
-    res.render('registro', {
-      title: 'Crear cuenta - Proshop', planes, error: null, simboloMoneda,
-      datos: { planId: req.query.plan || '' }, // plan preseleccionado desde la web
-    });
+    res.render('registro', { title: 'Crear cuenta - Proshop', error: null, datos: {}, diasPrueba: planesCliente.DIAS_PRUEBA });
   } catch (err) { next(err); }
 });
 
 app.post('/registro', async (req, res, next) => {
-  const { empresa, nombre, email, password, planId } = req.body || {};
-  const pais = detectarPais(req.ip);
+  const { empresa, nombre, email, password } = req.body || {};
   try {
-    const planes = await planesConPrecio(pais);
     const volverConError = (msg) =>
       res.status(400).render('registro', {
-        title: 'Crear cuenta - Proshop', planes, error: msg, simboloMoneda,
-        datos: { empresa, nombre, email, planId },
+        title: 'Crear cuenta - Proshop', error: msg, datos: { empresa, nombre, email }, diasPrueba: planesCliente.DIAS_PRUEBA,
       });
 
-    if (!empresa || !nombre || !email || !password || !planId) {
+    if (!empresa || !nombre || !email || !password) {
       return volverConError('Completa todos los campos obligatorios.');
     }
     if (String(password).length < 8) {
@@ -819,7 +806,7 @@ app.post('/registro', async (req, res, next) => {
       return volverConError('El correo no es válido.');
     }
 
-    const { usuario } = await registrarCliente({ empresa, nombre, email, password, planId, pais });
+    const { usuario } = await registrarCliente({ empresa, nombre, email, password });
 
     // Inicia sesion automaticamente
     req.session.clienteId = usuario.id;
@@ -828,11 +815,9 @@ app.post('/registro', async (req, res, next) => {
     req.session.clienteRol = usuario.rol;
     res.redirect('/panel?ok=' + encodeURIComponent('¡Bienvenido! Tu cuenta fue creada.'));
   } catch (err) {
-    if (err.codigo === 'EMAIL_DUPLICADO' || err.codigo === 'PLAN_INVALIDO') {
-      const planes = await prisma.plan.findMany({ where: { activo: true }, orderBy: { orden: 'asc' } });
+    if (err.codigo === 'EMAIL_DUPLICADO') {
       return res.status(400).render('registro', {
-        title: 'Crear cuenta - Proshop', planes, error: err.message,
-        datos: { empresa, nombre, email, planId },
+        title: 'Crear cuenta - Proshop', error: err.message, datos: { empresa, nombre, email }, diasPrueba: planesCliente.DIAS_PRUEBA,
       });
     }
     next(err);
@@ -3738,91 +3723,90 @@ app.get('/admin/registrados', requireAuth, async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
+// ---- Clientes: alta, edicion y PLAN (se asigna una plantilla, se copia, y el cliente se rige por su copia) ----
+const duracionDeForm = (body) => (
+  body.meses === 'personalizada' || (!body.meses && body.fechaFin)
+    ? { fechaFin: body.fechaFin ? new Date(`${body.fechaFin}T23:59:59Z`) : null }
+    : { meses: Number(body.meses) || null }
+);
+const planesParaAsignar = () => prisma.plan.findMany({ where: { activo: true }, orderBy: [{ oculto: 'asc' }, { orden: 'asc' }] });
+
+async function renderClienteForm(res, { empresa = null, error = null, mensaje = null, status = 200 } = {}) {
+  const planes = await planesParaAsignar();
+  const valores = empresa ? await planesCliente.valoresDe(empresa.id) : null;
+  const consumo = empresa && empresa.suscripcion ? await obtenerEstadoConsumo(empresa.suscripcion.id) : null;
+  res.status(status).render('admin/registrado-form', {
+    title: empresa ? 'Editar empresa' : 'Agregar empresa', tituloPagina: empresa ? 'Editar empresa' : 'Agregar empresa', activo: 'registrados',
+    empresa, planes, error, mensaje, valores, consumo,
+    nombresModulo: planesCliente.NOMBRES_MODULO, topeTexto: planesCliente.topeTexto,
+  });
+}
+
 app.get('/admin/registrados/nuevo', requireAuth, async (req, res, next) => {
-  try {
-    const planes = await prisma.plan.findMany({ where: { activo: true }, orderBy: { orden: 'asc' } });
-    res.render('admin/registrado-form', {
-      title: 'Agregar empresa', tituloPagina: 'Agregar empresa', activo: 'registrados',
-      empresa: null, planes, error: null,
-      periodoFinValor: fechaInput(Date.now() + 30 * 24 * 60 * 60 * 1000),
-    });
-  } catch (err) { next(err); }
+  try { await renderClienteForm(res); } catch (err) { next(err); }
 });
 
 app.post('/admin/registrados', requireAuth, async (req, res, next) => {
-  const { nombre, planId, estado, marca, periodoFin } = req.body || {};
+  const { nombre, planId, marca } = req.body || {};
   try {
-    const planes = await prisma.plan.findMany({ where: { activo: true }, orderBy: { orden: 'asc' } });
-    if (!nombre || !planId) {
-      return res.status(400).render('admin/registrado-form', {
-        title: 'Agregar empresa', tituloPagina: 'Agregar empresa', activo: 'registrados',
-        empresa: null, planes, error: 'El nombre y el plan son obligatorios.',
-        periodoFinValor: periodoFin || '',
-      });
-    }
-
-    // Slug unico
+    if (!nombre || !planId) return await renderClienteForm(res, { error: 'El nombre y el plan son obligatorios.', status: 400 });
     let slug = slugify(nombre);
     if (await prisma.empresa.findUnique({ where: { slug } })) slug = `${slug}-${Date.now().toString(36)}`;
-
-    const fin = periodoFin ? new Date(periodoFin) : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
-    await prisma.empresa.create({
-      data: {
-        nombre: String(nombre).trim().slice(0, 120),
-        slug,
-        marca: marca ? String(marca).trim().slice(0, 120) : null,
-        suscripcion: {
-          create: {
-            planId: Number(planId),
-            estado: ['PRUEBA', 'ACTIVA', 'MOROSA', 'CANCELADA'].includes(estado) ? estado : 'PRUEBA',
-            periodoFin: fin,
-          },
-        },
-      },
+    const empresa = await prisma.empresa.create({
+      data: { nombre: String(nombre).trim().slice(0, 120), slug, marca: marca ? String(marca).trim().slice(0, 120) : null },
     });
+    try {
+      await planesCliente.asignarPlan(empresa.id, Number(planId), duracionDeForm(req.body));
+    } catch (err) {
+      if (!err.codigo) throw err;
+      await prisma.empresa.delete({ where: { id: empresa.id } }); // no queda un cliente sin plan por un dato mal cargado
+      return await renderClienteForm(res, { error: err.message, status: 400 });
+    }
     res.redirect('/admin/registrados?ok=' + encodeURIComponent('Empresa creada correctamente.'));
   } catch (err) { next(err); }
 });
 
 app.get('/admin/registrados/:id/editar', requireAuth, async (req, res, next) => {
   try {
-    const empresa = await prisma.empresa.findUnique({
-      where: { id: Number(req.params.id) },
-      include: { suscripcion: true },
-    });
+    const empresa = await prisma.empresa.findUnique({ where: { id: Number(req.params.id) }, include: { suscripcion: true } });
     if (!empresa) return res.redirect('/admin/registrados');
-    const planes = await prisma.plan.findMany({ where: { activo: true }, orderBy: { orden: 'asc' } });
-    res.render('admin/registrado-form', {
-      title: 'Editar empresa', tituloPagina: 'Editar empresa', activo: 'registrados',
-      empresa, planes, error: null,
-      periodoFinValor: fechaInput(empresa.suscripcion && empresa.suscripcion.periodoFin),
-    });
+    await renderClienteForm(res, { empresa, mensaje: req.query.ok || null, error: req.query.err || null });
   } catch (err) { next(err); }
 });
 
 app.post('/admin/registrados/:id', requireAuth, async (req, res, next) => {
   const id = Number(req.params.id);
-  const { nombre, planId, estado, marca, periodoFin } = req.body || {};
+  const { nombre, estado, marca } = req.body || {};
   try {
     await prisma.empresa.update({
       where: { id },
-      data: {
-        nombre: String(nombre).trim().slice(0, 120),
-        marca: marca ? String(marca).trim().slice(0, 120) : null,
-      },
+      data: { nombre: String(nombre).trim().slice(0, 120), marca: marca ? String(marca).trim().slice(0, 120) : null },
     });
-    const sub = await prisma.suscripcion.findUnique({ where: { empresaId: id } });
-    const datosSub = {
-      planId: Number(planId),
-      estado: ['PRUEBA', 'ACTIVA', 'MOROSA', 'CANCELADA'].includes(estado) ? estado : 'PRUEBA',
-      periodoFin: periodoFin ? new Date(periodoFin) : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
-    };
-    if (sub) await prisma.suscripcion.update({ where: { empresaId: id }, data: datosSub });
-    else await prisma.suscripcion.create({ data: { empresaId: id, ...datosSub } });
-
+    if (['PRUEBA', 'ACTIVA', 'MOROSA', 'CANCELADA'].includes(estado)) {
+      await prisma.suscripcion.updateMany({ where: { empresaId: id }, data: { estado } });
+    }
     res.redirect('/admin/registrados?ok=' + encodeURIComponent('Cambios guardados.'));
   } catch (err) { next(err); }
 });
+
+// Acciones de plan: devuelven al mismo formulario con el resultado.
+const accionPlan = (okTexto, fn) => async (req, res, next) => {
+  const id = Number(req.params.id);
+  try {
+    await fn(id, req.body || {});
+    res.redirect(`/admin/registrados/${id}/editar?ok=` + encodeURIComponent(okTexto));
+  } catch (err) {
+    if (err.codigo === 'PLAN') return res.redirect(`/admin/registrados/${id}/editar?err=` + encodeURIComponent(err.message));
+    next(err);
+  }
+};
+app.post('/admin/registrados/:id/plan', requireAuth, accionPlan('Plan asignado: se copiaron sus valores y empieza hoy.', (id, b) => planesCliente.asignarPlan(id, Number(b.planId), duracionDeForm(b))));
+app.post('/admin/registrados/:id/renovar', requireAuth, accionPlan('Plan renovado.', (id, b) => planesCliente.renovar(id, Number(b.meses))));
+app.post('/admin/registrados/:id/valores', requireAuth, accionPlan('Valores de este cliente guardados.', (id, b) => planesCliente.editarCopia(id, {
+  modulos: [].concat(b.modulos || []), ilimitado: b.ilimitado === '1',
+  convIncluidas: b.convIncluidas, maxProductos: b.maxProductos, maxUsuarios: b.maxUsuarios,
+  maxMensajesPropios: b.maxMensajesPropios, maxServicios: b.maxServicios, maxCitasMes: b.maxCitasMes,
+})));
 
 // Atajo de un click para MOROSA/CANCELADA: mismo POST de edicion de arriba,
 // pero sin tener que abrir el formulario completo (pedido explicito: hacer
@@ -3830,11 +3814,9 @@ app.post('/admin/registrados/:id', requireAuth, async (req, res, next) => {
 app.post('/admin/registrados/:id/reactivar', requireAuth, async (req, res, next) => {
   const id = Number(req.params.id);
   try {
-    await prisma.suscripcion.update({
-      where: { empresaId: id },
-      data: { estado: 'ACTIVA', periodoFin: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) },
-    });
-    res.redirect('/admin/registrados?ok=' + encodeURIComponent('Suscripción reactivada.'));
+    await planesCliente.renovar(id, 1);
+    await prisma.suscripcion.update({ where: { empresaId: id }, data: { estado: 'ACTIVA' } });
+    res.redirect('/admin/registrados?ok=' + encodeURIComponent('Suscripción reactivada por 1 mes.'));
   } catch (err) { next(err); }
 });
 
