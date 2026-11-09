@@ -1,0 +1,59 @@
+<%- include('partials/inicio') %>
+<%
+  var ESTADO = {
+    APPROVED: ['Aprobada', 'badge-new', 'Lista: se usa para recordar a quienes no te escribieron en las últimas 24 h.'],
+    PENDING: ['Esperando aprobación de Meta', 'badge-done', 'Meta la está revisando. Suele tardar de minutos a unas horas.'],
+    REJECTED: ['Rechazada por Meta', 'badge-off', 'Meta no la aprobó. Podés volver a intentarlo o escribirnos.'],
+    PAUSED: ['Pausada por Meta', 'badge-off', 'Meta la pausó por baja calidad. Los recordatorios fuera de las 24 h no se mandan mientras esté pausada.'],
+    DISABLED: ['Desactivada por Meta', 'badge-off', 'Meta la desactivó.'],
+    NO_EXISTE: ['Todavía no creada', 'badge-off', 'Creala para poder recordar también a quienes no escribieron en las últimas 24 h.']
+  };
+  var est = plantilla && ESTADO[plantilla.estado] ? ESTADO[plantilla.estado] : ESTADO.NO_EXISTE;
+  var conectado = conexion && conexion.estado === 'CONECTADO';
+%>
+
+<div class="page-head page-head-row">
+  <div>
+    <h2>Recordatorios</h2>
+    <p>Avisá a tus clientes por WhatsApp antes de su <%= vocab.cita %> para que no se olviden y puedan confirmar, cambiar o cancelar con un toque.</p>
+  </div>
+  <a class="btn btn-ghost" href="/panel/citas">← Agenda</a>
+</div>
+
+<% if (mensaje) { %><div class="alert-ok"><%= mensaje %></div><% } %>
+<% if (error) { %><div class="alert-err" role="alert"><%= error %></div><% } %>
+<% if (!conectado) { %><div class="alert-err">Tu WhatsApp no está conectado: no se puede mandar ningún recordatorio. Conectalo en <a href="/panel/whatsapp">WhatsApp</a>.</div><% } %>
+
+<form method="POST" action="/panel/citas/recordatorios" class="form-card" style="max-width:640px">
+  <h3>Cuándo avisar</h3>
+  <p class="muted">Están <strong>apagados</strong> hasta que los actives: son mensajes que salen a tus clientes. No se manda entre las 21:00 y las 08:00, ni a quien reservó hace muy poco.</p>
+  <label class="check"><input type="checkbox" name="activo" value="1" <%= cfg.recordatorios.activo ? 'checked' : '' %> /> <strong>Activar los recordatorios</strong></label>
+  <label class="check" style="margin-left:1.4rem"><input type="checkbox" name="h24" value="1" <%= cfg.recordatorios.h24 ? 'checked' : '' %> /> Un día antes</label>
+  <label class="check" style="margin-left:1.4rem"><input type="checkbox" name="h2" value="1" <%= cfg.recordatorios.h2 ? 'checked' : '' %> /> Dos horas antes</label>
+  <div class="form-actions"><button class="btn btn-primary" type="submit">Guardar</button></div>
+</form>
+
+<div class="form-card" style="max-width:640px;margin-top:1.2rem">
+  <h3>Quiénes lo reciben</h3>
+  <p><strong>Quien te escribió en las últimas 24 h</strong> recibe el recordatorio con los botones <em>Confirmo / Cambiar horario / Cancelar</em>, sin costo extra.</p>
+  <p><strong>Quien no te escribió en las últimas 24 h</strong>: WhatsApp solo deja mandarle un mensaje con una <strong>plantilla aprobada por Meta</strong>. Sin plantilla, a esas personas <em>no</em> se les manda nada (no se rompe la regla de WhatsApp).</p>
+  <h4 style="margin:1rem 0 .4rem">Plantilla de recordatorio <span class="badge <%= est[1] %>"><%= est[0] %></span></h4>
+  <p class="muted" style="margin:0 0 .6rem"><%= est[2] %><% if (plantilla && plantilla.motivo) { %> Motivo: <%= plantilla.motivo %>.<% } %></p>
+  <blockquote style="margin:.4rem 0 1rem;padding:.7rem .9rem;border-left:3px solid var(--primary-2);background:rgba(255,255,255,.05);border-radius:0 10px 10px 0;font-size:.9rem">
+    <%= def.cuerpo.replace('{{1}}', 'Ana').replace('{{2}}', vocab.cita).replace('{{3}}', 'Corte de pelo').replace('{{4}}', 'jueves 12 de noviembre, 10:30') %>
+    <div class="muted" style="margin-top:.4rem;font-size:.8rem">Botones: <%= def.botones.join(' · ') %></div>
+  </blockquote>
+  <div style="display:flex;gap:.5rem;flex-wrap:wrap">
+    <% if (!plantilla || plantilla.estado === 'NO_EXISTE' || plantilla.estado === 'REJECTED') { %>
+      <form method="POST" action="/panel/citas/recordatorios/plantilla" class="inline-form"><button class="btn btn-primary" type="submit" <%= conectado && conexion.wabaId ? '' : 'disabled' %>>Crear plantilla y enviarla a Meta</button></form>
+    <% } %>
+    <% if (plantilla && plantilla.estado && plantilla.estado !== 'NO_EXISTE') { %>
+      <form method="POST" action="/panel/citas/recordatorios/plantilla/estado" class="inline-form"><button class="btn btn-ghost" type="submit">Actualizar estado</button></form>
+    <% } else { %>
+      <form method="POST" action="/panel/citas/recordatorios/plantilla/estado" class="inline-form"><button class="btn btn-ghost" type="submit" <%= conectado ? '' : 'disabled' %>>Ya la creé: ver estado</button></form>
+    <% } %>
+  </div>
+  <% if (conexion && !conexion.wabaId) { %><p class="muted" style="font-size:.82rem;margin-top:.8rem">Para crear la plantilla desde acá hace falta cargar el <strong>ID de la cuenta de WhatsApp Business (WABA)</strong> en tu conexión de <a href="/panel/whatsapp">WhatsApp</a>.</p><% } %>
+</div>
+
+<%- include('partials/fin') %>

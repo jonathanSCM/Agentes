@@ -13,6 +13,7 @@
   </div>
   <div class="agenda-nav">
     <a class="btn btn-ghost" href="/panel/citas?fecha=<%= anterior %>" aria-label="Día anterior">←</a>
+    <a class="btn btn-ghost" href="/panel/citas/recordatorios">Recordatorios</a>
     <a class="btn btn-ghost" href="/panel/citas">Hoy</a>
     <a class="btn btn-ghost" href="/panel/citas?fecha=<%= siguiente %>" aria-label="Día siguiente">→</a>
     <form method="GET" action="/panel/citas" class="inline-form"><input type="date" name="fecha" value="<%= fecha %>" aria-label="Elegir un día" onchange="this.form.submit()" /></form>
@@ -75,7 +76,9 @@
             <td><strong><%= c.cliente %></strong><br /><a class="muted" style="font-size:.78rem" href="/panel/conversaciones/<%= encodeURIComponent(c.telefono) %>"><%= c.telefono %></a></td>
             <td><%= c.servicio %><% if (c.personas > 1) { %><br /><span class="muted" style="font-size:.78rem"><%= c.personas %> personas</span><% } %></td>
             <td><%= c.recurso || '—' %></td>
-            <td><span class="badge <%= e[1] %>"><%= e[0] %></span></td>
+            <td><span class="badge <%= e[1] %>"><%= e[0] %></span>
+              <% if (c.confirmoAsistencia) { %><br /><span class="muted" style="font-size:.75rem">✓ Confirmó que va</span><% } %>
+              <% if (c.recordatorio) { %><br /><span class="muted" style="font-size:.72rem"><%= c.recordatorio %></span><% } %></td>
             <td class="muted"><%= ORIGEN[c.origen] || c.origen %></td>
             <td class="actions-cell" style="min-width:230px">
               <% c.acciones.forEach(function (a) { var b = ACCION[a]; %>

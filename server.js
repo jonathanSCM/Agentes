@@ -80,6 +80,7 @@ const { encolarRespuesta } = require('./lib/services/bufferMensajes');
 const wa = require('./lib/services/whatsapp');
 const { analizarImagenProducto, transcribirAudio, fichaProducto } = require('./lib/services/agente');
 const { iniciarJobFacturacion } = require('./lib/jobs/facturacion');
+const { iniciarJobRecordatorios } = require('./lib/jobs/recordatorios');
 const { initSocket, emitMensaje, emitConversacion } = require('./lib/services/realtime');
 const { detectarPais } = require('./lib/services/geo');
 const { precioPlanParaPais, precioPaqueteParaPais, simboloMoneda } = require('./lib/services/precios');
@@ -2921,12 +2922,50 @@ app.get('/panel/citas', requireCliente, soloCitas, async (req, res, next) => {
     });
   } catch (err) { next(err); }
 });
+// ---- Recordatorios de citas (solo dueño/admin) ----
+const recordatoriosSrv = require('./lib/services/recordatorios');
+app.get('/panel/citas/recordatorios', requireCliente, soloCitas, puedeEditarAtencion, async (req, res, next) => {
+  try {
+    const empresa = await prisma.empresa.findUnique({ where: { id: req.session.empresaId } });
+    const conexion = await prisma.conexionWhatsApp.findFirst({ where: { agente: { empresaId: empresa.id } }, select: { estado: true, wabaId: true } });
+    res.render('cliente/citas-recordatorios', {
+      title: 'Recordatorios - Proshop', tituloPagina: 'Recordatorios', activo: 'citas',
+      cfg: require('./lib/services/configAgenda').agendaDe(empresa), plantilla: (empresa.configAgenda && empresa.configAgenda.plantilla) || null,
+      def: recordatoriosSrv.PLANTILLA, conexion, vocab: res.locals.vocab || require('./lib/services/rubros').vocabularioDe(empresa),
+      mensaje: req.query.ok || null, error: req.query.err || null,
+    });
+  } catch (err) { next(err); }
+});
+app.post('/panel/citas/recordatorios', requireCliente, soloCitas, puedeEditarAtencion, async (req, res, next) => {
+  try {
+    const actual = (await prisma.empresa.findUnique({ where: { id: req.session.empresaId }, select: { configAgenda: true } })).configAgenda || {};
+    const b = req.body || {};
+    await prisma.empresa.update({ where: { id: req.session.empresaId }, data: { configAgenda: { ...actual, recordatorios: { activo: b.activo === '1', h24: b.h24 === '1', h2: b.h2 === '1' } } } });
+    res.redirect('/panel/citas/recordatorios?ok=' + encodeURIComponent('Guardado.'));
+  } catch (err) { next(err); }
+});
+const accionPlantilla = (fn, okTexto) => async (req, res, next) => {
+  try {
+    const empresa = await prisma.empresa.findUnique({ where: { id: req.session.empresaId } });
+    const r = await fn(empresa);
+    res.redirect('/panel/citas/recordatorios?' + (r.ok ? 'ok=' + encodeURIComponent(okTexto) : 'err=' + encodeURIComponent(r.error)));
+  } catch (err) { next(err); }
+};
+app.post('/panel/citas/recordatorios/plantilla', requireCliente, soloCitas, puedeEditarAtencion, accionPlantilla((e) => recordatoriosSrv.crearPlantillaEnMeta(e), 'Plantilla enviada a Meta. Suele aprobarse en minutos u horas: tocá "Actualizar estado" para ver cómo va.'));
+app.post('/panel/citas/recordatorios/plantilla/estado', requireCliente, soloCitas, puedeEditarAtencion, accionPlantilla((e) => recordatoriosSrv.actualizarEstadoPlantilla(e), 'Estado actualizado.'));
+
 app.post('/panel/citas/:id(\\d+)/estado', requireCliente, soloCitas, async (req, res, next) => {
   const fecha = T.esFecha(String(req.body.fecha || '')) ? `&fecha=${req.body.fecha}` : '';
   try {
     const empresa = await prisma.empresa.findUnique({ where: { id: req.session.empresaId } });
-    await citasPanel.cambiarEstado(empresa, req.params.id, String(req.body.estado || ''), { id: req.session.clienteId, rol: req.session.clienteRol });
-    res.redirect('/panel/citas?ok=' + encodeURIComponent('Listo, actualizado.') + fecha);
+    const cita = await citasPanel.cambiarEstado(empresa, req.params.id, String(req.body.estado || ''), { id: req.session.clienteId, rol: req.session.clienteRol });
+    let mensaje = 'Listo, actualizado.';
+    // Si el NEGOCIO cancela, se le avisa al cliente por WhatsApp (solo posible si escribio en las ultimas 24 h).
+    if (cita.estado === 'CANCELADA') {
+      const aviso = await recordatoriosSrv.avisarCancelacion(empresa, cita).catch(() => ({ avisado: false }));
+      mensaje += aviso.avisado ? ' Le avisamos al cliente por WhatsApp.' : ' No pudimos avisarle por WhatsApp (no escribió en las últimas 24 h): avisale vos.';
+    }
+    res.redirect('/panel/citas?ok=' + encodeURIComponent(mensaje) + fecha);
   } catch (err) {
     if (err.codigo === 'CITA') return res.redirect('/panel/citas?err=' + encodeURIComponent(err.message) + fecha);
     next(err);
@@ -3688,6 +3727,7 @@ async function interpretarMensajeEntrante(mensaje, conexion, telefonoCliente) {
   // (idBoton, ver el handler del webhook) para que el flujo determinista lo use.
   if (mensaje.interactive?.list_reply?.id) return mensaje.interactive.list_reply.title || mensaje.interactive.list_reply.id;
   if (mensaje.interactive?.button_reply?.id) return mensaje.interactive.button_reply.title || mensaje.interactive.button_reply.id;
+  if (mensaje.type === 'button' && mensaje.button) return mensaje.button.text || mensaje.button.payload || null;
 
   if (mensaje.type === 'image' && mensaje.image?.id) {
     const media = await wa.obtenerMedia(conexion, mensaje.image.id);
@@ -3767,7 +3807,8 @@ app.post('/webhooks/whatsapp', (req, res) => {
 
       const telefonoCliente = mensaje.from;
       // ID tecnico del boton/lista que toco el cliente (null si escribio texto).
-      const idBoton = mensaje.interactive?.list_reply?.id || mensaje.interactive?.button_reply?.id || null;
+      // (los botones de una plantilla llegan como mensaje tipo "button" con su payload)
+      const idBoton = mensaje.interactive?.list_reply?.id || mensaje.interactive?.button_reply?.id || (mensaje.type === 'button' ? mensaje.button?.payload : null) || null;
       const baseUrl = `${req.protocol}://${req.get('host')}`;
       await prisma.conexionWhatsApp.update({ where: { id: conexion.id }, data: { ultimoMensajeAt: new Date() } });
 
@@ -4984,4 +5025,5 @@ httpServer.listen(PORT, '0.0.0.0', () => {
   console.log(`  [DIAGNOSTICO] OPENAI_API_KEY presente: ${Boolean(process.env.OPENAI_API_KEY)} (largo: ${(process.env.OPENAI_API_KEY || '').length})`);
   console.log(`  [DIAGNOSTICO] ANTHROPIC_API_KEY presente: ${Boolean(process.env.ANTHROPIC_API_KEY)}\n`);
   iniciarJobFacturacion();
+  iniciarJobRecordatorios();
 });
