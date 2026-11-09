@@ -139,12 +139,29 @@ describe('resumen contra la base', () => {
     assert.equal(r.porCobrar.pedidos, 2, 'el nuevo y el que se cobró en el mostrador siguen sin entregar');
   });
 
+  test('una devolución resta lo vendido y la utilidad, sin contar como una venta más', async () => {
+    const v = await prisma.venta.findFirst({ where: { empresaId: A.empresaId, estado: 'COMPLETADA', items: { some: { nombre: 'Camisa', cantidad: 2 } } }, include: { items: true } });
+    await prisma.devolucion.create({
+      data: {
+        empresaId: A.empresaId, ventaId: v.id, metodo: 'EFECTIVO', monto: 100, repone: true, motivo: 'talla equivocada', createdAt: new Date('2026-11-10T16:00:00Z'),
+        items: { create: [{ ventaItemId: v.items[0].id, cantidad: 1, monto: 100 }] },
+      },
+    });
+    const r = await R.resumen(A.empresaId, 'hoy', { ahora: new Date('2026-11-10T17:00:00Z') });
+    assert.equal(r.ingresos, 350, '450 − 100 devueltos');
+    assert.equal(r.ventas, 4, 'la devolución no es una venta más');
+    assert.equal(r.canal.mostrador.ingresos, 250);
+    assert.equal(r.utilidad, 120 - 40, 'se resta la ganancia de esa unidad (100 de ingreso − 60 de costo)');
+    assert.equal(r.masVendidos.find((p) => p.nombre === 'Camisa').unidades, 2, 'de 3 camisas vendidas, 1 volvió');
+  });
+
   test('la serie diaria cubre todos los días del periodo y el Excel trae una fila por línea', async () => {
     const r = await R.resumen(A.empresaId, '7d', { ahora: AHORA });
     assert.equal(r.serie.length, 7);
-    assert.equal(r.serie[r.serie.length - 1].total, 450);
+    assert.equal(r.serie[r.serie.length - 1].total, 350, '450 vendidos − 100 devueltos');
     const { filas } = await R.filasParaExcel(A.empresaId, 'hoy', { ahora: AHORA });
-    assert.equal(filas.length, 4);
+    assert.equal(filas.length, 5, '4 líneas vendidas + 1 devuelta');
+    assert.ok(filas.some((f) => f.cantidad === -1 && f.ingreso === -100), 'la devolución sale como línea negativa');
     assert.ok(filas.some((f) => f.canal === 'WhatsApp' && f.referencia.startsWith('Pedido #')));
     assert.ok(filas.some((f) => /^V-\d{4}$/.test(f.referencia)));
     assert.ok(filas.every((f) => !f.referencia.includes('Ajeno')));

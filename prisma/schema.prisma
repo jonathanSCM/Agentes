@@ -268,6 +268,7 @@ model Empresa {
   sesionesCaja     SesionCaja[]
   ventas           Venta[]
   auditorias       Auditoria[]
+  devoluciones     Devolucion[]
   usosIA         UsoIA[]
   mensajesAgente MensajeAgente[]
   datosNegocio   DatoNegocio[]
@@ -994,6 +995,7 @@ model SesionCaja {
 
   @@index([empresaId, abiertaAt])
   @@map("sesiones_caja")
+  devoluciones Devolucion[]
 }
 
 // Entradas y salidas manuales de efectivo (ej. pagar a un proveedor desde la caja).
@@ -1043,6 +1045,7 @@ model Venta {
 
   items VentaItem[]
   pagos VentaPago[]
+  devoluciones Devolucion[]
 
   @@unique([empresaId, numero])
   @@index([empresaId, createdAt])
@@ -1063,6 +1066,7 @@ model VentaItem {
   total          Decimal   @db.Decimal(12, 2)
   // Costo al momento de vender: asi el margen no cambia si despues cambia el costo.
   costoUnitario  Decimal?  @db.Decimal(12, 2)
+  devolucionItems DevolucionItem[]
 
   @@index([ventaId])
   @@index([productoId])
@@ -1355,4 +1359,43 @@ model Auditoria {
   @@index([empresaId, createdAt])
   @@index([empresaId, accion])
   @@map("auditoria")
+}
+
+// Devolucion (parcial o total) de una venta del mostrador. Resta el dinero de la caja abierta si es en efectivo.
+model Devolucion {
+  id           Int         @id @default(autoincrement())
+  empresaId    Int
+  empresa      Empresa     @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  ventaId      Int
+  venta        Venta       @relation(fields: [ventaId], references: [id], onDelete: Cascade)
+  sesionCajaId Int?
+  sesionCaja   SesionCaja? @relation(fields: [sesionCajaId], references: [id], onDelete: SetNull)
+  usuarioId    Int?
+  // EFECTIVO | QR | TARJETA | TRANSFERENCIA
+  metodo       String
+  monto        Decimal     @db.Decimal(12, 2)
+  repone       Boolean     @default(true)
+  motivo       String
+  createdAt    DateTime    @default(now())
+
+  items DevolucionItem[]
+
+  @@index([empresaId, createdAt])
+  @@index([ventaId])
+  @@index([sesionCajaId])
+  @@map("devoluciones")
+}
+
+model DevolucionItem {
+  id           Int        @id @default(autoincrement())
+  devolucionId Int
+  devolucion   Devolucion @relation(fields: [devolucionId], references: [id], onDelete: Cascade)
+  ventaItemId  Int
+  ventaItem    VentaItem  @relation(fields: [ventaItemId], references: [id], onDelete: Cascade)
+  cantidad     Int
+  monto        Decimal    @db.Decimal(12, 2)
+
+  @@index([devolucionId])
+  @@index([ventaItemId])
+  @@map("devolucion_items")
 }

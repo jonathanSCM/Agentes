@@ -8,6 +8,9 @@
     </h2>
     <p><%= new Date(pedido.createdAt).toLocaleString('es-BO', { dateStyle: 'long', timeStyle: 'short' }) %></p>
   </div>
+  <% if (typeof modulos !== 'undefined' && modulos.indexOf('POS') !== -1 && (pedido.estado === 'NUEVO' || pedido.estado === 'CONFIRMADO')) { %>
+    <a class="btn btn-primary" href="/panel/pos/pedidos/<%= pedido.id %>">Cobrar en el mostrador</a>
+  <% } %>
   <span class="badge <%= pedido.estado === 'ENTREGADO' ? 'badge-new' : (pedido.estado === 'CANCELADO' ? 'badge-off' : 'badge-done') %>" style="font-size:.9rem;height:fit-content"><%= pedido.estado %></span>
 </div>
 

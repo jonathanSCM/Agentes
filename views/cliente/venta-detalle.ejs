@@ -53,6 +53,52 @@
   </table>
 </div>
 
+<% if (venta.devoluciones && venta.devoluciones.length) { %>
+  <h3>Devoluciones</h3>
+  <div class="table-wrap">
+    <table class="leads-table">
+      <thead><tr><th>Cuándo</th><th>Productos</th><th>Devuelto por</th><th>Motivo</th><th class="num">Monto</th></tr></thead>
+      <tbody>
+        <% venta.devoluciones.forEach(function (d) { %>
+          <tr>
+            <td class="nowrap muted"><%= new Date(d.createdAt).toLocaleString('es-BO', { dateStyle: 'short', timeStyle: 'short' }) %></td>
+            <td><%= d.items.map(function (di) { var it = venta.items.find(function (x) { return x.id === di.ventaItemId; }); return di.cantidad + ' × ' + (it ? it.nombre : 'producto'); }).join(', ') %><% if (!d.repone) { %> <span class="muted">(no volvió al stock)</span><% } %></td>
+            <td><%= etiquetas[d.metodo] %></td>
+            <td><%= d.motivo %></td>
+            <td class="num"><strong><%= m(d.monto) %></strong></td>
+          </tr>
+        <% }); %>
+      </tbody>
+    </table>
+  </div>
+<% } %>
+
+<% if (venta.estado === 'COMPLETADA' && puedeAnular && pendientes.length) { %>
+  <form method="POST" action="/panel/ventas/<%= venta.id %>/devolver" class="form-card" style="max-width:720px;margin-top:1.4rem"
+        onsubmit="return confirm('¿Registrar esta devolución? Sale dinero de la caja abierta si es en efectivo. No se puede deshacer.');">
+    <h3>Devolver productos</h3>
+    <p class="muted" style="font-size:.84rem">Indicá cuántas unidades devuelve el cliente. Hace falta una caja abierta: de ahí sale el dinero.</p>
+    <div class="table-wrap">
+      <table class="leads-table">
+        <thead><tr><th>Producto</th><th class="num">Pueden volver</th><th class="num">Devuelve</th></tr></thead>
+        <tbody>
+          <% pendientes.forEach(function (p) { %>
+            <tr><td><%= p.nombre %></td><td class="num"><%= p.quedan %></td>
+              <td class="num"><input type="number" name="cant_<%= p.id %>" min="0" max="<%= p.quedan %>" value="0" style="width:5rem" aria-label="Unidades a devolver de <%= p.nombre %>" /></td></tr>
+          <% }); %>
+        </tbody>
+      </table>
+    </div>
+    <div class="field"><label for="dev-metodo">Cómo se le devuelve el dinero</label>
+      <select id="dev-metodo" name="metodo">
+        <% Object.keys(etiquetas).forEach(function (k) { %><option value="<%= k %>"><%= etiquetas[k] %></option><% }); %>
+      </select></div>
+    <div class="field"><label for="dev-motivo">Motivo *</label><input id="dev-motivo" name="motivo" type="text" required minlength="5" maxlength="200" placeholder="Ej: talla equivocada" /></div>
+    <div class="field"><label><input type="checkbox" name="repone" value="1" checked /> Los productos vuelven al stock <span class="muted">(desmarcá si llegaron dañados)</span></label></div>
+    <div class="form-actions"><button class="btn btn-primary" type="submit">Registrar devolución</button></div>
+  </form>
+<% } %>
+
 <% if (venta.estado === 'COMPLETADA' && puedeAnular) { %>
   <form method="POST" action="/panel/ventas/<%= venta.id %>/anular" class="form-card" style="max-width:520px;margin-top:1.4rem"
         onsubmit="return confirm('¿Anular esta venta? Se devuelve el stock y deja de contar en la caja. No se puede deshacer.');">

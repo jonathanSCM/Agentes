@@ -26,6 +26,7 @@
   <div class="caja-grid">
     <div class="caja-dato"><small>Efectivo inicial</small><strong><%= m(s.efectivoInicial) %></strong></div>
     <div class="caja-dato"><small>Vendido (<%= r.cantidadVentas %> ventas)</small><strong><%= c(r.vendidoCentavos) %></strong></div>
+    <% if (r.devolucionesCentavos > 0) { %><div class="caja-dato"><small>Devuelto (<%= r.cantidadDevoluciones %>)</small><strong><%= c(r.devolucionesCentavos) %></strong></div><% } %>
     <% if (s.estado === 'CERRADA') { %>
       <div class="caja-dato"><small>Efectivo esperado</small><strong><%= m(s.efectivoEsperado) %></strong></div>
       <div class="caja-dato"><small>Efectivo contado</small><strong><%= m(s.efectivoContado) %></strong></div>
@@ -59,6 +60,7 @@
     <div class="caja-dato"><small>Caja abierta desde</small><strong style="font-size:1rem"><%= fecha(sesion.abiertaAt) %></strong></div>
     <div class="caja-dato"><small>Efectivo inicial</small><strong><%= m(sesion.efectivoInicial) %></strong></div>
     <div class="caja-dato"><small>Vendido (<%= resumen.cantidadVentas %> ventas)</small><strong><%= c(resumen.vendidoCentavos) %></strong></div>
+    <% if (resumen.devolucionesCentavos > 0) { %><div class="caja-dato"><small>Devuelto (<%= resumen.cantidadDevoluciones %>)</small><strong><%= c(resumen.devolucionesCentavos) %></strong></div><% } %>
     <% if (!esCajero) { %><div class="caja-dato destacado"><small>Efectivo que debería haber</small><strong><%= c(resumen.efectivoEsperadoCentavos) %></strong></div><% } %>
   </div>
   <div class="caja-grid">

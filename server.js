@@ -2977,7 +2977,7 @@ app.post('/panel/pos/venta', ...POS, async (req, res) => {
     const lineas = (Array.isArray(b.lineas) ? b.lineas : []).map((l) => ({ productoId: l.productoId, varianteId: l.varianteId || null, cantidad: l.cantidad, descuento: l.descuento }));
     const pagos = (Array.isArray(b.pagos) ? b.pagos : []).map((p) => ({ metodo: p.metodo, monto: p.monto, recibido: p.recibido, referencia: p.referencia }));
     const { venta, repetida } = await ventasSrv.crear(req.session.empresaId, usuarioPos(req), {
-      lineas, pagos, descuento: b.descuento, clienteNombre: b.clienteNombre, claveIdempotencia: b.claveIdempotencia,
+      lineas, pagos, descuento: b.descuento, clienteNombre: b.clienteNombre, clienteId: b.clienteId || null, claveIdempotencia: b.claveIdempotencia,
     });
     const vuelto = venta.pagos.reduce((t, p) => t + Number(p.vuelto || 0), 0);
     res.json({ ok: true, repetida, venta: { id: venta.id, numero: venta.numero, total: Number(venta.total), vuelto, token: venta.tokenRecibo, reciboUrl: `/recibo/${venta.tokenRecibo}` } });
@@ -3050,9 +3050,11 @@ app.get('/panel/ventas/:id(\\d+)', ...POS, async (req, res, next) => {
   try {
     const venta = await ventasSrv.detalle(req.session.empresaId, req.params.id);
     if (!venta) return res.redirect('/panel/ventas');
+    const devueltas = (await ventasSrv.devueltoDe(prisma, venta.id)).porItem;
     res.render('cliente/venta-detalle', {
       title: `Venta #${venta.numero} - Proshop`, tituloPagina: 'Venta', activo: 'ventas', hojas: ['/css/pos.css'],
       venta, etiquetas: ventaCalculo.ETIQUETAS_METODO, puedeAnular: ventasSrv.ROLES_QUE_ANULAN.includes(req.session.clienteRol),
+      pendientes: venta.items.map((i) => ({ id: i.id, nombre: i.nombre, quedan: i.cantidad - (devueltas.get(i.id) || 0) })).filter((i) => i.quedan > 0),
       mensaje: req.query.ok || null, error: req.query.err || null,
     });
   } catch (err) { next(err); }
@@ -3066,6 +3068,82 @@ app.post('/panel/ventas/:id(\\d+)/anular', ...POS, async (req, res, next) => {
   } catch (err) {
     if (esErrorDeNegocio(err)) return res.redirect(`/panel/ventas/${req.params.id}?err=` + encodeURIComponent(err.message));
     next(err);
+  }
+});
+
+// ---- Devoluciones (solo dueño/admin; el servicio lo vuelve a comprobar) ----
+app.post('/panel/ventas/:id(\\d+)/devolver', ...POS, async (req, res, next) => {
+  const volver = `/panel/ventas/${req.params.id}`;
+  try {
+    const items = Object.keys(req.body || {})
+      .filter((k) => /^cant_\d+$/.test(k) && Number(req.body[k]) > 0)
+      .map((k) => ({ ventaItemId: Number(k.slice(5)), cantidad: Number(req.body[k]) }));
+    await ventasSrv.devolver(req.session.empresaId, usuarioPos(req), req.params.id, { items, metodo: req.body.metodo, motivo: req.body.motivo, repone: req.body.repone === '1' });
+    catalogoCache.invalidarEmpresa(req.session.empresaId);
+    res.redirect(`${volver}?ok=` + encodeURIComponent('Devolución registrada.'));
+  } catch (err) {
+    if (esErrorDeNegocio(err)) return res.redirect(`${volver}?err=` + encodeURIComponent(err.message));
+    next(err);
+  }
+});
+
+// ---- Clientes para la venta (busqueda por nombre o telefono, solo de esta empresa) ----
+app.get('/panel/pos/clientes', ...POS, async (req, res, next) => {
+  try {
+    const q = String(req.query.q || '').trim().slice(0, 60);
+    if (q.length < 2) return res.json({ clientes: [] });
+    const clientes = await prisma.clienteFinal.findMany({
+      where: { empresaId: req.session.empresaId, OR: [{ nombre: { contains: q, mode: 'insensitive' } }, { nombrePerfil: { contains: q, mode: 'insensitive' } }, { telefono: { contains: q } }] },
+      select: { id: true, nombre: true, nombrePerfil: true, telefono: true }, orderBy: { createdAt: 'desc' }, take: 8,
+    });
+    res.json({ clientes: clientes.map((c) => ({ id: c.id, texto: `${c.nombre || c.nombrePerfil || 'Cliente'} · ${c.telefono}` })) });
+  } catch (err) { next(err); }
+});
+
+// ---- Cobrar en el mostrador un pedido que tomo el bot ----
+app.get('/panel/pos/pedidos', ...POS, async (req, res, next) => {
+  try {
+    const empresaId = req.session.empresaId;
+    const pedidos = await prisma.pedido.findMany({
+      where: { empresaId, estado: { in: ['NUEVO', 'CONFIRMADO'] } }, orderBy: { createdAt: 'asc' }, take: 100,
+      include: { cliente: { select: { nombre: true, nombrePerfil: true, telefono: true } }, items: { select: { nombre: true, cantidad: true } } },
+    });
+    res.render('cliente/pos-pedidos', {
+      title: 'Pedidos por cobrar - Proshop', tituloPagina: 'Pedidos por cobrar', activo: 'pos-pedidos', hojas: ['/css/pos.css'],
+      pedidos, sesion: await caja.sesionAbierta(empresaId), mensaje: req.query.ok || null, error: req.query.err || null,
+    });
+  } catch (err) { next(err); }
+});
+
+app.get('/panel/pos/pedidos/:id(\\d+)', ...POS, async (req, res, next) => {
+  try {
+    const empresaId = req.session.empresaId;
+    const pedido = await prisma.pedido.findFirst({ where: { id: Number(req.params.id), empresaId }, include: { items: true, cliente: true } });
+    if (!pedido) return res.redirect('/panel/pos/pedidos');
+    res.render('cliente/pos-pedido', {
+      title: `Cobrar pedido #${pedido.id} - Proshop`, tituloPagina: 'Cobrar pedido', activo: 'pos-pedidos', hojas: ['/css/pos.css'],
+      pedido, sesion: await caja.sesionAbierta(empresaId),
+      metodos: ventaCalculo.METODOS.map((m) => ({ clave: m, etiqueta: ventaCalculo.ETIQUETAS_METODO[m] })),
+    });
+  } catch (err) { next(err); }
+});
+
+app.post('/panel/pos/pedidos/:id(\\d+)/cobrar', ...POS, async (req, res) => {
+  try {
+    const b = req.body || {};
+    const pagos = (Array.isArray(b.pagos) ? b.pagos : []).map((p) => ({ metodo: p.metodo, monto: p.monto, recibido: p.recibido, referencia: p.referencia }));
+    const { venta, repetida } = await ventasSrv.cobrarPedido(req.session.empresaId, usuarioPos(req), req.params.id, { pagos, claveIdempotencia: b.claveIdempotencia, clienteNombre: b.clienteNombre });
+    // Se avisa al cliente por WhatsApp que su pedido quedo entregado (igual que al marcarlo entregado en Pedidos).
+    if (!repetida) {
+      const pedido = await prisma.pedido.findFirst({ where: { id: venta.pedidoId, empresaId: req.session.empresaId } });
+      if (pedido) notificarCambioDeEstadoPedido(req.session.empresaId, pedido, 'ENTREGADO').catch(() => {});
+    }
+    const vuelto = venta.pagos.reduce((t, p) => t + Number(p.vuelto || 0), 0);
+    res.json({ ok: true, repetida, venta: { id: venta.id, numero: venta.numero, total: Number(venta.total), vuelto, token: venta.tokenRecibo, reciboUrl: `/recibo/${venta.tokenRecibo}` } });
+  } catch (err) {
+    if (esErrorDeNegocio(err)) return res.status(400).json({ ok: false, error: err.message });
+    console.error('[pos] error al cobrar pedido:', err);
+    res.status(500).json({ ok: false, error: 'No se pudo cobrar por un problema técnico. Probá de nuevo: si ya se cobró, no se cobra dos veces.' });
   }
 });
 

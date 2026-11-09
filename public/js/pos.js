@@ -221,6 +221,27 @@
     actualizarCobro();
   });
 
+  // Cliente (opcional): sugiere clientes del negocio por nombre o telefono; si elige uno, la venta queda ligada a el.
+  var clientesPorTexto = {};
+  var temporizadorClientes = null;
+  $('cobroCliente').addEventListener('input', function () {
+    var q = this.value.trim();
+    clearTimeout(temporizadorClientes);
+    if (q.length < 2 || clientesPorTexto[q]) return;
+    temporizadorClientes = setTimeout(function () {
+      fetch('/panel/pos/clientes?q=' + encodeURIComponent(q), { credentials: 'same-origin' })
+        .then(function (r) { return r.json(); })
+        .then(function (d) {
+          var lista = $('cobroClientes'); lista.innerHTML = '';
+          (d.clientes || []).forEach(function (c) {
+            clientesPorTexto[c.texto] = c.id;
+            var o = document.createElement('option'); o.value = c.texto; lista.appendChild(o);
+          });
+        })
+        .catch(function () {});
+    }, 250);
+  });
+
   function confirmarCobro() {
     var btn = $('cobroConfirmar');
     if (btn.disabled) return;
@@ -230,6 +251,7 @@
       descuento: ($('posDescuento').value || '0'),
       pagos: leerPagos().map(function (p) { return { metodo: p.metodo, monto: p.monto / 100, recibido: p.metodo === 'EFECTIVO' && p.recibido !== null ? p.recibido / 100 : undefined }; }),
       clienteNombre: $('cobroCliente').value.trim(),
+      clienteId: clientesPorTexto[$('cobroCliente').value.trim()] || undefined,
       claveIdempotencia: claveCobro
     };
     fetch('/panel/pos/venta', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(cuerpo) })

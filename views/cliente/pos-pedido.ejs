@@ -1,0 +1,118 @@
+<%- include('partials/inicio') %>
+<%
+  var m = function (n) { return simboloCatalogo + ' ' + Number(n).toFixed(2); };
+  var cobrable = ['NUEVO', 'CONFIRMADO'].indexOf(pedido.estado) !== -1;
+  var cliente = pedido.cliente ? (pedido.cliente.nombre || pedido.cliente.nombrePerfil || pedido.cliente.telefono) : '';
+%>
+
+<div class="page-head page-head-row">
+  <div>
+    <h2>Cobrar pedido #<%= pedido.id %></h2>
+    <p><%= cliente ? 'Cliente: ' + cliente + ' · ' : '' %><%= new Date(pedido.createdAt).toLocaleString('es-BO', { dateStyle: 'long', timeStyle: 'short' }) %></p>
+  </div>
+  <a class="btn btn-ghost" href="/panel/pos/pedidos">← Pedidos por cobrar</a>
+</div>
+
+<div class="table-wrap">
+  <table class="leads-table">
+    <thead><tr><th>Producto</th><th class="num">Cant.</th><th class="num">Precio</th><th class="num">Total</th></tr></thead>
+    <tbody>
+      <% pedido.items.forEach(function (i) { %>
+        <tr><td><%= i.nombre %></td><td class="num"><%= i.cantidad %></td><td class="num"><%= m(i.precio) %></td><td class="num"><%= m(Number(i.precio) * i.cantidad) %></td></tr>
+      <% }); %>
+    </tbody>
+  </table>
+</div>
+
+<div class="caja-grid" style="margin-top:1rem">
+  <div class="caja-dato destacado"><small>Total a cobrar</small><strong><%= m(pedido.total) %></strong></div>
+</div>
+
+<% if (!cobrable) { %>
+  <div class="alert-err">Este pedido ya está <%= pedido.estado === 'ENTREGADO' ? 'entregado' : 'cancelado' %>: no se puede cobrar.</div>
+<% } else if (!sesion) { %>
+  <div class="alert-err">La caja está cerrada. Abrila en <a href="/panel/pos">Punto de venta</a> para poder cobrar.</div>
+<% } else { %>
+  <form id="formCobroPedido" class="form-card" style="max-width:560px;margin-top:1.2rem" novalidate>
+    <h3>Cómo paga el cliente</h3>
+    <div id="pagosPedido"></div>
+    <button type="button" class="btn btn-ghost btn-chico" id="dividirPedido">+ Dividir el pago</button>
+    <p class="pos-cobro-estado" id="estadoPedido" role="status"></p>
+    <p class="alert-err" id="errorPedido" role="alert" hidden></p>
+    <div class="form-actions"><button class="btn btn-primary" type="submit" id="confirmarPedido">Confirmar cobro</button></div>
+  </form>
+
+  <div id="listoPedido" class="form-card" style="max-width:560px;margin-top:1.2rem" hidden>
+    <h3>Pedido cobrado ✓</h3>
+    <p id="resumenListo"></p>
+    <div style="display:flex;gap:.5rem;flex-wrap:wrap">
+      <a class="btn btn-primary" id="verRecibo" target="_blank" rel="noopener">🖨 Imprimir recibo</a>
+      <a class="btn btn-ghost" href="/panel/pos/pedidos">Más pedidos por cobrar</a>
+    </div>
+  </div>
+
+  <script>
+  (function () {
+    var TOTAL = Math.round(<%= Number(pedido.total) %> * 100);
+    var SIMBOLO = <%- JSON.stringify(simboloCatalogo) %>;
+    var METODOS = <%- JSON.stringify(metodos) %>;
+    var clave = 'ped-' + <%= pedido.id %> + '-' + Date.now() + '-' + Math.random().toString(36).slice(2, 8);
+    var cont = document.getElementById('pagosPedido');
+    var aC = function (v) { return Math.round(parseFloat(String(v).replace(',', '.')) * 100) || 0; };
+    var fmt = function (c) { return SIMBOLO + ' ' + (c / 100).toFixed(2); };
+
+    function fila(metodo, centavos) {
+      var f = document.createElement('div'); f.className = 'pos-pago';
+      var sel = document.createElement('select'); sel.setAttribute('aria-label', 'Forma de pago');
+      METODOS.forEach(function (m) { var o = document.createElement('option'); o.value = m.clave; o.textContent = m.etiqueta; if (m.clave === metodo) o.selected = true; sel.appendChild(o); });
+      var monto = document.createElement('input'); monto.type = 'number'; monto.min = '0'; monto.step = '0.01'; monto.inputMode = 'decimal'; monto.value = (centavos / 100).toFixed(2); monto.setAttribute('aria-label', 'Monto');
+      var rec = document.createElement('input'); rec.type = 'number'; rec.min = '0'; rec.step = '0.01'; rec.inputMode = 'decimal'; rec.placeholder = 'Recibido'; rec.setAttribute('aria-label', 'Efectivo recibido');
+      var quitar = document.createElement('button'); quitar.type = 'button'; quitar.className = 'pos-quitar'; quitar.textContent = '✕'; quitar.setAttribute('aria-label', 'Quitar este pago');
+      function ajustar() { rec.hidden = sel.value !== 'EFECTIVO'; actualizar(); }
+      sel.addEventListener('change', ajustar); monto.addEventListener('input', actualizar); rec.addEventListener('input', actualizar);
+      quitar.addEventListener('click', function () { if (cont.children.length > 1) { f.remove(); actualizar(); } });
+      f.appendChild(sel); f.appendChild(monto); f.appendChild(rec); f.appendChild(quitar);
+      f._lee = function () { return { metodo: sel.value, monto: aC(monto.value), recibido: rec.value === '' ? null : aC(rec.value) }; };
+      rec.hidden = metodo !== 'EFECTIVO';
+      return f;
+    }
+    function pagos() { return Array.prototype.map.call(cont.children, function (f) { return f._lee(); }); }
+    function actualizar() {
+      var suma = pagos().reduce(function (t, p) { return t + p.monto; }, 0);
+      var e = document.getElementById('estadoPedido');
+      var ok = suma === TOTAL;
+      e.textContent = ok ? 'Listo para cobrar.' : (suma < TOTAL ? 'Falta cobrar ' + fmt(TOTAL - suma) + '.' : 'Los pagos suman ' + fmt(suma - TOTAL) + ' de más.');
+      e.className = 'pos-cobro-estado ' + (ok ? 'ok' : 'falta');
+      document.getElementById('confirmarPedido').disabled = !ok;
+    }
+    cont.appendChild(fila('EFECTIVO', TOTAL));
+    document.getElementById('dividirPedido').addEventListener('click', function () {
+      var suma = pagos().reduce(function (t, p) { return t + p.monto; }, 0);
+      cont.appendChild(fila('QR', Math.max(0, TOTAL - suma))); actualizar();
+    });
+    actualizar();
+
+    document.getElementById('formCobroPedido').addEventListener('submit', function (ev) {
+      ev.preventDefault();
+      var btn = document.getElementById('confirmarPedido');
+      if (btn.disabled) return;
+      btn.disabled = true; btn.textContent = 'Cobrando…';
+      var err = document.getElementById('errorPedido'); err.hidden = true;
+      var cuerpo = { claveIdempotencia: clave, pagos: pagos().map(function (p) { return { metodo: p.metodo, monto: p.monto / 100, recibido: p.metodo === 'EFECTIVO' && p.recibido !== null ? p.recibido / 100 : undefined }; }) };
+      fetch('/panel/pos/pedidos/<%= pedido.id %>/cobrar', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(cuerpo) })
+        .then(function (r) { return r.json().catch(function () { return { ok: false, error: 'Respuesta inesperada del servidor.' }; }); })
+        .then(function (d) {
+          btn.textContent = 'Confirmar cobro';
+          if (!d.ok) { err.textContent = d.error || 'No se pudo cobrar.'; err.hidden = false; actualizar(); return; }
+          document.getElementById('formCobroPedido').hidden = true;
+          document.getElementById('resumenListo').textContent = 'Venta V-' + String(d.venta.numero).padStart(4, '0') + ' por ' + fmt(Math.round(d.venta.total * 100)) + (d.venta.vuelto > 0 ? ' · vuelto ' + fmt(Math.round(d.venta.vuelto * 100)) : '') + '. El cliente recibió el aviso de entrega por WhatsApp si la conversación sigue abierta.';
+          document.getElementById('verRecibo').href = d.venta.reciboUrl + '?imprimir=1';
+          document.getElementById('listoPedido').hidden = false;
+        })
+        .catch(function () { btn.textContent = 'Confirmar cobro'; err.textContent = 'No hay conexión. Probá de nuevo: si ya se cobró, no se cobra dos veces.'; err.hidden = false; actualizar(); });
+    });
+  })();
+  </script>
+<% } %>
+
+<%- include('partials/fin') %>
