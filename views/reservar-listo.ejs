@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="robots" content="noindex, nofollow" />
+  <title><%= title %></title>
+  <link rel="stylesheet" href="/css/reservar.css" />
+</head>
+<body style="--acento: <%= neg.color %>">
+<main class="rv">
+  <header class="rv-cab">
+    <% if (neg.logo) { %><img class="rv-logo" src="<%= neg.logo %>" alt="" width="48" height="48" /><% } else { %><span class="rv-inicial" aria-hidden="true"><%= neg.nombre.charAt(0).toUpperCase() %></span><% } %>
+    <div><h1><%= neg.nombre %></h1></div>
+  </header>
+
+  <% if (mensaje) { %><p class="rv-ok" role="status"><%= mensaje %></p><% } %>
+  <% if (error) { %><p class="rv-aviso" role="alert"><%= error %></p><% } %>
+
+  <section class="rv-tarjeta">
+    <% if (activa) { %>
+      <p class="rv-tilde" aria-hidden="true">✓</p>
+      <h2>¡Listo<%= cita.cliente.nombre ? ', ' + cita.cliente.nombre.split(' ')[0] : '' %>! Reserva confirmada</h2>
+    <% } else { %>
+      <h2><%= cita.estado === 'CANCELADA' ? 'Reserva cancelada' : 'Esta reserva ya no está activa' %></h2>
+    <% } %>
+
+    <dl class="rv-resumen">
+      <div><dt><%= cap(vocab.servicio) %></dt><dd><%= cita.servicio ? cita.servicio.nombre : '—' %></dd></div>
+      <% if (cita.recurso) { %><div><dt><%= cap(vocab.profesional) %></dt><dd><%= cita.recurso.nombre %></dd></div><% } %>
+      <div><dt>Cuándo</dt><dd><%= cuando %></dd></div>
+      <% if (cita.servicio && cita.servicio.usaPersonas) { %><div><dt>Personas</dt><dd><%= cita.personas %></dd></div><% } %>
+      <% if (neg.direccion) { %><div><dt>Dónde</dt><dd><%= neg.direccion %></dd></div><% } %>
+    </dl>
+
+    <div class="rv-acciones">
+      <% if (activa) { %><a class="rv-boton rv-secundario" href="/reservar/<%= neg.slug %>/listo/<%= cita.id %>/calendario.ics?t=<%= encodeURIComponent(token) %>">Agregar al calendario</a><% } %>
+      <% if (neg.whatsapp) { %><a class="rv-boton rv-secundario" href="https://wa.me/<%= neg.whatsapp %>?text=<%= encodeURIComponent(whatsappTexto) %>" target="_blank" rel="noopener noreferrer">Escribir por WhatsApp</a><% } %>
+      <a class="rv-boton rv-secundario" href="/reservar/<%= neg.slug %>">Hacer otra reserva</a>
+    </div>
+
+    <% if (puedeCancelar) { %>
+      <form method="POST" action="/reservar/<%= neg.slug %>/listo/<%= cita.id %>/cancelar" class="rv-cancelar" onsubmit="return confirm('¿Cancelar esta reserva? Se libera el horario.');">
+        <input type="hidden" name="t" value="<%= token %>" />
+        <button type="submit">Cancelar mi reserva</button>
+      </form>
+    <% } %>
+    <p class="rv-nota">Guardá este link: desde acá podés ver o cancelar tu <%= vocab.cita %>. También podés escribirnos por WhatsApp con el número que dejaste.</p>
+  </section>
+</main>
+</body>
+</html>

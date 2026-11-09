@@ -22,6 +22,36 @@
 <% if (mensaje) { %><div class="alert-ok"><%= mensaje %></div><% } %>
 <% if (error) { %><div class="alert-err" role="alert"><%= error %></div><% } %>
 
+<div class="reserva-link">
+  <div>
+    <strong>Tu página de reservas</strong>
+    <% if (reservaActiva) { %>
+      <p class="muted">Compartila en Instagram, Google Maps o donde quieras: tus clientes reservan solos, sin escribirte.</p>
+      <input type="text" readonly id="linkReserva" value="<%= linkReserva %>" onfocus="this.select()" aria-label="Link de tu página de reservas" />
+    <% } else { %>
+      <p class="muted">Está desactivada. Activala en <a href="/panel/configuracion">Configuración → Mi negocio</a>.</p>
+    <% } %>
+  </div>
+  <% if (reservaActiva) { %>
+    <div class="reserva-acciones">
+      <button class="btn btn-primary" type="button" id="copiarReserva">Copiar link</button>
+      <a class="btn btn-ghost" href="<%= linkReserva %>" target="_blank" rel="noopener">Verla</a>
+    </div>
+  <% } %>
+</div>
+<script>
+  (function () {
+    var b = document.getElementById('copiarReserva'); var i = document.getElementById('linkReserva');
+    if (!b || !i) return;
+    b.addEventListener('click', function () {
+      i.select();
+      var fin = function () { b.textContent = '¡Copiado!'; setTimeout(function () { b.textContent = 'Copiar link'; }, 1800); };
+      if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(i.value).then(fin, function () { document.execCommand('copy'); fin(); });
+      else { document.execCommand('copy'); fin(); }
+    });
+  })();
+</script>
+
 <div class="admin-stats">
   <div class="stat-card stat-new"><span class="stat-num"><%= ind.hoy %></span><span class="stat-label">Hoy</span></div>
   <div class="stat-card"><span class="stat-num"><%= ind.proximas7 %></span><span class="stat-label">Próximos 7 días</span></div>
@@ -66,6 +96,10 @@
 
 <style>
   .agenda-nav { display: flex; gap: .4rem; flex-wrap: wrap; align-items: center; }
+  .reserva-link { display: flex; gap: 1rem; align-items: center; justify-content: space-between; flex-wrap: wrap; padding: 1rem 1.1rem; margin: 0 0 1.2rem; border-radius: 14px; border: 1px solid var(--border); background: rgba(255, 255, 255, .05); }
+  .reserva-link p { margin: .15rem 0 .5rem; font-size: .85rem; }
+  .reserva-link input { width: min(460px, 100%); background: rgba(255, 255, 255, .06); color: var(--text); border: 1px solid var(--border); border-radius: 10px; padding: .5rem .7rem; font: inherit; font-size: .85rem; }
+  .reserva-acciones { display: flex; gap: .5rem; flex-wrap: wrap; }
   .agenda-nav input[type=date] { background: rgba(255, 255, 255, .06); color: var(--text); border: 1px solid var(--border); border-radius: 10px; padding: .45rem .6rem; font: inherit; }
 </style>
 

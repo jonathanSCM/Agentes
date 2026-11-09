@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title><%= title %></title>
+  <meta name="description" content="Reservá tu <%= vocab.cita %> en <%= neg.nombre %> en pocos pasos." />
+  <link rel="stylesheet" href="/css/reservar.css" />
+</head>
+<body style="--acento: <%= neg.color %>">
+<main class="rv">
+  <header class="rv-cab">
+    <% if (neg.logo) { %><img class="rv-logo" src="<%= neg.logo %>" alt="" width="48" height="48" /><% } else { %><span class="rv-inicial" aria-hidden="true"><%= neg.nombre.charAt(0).toUpperCase() %></span><% } %>
+    <div>
+      <h1><%= neg.nombre %></h1>
+      <p><%= cap(vocab.cita) %> en línea, en pocos pasos<% if (neg.direccion) { %> · <span><%= neg.direccion %></span><% } %></p>
+    </div>
+  </header>
+
+  <% if (seleccion.length) { %>
+    <nav class="rv-migas" aria-label="Tu elección">
+      <% seleccion.forEach(function (s) { %>
+        <a href="<%= s.href %>" title="Cambiar"><small><%= s.etiqueta %></small><strong><%= s.valor %></strong><span aria-hidden="true">✎</span></a>
+      <% }); %>
+    </nav>
+  <% } %>
+
+  <% if (aviso) { %><p class="rv-aviso" role="alert"><%= aviso %></p><% } %>
+
+  <section class="rv-tarjeta">
+  <% if (paso === 'servicio') { %>
+    <h2>¿Qué <%= vocab.servicio %> querés reservar?</h2>
+    <% if (!servicios.length) { %><p class="rv-vacio">Todavía no hay <%= vocab.servicios %> para reservar en línea.</p><% } %>
+    <ul class="rv-lista">
+      <% servicios.forEach(function (s) { %>
+        <li><a class="rv-fila" href="<%= s.href %>">
+          <span><strong><%= s.nombre %></strong><% if (s.descripcion) { %><small><%= s.descripcion %></small><% } %></span>
+          <em><%= s.duracionMin %> min<% if (s.precioTexto) { %> · <%= s.precioTexto %><% } %></em>
+        </a></li>
+      <% }); %>
+    </ul>
+
+  <% } else if (paso === 'personas') { %>
+    <h2>¿Para cuántas personas?</h2>
+    <div class="rv-rejilla">
+      <% opciones.forEach(function (o) { %><a class="rv-chip" href="<%= o.href %>"><%= o.n %></a><% }); %>
+    </div>
+    <% if (tope > 12) { %><p class="rv-nota">Para grupos más grandes escribinos por WhatsApp.</p><% } %>
+
+  <% } else if (paso === 'profesional') { %>
+    <h2>¿Con qué <%= vocab.profesional %>?</h2>
+    <ul class="rv-lista">
+      <% opciones.forEach(function (o) { %>
+        <li><a class="rv-fila" href="<%= o.href %>"><span><strong><%= o.nombre %></strong><% if (o.especialidad) { %><small><%= o.especialidad %></small><% } %></span></a></li>
+      <% }); %>
+    </ul>
+
+  <% } else if (paso === 'dia') { %>
+    <h2>Elegí el día</h2>
+    <% if (!hayDias) { %>
+      <p class="rv-vacio"><%= esPrimera ? 'Por ahora no hay horarios libres en los próximos días.' : 'No hay más horarios en estos días.' %></p>
+    <% } %>
+    <div class="rv-dias">
+      <% dias.forEach(function (d) { %>
+        <a class="rv-dia" href="<%= d.href %>"><strong><%= d.corto %></strong><small><%= d.n %> <%= d.n === 1 ? 'horario' : 'horarios' %></small></a>
+      <% }); %>
+    </div>
+    <% if (masHref) { %><p><a class="rv-link" href="<%= masHref %>">Ver más días →</a></p><% } %>
+
+  <% } else if (paso === 'hora') { %>
+    <h2>Elegí la hora</h2>
+    <% if (manana.length) { %><h3>Por la mañana</h3><div class="rv-rejilla"><% manana.forEach(function (h) { %><a class="rv-chip" href="<%= h.href %>"><%= h.hora %></a><% }); %></div><% } %>
+    <% if (tarde.length) { %><h3>Por la tarde</h3><div class="rv-rejilla"><% tarde.forEach(function (h) { %><a class="rv-chip" href="<%= h.href %>"><%= h.hora %></a><% }); %></div><% } %>
+
+  <% } else if (paso === 'datos') { %>
+    <h2>Tus datos</h2>
+    <dl class="rv-resumen">
+      <div><dt><%= cap(vocab.servicio) %></dt><dd><%= servicio.nombre %></dd></div>
+      <% if (recurso) { %><div><dt><%= cap(vocab.profesional) %></dt><dd><%= recurso.nombre %></dd></div><% } %>
+      <div><dt>Cuándo</dt><dd><%= diaTexto %>, <%= oculto.hora %></dd></div>
+      <% if (servicio.usaPersonas) { %><div><dt>Personas</dt><dd><%= oculto.personas %></dd></div><% } %>
+      <% if (precioTexto) { %><div><dt>Precio</dt><dd><%= precioTexto %></dd></div><% } %>
+    </dl>
+    <% if (error) { %><p class="rv-aviso" role="alert"><%= error %></p><% } %>
+    <form method="POST" action="/reservar/<%= neg.slug %>" class="rv-form">
+      <input type="hidden" name="servicio" value="<%= oculto.servicio %>" />
+      <input type="hidden" name="profesional" value="<%= oculto.profesional %>" />
+      <input type="hidden" name="personas" value="<%= oculto.personas %>" />
+      <input type="hidden" name="fecha" value="<%= oculto.fecha %>" />
+      <input type="hidden" name="hora" value="<%= oculto.hora %>" />
+      <label class="rv-trampa" aria-hidden="true">No completar este campo <input type="text" name="sitio_web" tabindex="-1" autocomplete="off" /></label>
+      <label>Tu nombre
+        <input type="text" name="nombre" value="<%= valores.nombre || '' %>" required minlength="2" maxlength="60" autocomplete="name" placeholder="Ana Pérez" />
+      </label>
+      <label>Tu WhatsApp
+        <span class="rv-telefono">
+          <select name="codigo" aria-label="País"><% paises.forEach(function (p) { %><option value="<%= p.codigo %>" <%= p.codigo === codigo ? 'selected' : '' %>><%= p.nombre %></option><% }); %></select>
+          <input type="tel" name="telefono" value="<%= valores.telefono || '' %>" required inputmode="tel" autocomplete="tel-national" maxlength="20" placeholder="71234567" />
+        </span>
+        <small>Lo usamos para confirmar y para que puedas cambiar o cancelar escribiéndonos.</small>
+      </label>
+      <button class="rv-boton" type="submit">Confirmar <%= vocab.cita %></button>
+    </form>
+  <% } %>
+  </section>
+
+  <footer class="rv-pie">
+    <% if (neg.whatsapp) { %><a href="https://wa.me/<%= neg.whatsapp %>" target="_blank" rel="noopener noreferrer">¿Dudas? Escribinos por WhatsApp</a><% } %>
+  </footer>
+</main>
+</body>
+</html>

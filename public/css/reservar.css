@@ -1,0 +1,69 @@
+/* Página pública de reservas. Mobile first, clara u oscura según el sistema; el acento es el color del negocio. */
+:root { --acento: #7c3aed; --fondo: #f5f4f9; --tarjeta: #ffffff; --texto: #1c1b25; --tenue: #6a6880; --borde: #e3e1ee; --ok: #0f9d6b; --alerta: #b4232c; --alerta-fondo: #fdecee; }
+@media (prefers-color-scheme: dark) {
+  :root { --fondo: #14121c; --tarjeta: #1e1b2a; --texto: #f1effa; --tenue: #a9a6bd; --borde: #34304a; --ok: #3ddba0; --alerta: #ff9aa0; --alerta-fondo: #3a1d22; }
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--fondo); color: var(--texto); font: 16px/1.5 system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif; }
+a { color: inherit; }
+.rv { max-width: 560px; margin: 0 auto; padding: 1rem 1rem 2.5rem; }
+.rv-cab { display: flex; gap: .85rem; align-items: center; padding: .6rem 0 1rem; }
+.rv-cab h1 { margin: 0; font-size: 1.25rem; line-height: 1.2; }
+.rv-cab p { margin: .15rem 0 0; color: var(--tenue); font-size: .85rem; }
+.rv-logo { border-radius: 14px; object-fit: cover; }
+.rv-inicial { width: 48px; height: 48px; border-radius: 14px; display: inline-flex; align-items: center; justify-content: center; background: var(--acento); color: #fff; font-weight: 800; font-size: 1.3rem; flex-shrink: 0; }
+
+.rv-migas { display: flex; flex-wrap: wrap; gap: .45rem; margin: 0 0 .9rem; }
+.rv-migas a { display: inline-flex; align-items: baseline; gap: .4rem; padding: .3rem .65rem; border-radius: 999px; background: var(--tarjeta); border: 1px solid var(--borde); text-decoration: none; font-size: .82rem; }
+.rv-migas small { color: var(--tenue); }
+.rv-migas span { color: var(--tenue); font-size: .75rem; }
+
+.rv-tarjeta { background: var(--tarjeta); border: 1px solid var(--borde); border-radius: 18px; padding: 1.2rem 1.1rem 1.3rem; box-shadow: 0 6px 24px rgba(40, 30, 80, .06); }
+.rv-tarjeta h2 { margin: 0 0 .9rem; font-size: 1.15rem; }
+.rv-tarjeta h3 { margin: 1rem 0 .5rem; font-size: .8rem; text-transform: uppercase; letter-spacing: .07em; color: var(--tenue); }
+.rv-centro { text-align: center; }
+
+.rv-aviso { margin: 0 0 .9rem; padding: .7rem .9rem; border-radius: 12px; background: var(--alerta-fondo); color: var(--alerta); font-size: .9rem; }
+.rv-ok { margin: 0 0 .9rem; padding: .7rem .9rem; border-radius: 12px; background: color-mix(in srgb, var(--ok) 16%, transparent); color: var(--ok); font-size: .9rem; font-weight: 600; }
+.rv-vacio, .rv-nota { color: var(--tenue); font-size: .88rem; }
+
+.rv-lista { list-style: none; margin: 0; padding: 0; display: grid; gap: .55rem; }
+.rv-fila { display: flex; justify-content: space-between; align-items: center; gap: .8rem; padding: .85rem .95rem; border: 1px solid var(--borde); border-radius: 14px; text-decoration: none; }
+.rv-fila:hover, .rv-fila:focus-visible { border-color: var(--acento); outline: none; box-shadow: 0 0 0 3px color-mix(in srgb, var(--acento) 22%, transparent); }
+.rv-fila strong { display: block; }
+.rv-fila small { display: block; color: var(--tenue); font-size: .8rem; }
+.rv-fila em { font-style: normal; color: var(--tenue); font-size: .85rem; white-space: nowrap; }
+
+.rv-rejilla { display: grid; grid-template-columns: repeat(auto-fill, minmax(78px, 1fr)); gap: .5rem; }
+.rv-chip { display: flex; justify-content: center; align-items: center; min-height: 46px; border: 1px solid var(--borde); border-radius: 12px; text-decoration: none; font-weight: 700; font-variant-numeric: tabular-nums; }
+.rv-chip:hover, .rv-chip:focus-visible { background: var(--acento); border-color: var(--acento); color: #fff; outline: none; }
+.rv-dias { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: .5rem; }
+.rv-dia { display: grid; gap: .1rem; padding: .7rem .75rem; border: 1px solid var(--borde); border-radius: 14px; text-decoration: none; text-align: center; }
+.rv-dia strong { text-transform: capitalize; }
+.rv-dia small { color: var(--tenue); font-size: .75rem; }
+.rv-dia:hover, .rv-dia:focus-visible { border-color: var(--acento); outline: none; box-shadow: 0 0 0 3px color-mix(in srgb, var(--acento) 22%, transparent); }
+.rv-link { color: var(--acento); font-weight: 700; text-decoration: none; }
+
+.rv-resumen { margin: 0 0 1rem; display: grid; gap: .45rem; }
+.rv-resumen div { display: flex; justify-content: space-between; gap: 1rem; padding-bottom: .45rem; border-bottom: 1px dashed var(--borde); }
+.rv-resumen dt { color: var(--tenue); font-size: .85rem; }
+.rv-resumen dd { margin: 0; font-weight: 600; text-align: right; }
+
+.rv-form { display: grid; gap: .9rem; }
+.rv-form label { display: grid; gap: .3rem; font-size: .85rem; font-weight: 600; }
+.rv-form label small { font-weight: 400; color: var(--tenue); }
+.rv-form input, .rv-form select { width: 100%; padding: .75rem .8rem; border: 1px solid var(--borde); border-radius: 12px; background: var(--fondo); color: var(--texto); font: inherit; }
+.rv-form input:focus, .rv-form select:focus { outline: 2px solid var(--acento); outline-offset: 1px; }
+.rv-telefono { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1.5fr); gap: .5rem; }
+.rv-trampa { position: absolute; left: -9999px; width: 1px; height: 1px; overflow: hidden; }
+.rv-boton { display: inline-flex; justify-content: center; align-items: center; width: 100%; padding: .9rem 1rem; border: 0; border-radius: 14px; background: var(--acento); color: #fff; font: inherit; font-weight: 700; text-decoration: none; cursor: pointer; }
+.rv-boton:hover { filter: brightness(1.08); }
+.rv-secundario { background: transparent; color: var(--texto); border: 1px solid var(--borde); }
+.rv-secundario:hover { border-color: var(--acento); filter: none; }
+.rv-acciones { display: grid; gap: .55rem; margin: 1rem 0 .4rem; }
+.rv-tilde { width: 54px; height: 54px; margin: 0 0 .6rem; border-radius: 50%; display: flex; align-items: center; justify-content: center; background: color-mix(in srgb, var(--ok) 18%, transparent); color: var(--ok); font-size: 1.6rem; font-weight: 800; }
+.rv-cancelar { margin: .6rem 0 0; text-align: center; }
+.rv-cancelar button { background: none; border: 0; color: var(--alerta); font: inherit; font-size: .88rem; text-decoration: underline; cursor: pointer; }
+.rv-pie { text-align: center; margin-top: 1.2rem; font-size: .85rem; }
+.rv-pie a { color: var(--tenue); }
+@media (prefers-reduced-motion: no-preference) { .rv-fila, .rv-chip, .rv-dia { transition: border-color .12s, box-shadow .12s, background .12s; } }

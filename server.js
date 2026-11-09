@@ -364,6 +364,9 @@ async function cargarCatalogoPublico(slug) {
   return { empresaId: empresa.id, empresa, productos, agente, config: agente ? agente.config : null };
 }
 
+// Pagina publica de reservas para negocios de CITAS (sin login): /reservar/:slug
+app.use('/reservar', require('./lib/rutasReservas'));
+
 app.get('/catalogo/:slug', async (req, res, next) => {
   try {
     const catalogo = await catalogoCache.obtenerCatalogo(req.params.slug, () => cargarCatalogoPublico(req.params.slug));
@@ -2912,7 +2915,8 @@ app.get('/panel/citas', requireCliente, soloCitas, async (req, res, next) => {
     const [citas, ind] = await Promise.all([citasPanel.delDia(empresa, fecha), citasPanel.indicadores(empresa)]);
     res.render('cliente/citas', {
       title: 'Agenda - Proshop', tituloPagina: 'Agenda', activo: 'citas', fecha, anterior: T.sumarDias(fecha, -1), siguiente: T.sumarDias(fecha, 1),
-      diaLegible: (fecha === hoy ? 'Hoy, ' : '') + T.diaLegible(fecha, empresa.zonaHoraria), citas, ind, vocab: res.locals.vocab || require('./lib/services/rubros').vocabularioDe(empresa),
+      diaLegible: (fecha === hoy ? 'Hoy, ' : '') + T.diaLegible(fecha, empresa.zonaHoraria), citas, ind,
+      linkReserva: `${req.protocol}://${req.get('host')}/reservar/${empresa.slug}`, reservaActiva: require('./lib/services/configAgenda').agendaDe(empresa).reservaPublica, vocab: res.locals.vocab || require('./lib/services/rubros').vocabularioDe(empresa),
       mensaje: req.query.ok || null, error: req.query.err || null,
     });
   } catch (err) { next(err); }

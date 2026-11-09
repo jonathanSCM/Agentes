@@ -163,7 +163,9 @@ describe('Mi negocio', () => {
   test('reglas de agenda: horas a minutos, rangos y casillas', () => {
     const r = parsearNegocio({ agendaIntervalo: '45', agendaAnticipacionHoras: '2', agendaDiasMaximos: '30', agendaCerrarFeriados: '1' }, actual);
     assert.deepEqual(r.errores, []);
-    assert.deepEqual(r.empresa.configAgenda, { intervaloMin: 45, anticipacionMin: 120, diasMaximos: 30, cerrarFeriados: true, permiteElegirRecurso: false });
+    assert.deepEqual(r.empresa.configAgenda, { intervaloMin: 45, anticipacionMin: 120, diasMaximos: 30, cerrarFeriados: true, permiteElegirRecurso: false, reservaPublica: false });
+    const conWeb = parsearNegocio({ agendaIntervalo: '30', agendaDiasMaximos: '30', agendaReservaPublica: '1' }, actual);
+    assert.equal(conWeb.empresa.configAgenda.reservaPublica, true, 'la casilla de la página de reservas se guarda');
     assert.equal(parsearNegocio({ agendaIntervalo: '1', agendaDiasMaximos: '30' }, actual).errores.length, 1);
   });
   test('el registro del agente: vos o tu', () => {
