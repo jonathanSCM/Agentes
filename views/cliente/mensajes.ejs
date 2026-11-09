@@ -52,7 +52,7 @@
 <div class="pf-card">
   <h3 class="pf-titulo">Mis mensajes propios</h3>
   <% var llenoP = limite.usados >= limite.tope; %>
-  <p class="muted"><strong><%= limite.usados %> de <%= limite.tope %></strong> mensajes propios en tu plan. Tu agente los puede elegir cuando la descripción coincide con lo que pregunta el cliente.</p>
+  <p class="muted"><strong><%= limite.usados %> de <%= topeTexto(limite.tope) %></strong> mensajes propios en tu plan. Tu agente los puede elegir cuando la descripción coincide con lo que pregunta el cliente.</p>
   <% propios.forEach(function (m) { %>
     <details class="atn-editar">
       <summary><%= m.clave.replace('propio_', '').replace(/_/g, ' ') %> <%= m.activo ? '' : '· desactivado' %></summary>

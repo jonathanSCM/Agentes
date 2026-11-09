@@ -8,9 +8,9 @@
 <% if (mensaje) { %><div class="alert-ok"><%= mensaje %></div><% } %>
 <% if (error) { %><div class="alert-err" role="alert"><%= error %></div><% } %>
 
-<% var lleno = limites.usados >= limites.tope; var pct = Math.min(100, Math.round(limites.usados / limites.tope * 100)); %>
+<% var lleno = limites.usados >= limites.tope; var pct = limites.tope >= 1000000000 ? 0 : Math.min(100, Math.round(limites.usados / limites.tope * 100)); %>
 <div class="pf-card atn-limite">
-  <div><strong><%= limites.usados %> de <%= limites.tope %></strong> servicios activos en tu plan</div>
+  <div><strong><%= limites.usados %> de <%= topeTexto(limites.tope) %></strong> servicios activos en tu plan</div>
   <div class="bar-lg"><span style="width:<%= pct %>%"></span></div>
   <% if (lleno) { %><p class="muted">Llegaste al tope. Para agregar más, desactivá alguno o <a href="/panel/consumo">mejorá tu plan</a>.</p>
   <% } else if (pct >= 80) { %><p class="muted">Te estás acercando al tope de tu plan.</p><% } %>

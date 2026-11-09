@@ -86,3 +86,22 @@
 .sidebar-nav::-webkit-scrollbar { width: 6px; }
 .sidebar-nav::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, .18); border-radius: 6px; }
 .sidebar-nav::-webkit-scrollbar-track { background: transparent; }
+
+/* Menu principal por modulos (Inicio) */
+.modulos-hub { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: .9rem; margin: 0 0 1.3rem; }
+.modulo-card {
+  display: grid; grid-template-columns: auto 1fr; gap: .4rem .85rem; align-items: start; padding: 1rem 1.1rem;
+  background: rgba(255, 255, 255, .06); border: 1px solid var(--border); border-radius: 14px;
+}
+.modulo-card .btn, .modulo-card .badge { grid-column: 1 / -1; justify-self: start; margin-top: .3rem; }
+.modulo-ico {
+  width: 42px; height: 42px; border-radius: 12px; display: inline-flex; align-items: center; justify-content: center;
+  background: rgba(47, 227, 166, .14); color: var(--primary-2);
+}
+.modulo-card.es-bloqueado { opacity: .72; }
+.modulo-card.es-bloqueado .modulo-ico { background: rgba(255, 255, 255, .08); color: var(--muted); }
+.modulo-texto strong { display: block; font-size: .95rem; }
+.modulo-texto p { margin: .15rem 0 0; font-size: .82rem; color: var(--muted); line-height: 1.4; }
+
+/* Un solo titulo por pantalla: si la pagina ya trae su encabezado, la barra superior no lo repite */
+.admin-body:has(.page-head) .topbar-title { display: none; }

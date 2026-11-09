@@ -970,3 +970,11 @@ Plan completo en `docs/11-plan-planes-pos-panel-y-rediseno.md` (§11). Reemplaza
 - **Foto de perfil**: WhatsApp no entrega la foto del cliente, por eso es avatar con iniciales.
 - Celular: lista primero; el chat con flecha para volver. Todo filtrado por empresa (probado con dos empresas).
 - Código: `lib/services/bandeja.js`, `views/cliente/bandeja.ejs`, `partials/conv-lista.ejs`, `public/css/bandeja.css`. Se eliminaron las vistas viejas de lista y detalle. Tests: `bandeja` (7). Suite: 890.
+
+
+## 48. Rediseño: menú principal por módulos y pulido de las pantallas
+
+- **Inicio con módulos** (`views/cliente/inicio.ejs`): tres tarjetas (Agente · Punto de venta · Panel comercial) arriba del resumen. Las que el plan incluye tienen su botón; el Punto de venta muestra "Próximamente" hasta que exista; las que no están en el plan salen atenuadas con candado.
+- **Un solo título por pantalla**: si la página ya trae su encabezado, la barra superior no lo repite (`.admin-body:has(.page-head)`).
+- **Topes ilimitados** (plan Acceso total): antes se mostraba "Límite: 1.000.000.000" en Productos, Mensajes, Servicios, Inicio y Pedir conversaciones. Ahora se lee "Ilimitado" (`topeTexto` disponible en todas las vistas del panel).
+- Verificado con un barrido real de las 19 rutas del panel con dos cuentas (plan Agente y Acceso total).

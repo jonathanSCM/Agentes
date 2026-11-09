@@ -7,9 +7,39 @@
 
 <% if (avisoSaldo) { %>
   <div class="alert-err">
-    <%= avisoSaldo %> <a href="/panel/paquetes" style="color:var(--primary-2)">Comprar conversaciones</a>
+    <%= avisoSaldo %> <a href="/panel/paquetes" style="color:var(--primary-2)">Pedir conversaciones</a>
   </div>
 <% } %>
+
+<%# Menu principal por modulos: lo que incluye el plan y lo que se puede sumar %>
+<%
+  var hubModulos = [
+    { clave: 'AGENTE', nombre: 'Agente de ventas', texto: 'Atiende a tus clientes por WhatsApp, toma pedidos y reserva citas.', href: '/panel/conversaciones', boton: 'Abrir conversaciones',
+      icono: '<rect x="4" y="7" width="16" height="12" rx="3"/><path d="M12 7V3M9 12h.01M15 12h.01"/>' },
+    { clave: 'POS', nombre: 'Punto de venta', texto: 'Caja, ventas, recibos, impresora térmica y lector de códigos en el mostrador.', href: null, boton: '',
+      icono: '<path d="M4 5h16l-1.5 9h-13L4 5Z"/><path d="M4 5 3 2H1"/><circle cx="9" cy="19" r="1.4"/><circle cx="17" cy="19" r="1.4"/>' }
+  ];
+  if (modeloNegocio !== 'CITAS') hubModulos.push({ clave: 'PANEL', nombre: 'Panel comercial', texto: 'Ventas, utilidad y margen, canal WhatsApp vs mostrador, reportes con Excel.', href: '/panel/reportes', boton: 'Abrir reportes',
+    icono: '<path d="M4 19h16M6 16V9m6 7V5m6 11v-4"/>' });
+%>
+<section class="modulos-hub" aria-label="Módulos de tu plan">
+  <% hubModulos.forEach(function (m) { var incluido = modulos.indexOf(m.clave) !== -1; %>
+    <article class="modulo-card <%= incluido ? 'es-activo' : 'es-bloqueado' %>">
+      <span class="modulo-ico" aria-hidden="true"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><%- incluido || m.clave === 'POS' ? m.icono : '<rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/>' %></svg></span>
+      <div class="modulo-texto">
+        <strong><%= m.nombre %></strong>
+        <p><%= m.texto %></p>
+      </div>
+      <% if (incluido && m.href) { %>
+        <a class="btn btn-ghost" href="<%= m.href %>"><%= m.boton %></a>
+      <% } else if (incluido) { %>
+        <span class="badge badge-done">Próximamente</span>
+      <% } else { %>
+        <a class="btn btn-ghost" href="<%= m.href || '/panel/consumo' %>">No está en tu plan</a>
+      <% } %>
+    </article>
+  <% }); %>
+</section>
 
 <% if (!primerosPasos.completo) { %>
   <!-- Primeros pasos: solo mientras falte alguno. El siguiente pendiente es el
@@ -116,13 +146,13 @@
       <a href="/panel/consumo">Ver detalle</a>
     </div>
     <div style="text-align:center;padding:.5rem 0">
-      <div class="gauge-num" style="font-size:2.2rem"><%= consumo.totalDisponible.toLocaleString('es-BO') %></div>
+      <div class="gauge-num" style="font-size:2.2rem"><%= consumo.ilimitado ? 'Ilimitadas' : consumo.totalDisponible.toLocaleString('es-BO') %></div>
       <span class="gauge-sub">conversaciones disponibles</span>
       <div class="bar-lg" style="margin-top:.8rem">
         <span class="<%= consumo.porcentajeUsado >= 100 ? 'bar-full' : (consumo.porcentajeUsado >= 80 ? 'bar-alert' : '') %>"
               style="width:<%= consumo.porcentajeUsado %>%"></span>
       </div>
-      <span class="muted" style="font-size:.82rem">Usaste <%= consumo.porcentajeUsado %>% de tu plan</span>
+      <span class="muted" style="font-size:.82rem"><%= consumo.ilimitado ? 'Tu plan no tiene tope de conversaciones' : 'Usaste ' + consumo.porcentajeUsado + '% de tu plan' %></span>
     </div>
   </div>
 

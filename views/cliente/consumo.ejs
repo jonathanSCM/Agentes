@@ -66,7 +66,7 @@
 <% } %>
 
 <div class="admin-stats">
-  <div class="stat-card"><span class="stat-num"><%= consumo.ilimitado ? '∞' : consumo.incluidasDisponibles.toLocaleString('es-BO') %></span><span class="stat-label">Del plan (este mes)</span></div>
+  <div class="stat-card"><span class="stat-num"><%= consumo.ilimitado ? 'Sin tope' : consumo.incluidasDisponibles.toLocaleString('es-BO') %></span><span class="stat-label">Del plan (este mes)</span></div>
   <div class="stat-card stat-new"><span class="stat-num"><%= consumo.extraDisponible.toLocaleString('es-BO') %></span><span class="stat-label">Saldo de paquetes (de <%= consumo.extraComprado.toLocaleString('es-BO') %> comprados)</span></div>
   <div class="stat-card stat-done"><span class="stat-num"><%= consumo.paquetesVigentes %></span><span class="stat-label">Paquetes vigentes</span></div>
   <div class="stat-card"><span class="stat-num"><%= valores.planFin ? new Date(valores.planFin).toLocaleDateString('es-BO') : 'Sin fecha' %></span><span class="stat-label">Vence el</span></div>

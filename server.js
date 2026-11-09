@@ -928,6 +928,7 @@ app.use('/panel', async (req, res, next) => {
       bandeja.contarNoLeidos(agenteIdsMenu),
     ]);
     res.locals.modulos = valoresPlan.modulos;
+    res.locals.topeTexto = planesCliente.topeTexto; // 'Ilimitado' si no hay tope
     res.locals.menu = menuPanel.construirMenu({
       esCitas: res.locals.modeloNegocio === 'CITAS', rol: req.session.clienteRol,
       modulos: valoresPlan.modulos, vocab: res.locals.vocab, badges: { pedidos: pedidosNuevos, conversaciones: noLeidosMenu },
