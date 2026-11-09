@@ -78,6 +78,7 @@ model Plan {
   suscripciones Suscripcion[]
   preciosPais   PlanPrecioPais[]
   caracteristicas PlanCaracteristica[]
+  solicitudes     SolicitudPlan[]
 
   @@map("planes")
 }
@@ -210,6 +211,26 @@ model SolicitudConversaciones {
   @@map("solicitudes_conversaciones")
 }
 
+// Pedido de cambio de plan: llega al buzon del superadmin, que lo aprueba (asigna el plan) o lo rechaza.
+model SolicitudPlan {
+  id         Int             @id @default(autoincrement())
+  empresaId  Int
+  empresa    Empresa         @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  planId     Int?
+  plan       Plan?           @relation(fields: [planId], references: [id], onDelete: SetNull)
+  planNombre String
+  meses      Int
+  nota       String?
+  estado     EstadoSolicitud @default(PENDIENTE)
+  respuesta  String?
+  createdAt  DateTime        @default(now())
+  resueltaAt DateTime?
+
+  @@index([estado, createdAt])
+  @@index([empresaId])
+  @@map("solicitudes_plan")
+}
+
 enum EstadoSolicitud {
   PENDIENTE
   APROBADA
@@ -269,6 +290,7 @@ model Empresa {
   ventas           Venta[]
   auditorias       Auditoria[]
   devoluciones     Devolucion[]
+  solicitudesPlan  SolicitudPlan[]
   usosIA         UsoIA[]
   mensajesAgente MensajeAgente[]
   datosNegocio   DatoNegocio[]

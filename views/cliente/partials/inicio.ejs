@@ -20,10 +20,11 @@
       </button>
     </div>
 
-    <div class="marca-negocio" title="<%= empresaNombre %>">
+    <% var puedeVerPlan = menuUsuario.rol === 'Dueño'; %>
+    <<%= puedeVerPlan ? 'a href="/panel/plan"' : 'div' %> class="marca-negocio" title="<%= empresaNombre %><%= puedeVerPlan ? ' · cambiar de plan' : '' %>">
       <strong><%= empresaNombre %></strong>
       <small><%= menuPlan.nombre %><%= menuPlan.vence ? ' · vence ' + menuPlan.vence : '' %></small>
-    </div>
+    </<%= puedeVerPlan ? 'a' : 'div' %>>
 
     <nav class="sidebar-nav" aria-label="Menu de mi negocio">
       <% menu.forEach(function (grupo) { %>

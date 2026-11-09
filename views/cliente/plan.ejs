@@ -1,0 +1,129 @@
+<%- include('partials/inicio') %>
+<link rel="stylesheet" href="/css/plan.css" />
+<%
+  var ESTADO = { PRUEBA: ['Prueba gratis', 'badge-done'], ACTIVA: ['Activo', 'badge-new'], MOROSA: ['Vencido', 'badge-off'], CANCELADA: ['Cancelado', 'badge-off'] };
+  var est = estado ? ESTADO[estado] : null;
+  var fecha = function (f) { return new Date(f).toLocaleDateString('es-BO', { day: 'numeric', month: 'long', year: 'numeric' }); };
+  var pendientes = solicitudes.filter(function (s) { return s.estado === 'PENDIENTE'; });
+  var bs = function (n) { return 'Bs ' + Number(n).toLocaleString('es-BO', { minimumFractionDigits: 0, maximumFractionDigits: 2 }); };
+  var ETQ_SOL = { PENDIENTE: ['En revisión', 'badge-done'], APROBADA: ['Aprobado', 'badge-new'], RECHAZADA: ['Rechazado', 'badge-off'] };
+%>
+
+<div class="page-head">
+  <h2>Cambiar de plan</h2>
+  <p>Elegí el plan que mejor se ajusta a tu negocio. Tu plan actual sigue igual hasta que confirmemos el cambio.</p>
+</div>
+
+<% if (mensaje) { %><div class="alert-ok"><%= mensaje %></div><% } %>
+<% if (error) { %><div class="alert-err" role="alert"><%= error %></div><% } %>
+
+<section class="plan-actual" aria-label="Tu plan actual">
+  <div>
+    <small class="plan-etq">Tu plan actual</small>
+    <h3><%= valores.planNombre %> <% if (est) { %><span class="badge <%= est[1] %>"><%= est[0] %></span><% } %></h3>
+    <p class="muted">
+      Incluye: <%= valores.modulos.map(function (m) { return nombresModulo[m] || m; }).join(' + ') %>.
+      <% if (valores.planFin) { %>
+        <%= valores.vigencia.estado === 'VENCIDO' || valores.vigencia.estado === 'GRACIA' ? 'Venció' : 'Vence' %> el <strong><%= fecha(valores.planFin) %></strong><% if (valores.vigencia.diasRestantes !== null && valores.vigencia.diasRestantes >= 0) { %> (faltan <%= valores.vigencia.diasRestantes %> días)<% } %>.
+      <% } else if (valores.ilimitado) { %>Acceso total, sin vencimiento.<% } else if (valores.origen === 'BASE') { %>Todavía no tenés un plan: solo está el módulo Agente, sin conversaciones incluidas.<% } %>
+    </p>
+  </div>
+  <% if (consumo) { %>
+    <div class="plan-uso">
+      <small class="plan-etq">Conversaciones este mes</small>
+      <strong><%= consumo.incluidasUsadas %> <span class="muted">/ <%= consumo.ilimitado ? 'ilimitadas' : consumo.incluidasTotal %></span></strong>
+      <% if (!consumo.ilimitado) { %><div class="bar"><span style="width:<%= Math.min(100, consumo.porcentajeUsado) %>%"></span></div><% } %>
+      <a href="/panel/paquetes">Pedir más conversaciones →</a>
+    </div>
+  <% } %>
+</section>
+
+<% if (pendientes.length) { %>
+  <div class="alert-ok" role="status">
+    Tenés <%= pendientes.length === 1 ? 'un pedido' : pendientes.length + ' pedidos' %> en revisión (<%= pendientes.map(function (s) { return s.planNombre + ' · ' + s.meses + (s.meses === 1 ? ' mes' : ' meses'); }).join(', ') %>). Te avisamos apenas se confirme.
+  </div>
+<% } %>
+
+<% if (!planes.length) { %>
+  <div class="empty-state"><h3>No hay planes disponibles por ahora</h3><p>Escribinos y te ayudamos a elegir.</p></div>
+<% } else { %>
+  <div class="planes-grid">
+    <% planes.forEach(function (p) {
+         var esActual = planActualId === p.id;
+         var suma = p.modulos.filter(function (m) { return valores.modulos.indexOf(m) === -1; });
+         var quita = valores.modulos.filter(function (m) { return p.modulos.indexOf(m) === -1; });
+         var yaPedido = pendientes.some(function (s) { return s.planId === p.id; });
+    %>
+      <article class="plan-card <%= esActual ? 'es-actual' : '' %> <%= p.recomendado ? 'es-recomendado' : '' %>">
+        <% if (p.recomendado) { %><span class="plan-cinta">Recomendado</span><% } %>
+        <h3><%= p.nombre %></h3>
+        <p class="plan-precio"><strong><%= bs(p.mensualidadBs) %></strong> <span class="muted">/ mes</span></p>
+        <% if (Number(p.implementacionBs) > 0) { %><p class="muted plan-impl">+ <%= bs(p.implementacionBs) %> de implementación (una sola vez)</p><% } %>
+        <ul class="plan-modulos">
+          <% p.modulos.forEach(function (m) { %><li><span aria-hidden="true">✓</span> <%= nombresModulo[m] || m %></li><% }); %>
+        </ul>
+        <ul class="plan-limites">
+          <li><strong><%= topeTexto(p.convIncluidas) %></strong> conversaciones por mes</li>
+          <li><strong><%= topeTexto(p.maxProductos) %></strong> productos</li>
+          <li><strong><%= topeTexto(p.maxUsuarios) %></strong> usuario<%= Number(p.maxUsuarios) === 1 ? '' : 's' %></li>
+        </ul>
+        <% if (p.caracteristicas.length) { %>
+          <ul class="plan-extras"><% p.caracteristicas.slice(0, 5).forEach(function (c) { %><li><%= c.caracteristica.nombre %></li><% }); %></ul>
+        <% } %>
+        <% if (!esActual && (suma.length || quita.length)) { %>
+          <p class="plan-diferencia">
+            <% if (suma.length) { %><span class="suma">Suma: <%= suma.map(function (m) { return nombresModulo[m] || m; }).join(', ') %></span><% } %>
+            <% if (quita.length) { %><span class="quita">Deja de incluir: <%= quita.map(function (m) { return nombresModulo[m] || m; }).join(', ') %> <em>(tus datos se conservan)</em></span><% } %>
+          </p>
+        <% } %>
+
+        <% if (yaPedido) { %>
+          <p class="plan-estado">Pedido en revisión</p>
+        <% } else { %>
+          <details class="plan-pedir" <%= datos && Number(datos.planId) === p.id ? 'open' : '' %>>
+            <summary class="btn <%= esActual ? 'btn-ghost' : 'btn-primary' %>"><%= esActual ? 'Renovar este plan' : 'Pedir este plan' %></summary>
+            <form method="POST" action="/panel/plan/solicitar">
+              <input type="hidden" name="planId" value="<%= p.id %>" />
+              <div class="field">
+                <label for="meses-<%= p.id %>">Duración</label>
+                <select id="meses-<%= p.id %>" name="meses">
+                  <% meses.forEach(function (m) { %><option value="<%= m %>" <%= datos && Number(datos.planId) === p.id && Number(datos.meses) === m ? 'selected' : '' %>><%= m %> <%= m === 1 ? 'mes' : 'meses' %> · <%= bs(Number(p.mensualidadBs) * m) %></option><% }); %>
+                </select>
+              </div>
+              <div class="field">
+                <label for="nota-<%= p.id %>">Nota <em class="opcional">(opcional)</em></label>
+                <input id="nota-<%= p.id %>" name="nota" type="text" maxlength="300" placeholder="Ej: pago por transferencia" value="<%= datos && Number(datos.planId) === p.id ? (datos.nota || '') : '' %>" />
+              </div>
+              <button class="btn btn-primary" type="submit">Enviar pedido</button>
+            </form>
+          </details>
+        <% } %>
+        <% if (esActual) { %><span class="plan-actual-marca">Tu plan actual</span><% } %>
+      </article>
+    <% }); %>
+  </div>
+  <p class="muted plan-nota">Cuando enviás el pedido lo revisamos y, al confirmar el pago, cambiamos tu plan: empieza ese mismo día y los valores del plan se aplican a tu cuenta. Si pasás a un plan con menos módulos, tus datos no se borran: solo se bloquea el acceso a esos módulos.
+    ¿Dudas? <a href="<%= site.whatsappUrl %>?text=<%= encodeURIComponent('Hola Proshop, quiero cambiar de plan (' + empresaNombre + ')') %>" target="_blank" rel="noopener">Escribinos por WhatsApp</a>.</p>
+<% } %>
+
+<% if (solicitudes.length) { %>
+  <h3 style="margin-top:2rem">Tus pedidos de plan</h3>
+  <div class="table-wrap">
+    <table class="leads-table">
+      <thead><tr><th>Fecha</th><th>Plan</th><th>Duración</th><th>Estado</th><th>Respuesta</th></tr></thead>
+      <tbody>
+        <% solicitudes.forEach(function (s) { var e = ETQ_SOL[s.estado]; %>
+          <tr>
+            <td class="nowrap muted"><%= new Date(s.createdAt).toLocaleDateString('es-BO') %></td>
+            <td><strong><%= s.planNombre %></strong></td>
+            <td><%= s.meses %> <%= s.meses === 1 ? 'mes' : 'meses' %></td>
+            <td><span class="badge <%= e[1] %>"><%= e[0] %></span></td>
+            <td class="muted"><%= s.respuesta || '—' %></td>
+          </tr>
+        <% }); %>
+      </tbody>
+    </table>
+  </div>
+<% } %>
+
+<%- include('partials/fin') %>

@@ -77,30 +77,9 @@
   <% } %>
 </div>
 
-<form method="POST" action="/admin/registrados/<%= empresa.id %>" class="form-card">
-  <h3>Datos del cliente</h3>
-  <div class="field">
-    <label for="nombre">Nombre de la empresa *</label>
-    <input id="nombre" name="nombre" type="text" required maxlength="120" value="<%= empresa.nombre %>" />
-  </div>
-  <div class="field-row">
-    <div class="field">
-      <label for="marca">Marca (opcional)</label>
-      <input id="marca" name="marca" type="text" maxlength="120" value="<%= empresa.marca || '' %>" placeholder="Para marca blanca" />
-    </div>
-    <div class="field">
-      <label for="estado">Estado</label>
-      <select id="estado" name="estado">
-        <% ['PRUEBA','ACTIVA','MOROSA','CANCELADA'].forEach(function (e) { %>
-          <option value="<%= e %>" <%= s && s.estado === e ? 'selected' : '' %>><%= e %></option>
-        <% }); %>
-      </select>
-    </div>
-  </div>
-  <div class="form-actions"><button class="btn btn-primary" type="submit">Guardar</button></div>
-</form>
 
-<form method="POST" action="/admin/registrados/<%= empresa.id %>/plan" class="form-card"
+
+<form method="POST" action="/admin/registrados/<%= empresa.id %>/plan" id="plan" class="form-card"
       onsubmit="return confirm('Se copian los valores del plan al cliente y su vigencia empieza hoy. ¿Continuar?');">
   <h3><%= v.origen === 'BASE' ? 'Asignar un plan' : 'Cambiar de plan' %></h3>
   <p class="muted">Se copian los valores del plan a este cliente y empieza <strong>hoy</strong>. Después podés ajustar sus valores sin tocar el plan.</p>
@@ -156,6 +135,29 @@
   <div class="form-actions"><button class="btn btn-primary" type="submit">Guardar valores</button></div>
 </form>
 <% } %>
+
+<form method="POST" action="/admin/registrados/<%= empresa.id %>" class="form-card">
+  <h3>Datos del cliente</h3>
+  <div class="field">
+    <label for="nombre">Nombre de la empresa *</label>
+    <input id="nombre" name="nombre" type="text" required maxlength="120" value="<%= empresa.nombre %>" />
+  </div>
+  <div class="field-row">
+    <div class="field">
+      <label for="marca">Marca (opcional)</label>
+      <input id="marca" name="marca" type="text" maxlength="120" value="<%= empresa.marca || '' %>" placeholder="Para marca blanca" />
+    </div>
+    <div class="field">
+      <label for="estado">Estado</label>
+      <select id="estado" name="estado">
+        <% ['PRUEBA','ACTIVA','MOROSA','CANCELADA'].forEach(function (e) { %>
+          <option value="<%= e %>" <%= s && s.estado === e ? 'selected' : '' %>><%= e %></option>
+        <% }); %>
+      </select>
+    </div>
+  </div>
+  <div class="form-actions"><button class="btn btn-primary" type="submit">Guardar</button></div>
+</form>
 
 <div class="form-actions"><a class="btn btn-ghost" href="/admin/registrados">← Volver a registrados</a></div>
 <% } %>

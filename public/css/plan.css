@@ -1,0 +1,37 @@
+/* Cambiar de plan (cliente). Usa la paleta del panel. */
+.plan-actual { display: flex; gap: 1.4rem; align-items: flex-start; justify-content: space-between; flex-wrap: wrap; padding: 1.1rem 1.3rem; margin: 0 0 1.2rem; border-radius: 16px; border: 1px solid var(--border); background: rgba(255, 255, 255, .05); }
+.plan-actual h3 { margin: .15rem 0 .35rem; font-size: 1.25rem; }
+.plan-actual p { margin: 0; max-width: 62ch; font-size: .9rem; }
+.plan-etq { display: block; text-transform: uppercase; letter-spacing: .08em; font-size: .68rem; color: var(--muted); font-weight: 700; }
+.plan-uso { min-width: 220px; display: grid; gap: .35rem; }
+.plan-uso strong { font-size: 1.3rem; }
+.plan-uso a { font-size: .82rem; color: var(--primary-2); }
+
+.planes-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 1.1rem; align-items: stretch; }
+.plan-card { position: relative; display: flex; flex-direction: column; gap: .6rem; padding: 1.2rem 1.2rem 1.1rem; border-radius: 18px; border: 1px solid var(--border); background: rgba(255, 255, 255, .05); }
+.plan-card.es-recomendado { border-color: rgba(47, 227, 166, .55); }
+.plan-card.es-actual { border-color: rgba(139, 92, 246, .7); background: rgba(139, 92, 246, .1); }
+.plan-card h3 { margin: 0; font-size: 1.1rem; }
+.plan-cinta { position: absolute; top: -10px; right: 14px; background: var(--primary-2); color: #06231a; font-size: .68rem; font-weight: 800; padding: 2px 10px; border-radius: 999px; }
+.plan-precio { margin: 0; font-size: 1.05rem; }
+.plan-precio strong { font-size: 1.7rem; }
+.plan-impl { margin: -.3rem 0 0; font-size: .78rem; }
+.plan-card ul { list-style: none; margin: 0; padding: 0; display: grid; gap: .3rem; font-size: .88rem; }
+.plan-modulos li span { color: var(--primary-2); font-weight: 800; }
+.plan-limites { padding-top: .5rem; border-top: 1px solid var(--border); color: var(--muted); }
+.plan-limites strong { color: var(--text); }
+.plan-extras { font-size: .8rem !important; color: var(--muted); }
+.plan-extras li::before { content: '· '; }
+.plan-diferencia { display: grid; gap: .2rem; margin: 0; font-size: .8rem; }
+.plan-diferencia .suma { color: var(--primary-2); }
+.plan-diferencia .quita { color: #fbbf24; }
+.plan-diferencia em { font-style: normal; opacity: .8; }
+.plan-estado { margin: auto 0 0; padding: .5rem; text-align: center; border-radius: 10px; background: rgba(245, 158, 11, .15); color: #fbbf24; font-size: .85rem; font-weight: 600; }
+.plan-pedir { margin-top: auto; }
+.plan-pedir summary { list-style: none; cursor: pointer; text-align: center; display: block; }
+.plan-pedir summary::-webkit-details-marker { display: none; }
+.plan-pedir form { display: grid; gap: .6rem; margin-top: .8rem; padding-top: .8rem; border-top: 1px solid var(--border); }
+.plan-pedir .field { margin: 0; }
+.plan-actual-marca { position: absolute; top: 12px; right: 14px; font-size: .68rem; font-weight: 800; color: var(--accent); text-transform: uppercase; letter-spacing: .06em; }
+.plan-card.es-recomendado .plan-actual-marca { top: 16px; right: auto; left: 14px; }
+.plan-nota { max-width: 78ch; font-size: .85rem; margin-top: 1.1rem; }

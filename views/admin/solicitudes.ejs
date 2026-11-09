@@ -1,12 +1,61 @@
 <%- include('partials/inicio') %>
 
 <div class="page-head">
-  <h2>Pedidos de conversaciones</h2>
-  <p>Lo que piden los clientes con su nota. Al <strong>aprobar</strong> se carga el paquete a su saldo; al <strong>rechazar</strong> no se carga nada y el cliente recibe el motivo.</p>
+  <h2>Pedidos de clientes</h2>
+  <p>Cambios de plan y pedidos de más conversaciones. Al <strong>aprobar</strong> se aplica en el momento; al <strong>rechazar</strong> no se cambia nada y el cliente recibe el motivo.</p>
 </div>
 
 <% if (mensaje) { %><div class="alert-ok"><%= mensaje %></div><% } %>
 <% if (error) { %><div class="alert-err"><%= error %></div><% } %>
+
+<h3>Cambios de plan</h3>
+<% if (!solicitudesPlan.length) { %>
+  <div class="empty-state">
+    <h3>No hay pedidos de plan</h3>
+    <p>Cuando un cliente pida cambiar de plan desde su panel («Cambiar de plan»), va a aparecer acá. También podés cambiarlo vos desde <a href="/admin/registrados">Registrados</a>.</p>
+  </div>
+<% } else { %>
+  <div class="table-wrap">
+    <table class="leads-table">
+      <thead>
+        <tr><th>Fecha</th><th>Cliente</th><th>Plan pedido</th><th>Duración</th><th>Nota del cliente</th><th>Estado</th><th>Acciones</th></tr>
+      </thead>
+      <tbody>
+        <% solicitudesPlan.forEach(function (s) { %>
+          <tr class="<%= s.estado !== 'PENDIENTE' ? 'is-done' : '' %>">
+            <td class="nowrap muted"><%= new Date(s.createdAt).toLocaleString('es-BO') %></td>
+            <td><a href="/admin/registrados/<%= s.empresa.id %>/editar#plan"><strong><%= s.empresa.nombre %></strong></a></td>
+            <td><strong><%= s.planNombre %></strong><% if (s.plan) { %><br /><span class="muted"><%= s.plan.modulos.join(' + ') %> · Bs <%= Number(s.plan.mensualidadBs).toLocaleString('es-BO') %>/mes</span><% } %></td>
+            <td class="nowrap"><%= s.meses %> <%= s.meses === 1 ? 'mes' : 'meses' %></td>
+            <td style="max-width:260px"><%= s.nota || '—' %></td>
+            <td>
+              <span class="badge <%= s.estado === 'APROBADA' ? 'badge-new' : (s.estado === 'RECHAZADA' ? 'badge-off' : 'badge-done') %>"><%= s.estado %></span>
+              <% if (s.respuesta) { %><br /><span class="muted"><%= s.respuesta %></span><% } %>
+            </td>
+            <td class="actions-cell" style="min-width:280px">
+              <% if (s.estado === 'PENDIENTE') { %>
+                <form method="POST" action="/admin/solicitudes-plan/<%= s.id %>/aprobar" class="inline-form" style="display:flex;gap:.3rem;flex-wrap:wrap;align-items:center;margin-bottom:.4rem"
+                      onsubmit="return confirm('Se le asigna el plan «<%= s.planNombre %>» a «<%= s.empresa.nombre %>» desde hoy. ¿Aprobar?');">
+                  <select name="meses" aria-label="Duración" style="width:96px">
+                    <% [1, 2, 3, 6, 12].forEach(function (m) { %><option value="<%= m %>" <%= m === s.meses ? 'selected' : '' %>><%= m %> <%= m === 1 ? 'mes' : 'meses' %></option><% }); %>
+                  </select>
+                  <input name="respuesta" type="text" maxlength="300" placeholder="Mensaje al cliente (opcional)" style="flex:1;min-width:140px" />
+                  <button class="btn btn-primary" style="padding:.35rem .7rem;font-size:.8rem" type="submit">Aprobar y cambiar plan</button>
+                </form>
+                <form method="POST" action="/admin/solicitudes-plan/<%= s.id %>/rechazar" class="inline-form" style="display:flex;gap:.3rem;flex-wrap:wrap">
+                  <input name="respuesta" type="text" maxlength="300" placeholder="Motivo (opcional)" style="flex:1;min-width:140px" />
+                  <button class="btn btn-ghost" style="padding:.35rem .7rem;font-size:.8rem" type="submit">Rechazar</button>
+                </form>
+              <% } %>
+            </td>
+          </tr>
+        <% }); %>
+      </tbody>
+    </table>
+  </div>
+<% } %>
+
+<h3 style="margin-top:2rem">Pedidos de conversaciones</h3>
 
 <% if (!solicitudes.length) { %>
   <div class="empty-state">

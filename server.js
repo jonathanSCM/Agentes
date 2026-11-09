@@ -64,6 +64,7 @@ const {
 } = require('./lib/services/suscripciones');
 const planesCliente = require('./lib/services/planesCliente');
 const solicitudesConv = require('./lib/services/solicitudesConv');
+const solicitudesPlan = require('./lib/services/solicitudesPlan');
 const menuPanel = require('./lib/services/menuPanel');
 const bandeja = require('./lib/services/bandeja');
 const stockSrv = require('./lib/services/stock');
@@ -1074,7 +1075,7 @@ app.get('/panel', requireCliente, async (req, res, next) => {
 app.get('/panel/consumo', requireCliente, requireRol('OWNER'), async (req, res, next) => {
   try {
     const resumen = await obtenerResumenEmpresa(req.session.empresaId);
-    if (!resumen) return res.redirect('/ingresar');
+    if (!resumen) return res.redirect('/panel/plan');
     res.render('cliente/consumo', {
       title: 'Mi consumo - Proshop', tituloPagina: 'Mi consumo', activo: 'consumo',
       plan: resumen.plan, suscripcion: resumen.suscripcion, consumo: resumen.consumo,
@@ -1845,12 +1846,47 @@ app.get('/panel/inteligencia/comentarios', requireCliente, requireModulo('PANEL'
   } catch (err) { next(err); }
 });
 
+// ===== Cambiar de plan (solo el dueño) =====
+// El cliente elige un plan y una duración y envía el pedido al buzón del superadmin (/admin/solicitudes).
+// Pedir NO cambia el plan: se asigna cuando el superadmin aprueba (hasta que haya pasarela de pago).
+async function renderPlan(req, res, { error = null, datos = null, status = 200 } = {}) {
+  const empresaId = req.session.empresaId;
+  const [resumen, valores, planes, solicitudes] = await Promise.all([
+    obtenerResumenEmpresa(empresaId),
+    planesCliente.valoresDe(empresaId),
+    solicitudesPlan.disponibles(),
+    solicitudesPlan.delCliente(empresaId),
+  ]);
+  const empresa = await prisma.empresa.findUnique({ where: { id: empresaId }, select: { nombre: true } });
+  res.status(status).render('cliente/plan', {
+    title: 'Cambiar de plan - Proshop', tituloPagina: 'Cambiar de plan', activo: 'plan',
+    valores, consumo: resumen ? resumen.consumo : null, estado: resumen ? resumen.suscripcion.estado : null,
+    planActualId: resumen ? resumen.suscripcion.planId : null, planes, solicitudes, meses: solicitudesPlan.MESES,
+    nombresModulo: planesCliente.NOMBRES_MODULO, topeTexto: planesCliente.topeTexto, empresaNombre: empresa.nombre,
+    mensaje: req.query.ok || null, error: error || req.query.err || null, datos,
+  });
+}
+app.get('/panel/plan', requireCliente, requireRol('OWNER'), async (req, res, next) => {
+  try { await renderPlan(req, res); } catch (err) { next(err); }
+});
+app.post('/panel/plan/solicitar', requireCliente, requireRol('OWNER'), async (req, res, next) => {
+  try {
+    await solicitudesPlan.crear(req.session.empresaId, { planId: req.body.planId, meses: req.body.meses, nota: req.body.nota });
+    res.redirect('/panel/plan?ok=' + encodeURIComponent('Pedido enviado. Apenas confirmemos tu pago, cambiamos tu plan y te avisamos.'));
+  } catch (err) {
+    if (err.codigo === 'SOLICITUD') return renderPlan(req, res, { error: err.message, datos: req.body, status: 400 });
+    next(err);
+  }
+});
+
 async function renderPaquetes(req, res, { error = null, datos = null, status = 200 } = {}) {
   const [resumen, paquetesDb, solicitudes] = await Promise.all([
     obtenerResumenEmpresa(req.session.empresaId),
     prisma.paquete.findMany({ where: { activo: true }, orderBy: { cantidad: 'asc' }, include: { preciosPais: true } }),
     solicitudesConv.delCliente(req.session.empresaId),
   ]);
+  // Sin plan (estado base) no hay conversaciones que ampliar: primero se elige un plan.
+  if (!resumen) return res.redirect('/panel/plan?err=' + encodeURIComponent('Para pedir más conversaciones primero elegí un plan.'));
   const pais = detectarPais(req.ip);
   const paquetes = paquetesDb.map((p) => ({ ...p, precio: precioPaqueteParaPais(p, pais, p.preciosPais) }));
   res.status(status).render('cliente/paquetes', {
@@ -4785,8 +4821,9 @@ app.post('/admin/paquetes/:id/activo', requireAuth, async (req, res, next) => {
 app.get('/admin/solicitudes', requireAuth, async (req, res, next) => {
   try {
     res.render('admin/solicitudes', {
-      title: 'Panel Proshop - Pedidos de conversaciones', tituloPagina: 'Pedidos de conversaciones', activo: 'solicitudes',
-      solicitudes: await solicitudesConv.listar(), mensaje: req.query.ok || null, error: req.query.err || null,
+      title: 'Panel Proshop - Pedidos de clientes', tituloPagina: 'Pedidos de clientes', activo: 'solicitudes',
+      solicitudes: await solicitudesConv.listar(), solicitudesPlan: await solicitudesPlan.listar(),
+      mensaje: req.query.ok || null, error: req.query.err || null,
     });
   } catch (err) { next(err); }
 });
@@ -4795,12 +4832,14 @@ const accionSolicitud = (okTexto, fn) => async (req, res, next) => {
     await fn(Number(req.params.id), req.body || {});
     res.redirect('/admin/solicitudes?ok=' + encodeURIComponent(okTexto));
   } catch (err) {
-    if (err.codigo === 'SOLICITUD') return res.redirect('/admin/solicitudes?err=' + encodeURIComponent(err.message));
+    if (err.codigo === 'SOLICITUD' || err.codigo === 'PLAN') return res.redirect('/admin/solicitudes?err=' + encodeURIComponent(err.message));
     next(err);
   }
 };
 app.post('/admin/solicitudes/:id/aprobar', requireAuth, accionSolicitud('Pedido aprobado: se cargaron las conversaciones al cliente.', (id, b) => solicitudesConv.aprobar(id, { cantidad: b.cantidad, vigenciaDias: b.vigenciaDias || undefined, respuesta: b.respuesta })));
 app.post('/admin/solicitudes/:id/rechazar', requireAuth, accionSolicitud('Pedido rechazado.', (id, b) => solicitudesConv.rechazar(id, { respuesta: b.respuesta })));
+app.post('/admin/solicitudes-plan/:id/aprobar', requireAuth, accionSolicitud('Pedido aprobado: el plan del cliente ya está cambiado.', (id, b) => solicitudesPlan.aprobar(id, { meses: b.meses || null, respuesta: b.respuesta })));
+app.post('/admin/solicitudes-plan/:id/rechazar', requireAuth, accionSolicitud('Pedido de plan rechazado.', (id, b) => solicitudesPlan.rechazar(id, { respuesta: b.respuesta })));
 
 app.get('/admin/pagos', requireAuth, async (req, res, next) => {
   try {
