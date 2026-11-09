@@ -70,6 +70,7 @@ const bandeja = require('./lib/services/bandeja');
 const stockSrv = require('./lib/services/stock');
 const codigosBarras = require('./lib/services/codigosBarras');
 const caja = require('./lib/services/caja');
+const ventasEsperaSrv = require('./lib/services/ventasEspera');
 const ventasSrv = require('./lib/services/ventas');
 const ventaCalculo = require('./lib/services/ventaCalculo');
 const posCatalogo = require('./lib/services/posCatalogo');
@@ -2987,8 +2988,15 @@ app.get('/panel/pos', ...POS, async (req, res, next) => {
   try {
     const empresaId = req.session.empresaId;
     const sesion = await caja.sesionAbierta(empresaId);
+    // Modo CAMBIO (solo dueño/admin): se llega desde el detalle de una venta.
+    let cambio = null;
+    if (req.query.cambio) {
+      if (!ventasSrv.ROLES_QUE_ANULAN.includes(req.session.clienteRol)) return res.redirect('/panel/pos?err=' + encodeURIComponent('Solo el dueño o un administrador puede hacer un cambio.'));
+      cambio = await ventasSrv.pendientesDeCambio(empresaId, req.query.cambio);
+      if (!cambio || !cambio.items.length) return res.redirect(`/panel/ventas/${Number(req.query.cambio) || ''}?err=` + encodeURIComponent('Esa venta no tiene productos para cambiar.'));
+    }
     res.render('cliente/pos', {
-      title: 'Punto de venta - Proshop', tituloPagina: 'Punto de venta', activo: 'pos', hojas: ['/css/pos.css'],
+      title: 'Punto de venta - Proshop', tituloPagina: 'Punto de venta', activo: 'pos', hojas: ['/css/pos.css'], cambio,
       sesion, empresaId, mensaje: req.query.ok || null, error: req.query.err || null,
       metodos: ventaCalculo.METODOS.map((m) => ({ clave: m, etiqueta: ventaCalculo.ETIQUETAS_METODO[m] })),
     });
@@ -3026,6 +3034,58 @@ app.post('/panel/pos/venta', ...POS, async (req, res) => {
     console.error('[pos] error al cobrar:', err);
     res.status(500).json({ ok: false, error: 'No se pudo cobrar por un problema técnico. Probá de nuevo: si ya se cobró, no se cobra dos veces.' });
   }
+});
+
+// ---- Ventas en espera (cualquiera del mostrador) ----
+const errorJson = (res, err, tecnico) => {
+  if (esErrorDeNegocio(err)) return res.status(400).json({ ok: false, error: err.message });
+  console.error(tecnico, err);
+  return res.status(500).json({ ok: false, error: 'No se pudo por un problema técnico. Probá de nuevo.' });
+};
+app.get('/panel/pos/espera', ...POS, async (req, res) => {
+  try { res.json({ ok: true, ventas: await ventasEsperaSrv.listar(req.session.empresaId) }); } catch (err) { errorJson(res, err, '[pos] espera:'); }
+});
+app.post('/panel/pos/espera', ...POS, async (req, res) => {
+  try {
+    const b = req.body || {};
+    const lineas = (Array.isArray(b.lineas) ? b.lineas : []).map((l) => ({ productoId: l.productoId, varianteId: l.varianteId || null, cantidad: l.cantidad, descuento: l.descuento }));
+    const v = await ventasEsperaSrv.guardar(req.session.empresaId, usuarioPos(req), { lineas, descuento: b.descuento, clienteId: b.clienteId || null, clienteNombre: b.clienteNombre, etiqueta: b.etiqueta });
+    res.json({ ok: true, id: v.id });
+  } catch (err) { errorJson(res, err, '[pos] guardar espera:'); }
+});
+app.post('/panel/pos/espera/:id(\\d+)/retomar', ...POS, async (req, res) => {
+  try { res.json({ ok: true, ...(await ventasEsperaSrv.retomar(req.session.empresaId, req.params.id)) }); } catch (err) { errorJson(res, err, '[pos] retomar espera:'); }
+});
+app.post('/panel/pos/espera/:id(\\d+)/eliminar', ...POS, async (req, res) => {
+  try { await ventasEsperaSrv.eliminar(req.session.empresaId, req.params.id); res.json({ ok: true }); } catch (err) { errorJson(res, err, '[pos] eliminar espera:'); }
+});
+
+// ---- Cambio de producto (solo dueño/admin; el servicio lo vuelve a comprobar) ----
+const itemsDeCambio = (b) => (Array.isArray(b.devuelven) ? b.devuelven : []).map((x) => ({ ventaItemId: Number(x.ventaItemId), cantidad: Number(x.cantidad) })).filter((x) => x.cantidad > 0);
+app.post('/panel/pos/cambio/calcular', ...POS, async (req, res) => {
+  try {
+    const b = req.body || {};
+    const r = await ventasSrv.calcularCredito(req.session.empresaId, b.ventaId, itemsDeCambio(b));
+    res.json({ ok: true, creditoCentavos: r.creditoCentavos });
+  } catch (err) {
+    // Aun no eligió nada: no es un error, el crédito es 0.
+    if (esErrorDeNegocio(err) && /Elegí qué productos/.test(err.message)) return res.json({ ok: true, creditoCentavos: 0 });
+    errorJson(res, err, '[pos] calcular cambio:');
+  }
+});
+app.post('/panel/pos/cambio', ...POS, async (req, res) => {
+  try {
+    const b = req.body || {};
+    const lineas = (Array.isArray(b.lineas) ? b.lineas : []).map((l) => ({ productoId: l.productoId, varianteId: l.varianteId || null, cantidad: l.cantidad, descuento: l.descuento }));
+    const pagos = (Array.isArray(b.pagos) ? b.pagos : []).map((p) => ({ metodo: p.metodo, monto: p.monto, recibido: p.recibido, referencia: p.referencia }));
+    const r = await ventasSrv.cambiar(req.session.empresaId, usuarioPos(req), b.ventaId, {
+      items: itemsDeCambio(b), motivo: b.motivo, repone: b.repone, lineas, descuento: b.descuento, pagos, clienteNombre: b.clienteNombre, claveIdempotencia: b.claveIdempotencia,
+    });
+    catalogoCache.invalidarEmpresa(req.session.empresaId);
+    const venta = r.venta;
+    const vuelto = venta.pagos.reduce((t, p) => t + Number(p.vuelto || 0), 0);
+    res.json({ ok: true, repetida: r.repetida, aDevolver: r.aDevolver, venta: { id: venta.id, numero: venta.numero, total: Number(venta.total), credito: Number(venta.creditoCambio), vuelto, token: venta.tokenRecibo, reciboUrl: `/recibo/${venta.tokenRecibo}` } });
+  } catch (err) { errorJson(res, err, '[pos] cambio:'); }
 });
 
 // ---- Caja ----

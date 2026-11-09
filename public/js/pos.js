@@ -9,7 +9,8 @@
 
   var SIMBOLO = raiz.getAttribute('data-simbolo') || '';
   var EMPRESA = raiz.getAttribute('data-empresa') || '0';
-  var CLAVE_CARRITO = 'pos:carrito:' + EMPRESA;
+  var CAMBIO = window.POS_CAMBIO || null;   // modo cambio: se llega desde el detalle de una venta
+  var CLAVE_CARRITO = 'pos:carrito:' + (CAMBIO ? 'cambio:' + CAMBIO.ventaId + ':' : '') + EMPRESA;
   var CLAVE_AUTO = 'pos:autoimprimir';
   var METODOS = window.POS_METODOS || [];
   var $ = function (id) { return document.getElementById(id); };
@@ -17,6 +18,7 @@
   var carrito = [];       // { productoId, varianteId, nombre, precio, stock, cantidad }
   var claveCobro = null;  // se mantiene mientras el cobro no se confirme (reintentos seguros)
   var ultimaVenta = null;
+  var credito = 0;        // modo cambio: lo que vale (en centavos) lo que devuelve el cliente
 
   // ---------- utilidades ----------
   function aC(n) { return Math.round((Number(n) || 0) * 100); }           // a centavos enteros
@@ -40,8 +42,11 @@
     var sub = 0;
     carrito.forEach(function (l) { sub += aC(l.precio) * l.cantidad; });
     var desc = Math.min(aC($('posDescuento').value), sub);
-    return { sub: sub, desc: desc, total: sub - desc };
+    var total = sub - desc;
+    // En un cambio lo devuelto es un credito: se cobra la diferencia, o se devuelve en efectivo si lo nuevo vale menos.
+    return { sub: sub, desc: desc, total: total, credito: credito, cobrar: CAMBIO ? Math.max(0, total - credito) : total, devolver: CAMBIO ? Math.max(0, credito - total) : 0 };
   }
+  function objetivo() { return totales().cobrar; }   // lo que los pagos tienen que sumar
 
   function pintarCarrito() {
     var ul = $('posLineas');
@@ -69,7 +74,12 @@
     var t = totales();
     texto($('posSubtotal'), fmtC(t.sub));
     texto($('posTotal'), fmtC(t.total));
-    $('posCobrar').disabled = carrito.length === 0;
+    if (CAMBIO) {
+      texto($('posCredito'), credito ? fmtC(credito) : '—');
+      texto($('posDiferenciaEtq'), t.devolver > 0 ? 'A devolver al cliente (efectivo)' : (t.cobrar > 0 ? 'A cobrar' : 'Diferencia'));
+      texto($('posDiferencia'), credito ? fmtC(t.devolver > 0 ? t.devolver : t.cobrar) : '—');
+    }
+    $('posCobrar').disabled = carrito.length === 0 || (CAMBIO && !credito);
     guardarCarrito();
   }
 
@@ -180,9 +190,9 @@
   function leerPagos() { return Array.prototype.map.call($('cobroPagos').children, function (f) { return f._lee(); }); }
 
   function actualizarCobro() {
-    var total = totales().total;
+    var total = objetivo();
     var pagos = leerPagos();
-    var suma = 0, valido = pagos.length > 0;
+    var suma = 0, valido = pagos.length > 0 || total === 0;
     pagos.forEach(function (p) {
       suma += p.monto;
       if (p.monto <= 0) valido = false;
@@ -201,21 +211,32 @@
 
   function abrirCobro() {
     if (!carrito.length) return;
-    var total = totales().total;
-    if (total <= 0 && totales().sub <= 0) return;
+    var t = totales();
+    if (CAMBIO) {
+      if (!credito) { aviso('Primero indicá qué devuelve el cliente.', 'error'); return; }
+      if (motivoCambio().length < 5) { aviso('Escribí el motivo del cambio (mínimo 5 letras).', 'error'); $('cambioMotivo').focus(); return; }
+    } else if (t.total <= 0 && t.sub <= 0) return;
     claveCobro = claveCobro || nuevaClave();
+    var total = t.cobrar;
+    texto($('cobroTotalEtq'), CAMBIO ? 'A cobrar (la diferencia)' : 'Total a cobrar');
     texto($('cobroTotal'), fmtC(total));
+    var info = $('cobroCambioInfo');
+    if (CAMBIO) {
+      info.textContent = 'Lo nuevo ' + fmtC(t.total) + ' − lo que devuelve ' + fmtC(credito) + (t.devolver > 0 ? ' → hay que devolverle ' + fmtC(t.devolver) + ' en efectivo.' : (total === 0 ? ' → no hay nada que cobrar.' : '.'));
+      info.hidden = false;
+    } else { info.hidden = true; }
     $('cobroError').hidden = true;
     var cont = $('cobroPagos'); cont.innerHTML = '';
-    cont.appendChild(filaPago('EFECTIVO', total));
-    var primera = cont.firstChild; primera.querySelector('.pos-recibido').hidden = false;
+    var primera = null;
+    if (total > 0) { cont.appendChild(filaPago('EFECTIVO', total)); primera = cont.firstChild; primera.querySelector('.pos-recibido').hidden = false; }
+    $('cobroDividir').hidden = total === 0;
     actualizarCobro();
     abrirModal('modalCobro');
-    var inRec = primera.querySelector('.pos-recibido'); if (inRec) inRec.focus();
+    var inRec = primera && primera.querySelector('.pos-recibido'); if (inRec) inRec.focus(); else $('cobroConfirmar').focus();
   }
 
   $('cobroDividir').addEventListener('click', function () {
-    var total = totales().total;
+    var total = objetivo();
     var suma = leerPagos().reduce(function (t, p) { return t + p.monto; }, 0);
     $('cobroPagos').appendChild(filaPago('QR', Math.max(0, total - suma)));
     actualizarCobro();
@@ -248,18 +269,22 @@
     btn.disabled = true; btn.textContent = 'Cobrando…';
     var cuerpo = {
       lineas: carrito.map(function (l) { return { productoId: l.productoId, varianteId: l.varianteId, cantidad: l.cantidad }; }),
+      ventaId: CAMBIO ? CAMBIO.ventaId : undefined,
+      devuelven: CAMBIO ? itemsQueDevuelve() : undefined,
+      repone: CAMBIO ? $('cambioRepone').checked : undefined,
+      motivo: CAMBIO ? motivoCambio() : undefined,
       descuento: ($('posDescuento').value || '0'),
       pagos: leerPagos().map(function (p) { return { metodo: p.metodo, monto: p.monto / 100, recibido: p.metodo === 'EFECTIVO' && p.recibido !== null ? p.recibido / 100 : undefined }; }),
       clienteNombre: $('cobroCliente').value.trim(),
       clienteId: clientesPorTexto[$('cobroCliente').value.trim()] || undefined,
       claveIdempotencia: claveCobro
     };
-    fetch('/panel/pos/venta', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(cuerpo) })
+    fetch(CAMBIO ? '/panel/pos/cambio' : '/panel/pos/venta', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(cuerpo) })
       .then(function (r) { return r.json().catch(function () { return { ok: false, error: 'Respuesta inesperada del servidor.' }; }); })
       .then(function (d) {
         btn.textContent = 'Confirmar cobro';
         if (!d.ok) { var e = $('cobroError'); e.textContent = d.error || 'No se pudo cobrar.'; e.hidden = false; actualizarCobro(); return; }
-        ventaCobrada(d.venta);
+        ventaCobrada(d.venta, d.aDevolver);
       })
       .catch(function () {
         // Sin conexion: la misma clave permite reintentar sin riesgo de cobrar dos veces.
@@ -269,13 +294,15 @@
   }
   $('cobroConfirmar').addEventListener('click', confirmarCobro);
 
-  function ventaCobrada(v) {
+  function ventaCobrada(v, aDevolver) {
     ultimaVenta = v;
     claveCobro = null;
     cerrarModalSinFoco('modalCobro');
-    texto($('exitoNumero'), 'Venta V-' + String(v.numero).padStart(4, '0') + ' · ' + fmtC(aC(v.total)));
+    texto($('exitoTitulo'), CAMBIO ? 'Cambio hecho' : 'Venta cobrada');
+    texto($('exitoNumero'), (CAMBIO ? 'Cambio V-' : 'Venta V-') + String(v.numero).padStart(4, '0') + ' · ' + fmtC(aC(v.total)));
     var vu = $('exitoVuelto');
-    if (v.vuelto > 0) { texto(vu, 'Vuelto: ' + fmtC(aC(v.vuelto))); vu.hidden = false; } else { vu.hidden = true; }
+    if (aDevolver > 0) { texto(vu, 'Devolvele ' + fmtC(aC(aDevolver)) + ' en efectivo'); vu.hidden = false; }
+    else if (v.vuelto > 0) { texto(vu, 'Vuelto: ' + fmtC(aC(v.vuelto))); vu.hidden = false; } else { vu.hidden = true; }
     $('exitoVer').href = v.reciboUrl;
     abrirModal('modalExito');
     $('exitoNueva').focus();
@@ -286,6 +313,7 @@
   function nuevaVenta() {
     carrito = []; $('posDescuento').value = ''; $('cobroCliente').value = '';
     guardar(CLAVE_CARRITO, '');
+    if (CAMBIO) { window.location.href = '/panel/pos'; return; }   // el cambio termino: se vuelve al punto de venta normal
     pintarCarrito();
     cerrarModal('modalExito');
     buscar('', false);
@@ -343,6 +371,100 @@
     else if (e.key === 'Enter' && !$('modalExito').hidden) { e.preventDefault(); nuevaVenta(); }
     else if (e.key === 'Enter' && !$('modalCobro').hidden && !$('cobroConfirmar').disabled && e.target.tagName !== 'SELECT') { e.preventDefault(); confirmarCobro(); }
   });
+
+  // ---------- cambio de producto: lo que devuelve el cliente ----------
+  function motivoCambio() { var m = $('cambioMotivo'); return m ? m.value.trim() : ''; }
+  function itemsQueDevuelve() {
+    var items = [];
+    Array.prototype.forEach.call(document.querySelectorAll('.pos-cambio-cant'), function (i) {
+      var n = parseInt(i.value, 10) || 0;
+      if (n > 0) items.push({ ventaItemId: Number(i.getAttribute('data-item')), cantidad: n });
+    });
+    return items;
+  }
+  function recalcularCredito() {
+    var items = itemsQueDevuelve();
+    if (!items.length) { credito = 0; pintarCarrito(); return; }
+    fetch('/panel/pos/cambio/calcular', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ventaId: CAMBIO.ventaId, devuelven: items }) })
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        if (!d.ok) { credito = 0; aviso(d.error || 'No se pudo calcular.', 'error'); } else { credito = d.creditoCentavos || 0; }
+        claveCobro = null; pintarCarrito();
+      })
+      .catch(function () { aviso('No se pudo calcular. Revisá la conexión.', 'error'); });
+  }
+  if (CAMBIO) {
+    Array.prototype.forEach.call(document.querySelectorAll('.pos-cambio-cant'), function (i) { i.addEventListener('input', recalcularCredito); });
+  }
+
+  // ---------- ventas en espera ----------
+  function esperaError(msg) { var e = $('esperaError'); if (!e) return; e.textContent = msg || ''; e.hidden = !msg; }
+  function pintarEspera(ventas) {
+    var ul = $('esperaLista'); ul.innerHTML = '';
+    $('esperaVacia').hidden = ventas.length > 0;
+    var n = $('posEsperaN'); n.textContent = String(ventas.length); n.hidden = ventas.length === 0;
+    ventas.forEach(function (v) {
+      var li = document.createElement('li'); li.className = 'pos-espera-item';
+      var info = document.createElement('div');
+      info.appendChild(texto(document.createElement('strong'), v.etiqueta || 'Venta sin nombre'));
+      var hora = new Date(v.creadaAt).toLocaleTimeString('es-BO', { hour: '2-digit', minute: '2-digit' });
+      info.appendChild(texto(document.createElement('small'), v.productos + (v.productos === 1 ? ' producto' : ' productos') + ' · ' + hora + (v.por ? ' · ' + v.por : '')));
+      var retomar = texto(document.createElement('button'), 'Retomar'); retomar.type = 'button'; retomar.className = 'btn btn-primary btn-chico';
+      var borrar = texto(document.createElement('button'), '✕'); borrar.type = 'button'; borrar.className = 'pos-quitar'; borrar.setAttribute('aria-label', 'Borrar esta venta en espera');
+      retomar.addEventListener('click', function () { retomarEspera(v.id); });
+      borrar.addEventListener('click', function () {
+        if (!confirm('¿Borrar esta venta en espera? No se puede deshacer.')) return;
+        fetch('/panel/pos/espera/' + v.id + '/eliminar', { method: 'POST', credentials: 'same-origin' }).then(function (r) { return r.json(); }).then(function (d) { if (!d.ok) esperaError(d.error); cargarEspera(); });
+      });
+      li.appendChild(info); li.appendChild(retomar); li.appendChild(borrar); ul.appendChild(li);
+    });
+  }
+  function cargarEspera() {
+    return fetch('/panel/pos/espera', { credentials: 'same-origin' }).then(function (r) { return r.json(); })
+      .then(function (d) { if (d.ok) pintarEspera(d.ventas || []); }).catch(function () { /* sin red: queda como estaba */ });
+  }
+  function cuerpoEspera(etiqueta) {
+    return {
+      lineas: carrito.map(function (l) { return { productoId: l.productoId, varianteId: l.varianteId, cantidad: l.cantidad }; }),
+      descuento: $('posDescuento').value || '0', etiqueta: etiqueta || '',
+      clienteNombre: $('cobroCliente').value.trim(), clienteId: clientesPorTexto[$('cobroCliente').value.trim()] || undefined
+    };
+  }
+  function vaciarVentaActual() { carrito = []; $('posDescuento').value = ''; $('cobroCliente').value = ''; claveCobro = null; pintarCarrito(); }
+  function dejarEnEspera(etiqueta) {
+    return fetch('/panel/pos/espera', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(cuerpoEspera(etiqueta)) })
+      .then(function (r) { return r.json(); });
+  }
+  function retomarEspera(id) {
+    esperaError('');
+    var seguir = function () {
+      fetch('/panel/pos/espera/' + id + '/retomar', { method: 'POST', credentials: 'same-origin' }).then(function (r) { return r.json(); }).then(function (d) {
+        if (!d.ok) { esperaError(d.error); cargarEspera(); return; }
+        carrito = d.lineas || []; $('posDescuento').value = d.descuento ? String(d.descuento) : ''; $('cobroCliente').value = d.clienteNombre || ''; claveCobro = null;
+        pintarCarrito(); cargarEspera(); cerrarModal('modalEspera');
+        aviso(d.avisos && d.avisos.length ? d.avisos.join(' ') : 'Venta retomada.', d.avisos && d.avisos.length ? 'error' : 'ok');
+      }).catch(function () { esperaError('No se pudo retomar. Revisá la conexión.'); });
+    };
+    if (!carrito.length) { seguir(); return; }
+    // Hay una venta en curso: se deja en espera antes de retomar la otra, para no perderla.
+    if (!confirm('Hay una venta en curso: se deja en espera y se retoma la otra. ¿Seguir?')) return;
+    dejarEnEspera('').then(function (d) { if (!d.ok) { esperaError(d.error); return; } seguir(); });
+  }
+  if ($('posEspera')) {
+    $('posEspera').addEventListener('click', function () {
+      esperaError(''); $('esperaGuardar').hidden = carrito.length === 0; $('esperaEtiqueta').value = '';
+      cargarEspera(); abrirModal('modalEspera'); if (carrito.length) $('esperaEtiqueta').focus();
+    });
+    $('esperaDejar').addEventListener('click', function () {
+      esperaError('');
+      dejarEnEspera($('esperaEtiqueta').value.trim()).then(function (d) {
+        if (!d.ok) { esperaError(d.error); return; }
+        vaciarVentaActual(); aviso('Venta dejada en espera.', 'ok'); cargarEspera(); $('esperaGuardar').hidden = true;
+      }).catch(function () { esperaError('No se pudo guardar. Revisá la conexión.'); });
+    });
+    $('esperaEtiqueta').addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); $('esperaDejar').click(); } });
+    cargarEspera();
+  }
 
   // ---------- arranque ----------
   try {

@@ -8,6 +8,7 @@
 <div class="page-head page-head-row">
   <div>
     <h2>Venta <%= num %> <span class="badge <%= venta.estado === 'ANULADA' ? 'badge-anulada' : 'badge-new' %>"><%= venta.estado === 'ANULADA' ? 'Anulada' : 'Cobrada' %></span></h2>
+    <% if (venta.cambioDeVentaId) { %><p><a href="/panel/ventas/<%= venta.cambioDeVentaId %>">↩ Es un cambio de otra venta</a></p><% } %>
     <p><%= new Date(venta.createdAt).toLocaleString('es-BO', { dateStyle: 'long', timeStyle: 'short' }) %> · Cajero: <%= venta.cajero ? venta.cajero.nombre : '—' %><% if (venta.clienteNombre) { %> · Cliente: <%= venta.clienteNombre %><% } %></p>
   </div>
   <div style="display:flex;gap:.5rem;flex-wrap:wrap">
@@ -38,6 +39,7 @@
 <div class="caja-grid" style="margin-top:1rem">
   <div class="caja-dato"><small>Subtotal</small><strong><%= m(venta.subtotal) %></strong></div>
   <div class="caja-dato"><small>Descuento</small><strong><%= m(venta.descuento) %></strong></div>
+  <% if (Number(venta.creditoCambio) > 0) { %><div class="caja-dato"><small>Crédito por cambio</small><strong><%= m(venta.creditoCambio) %></strong></div><% } %>
   <div class="caja-dato destacado"><small>Total</small><strong><%= m(venta.total) %></strong></div>
 </div>
 
@@ -74,6 +76,7 @@
 <% } %>
 
 <% if (venta.estado === 'COMPLETADA' && puedeAnular && pendientes.length) { %>
+  <p style="margin-top:1.2rem"><a class="btn btn-primary" href="/panel/pos?cambio=<%= venta.id %>">🔄 Cambiar productos</a> <span class="muted" style="font-size:.84rem">El cliente devuelve algo y se lleva otra cosa en la misma operación.</span></p>
   <form method="POST" action="/panel/ventas/<%= venta.id %>/devolver" class="form-card" style="max-width:720px;margin-top:1.4rem"
         onsubmit="return confirm('¿Registrar esta devolución? Sale dinero de la caja abierta si es en efectivo. No se puede deshacer.');">
     <h3>Devolver productos</h3>

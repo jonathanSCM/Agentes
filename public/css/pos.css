@@ -24,6 +24,8 @@
 .pos-aviso.es-error { background: rgba(251, 113, 133, .14); border-color: rgba(251, 113, 133, .45); }
 .pos-grilla {
   flex: 1; min-height: 0; overflow-y: auto; display: grid; gap: .6rem; align-content: start;
+  /* Cada fila mide lo que mide su contenido (sin esto las filas se achicaban a 96px y los textos de las fichas se pisaban). */
+  grid-auto-rows: max-content;
   grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); padding-right: .2rem;
   scrollbar-width: thin; scrollbar-color: rgba(255, 255, 255, .2) transparent;
 }
@@ -136,3 +138,27 @@
   .pos-grilla { max-height: 46vh; }
   .pos-carrito { position: sticky; bottom: 0; max-height: 60vh; z-index: 5; background: #1d1129; }
 }
+
+/* Ventas en espera y cambio de producto */
+.pos-carrito-botones { display: flex; gap: .4rem; align-items: center; }
+.pos-contador { display: inline-flex; align-items: center; justify-content: center; min-width: 18px; height: 18px; padding: 0 5px; margin-left: 2px; border-radius: 999px; background: var(--primary-2); color: #06231a; font-size: .68rem; font-weight: 800; }
+.pos-espera-guardar { margin: 0 0 1rem; padding-bottom: 1rem; border-bottom: 1px solid var(--border); }
+.pos-espera-guardar p { margin: 0 0 .6rem; font-size: .85rem; }
+.pos-espera-fila { display: flex; gap: .5rem; flex-wrap: wrap; }
+.pos-espera-fila input { flex: 1; min-width: 160px; background: rgba(255, 255, 255, .06); color: var(--text); border: 1px solid var(--border); border-radius: 10px; padding: .5rem .7rem; font: inherit; }
+.pos-espera-lista { list-style: none; margin: 0; padding: 0; display: grid; gap: .5rem; max-height: 46vh; overflow-y: auto; }
+.pos-espera-item { display: flex; align-items: center; gap: .7rem; padding: .6rem .75rem; border: 1px solid var(--border); border-radius: 12px; background: rgba(255, 255, 255, .04); }
+.pos-espera-item > div { flex: 1; min-width: 0; }
+.pos-espera-item strong, .pos-espera-item small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pos-espera-item small { color: var(--muted); font-size: .76rem; }
+.pos-cambio { margin: 0 0 .8rem; padding: .8rem .85rem; border: 1px solid rgba(139, 92, 246, .5); border-radius: 12px; background: rgba(139, 92, 246, .1); display: grid; gap: .55rem; }
+.pos-cambio h4 { margin: 0; font-size: .95rem; }
+.pos-cambio p { margin: 0; font-size: .8rem; }
+.pos-cambio-fila { display: flex; align-items: center; justify-content: space-between; gap: .6rem; font-size: .88rem; }
+.pos-cambio-fila small { display: block; color: var(--muted); font-size: .74rem; }
+.pos-cambio-fila input { width: 4.2rem; background: rgba(255, 255, 255, .08); color: var(--text); border: 1px solid var(--border); border-radius: 8px; padding: .35rem .45rem; font: inherit; text-align: center; }
+.pos-cambio-check { display: flex; gap: .45rem; align-items: center; font-size: .82rem; }
+.pos-cambio-motivo { display: grid; gap: .25rem; font-size: .82rem; font-weight: 600; }
+.pos-cambio-motivo input { background: rgba(255, 255, 255, .08); color: var(--text); border: 1px solid var(--border); border-radius: 8px; padding: .45rem .6rem; font: inherit; font-weight: 400; }
+.pos-cambio-salir { font-size: .8rem; color: var(--muted); }
+.pos-cobro-cambio { margin: 0 0 .7rem; font-size: .85rem; color: var(--muted); }

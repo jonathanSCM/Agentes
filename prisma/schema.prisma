@@ -291,6 +291,7 @@ model Empresa {
   auditorias       Auditoria[]
   devoluciones     Devolucion[]
   solicitudesPlan  SolicitudPlan[]
+  ventasEspera     VentaEspera[]
   usosIA         UsoIA[]
   mensajesAgente MensajeAgente[]
   datosNegocio   DatoNegocio[]
@@ -1063,6 +1064,9 @@ model Venta {
   anuladaPorId      Int?
   anuladaPor        Usuario?    @relation("VentaAnuladaPor", fields: [anuladaPorId], references: [id], onDelete: SetNull)
   motivoAnulacion   String?
+  // Cambio de producto: cuanto credito traia la venta (lo devuelto) y de que venta viene.
+  creditoCambio     Decimal     @default(0) @db.Decimal(12, 2)
+  cambioDeVentaId   Int?
   createdAt         DateTime    @default(now())
 
   items VentaItem[]
@@ -1420,4 +1424,21 @@ model DevolucionItem {
   @@index([devolucionId])
   @@index([ventaItemId])
   @@map("devolucion_items")
+}
+
+// Carrito dejado en espera (no toca stock ni caja). Los precios no se guardan: se leen de nuevo al retomar.
+model VentaEspera {
+  id            Int      @id @default(autoincrement())
+  empresaId     Int
+  empresa       Empresa  @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  usuarioId     Int?
+  etiqueta      String?
+  lineas        Json
+  descuento     Decimal  @default(0) @db.Decimal(12, 2)
+  clienteId     Int?
+  clienteNombre String?
+  createdAt     DateTime @default(now())
+
+  @@index([empresaId, createdAt])
+  @@map("ventas_espera")
 }

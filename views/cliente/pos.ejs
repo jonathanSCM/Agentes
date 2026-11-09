@@ -38,9 +38,25 @@
   <%# ---------- Carrito ---------- %>
   <aside class="pos-carrito" aria-label="Venta actual">
     <header class="pos-carrito-cab">
-      <h3>Venta actual</h3>
-      <button type="button" class="btn btn-ghost btn-chico" id="posVaciar">Vaciar</button>
+      <h3><%= cambio ? 'Lo que se lleva' : 'Venta actual' %></h3>
+      <div class="pos-carrito-botones">
+        <% if (!cambio) { %><button type="button" class="btn btn-ghost btn-chico" id="posEspera" title="Dejar esta venta en espera o retomar otra">⏸ En espera <span class="pos-contador" id="posEsperaN" hidden></span></button><% } %>
+        <button type="button" class="btn btn-ghost btn-chico" id="posVaciar">Vaciar</button>
+      </div>
     </header>
+    <% if (cambio) { %>
+      <section class="pos-cambio" id="posCambio" aria-label="Lo que devuelve el cliente">
+        <h4>Cambio sobre la venta V-<%= String(cambio.numero).padStart(4, '0') %></h4>
+        <p class="muted">Indicá cuántas unidades devuelve. Después agregá abajo lo que se lleva.</p>
+        <% cambio.items.forEach(function (i) { %>
+          <label class="pos-cambio-fila"><span><strong><%= i.nombre %></strong><small>Puede devolver hasta <%= i.quedan %></small></span>
+            <input type="number" class="pos-cambio-cant" data-item="<%= i.id %>" min="0" max="<%= i.quedan %>" value="0" aria-label="Unidades que devuelve de <%= i.nombre %>" /></label>
+        <% }); %>
+        <label class="pos-cambio-check"><input type="checkbox" id="cambioRepone" checked /> Lo que devuelve vuelve al stock <span class="muted">(desmarcá si está dañado)</span></label>
+        <label class="pos-cambio-motivo">Motivo * <input type="text" id="cambioMotivo" maxlength="200" placeholder="Ej: talla equivocada" /></label>
+        <a class="pos-cambio-salir" href="/panel/ventas/<%= cambio.id %>">← Cancelar el cambio</a>
+      </section>
+    <% } %>
     <ul class="pos-lineas" id="posLineas"></ul>
     <div class="pos-vacio" id="posVacio">Escaneá o tocá un producto para empezar.</div>
     <div class="pos-totales">
@@ -49,9 +65,13 @@
         <label for="posDescuento">Descuento</label>
         <input id="posDescuento" type="number" min="0" step="0.01" inputmode="decimal" placeholder="0.00" />
       </div>
-      <div class="pos-fila pos-total"><span>Total</span><strong id="posTotal"></strong></div>
+      <div class="pos-fila pos-total"><span><%= cambio ? 'Total de lo nuevo' : 'Total' %></span><strong id="posTotal"></strong></div>
+      <% if (cambio) { %>
+        <div class="pos-fila" id="posCreditoFila"><span>Crédito por lo que devuelve</span><strong id="posCredito">—</strong></div>
+        <div class="pos-fila pos-total" id="posDiferenciaFila"><span id="posDiferenciaEtq">Diferencia</span><strong id="posDiferencia">—</strong></div>
+      <% } %>
     </div>
-    <button type="button" class="btn btn-primary btn-block pos-cobrar" id="posCobrar" disabled>Cobrar <kbd>F4</kbd></button>
+    <button type="button" class="btn btn-primary btn-block pos-cobrar" id="posCobrar" disabled><%= cambio ? 'Hacer el cambio' : 'Cobrar' %> <kbd>F4</kbd></button>
     <label class="pos-auto"><input type="checkbox" id="posAutoImprimir" /> Imprimir el recibo al cobrar</label>
   </aside>
 </div>
@@ -70,7 +90,8 @@
   <div class="pos-modal-caja" role="dialog" aria-modal="true" aria-labelledby="cobroTitulo">
     <button type="button" class="pos-cerrar" data-cerrar aria-label="Cerrar">✕</button>
     <h3 id="cobroTitulo">Cobrar</h3>
-    <p class="pos-cobro-total">Total a cobrar <strong id="cobroTotal"></strong></p>
+    <p class="pos-cobro-total"><span id="cobroTotalEtq">Total a cobrar</span> <strong id="cobroTotal"></strong></p>
+    <p class="pos-cobro-cambio" id="cobroCambioInfo" hidden></p>
     <div id="cobroPagos"></div>
     <button type="button" class="btn btn-ghost btn-chico" id="cobroDividir">+ Dividir el pago</button>
     <div class="field" style="margin-top:.8rem">
@@ -81,6 +102,22 @@
     <p class="pos-cobro-estado" id="cobroEstado" role="status"></p>
     <p class="pos-error" id="cobroError" role="alert" hidden></p>
     <button type="button" class="btn btn-primary btn-block pos-confirmar" id="cobroConfirmar">Confirmar cobro</button>
+  </div>
+</div>
+
+<%# ---------- Modal: ventas en espera ---------- %>
+<div class="pos-modal" id="modalEspera" hidden>
+  <div class="pos-modal-caja" role="dialog" aria-modal="true" aria-labelledby="esperaTitulo">
+    <button type="button" class="pos-cerrar" data-cerrar aria-label="Cerrar">✕</button>
+    <h3 id="esperaTitulo">Ventas en espera</h3>
+    <div class="pos-espera-guardar" id="esperaGuardar">
+      <p class="muted">Dejá esta venta guardada y atendé a otro cliente. No reserva stock ni toca la caja.</p>
+      <div class="pos-espera-fila"><input type="text" id="esperaEtiqueta" maxlength="40" placeholder="Nombre o referencia (opcional)" autocomplete="off" /><button type="button" class="btn btn-primary" id="esperaDejar">Dejar en espera</button></div>
+    </div>
+    <h4>Guardadas</h4>
+    <p class="pos-error" id="esperaError" role="alert" hidden></p>
+    <ul class="pos-espera-lista" id="esperaLista"></ul>
+    <p class="muted" id="esperaVacia" hidden>No hay ventas en espera.</p>
   </div>
 </div>
 
@@ -109,7 +146,7 @@
   </div>
 </div>
 
-<script>window.POS_METODOS = <%- JSON.stringify(metodos) %>;</script>
+<script>window.POS_METODOS = <%- JSON.stringify(metodos) %>;<% if (cambio) { %> window.POS_CAMBIO = <%- JSON.stringify({ ventaId: cambio.id, numero: cambio.numero }) %>;<% } %></script>
 <script src="/js/pos.js"></script>
 <% } %>
 

@@ -68,6 +68,7 @@
     </table>
     <hr />
     <table>
+      <% if (Number(venta.creditoCambio) > 0) { %><tr><td>Crédito por cambio</td><td class="d">- <%= m(venta.creditoCambio) %></td></tr><% } %>
       <% venta.pagos.forEach(function (p) { %>
         <tr><td><%= etiquetas[p.metodo] %></td><td class="d"><%= m(p.monto) %></td></tr>
         <% if (p.metodo === 'EFECTIVO' && Number(p.vuelto) > 0) { %>
