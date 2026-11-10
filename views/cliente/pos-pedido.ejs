@@ -3,6 +3,7 @@
   var m = function (n) { return simboloCatalogo + ' ' + Number(n).toFixed(2); };
   var cobrable = ['NUEVO', 'CONFIRMADO'].indexOf(pedido.estado) !== -1;
   var cliente = pedido.cliente ? (pedido.cliente.nombre || pedido.cliente.nombrePerfil || pedido.cliente.telefono) : '';
+  var eligio = pedido.formaPago && pedido.formaPago !== 'EFECTIVO' ? pedido.formaPago : '';
 %>
 
 <div class="page-head page-head-row">
@@ -10,8 +11,14 @@
     <h2>Cobrar pedido #<%= pedido.id %></h2>
     <p><%= cliente ? 'Cliente: ' + cliente + ' · ' : '' %><%= new Date(pedido.createdAt).toLocaleString('es-BO', { dateStyle: 'long', timeStyle: 'short' }) %></p>
   </div>
-  <a class="btn btn-ghost" href="/panel/pos/pedidos">← Pedidos por cobrar</a>
+  <div class="cmp-acciones">
+    <% if (cobrable) { %><a class="btn btn-ghost" href="/panel/pos/pedidos/<%= pedido.id %>/editar">Editar pedido</a><% } %>
+    <a class="btn btn-ghost" href="/panel/pos/pedidos">← Pedidos por cobrar</a>
+  </div>
 </div>
+
+<% if (mensaje) { %><div class="alert-ok"><%= mensaje %></div><% } %>
+<% if (error) { %><div class="alert-err" role="alert"><%= error %></div><% } %>
 
 <div class="table-wrap">
   <table class="leads-table">
@@ -25,16 +32,39 @@
 </div>
 
 <div class="caja-grid" style="margin-top:1rem">
-  <div class="caja-dato destacado"><small>Total a cobrar</small><strong><%= m(pedido.total) %></strong></div>
+  <div class="caja-dato"><small>Total del pedido</small><strong><%= m(pedido.total) %></strong></div>
+  <% if (pago.pagadoCentavos > 0) { %><div class="caja-dato"><small>Ya pagó (<%= etiquetasPago[pago.metodo] || pago.metodo %>)</small><strong><%= m(pago.pagadoCentavos / 100) %></strong></div><% } %>
+  <div class="caja-dato destacado"><small><%= pago.pagado ? 'Falta cobrar' : 'Total a cobrar' %></small><strong><%= m(pago.saldoCentavos / 100) %></strong></div>
 </div>
 
 <% if (!cobrable) { %>
   <div class="alert-err">Este pedido ya está <%= pedido.estado === 'ENTREGADO' ? 'entregado' : 'cancelado' %>: no se puede cobrar.</div>
 <% } else if (!sesion) { %>
   <div class="alert-err">La caja está cerrada. Abrila en <a href="/panel/pos">Punto de venta</a> para poder cobrar.</div>
+<% } else if (pago.pagado) { %>
+  <div class="form-card" style="max-width:560px;margin-top:1.2rem" id="formEntregaPedido">
+    <h3>Pagado por <%= etiquetasPago[pago.metodo] || pago.metodo %> ✓</h3>
+    <p class="muted">El cliente ya pagó este pedido: no se cobra de nuevo. Al entregarlo queda registrado como venta, sin mover el efectivo de la caja.</p>
+    <p class="alert-err" id="errorEntrega" role="alert" hidden></p>
+    <div class="form-actions"><button class="btn btn-primary" type="button" id="entregarPedido">Entregar pedido</button></div>
+    <form method="POST" action="/panel/pos/pedidos/<%= pedido.id %>/pago" style="margin-top:.8rem" onsubmit="return confirm('¿Quitar el pago registrado? El pedido vuelve a estar por cobrar.')">
+      <input type="hidden" name="accion" value="quitar" />
+      <button class="btn btn-ghost btn-chico" type="submit">Me equivoqué: quitar el pago</button>
+    </form>
+  </div>
 <% } else { %>
+  <% if (eligio && pago.pagadoCentavos === 0) { %>
+    <form method="POST" action="/panel/pos/pedidos/<%= pedido.id %>/pago" class="form-card" style="max-width:560px;margin-top:1.2rem">
+      <h3>El cliente eligió pagar por <%= etiquetasPago[eligio] || eligio %></h3>
+      <p class="muted">Si ya viste el comprobante, confirmá el pago: el pedido deja de cobrarse y solo se entrega. Si todavía no pagó, cobralo abajo.</p>
+      <input type="hidden" name="accion" value="confirmar" />
+      <div class="field"><label for="metodoPrevio">Pagó por</label>
+        <select id="metodoPrevio" name="metodo"><% ['QR', 'TARJETA', 'TRANSFERENCIA'].forEach(function (k) { %><option value="<%= k %>" <%= k === eligio ? 'selected' : '' %>><%= etiquetasPago[k] %></option><% }); %></select></div>
+      <div class="form-actions"><button class="btn btn-primary" type="submit">Confirmar pago recibido</button></div>
+    </form>
+  <% } %>
   <form id="formCobroPedido" class="form-card" style="max-width:560px;margin-top:1.2rem" novalidate>
-    <h3>Cómo paga el cliente</h3>
+    <h3><%= pago.parcial ? 'Falta cobrar el resto' : 'Cómo paga el cliente' %></h3>
     <div id="pagosPedido"></div>
     <button type="button" class="btn btn-ghost btn-chico" id="dividirPedido">+ Dividir el pago</button>
     <p class="pos-cobro-estado" id="estadoPedido" role="status"></p>
@@ -53,7 +83,7 @@
 
   <script>
   (function () {
-    var TOTAL = Math.round(<%= Number(pedido.total) %> * 100);
+    var TOTAL = <%= pago.saldoCentavos %>;
     var SIMBOLO = <%- JSON.stringify(simboloCatalogo) %>;
     var METODOS = <%- JSON.stringify(metodos) %>;
     var clave = 'ped-' + <%= pedido.id %> + '-' + Date.now() + '-' + Math.random().toString(36).slice(2, 8);
@@ -110,6 +140,37 @@
           document.getElementById('listoPedido').hidden = false;
         })
         .catch(function () { btn.textContent = 'Confirmar cobro'; err.textContent = 'No hay conexión. Probá de nuevo: si ya se cobró, no se cobra dos veces.'; err.hidden = false; actualizar(); });
+    });
+  })();
+  </script>
+<% } %>
+
+<% if (cobrable && sesion && pago.pagado) { %>
+  <div id="listoPedido" class="form-card" style="max-width:560px;margin-top:1.2rem" hidden>
+    <h3>Pedido entregado ✓</h3>
+    <p id="resumenListo"></p>
+    <div style="display:flex;gap:.5rem;flex-wrap:wrap">
+      <a class="btn btn-primary" id="verRecibo" target="_blank" rel="noopener">🖨 Imprimir recibo</a>
+      <a class="btn btn-ghost" href="/panel/pos/pedidos">Más pedidos por cobrar</a>
+    </div>
+  </div>
+  <script>
+  (function () {
+    var clave = 'ent-' + <%= pedido.id %> + '-' + Date.now() + '-' + Math.random().toString(36).slice(2, 8);
+    var btn = document.getElementById('entregarPedido'); var err = document.getElementById('errorEntrega');
+    btn.addEventListener('click', function () {
+      btn.disabled = true; btn.textContent = 'Entregando…'; err.hidden = true;
+      fetch('/panel/pos/pedidos/<%= pedido.id %>/cobrar', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ claveIdempotencia: clave, pagos: [] }) })
+        .then(function (r) { return r.json().catch(function () { return { ok: false, error: 'Respuesta inesperada del servidor.' }; }); })
+        .then(function (d) {
+          btn.textContent = 'Entregar pedido';
+          if (!d.ok) { err.textContent = d.error || 'No se pudo entregar.'; err.hidden = false; btn.disabled = false; return; }
+          document.getElementById('formEntregaPedido').hidden = true;
+          document.getElementById('resumenListo').textContent = 'Venta V-' + String(d.venta.numero).padStart(4, '0') + ' por ' + <%- JSON.stringify(simboloCatalogo) %> + ' ' + Number(d.venta.total).toFixed(2) + ', ya pagada. El cliente recibió el aviso de entrega por WhatsApp si la conversación sigue abierta.';
+          document.getElementById('verRecibo').href = d.venta.reciboUrl + '?imprimir=1';
+          document.getElementById('listoPedido').hidden = false;
+        })
+        .catch(function () { btn.textContent = 'Entregar pedido'; btn.disabled = false; err.textContent = 'No hay conexión. Probá de nuevo: si ya se entregó, no se duplica.'; err.hidden = false; });
     });
   })();
   </script>

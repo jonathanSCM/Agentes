@@ -1,0 +1,49 @@
+<%- include('partials/inicio') %>
+<%
+  var cliente = pedido.cliente ? (pedido.cliente.nombre || pedido.cliente.nombrePerfil || pedido.cliente.telefono) : '';
+%>
+
+<div class="page-head page-head-row">
+  <div>
+    <h2>Editar pedido #<%= pedido.id %></h2>
+    <p><%= cliente ? 'Cliente: ' + cliente + ' · ' : '' %>Sumá o quitá productos y cambiá cantidades. El stock se ajusta solo con la diferencia.</p>
+  </div>
+  <a class="btn btn-ghost" href="/panel/pos/pedidos/<%= pedido.id %>">← Volver al pedido</a>
+</div>
+
+<% if (pago.pagadoCentavos > 0) { %>
+  <div class="alert-ok">El cliente ya pagó <%= simboloCatalogo %> <%= (pago.pagadoCentavos / 100).toFixed(2) %> (<%= etiquetasPago[pago.metodo] || pago.metodo %>). El pedido no puede quedar por debajo de ese monto; si sube, se cobra solo la diferencia.</div>
+<% } %>
+<div class="alert-err" id="pedError" role="alert" hidden></div>
+
+<div class="cmp-nueva">
+  <section class="cmp-buscar card-form">
+    <label for="pedQ" class="cmp-form-titulo">Agregar un producto</label>
+    <input id="pedQ" type="search" autocomplete="off" placeholder="Nombre, código o código de barras…" />
+    <ul class="cmp-resultados" id="pedResultados" aria-live="polite"></ul>
+  </section>
+
+  <section class="cmp-detalle card-form">
+    <h3 class="cmp-form-titulo">Productos del pedido</h3>
+    <div class="table-wrap">
+      <table class="leads-table">
+        <thead><tr><th>Producto</th><th class="num">Precio</th><th class="num">Cantidad</th><th class="num">Subtotal</th><th></th></tr></thead>
+        <tbody id="pedLineas"></tbody>
+      </table>
+    </div>
+    <p class="muted" id="pedVacio" hidden>No quedan productos. Para un pedido vacío, cancelalo desde Pedidos.</p>
+    <p class="cmp-total-linea">Total: <strong><%= simboloCatalogo %> <span id="pedTotal">0.00</span></strong></p>
+    <p class="muted" id="pedDiferencia"></p>
+    <div class="form-actions"><button class="btn btn-primary" type="button" id="pedGuardar" disabled>Guardar los cambios</button></div>
+  </section>
+</div>
+
+<script>
+  window.PEDIDO = {
+    id: <%= pedido.id %>, simbolo: <%- JSON.stringify(simboloCatalogo) %>, totalOriginal: <%= pago.totalCentavos %>, pagado: <%= pago.pagadoCentavos %>,
+    items: <%- JSON.stringify(pedido.items.map(function (i) { return { itemId: i.id, productoId: i.productoId, varianteId: i.varianteId, nombre: i.nombre, precio: Number(i.precio), cantidad: i.cantidad, editable: Boolean(i.productoId || i.varianteId) }; })) %>
+  };
+</script>
+<script src="/js/pedido-editar.js"></script>
+
+<%- include('partials/fin') %>

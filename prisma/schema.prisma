@@ -1277,6 +1277,11 @@ model Pedido {
   // registra que eligio el cliente - el cobro en si lo verifica un humano
   // por fuera del bot (ver /panel/pedidos/:id/estado).
   formaPago        FormaPago?
+  // Lo que el cliente YA pago antes de retirar (QR, tarjeta o transferencia confirmados por una persona) y como.
+  // 0 = todavia no pago nada. Si pagadoMonto alcanza el total, el pedido no se vuelve a cobrar: solo se entrega.
+  pagadoMonto      Decimal       @default(0) @db.Decimal(10, 2)
+  pagoMetodo       String?
+  pagadoAt         DateTime?
   estado           EstadoPedido  @default(NUEVO)
   createdAt        DateTime      @default(now())
 

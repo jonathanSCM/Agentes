@@ -93,6 +93,23 @@
     <div class="dash-card" style="margin-top:1rem">
       <div class="dash-card-head"><h3>Forma de pago</h3></div>
       <p style="font-size:.95rem"><%= pedido.formaPago ? pedido.formaPago.charAt(0) + pedido.formaPago.slice(1).toLowerCase() : 'No registrada' %></p>
+      <% var abierto = pedido.estado === 'NUEVO' || pedido.estado === 'CONFIRMADO'; var pagadoTodo = Number(pedido.pagadoMonto) > 0 && Number(pedido.pagadoMonto) >= Number(pedido.total); %>
+      <% if (Number(pedido.pagadoMonto) > 0) { %>
+        <p style="font-size:.9rem"><span class="badge badge-new">Pago confirmado</span> <%= simboloCatalogo %> <%= Number(pedido.pagadoMonto).toFixed(2) %> por <%= String(pedido.pagoMetodo || '').toLowerCase() %><%= pagadoTodo ? '' : ' (falta el resto)' %></p>
+        <% if (abierto) { %>
+          <form method="POST" action="/panel/pedidos/<%= pedido.id %>/pago" class="inline-form" onsubmit="return confirm('¿Quitar el pago confirmado?')">
+            <input type="hidden" name="accion" value="quitar" />
+            <button class="btn btn-ghost" type="submit">Quitar el pago</button>
+          </form>
+        <% } %>
+      <% } else if (abierto && pedido.formaPago && pedido.formaPago !== 'EFECTIVO') { %>
+        <p class="muted" style="font-size:.85rem">Cuando veas el comprobante, confirmá el pago: ya no se cobra de nuevo, solo se entrega.</p>
+        <form method="POST" action="/panel/pedidos/<%= pedido.id %>/pago" class="inline-form">
+          <input type="hidden" name="accion" value="confirmar" />
+          <input type="hidden" name="metodo" value="<%= pedido.formaPago %>" />
+          <button class="btn btn-primary" type="submit">Confirmar pago por <%= pedido.formaPago.toLowerCase() %></button>
+        </form>
+      <% } %>
     </div>
 
     <% if (pedido.estado === 'NUEVO' || pedido.estado === 'CONFIRMADO') { %>

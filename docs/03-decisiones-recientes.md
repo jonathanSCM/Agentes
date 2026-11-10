@@ -1142,3 +1142,11 @@ Migración aditiva `20261114100000_pos_espera_y_cambios` (tabla `ventas_espera`,
 - **Migraciones aditivas:** `20261116100000_proveedores_y_compras`, `20261116110000_stock_anulacion_compra` (amplía el CHECK de tipos de movimiento de stock).
 - **Tests:** `test/compras.test.js` (19). Auditoría: `COMPRA_REGISTRADA`, `COMPRA_PAGADA`, `COMPRA_ANULADA`.
 - **No incluido (a propósito):** pagos parciales/abonos, órdenes de compra previas a la recepción, costo promedio ponderado (se usa el último costo).
+
+## 63. Pedidos pagados por QR y edición de pedidos (nov 2026)
+
+- **Problema:** en "Pedidos por cobrar" se podía cobrar de nuevo un pedido que el cliente ya había pagado por QR, y no había forma de agregar o quitar productos de un pedido antes de cobrarlo.
+- **Pago previo:** `Pedido.pagadoMonto/pagoMetodo/pagadoAt`. Hoy nada verifica el comprobante, así que **lo confirma una persona** (botón "Confirmar pago recibido", en el POS y en el detalle del pedido). Un pedido con el pago confirmado no se cobra de nuevo: en el mostrador solo se **entrega** y queda como venta con su pago QR/tarjeta/transferencia, sin tocar el efectivo de la caja. El efectivo no se confirma: se cobra en el mostrador. Hay "quitar el pago" si se confirmó por error. Cobrar con pagos nuevos un pedido ya pagado se rechaza.
+- **Edición:** `lib/services/pedidosPago.js › editar`. Mientras el pedido siga NUEVO/CONFIRMADO se suman, quitan y cambian cantidades; el stock se ajusta solo con la **diferencia** (el del pedido ya estaba reservado), atómico y en la misma transacción, con el candado por empresa. Precio: las líneas viejas conservan el suyo; las nuevas usan el actual. Si ya había pago parcial/total, el total no puede bajar de lo pagado; si sube, se cobra solo el saldo y la venta guarda los dos pagos (ej. QR 780 + efectivo 380). Cancelar un pedido vuelve a leer las líneas dentro de la transacción (por si se editó justo antes) y avisa si había un pago que devolver.
+- **Migración aditiva:** `20261117100000_pedido_pago_previo`. Auditoría: `PEDIDO_EDITADO`, `PEDIDO_PAGO_CONFIRMADO`, `PEDIDO_PAGO_QUITADO`. Tests: `test/pedidos-pago-edicion.test.js`.
+- **Pendiente (C):** cuenta compartida para negocios de citas (servicio + extras), siguiendo `D:\Trabajo\barberia\apps\pos` (venta en estado OPEN abierta desde la cita).

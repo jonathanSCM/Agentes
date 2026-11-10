@@ -28,9 +28,12 @@
             <td><strong>#<%= p.id %></strong><br><span class="muted" style="font-size:.78rem"><%= new Date(p.createdAt).toLocaleString('es-BO', { dateStyle: 'short', timeStyle: 'short' }) %></span></td>
             <td><%= nombreDe(p) %></td>
             <td><%= p.items.map(function (i) { return i.cantidad + ' × ' + i.nombre; }).join(', ') %></td>
-            <td><span class="badge badge-new"><%= p.estado === 'NUEVO' ? 'Nuevo' : 'Confirmado' %></span></td>
+            <td><span class="badge badge-new"><%= p.estado === 'NUEVO' ? 'Nuevo' : 'Confirmado' %></span>
+              <% if (Number(p.pagadoMonto) >= Number(p.total) && Number(p.total) > 0) { %><br><span class="badge badge-new">Pagado · <%= etiquetasPago[p.pagoMetodo] || p.pagoMetodo %></span>
+              <% } else if (Number(p.pagadoMonto) > 0) { %><br><span class="badge badge-pendiente">Pagó <%= m(p.pagadoMonto) %></span>
+              <% } else if (p.formaPago && p.formaPago !== 'EFECTIVO') { %><br><span class="muted" style="font-size:.75rem">Eligió <%= etiquetasPago[p.formaPago] || p.formaPago %> · sin confirmar</span><% } %></td>
             <td class="num"><strong><%= m(p.total) %></strong></td>
-            <td><a class="btn btn-primary btn-chico" href="/panel/pos/pedidos/<%= p.id %>">Cobrar</a></td>
+            <td><a class="btn btn-primary btn-chico" href="/panel/pos/pedidos/<%= p.id %>"><%= Number(p.pagadoMonto) >= Number(p.total) && Number(p.total) > 0 ? 'Entregar' : 'Cobrar' %></a></td>
           </tr>
         <% }); %>
       </tbody>

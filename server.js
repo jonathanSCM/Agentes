@@ -1551,7 +1551,9 @@ app.post('/panel/pedidos/:id/estado', requireCliente, async (req, res, next) => 
           await auditoriaSrv.registrar(tx, { empresaId, actor: { id: req.session.clienteId }, accion: 'PEDIDO_CANCELADO', entidad: 'Pedido', entidadId: pedido.id, detalle: { total: Number(pedido.total), estadoAnterior: pedido.estado } });
         }
         if (requiereRestock(pedido.estado, estadoNuevo)) {
-          const lineas = pedido.items.filter((i) => i.productoId || i.varianteId).map((i) => ({ productoId: i.productoId, varianteId: i.varianteId, cantidad: i.cantidad }));
+          // Se vuelven a leer las líneas ya reclamado el pedido: si alguien lo editó justo antes, se repone lo que de verdad tiene.
+          const itemsAhora = await tx.pedidoItem.findMany({ where: { pedidoId: pedido.id } });
+          const lineas = itemsAhora.filter((i) => i.productoId || i.varianteId).map((i) => ({ productoId: i.productoId, varianteId: i.varianteId, cantidad: i.cantidad }));
           if (lineas.length) {
             await stockSrv.reponer(tx, { empresaId, lineas, tipo: 'CANCELACION_PEDIDO', referenciaTipo: 'Pedido', referenciaId: pedido.id, usuarioId: req.session.clienteId });
           }
@@ -1570,6 +1572,7 @@ app.post('/panel/pedidos/:id/estado', requireCliente, async (req, res, next) => 
       mensajeOk = notificado ? `Pedido ${etiqueta} y cliente avisado por WhatsApp.` : `Pedido ${etiqueta} (no se pudo avisar por WhatsApp: sin conexión o fuera de la ventana de 24hs).`;
     }
 
+    if (estadoNuevo === 'CANCELADO' && Number(pedido.pagadoMonto) > 0) mensajeOk += ` Ojo: el cliente ya había pagado ${Number(pedido.pagadoMonto).toFixed(2)} (${String(pedido.pagoMetodo || '').toLowerCase()}): hay que devolverle el dinero.`;
     res.redirect(`${volverA}?ok=` + encodeURIComponent(mensajeOk));
   } catch (err) { next(err); }
 });
@@ -3392,7 +3395,7 @@ app.get('/panel/pos/pedidos', ...POS, async (req, res, next) => {
     });
     res.render('cliente/pos-pedidos', {
       title: 'Pedidos por cobrar - Proshop', tituloPagina: 'Pedidos por cobrar', activo: 'pos-pedidos', hojas: ['/css/pos.css'],
-      pedidos, sesion: await caja.sesionAbierta(empresaId), mensaje: req.query.ok || null, error: req.query.err || null,
+      pedidos, sesion: await caja.sesionAbierta(empresaId), etiquetasPago: { QR: 'QR', TARJETA: 'tarjeta', TRANSFERENCIA: 'transferencia' }, mensaje: req.query.ok || null, error: req.query.err || null,
     });
   } catch (err) { next(err); }
 });
@@ -3404,8 +3407,9 @@ app.get('/panel/pos/pedidos/:id(\\d+)', ...POS, async (req, res, next) => {
     if (!pedido) return res.redirect('/panel/pos/pedidos');
     res.render('cliente/pos-pedido', {
       title: `Cobrar pedido #${pedido.id} - Proshop`, tituloPagina: 'Cobrar pedido', activo: 'pos-pedidos', hojas: ['/css/pos.css'],
-      pedido, sesion: await caja.sesionAbierta(empresaId),
+      pedido, sesion: await caja.sesionAbierta(empresaId), pago: pedidosPagoSrv.estadoDePago(pedido), etiquetasPago: pedidosPagoSrv.ETIQUETAS,
       metodos: ventaCalculo.METODOS.map((m) => ({ clave: m, etiqueta: ventaCalculo.ETIQUETAS_METODO[m] })),
+      mensaje: req.query.ok || null, error: req.query.err || null,
     });
   } catch (err) { next(err); }
 });
@@ -3426,6 +3430,51 @@ app.post('/panel/pos/pedidos/:id(\\d+)/cobrar', ...POS, async (req, res) => {
     if (esErrorDeNegocio(err)) return res.status(400).json({ ok: false, error: err.message });
     console.error('[pos] error al cobrar pedido:', err);
     res.status(500).json({ ok: false, error: 'No se pudo cobrar por un problema técnico. Probá de nuevo: si ya se cobró, no se cobra dos veces.' });
+  }
+});
+
+// ---- Pago previo y edicion de pedidos (A y B) ----
+// Un pedido pagado antes (QR, tarjeta, transferencia) lo confirma una persona y ya no se cobra de nuevo: solo se entrega.
+const pedidosPagoSrv = require('./lib/services/pedidosPago');
+const esErrorDePedido = (err) => err && ['PEDIDO', 'STOCK'].includes(err.codigo);
+async function accionDePago(req, res, volverA) {
+  try {
+    const empresaId = req.session.empresaId;
+    if (String(req.body.accion) === 'quitar') {
+      await pedidosPagoSrv.quitarPago(empresaId, usuarioPos(req), req.params.id);
+      return res.redirect(`${volverA}?ok=` + encodeURIComponent('Pago quitado: el pedido vuelve a estar por cobrar.'));
+    }
+    await pedidosPagoSrv.confirmarPago(empresaId, usuarioPos(req), req.params.id, req.body.metodo);
+    return res.redirect(`${volverA}?ok=` + encodeURIComponent('Pago confirmado: ya no se cobra de nuevo, solo se entrega.'));
+  } catch (err) {
+    if (esErrorDePedido(err)) return res.redirect(`${volverA}?err=` + encodeURIComponent(err.message));
+    throw err;
+  }
+}
+app.post('/panel/pedidos/:id(\\d+)/pago', requireCliente, requireRol('OWNER', 'ADMIN', 'STAFF'), (req, res, next) => accionDePago(req, res, `/panel/pedidos/${req.params.id}`).catch(next));
+app.post('/panel/pos/pedidos/:id(\\d+)/pago', ...POS, (req, res, next) => accionDePago(req, res, `/panel/pos/pedidos/${req.params.id}`).catch(next));
+
+app.get('/panel/pos/pedidos/:id(\\d+)/editar', ...POS, async (req, res, next) => {
+  try {
+    const pedido = await prisma.pedido.findFirst({ where: { id: Number(req.params.id), empresaId: req.session.empresaId }, include: { items: { orderBy: { id: 'asc' } }, cliente: true } });
+    if (!pedido) return res.redirect('/panel/pos/pedidos');
+    if (!pedidosPagoSrv.ABIERTOS.includes(pedido.estado)) return res.redirect(`/panel/pos/pedidos/${pedido.id}?err=` + encodeURIComponent('Ese pedido ya no se puede editar.'));
+    res.render('cliente/pos-pedido-editar', {
+      title: `Editar pedido #${pedido.id} - Proshop`, tituloPagina: 'Editar pedido', activo: 'pos-pedidos', hojas: ['/css/pos.css', '/css/compras.css'],
+      pedido, pago: pedidosPagoSrv.estadoDePago(pedido), etiquetasPago: pedidosPagoSrv.ETIQUETAS,
+    });
+  } catch (err) { next(err); }
+});
+app.post('/panel/pos/pedidos/:id(\\d+)/editar', ...POS, async (req, res) => {
+  try {
+    const items = (Array.isArray(req.body && req.body.items) ? req.body.items : []).map((i) => ({ itemId: i.itemId || null, productoId: i.productoId || null, varianteId: i.varianteId || null, cantidad: i.cantidad }));
+    const r = await pedidosPagoSrv.editar(req.session.empresaId, usuarioPos(req), req.params.id, { items });
+    catalogoCache.invalidarEmpresa(req.session.empresaId);
+    res.json({ ok: true, totalAntes: r.totalAntes, totalDespues: r.totalDespues, url: `/panel/pos/pedidos/${r.pedido.id}?ok=` + encodeURIComponent('Pedido actualizado: el stock y el total ya están al día.') });
+  } catch (err) {
+    if (esErrorDePedido(err)) return res.status(400).json({ ok: false, error: err.message });
+    console.error('[pos] error al editar pedido:', err);
+    res.status(500).json({ ok: false, error: 'No se pudo guardar por un problema técnico. Probá de nuevo.' });
   }
 });
 
