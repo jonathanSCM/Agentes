@@ -1201,3 +1201,5 @@ Migración aditiva `20261114100000_pos_espera_y_cambios` (tabla `ventas_espera`,
 - **Lo que el dueño escribe desde el celular** aparece en Conversaciones como mensaje del equipo ("App de WhatsApp") y el chat queda en manos de una persona (la IA no le contesta encima).
 - **Firma del webhook** (`X-Hub-Signature-256`): se exige en conexiones por coexistence; las manuales no cambian (usan la app de cada cliente).
 - Migración aditiva `20261120100000_whatsapp_coexistence` (`modo`, `estadoSync`, `conectadoAt`). Tests: `test/meta-coexistence.test.js` (15). Auditoría: `WHATSAPP_CONECTADO`.
+
+**Corrección (#67):** Productos vuelve a ser el de las **tarjetas** (con filtros) e Inventario vuelve a ser **tabla** (con filtros), como se pidió; las listas largas se **agrupan en páginas** (tarjetas de a 24, tabla de a 20) con `data-pagina` en `filtros-lista.js`. En "Pedir conversaciones" se quita el degradado verde de los números (blanco sólido, sin recortes).

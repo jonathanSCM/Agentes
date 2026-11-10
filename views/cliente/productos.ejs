@@ -41,7 +41,7 @@
       return t.join(' ');
     };
   %>
-  <div class="filtros-barra" data-objetivo="#prodTabla" data-vacio="#prodVacio" data-etiqueta="productos">
+  <div class="filtros-barra" data-objetivo="#prodTabla" data-vacio="#prodVacio" data-etiqueta="productos" data-pagina="24">
     <label class="f-buscar"><span style="position:absolute;left:-9999px">Buscar producto</span><input type="search" data-filtro-q placeholder="Buscar por nombre, código o categoría…" autocomplete="off" /></label>
     <% if (categoriasLista.length) { %>
       <select data-filtro-cat aria-label="Categoría">
@@ -59,49 +59,32 @@
     </div>
     <span class="f-cuenta" data-filtro-cuenta aria-live="polite"></span>
   </div>
-  <div class="table-wrap">
-    <table class="leads-table" id="prodTabla">
-      <thead>
-        <tr><th></th><th>Producto</th><th>Categoría</th><th class="num">Precio</th><th class="num">Stock</th><% if (!porCitas) { %><th>¿El agente lo muestra?</th><% } %><th>Acciones</th></tr>
-      </thead>
-      <tbody>
-        <% productos.forEach(function (p) { %>
-          <tr class="<%= p.activo ? '' : 'is-done' %>" data-item data-texto="<%= p.nombre %> <%= p.sku || '' %> <%= p.categoria ? p.categoria.nombre : '' %>" data-categoria="<%= p.categoria ? p.categoria.nombre : '' %>" data-tags="<%= tagsDe(p) %>">
-            <td>
-              <% if (p.fotos && p.fotos.length) { %>
-                <img src="<%= p.fotos[0] %>" alt="" class="prod-thumb" />
-              <% } else { %>
-                <div class="prod-thumb prod-thumb-vacio">Sin foto</div>
-              <% } %>
-            </td>
-            <td>
-              <strong><%= p.nombre %></strong>
-              <% if (p.descripcion) { %><br /><span class="muted"><%= p.descripcion %></span><% } %>
-            </td>
-            <td><%= p.categoria ? p.categoria.nombre : '-' %></td>
-            <td class="num"><%= simboloCatalogo %> <%= Number(p.precio).toFixed(2) %></td>
-            <td class="num">
-              <span class="badge <%= p.stockMostrado <= 0 ? 'badge-alerta' : (p.stockMostrado <= 5 ? 'badge-star' : 'badge-new') %>"><%= p.stockMostrado %></span><% if (p.tieneVariantes) { %><br><span class="muted" style="font-size:.72rem">con opciones</span><% } %>
-            </td>
-            <% if (!porCitas) { %><td>
-              <% if (p.motivoOculto) { %>
-                <span class="badge badge-off" title="<%= p.motivoOculto %>">No lo ofrece</span>
-                <div class="muted" style="font-size:.75rem;margin-top:.25rem;max-width:230px"><%= p.motivoOculto %></div>
-              <% } else { %>
-                <span class="badge badge-new">Lo ofrece</span>
-              <% } %>
-            </td><% } %>
-            <td class="actions-cell">
-              <a class="icon-btn" title="Editar" href="/panel/productos/<%= p.id %>/editar"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8"><path d="m16.5 3.5 4 4L7 21l-4.5 1L3.5 17.5 16.5 3.5Z"/></svg></a>
-              <form method="POST" action="/panel/productos/<%= p.id %>/eliminar" class="inline-form"
+  <div class="cat-grid" id="prodTabla">
+    <% productos.forEach(function (p) { var est = p.stockMostrado <= 0 ? 'agotado' : (p.stockMostrado <= 5 ? 'bajo' : 'ok'); %>
+      <article class="cat-card s-<%= est %>" style="<%= p.activo ? '' : 'opacity:.6' %>" data-item data-texto="<%= p.nombre %> <%= p.sku || '' %> <%= p.categoria ? p.categoria.nombre : '' %>" data-categoria="<%= p.categoria ? p.categoria.nombre : '' %>" data-tags="<%= tagsDe(p) %>">
+        <div class="cat-foto">
+          <% if (p.fotos && p.fotos.length) { %><img src="<%= p.fotos[0] %>" alt="" loading="lazy" /><% } else { %><span class="cat-inicial" aria-hidden="true"><%= p.nombre.charAt(0).toUpperCase() %></span><% } %>
+          <% if (!p.activo) { %><span class="cat-estado badge badge-off">Desactivado</span><% } else if (est !== 'ok') { %><span class="cat-estado badge <%= est === 'agotado' ? 'badge-alerta' : 'badge-star' %>"><%= est === 'agotado' ? 'Agotado' : 'Stock bajo' %></span><% } %>
+        </div>
+        <div class="cat-cuerpo">
+          <h3><%= p.nombre %></h3>
+          <span class="cat-cat"><%= p.categoria ? p.categoria.nombre : 'Sin categoría' %></span>
+          <span class="cat-precio"><%= simboloCatalogo %> <%= Number(p.precio).toFixed(2) %></span>
+          <div class="cat-stock"><strong><%= p.stockMostrado %></strong><span>en stock<%= p.tieneVariantes ? ' · con opciones' : '' %></span></div>
+          <% if (!porCitas) { %>
+            <% if (p.motivoOculto) { %><span class="badge badge-off" title="<%= p.motivoOculto %>" style="align-self:flex-start">El agente no lo ofrece</span><span class="cat-agente"><%= p.motivoOculto %></span>
+            <% } else { %><span class="badge badge-new" style="align-self:flex-start">Lo ofrece el agente</span><% } %>
+          <% } %>
+          <div class="cat-acciones">
+            <a class="icon-btn" title="Editar" href="/panel/productos/<%= p.id %>/editar"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8"><path d="m16.5 3.5 4 4L7 21l-4.5 1L3.5 17.5 16.5 3.5Z"/></svg></a>
+            <form method="POST" action="/panel/productos/<%= p.id %>/eliminar" class="inline-form"
                     onsubmit="return confirm('¿Eliminar «<%= p.nombre %>»?');">
                 <button class="icon-btn del" type="submit" title="Eliminar"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 7h16M9 7V4h6v3m-9 0 1 13h10l1-13"/></svg></button>
               </form>
-            </td>
-          </tr>
-        <% }); %>
-      </tbody>
-    </table>
+          </div>
+        </div>
+      </article>
+    <% }); %>
   </div>
   <div class="f-vacio" id="prodVacio" hidden>No hay productos con esos filtros.</div>
   <script src="/js/filtros-lista.js"></script>

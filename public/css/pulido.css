@@ -1,12 +1,9 @@
 /* Pulido visual del panel: tablas, tarjetas, filtros y tarjetas de compra. Va DESPUES de admin.css y panel-shell.css. */
 
-/* ---------- Pedir conversaciones: el número en blanco, grueso y con color (como en Planes) ---------- */
+/* ---------- Pedir conversaciones: número blanco y grueso, sin degradados (como en Planes) ---------- */
 .buy-card { color: var(--text); font: inherit; border-radius: 18px; background: rgba(255, 255, 255, .05); }
-.buy-qty {
-  display: block; font-size: 2rem; line-height: 1.1; color: var(--text);
-  background: linear-gradient(120deg, #ffffff 25%, var(--primary-2) 100%); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
-}
-.buy-card:hover .buy-qty { background: linear-gradient(120deg, #ffffff 0%, #c4b5fd 100%); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; }
+.buy-qty { display: block; font-size: clamp(1.5rem, 2.2vw, 2rem); line-height: 1.15; color: #fff; font-weight: 800; white-space: nowrap; }
+.buy-card:hover .buy-qty { color: #fff; }
 .buy-unit { color: var(--primary-2); font-weight: 700; font-size: .85rem; }
 .buy-card:focus-visible { outline: 2px solid var(--primary-2); outline-offset: 2px; }
 
@@ -100,3 +97,14 @@
 .wa-coex p { margin: 0 0 .5rem; max-width: 62ch; font-size: .9rem; }
 .wa-coex-lista { margin: 0; padding-left: 1.1rem; color: var(--muted); font-size: .84rem; display: grid; gap: .2rem; }
 .wa-coex-accion { display: grid; gap: .5rem; justify-items: start; min-width: 220px; }
+
+/* ---------- Páginas de las listas ---------- */
+.f-paginas { display: flex; flex-wrap: wrap; gap: .35rem; justify-content: center; align-items: center; margin: 1rem 0 .4rem; }
+.f-paginas button { min-width: 2.2rem; padding: .4rem .7rem; border-radius: 10px; border: 1px solid var(--border); background: rgba(255, 255, 255, .05); color: var(--text); font: inherit; font-size: .85rem; cursor: pointer; }
+.f-paginas button:hover:not(:disabled) { border-color: rgba(139, 92, 246, .6); }
+.f-paginas button.actual { background: rgba(139, 92, 246, .3); border-color: rgba(139, 92, 246, .7); font-weight: 700; }
+.f-paginas button:disabled { opacity: .4; cursor: default; }
+.f-paginas .f-pag-info { color: var(--muted); font-size: .8rem; margin: 0 .6rem; }
+.cat-acciones { display: flex; gap: .4rem; margin-top: auto; padding-top: .6rem; align-items: center; }
+.cat-acciones form { margin: 0; }
+.cat-agente { font-size: .72rem; color: var(--muted); }
