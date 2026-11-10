@@ -36,7 +36,7 @@ test('el dueño de una tienda ve sus módulos como secciones separadas y ninguna
 
 test('un negocio de citas tiene su sección "Mi negocio" en vez de Catálogo y Panel comercial', () => {
   const menu = construirMenu({ esCitas: true });
-  assert.deepEqual(menu.filter((g) => g.titulo).map((g) => g.clave), ['agente', 'negocio', 'cobros', 'cuenta']);
+  assert.deepEqual(menu.filter((g) => g.titulo).map((g) => g.clave), ['agente', 'negocio', 'cobros', 'catalogo', 'cuenta']);
 });
 
 test('en un negocio de citas, cobros trae las cuentas, la caja y las ventas (módulo POS); el cajero y el profesional ven lo suyo', () => {

@@ -1159,3 +1159,8 @@ Migración aditiva `20261114100000_pos_espera_y_cambios` (tabla `ventas_espera`,
 - **Pantallas:** Cobros → Cuentas (`/panel/cuentas`: abiertas, citas de hoy sin cuenta, cuenta suelta), detalle de cuenta con cobro dividido; botón "Cobrar / Ver cuenta" en Agenda y en el detalle del Calendario. El menú de negocios de citas gana la sección **Cobros** (Cuentas, Caja, Ventas; módulo POS). El cajero de un negocio de citas ve y entra a Cuentas.
 - **Migración aditiva:** `20261118100000_cuentas`. Tests: `test/cuentas.test.js` (15) y menú.
 - **No incluido:** vender productos sin cuenta en un negocio de citas desde el POS clásico, pegar un pedido de WhatsApp a una cita (el ejemplo lo hace), propinas.
+
+## 65. Productos en el menú de negocios de citas (nov 2026)
+
+- Para poder vender productos en las cuentas (#64), el menú de un negocio de citas (dueño/admin) gana la sección **Productos**: Productos, Inventario, Proveedores y Compras de stock (estas dos con módulo POS). Son las mismas pantallas que usa un negocio de productos: alta con variantes, stock, kardex, compras.
+- En un negocio de citas, la pantalla de Productos no habla del agente: el bot de citas no vende productos, son solo para sumar a la cuenta del cliente. Se oculta la columna "¿El agente lo muestra?" y la tarjeta "Que el agente NO muestra".
