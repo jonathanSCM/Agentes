@@ -66,6 +66,9 @@
           <li><strong><%= topeTexto(p.convIncluidas) %></strong> conversaciones por mes</li>
           <li><strong><%= topeTexto(p.maxProductos) %></strong> productos</li>
           <li><strong><%= topeTexto(p.maxUsuarios) %></strong> usuario<%= Number(p.maxUsuarios) === 1 ? '' : 's' %></li>
+          <% [['maxAdmins', 'administrador', 'administradores'], ['maxCajeros', 'cajero', 'cajeros'], ['maxStaff', 'colaborador', 'colaboradores'], ['maxProfesionales', 'profesional', 'profesionales']].forEach(function (r) { if (p[r[0]] !== null && p[r[0]] !== undefined) { %>
+            <li class="plan-rol">↳ <strong><%= p[r[0]] %></strong> <%= p[r[0]] === 1 ? r[1] : r[2] %></li>
+          <% } }); %>
         </ul>
         <% if (p.caracteristicas.length) { %>
           <ul class="plan-extras"><% p.caracteristicas.slice(0, 5).forEach(function (c) { %><li><%= c.caracteristica.nombre %></li><% }); %></ul>

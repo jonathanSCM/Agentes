@@ -6,6 +6,18 @@
     <span class="muted">Usás <strong><%= cupo.usados %></strong> de <strong><%= cupo.topeTexto %></strong> usuarios de tu plan (cuentan las invitaciones pendientes).</span></p>
 </div>
 
+<% var llenoDe = {}; porRol.forEach(function (r) { llenoDe[r.rol] = r.lleno; }); %>
+<% if (porRol.some(function (r) { return r.hayTope; })) { %>
+  <div class="eq-cupos" aria-label="Usuarios por rol según tu plan">
+    <% porRol.filter(function (r) { return r.hayTope; }).forEach(function (r) { %>
+      <div class="eq-cupo <%= r.lleno ? 'lleno' : '' %>">
+        <strong><%= r.usados %><span> / <%= r.tope %></span></strong>
+        <small><%= r.etiqueta %><%= r.lleno ? ' · completo' : '' %></small>
+      </div>
+    <% }); %>
+  </div>
+<% } %>
+
 <% if (mensaje) { %><div class="alert-ok"><%= mensaje %></div><% } %>
 <% if (error) { %><div class="alert-err"><%= error %></div><% } %>
 <% if (linkInvitacion) { %>
@@ -25,10 +37,10 @@
     <div class="field">
       <label for="rol">Rol</label>
       <select id="rol" name="rol">
-        <option value="STAFF">Staff (atiende conversaciones y pedidos)</option>
-        <option value="ADMIN">Admin (todo, menos equipo y facturación)</option>
-        <option value="CAJERO">Cajero (solo punto de venta, caja y ventas)</option>
-        <% if (esCitas) { %><option value="PROFESIONAL">Profesional (solo ve su calendario de citas)</option><% } %>
+        <option value="STAFF" <%= llenoDe.STAFF ? 'disabled' : '' %>>Staff (atiende conversaciones y pedidos)<%= llenoDe.STAFF ? ' — límite del plan alcanzado' : '' %></option>
+        <option value="ADMIN" <%= llenoDe.ADMIN ? 'disabled' : '' %>>Admin (todo, menos equipo y facturación)<%= llenoDe.ADMIN ? ' — límite del plan alcanzado' : '' %></option>
+        <option value="CAJERO" <%= llenoDe.CAJERO ? 'disabled' : '' %>>Cajero (solo punto de venta, caja y ventas)<%= llenoDe.CAJERO ? ' — límite del plan alcanzado' : '' %></option>
+        <% if (esCitas) { %><option value="PROFESIONAL" <%= llenoDe.PROFESIONAL ? 'disabled' : '' %>>Profesional (solo ve su calendario de citas)<%= llenoDe.PROFESIONAL ? ' — límite del plan alcanzado' : '' %></option><% } %>
       </select>
     </div>
   </div>

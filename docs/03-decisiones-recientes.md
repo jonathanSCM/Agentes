@@ -1185,3 +1185,11 @@ Migración aditiva `20261114100000_pos_espera_y_cambios` (tabla `ventas_espera`,
 - **Tablas del sistema** (todas las `.leads-table`): encabezado fijo, filas alternadas, resalte al pasar, columnas numéricas sin cortes y más etiquetas de estado.
 - **Menú:** se quitan **Proveedores** y **Compras de stock** (todo el stock y el inventario se maneja desde el catálogo). Solo se ocultan del menú; el código y las tablas quedan por si se retoman.
 - Los filtros son del navegador (`public/js/filtros-lista.js`, reutilizable con `data-item`/`data-texto`/`data-tags`).
+
+## 68. Límites de usuarios por rol en los planes (PAVP-5) (nov 2026)
+
+- Los planes ahora limitan **cuántos administradores, colaboradores, cajeros y profesionales** puede tener el negocio, además del total de usuarios. Reglas en `lib/services/limitesRol.js` (puras): el dueño no cuenta en ningún rol; cuentan los usuarios que ya están **más** las invitaciones pendientes no vencidas; vacío (null) = sin límite por rol (solo manda el total); **0 = ese rol no está en el plan**; bajar un tope por debajo de lo que ya hay no echa a nadie, solo impide sumar.
+- **Datos:** `Plan` y `Suscripcion` ganan `maxAdmins`, `maxStaff`, `maxCajeros`, `maxProfesionales` (nullable). Migración aditiva `20261119100000_limites_por_rol`: **los planes que ya existen quedan sin límite por rol** (no cambia nada para nadie hasta que el superadmin los cargue). Viajan por el mismo circuito que los demás topes: copia al asignar el plan, ajuste por cliente, propagación al editar el plan (con aviso al dueño: "Cajeros: 2 → 4") y acceso total = sin topes.
+- **Superadmin:** campos nuevos en el formulario del plan y en los valores de cada cliente; la lista de planes muestra los topes por rol.
+- **Dueño:** Mi equipo muestra tarjetas "usados / tope" por rol (en ámbar al completarse), las opciones de rol llenas quedan bloqueadas con el motivo, y el servidor rechaza la invitación con un mensaje claro ("Tu plan permite 2 cajeros…" / "Tu plan no incluye cajeros"). Planes y Mi plan y consumo también muestran los topes por rol.
+- Tests: `test/limites-rol.test.js` (11).

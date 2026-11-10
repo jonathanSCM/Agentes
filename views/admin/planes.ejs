@@ -25,7 +25,7 @@
         <li>Primer pago: <b>Bs <%= Number(p.primerPagoBs).toLocaleString('es-BO') %></b></li>
         <li>Conversaciones: <b><%= p.convIncluidas.toLocaleString('es-BO') %>/mes</b></li>
         <li>Productos: <b><%= p.maxProductos.toLocaleString('es-BO') %></b></li>
-        <li>Usuarios: <b><%= p.maxUsuarios %></b></li>
+        <li>Usuarios: <b><%= p.maxUsuarios %></b><% var porRolTxt = [['maxAdmins', 'admin'], ['maxStaff', 'colab.'], ['maxCajeros', 'cajeros'], ['maxProfesionales', 'profes.']].filter(function (k) { return p[k[0]] !== null && p[k[0]] !== undefined; }).map(function (k) { return p[k[0]] + ' ' + k[1]; }); %><% if (porRolTxt.length) { %> <span class="muted">(<%= porRolTxt.join(', ') %>)</span><% } %></li>
         <li>Modelo IA: <b><%= p.modeloIa %></b></li>
         <li>Marca blanca: <b><%= p.marcaBlanca ? 'Sí' : 'No' %></b></li>
       </ul>

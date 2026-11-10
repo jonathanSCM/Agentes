@@ -3895,6 +3895,7 @@ app.post(`${HORARIOS}/feriados`, requireCliente, soloCitas, puedeEditarAtencion,
 
 // -------- Mi equipo (invitar colaboradores, solo el dueño) --------
 const { crearInvitacion, obtenerInvitacionPorToken, aceptarInvitacion } = require('./lib/services/auth');
+const limitesRol = require('./lib/services/limitesRol');
 
 app.get('/panel/equipo', requireCliente, requireRol('OWNER'), async (req, res, next) => {
   try {
@@ -3908,6 +3909,7 @@ app.get('/panel/equipo', requireCliente, requireRol('OWNER'), async (req, res, n
       title: 'Mi equipo - Proshop', tituloPagina: 'Mi equipo', activo: 'equipo',
       usuarios, invitaciones, recursos, esCitas: res.locals.modeloNegocio === 'CITAS', etiquetaRol: menuPanel.etiquetaRol,
       cupo: { usados: usuarios.length + invitaciones.length, tope: planesCliente.topeNumerico(valores.limites.maxUsuarios), topeTexto: planesCliente.topeTexto(valores.limites.maxUsuarios) },
+      porRol: limitesRol.estadoPorRol(usuarios, invitaciones.filter((i) => i.expiraEn > new Date()), valores.limites).filter((r) => r.rol !== 'PROFESIONAL' || res.locals.modeloNegocio === 'CITAS'),
       mensaje: req.query.ok || null, error: req.query.err || null,
       linkInvitacion: req.query.link || null, usuarioActualId: req.session.clienteId,
     });
@@ -3930,6 +3932,13 @@ app.post('/panel/equipo/invitar', requireCliente, requireRol('OWNER'), async (re
       prisma.invitacion.count({ where: { empresaId: req.session.empresaId, aceptada: false, expiraEn: { gt: new Date() } } }),
       planesCliente.valoresDe(req.session.empresaId),
     ]);
+    // Limite por rol (administradores, colaboradores, cajeros, profesionales) dentro del total.
+    const [usuariosRol, invitacionesRol] = await Promise.all([
+      prisma.usuario.findMany({ where: { empresaId: req.session.empresaId }, select: { rol: true } }),
+      prisma.invitacion.findMany({ where: { empresaId: req.session.empresaId, aceptada: false, expiraEn: { gt: new Date() } }, select: { rol: true } }),
+    ]);
+    const porRol = limitesRol.puedeSumar(rol, usuariosRol, invitacionesRol, valoresPlan.limites);
+    if (!porRol.ok) return res.redirect('/panel/equipo?err=' + encodeURIComponent(porRol.mensaje));
     const tope = planesCliente.topeNumerico(valoresPlan.limites.maxUsuarios);
     if (cantidad + pendientes >= tope) {
       return res.redirect('/panel/equipo?err=' + encodeURIComponent(`Tu plan permite ${planesCliente.topeTexto(valoresPlan.limites.maxUsuarios)} usuario${tope === 1 ? '' : 's'} (contando las invitaciones pendientes). Para sumar más personas, cambiá de plan o escribinos.`));
@@ -4705,6 +4714,7 @@ app.post('/admin/registrados/:id/renovar', requireAuth, accionPlan('Plan renovad
 app.post('/admin/registrados/:id/valores', requireAuth, accionPlan('Valores de este cliente guardados.', (id, b) => planesCliente.editarCopia(id, {
   modulos: [].concat(b.modulos || []), ilimitado: b.ilimitado === '1',
   convIncluidas: b.convIncluidas, maxProductos: b.maxProductos, maxUsuarios: b.maxUsuarios,
+  maxAdmins: b.maxAdmins, maxStaff: b.maxStaff, maxCajeros: b.maxCajeros, maxProfesionales: b.maxProfesionales,
   maxMensajesPropios: b.maxMensajesPropios, maxServicios: b.maxServicios, maxCitasMes: b.maxCitasMes,
 })));
 
@@ -5112,6 +5122,10 @@ function datosPlanDesdeForm(body) {
     convIncluidas: parseInt(body.convIncluidas, 10) || 0,
     maxProductos: parseInt(body.maxProductos, 10) || 0,
     maxUsuarios: parseInt(body.maxUsuarios, 10) || 1,
+    maxAdmins: limitesRol.leerTope(body.maxAdmins, 'Administradores'),
+    maxStaff: limitesRol.leerTope(body.maxStaff, 'Colaboradores'),
+    maxCajeros: limitesRol.leerTope(body.maxCajeros, 'Cajeros'),
+    maxProfesionales: limitesRol.leerTope(body.maxProfesionales, 'Profesionales'),
     maxServicios: parseInt(body.maxServicios, 10) || 10,
     maxCitasMes: parseInt(body.maxCitasMes, 10) || 200,
     maxMensajesPropios: Number.isFinite(parseInt(body.maxMensajesPropios, 10)) ? parseInt(body.maxMensajesPropios, 10) : 30,

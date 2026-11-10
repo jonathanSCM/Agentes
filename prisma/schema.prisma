@@ -53,6 +53,11 @@ model Plan {
   convIncluidas    Int // conversaciones incluidas por periodo
   maxProductos     Int
   maxUsuarios      Int
+  // Limites por ROL dentro de ese total (null = sin limite por rol).
+  maxAdmins        Int?
+  maxStaff         Int?
+  maxCajeros       Int?
+  maxProfesionales Int?
   // Mensajes propios que el negocio puede crear sobre los de fabrica (docs/10).
   maxMensajesPropios Int    @default(30)
   // Topes del modelo de citas (docs/09).
@@ -600,6 +605,10 @@ model Suscripcion {
   convIncluidas      Int?
   maxProductos       Int?
   maxUsuarios        Int?
+  maxAdmins          Int?
+  maxStaff           Int?
+  maxCajeros         Int?
+  maxProfesionales   Int?
   maxMensajesPropios Int?
   maxServicios       Int?
   maxCitasMes        Int?

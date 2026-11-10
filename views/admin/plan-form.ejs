@@ -93,6 +93,16 @@
     </div>
   </div>
 
+  <h3 class="form-section-title">Usuarios por rol <span class="muted" style="font-weight:400">(vacío = sin límite por rol; el dueño no cuenta)</span></h3>
+  <div class="field-row">
+    <% [['maxAdmins', 'Administradores'], ['maxStaff', 'Colaboradores'], ['maxCajeros', 'Cajeros'], ['maxProfesionales', 'Profesionales (citas)']].forEach(function (k) { %>
+      <div class="field">
+        <label for="<%= k[0] %>"><%= k[1] %></label>
+        <input id="<%= k[0] %>" name="<%= k[0] %>" type="number" min="0" placeholder="Sin límite" value="<%= plan && plan[k[0]] !== null && plan[k[0]] !== undefined ? plan[k[0]] : '' %>" />
+      </div>
+    <% }); %>
+  </div>
+
   <h3 class="form-section-title">Topes para negocios que agendan citas y mensajes del agente</h3>
   <div class="field-row">
     <div class="field">

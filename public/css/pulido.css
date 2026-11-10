@@ -83,3 +83,13 @@
 .cli-acciones .btn { padding: .35rem .75rem; font-size: .8rem; }
 .cli-interes { font-size: .82rem; color: var(--muted); overflow-wrap: anywhere; }
 @media (max-width: 600px) { .cli-grid { grid-template-columns: 1fr; } }
+
+/* ---------- Mi equipo: cupos por rol del plan ---------- */
+.eq-cupos { display: flex; flex-wrap: wrap; gap: .7rem; margin: 0 0 1.2rem; }
+.eq-cupo { min-width: 130px; padding: .7rem 1rem; border-radius: 14px; border: 1px solid var(--border); background: rgba(255, 255, 255, .05); }
+.eq-cupo strong { display: block; font-size: 1.5rem; line-height: 1.1; }
+.eq-cupo strong span { color: var(--muted); font-size: .95rem; font-weight: 600; }
+.eq-cupo small { color: var(--muted); font-size: .76rem; }
+.eq-cupo.lleno { border-color: rgba(245, 158, 11, .5); background: rgba(245, 158, 11, .08); }
+.eq-cupo.lleno small { color: #fde68a; }
+.plan-rol { color: var(--muted); font-size: .84rem; }

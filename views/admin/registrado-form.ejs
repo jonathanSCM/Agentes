@@ -69,7 +69,7 @@
       <% } else { %>no vence<% } %>
     </p>
     <ul class="muted" style="margin:.3rem 0 0;padding-left:1.1rem">
-      <% [['convIncluidas', 'Conversaciones por mes'], ['maxProductos', 'Productos'], ['maxUsuarios', 'Usuarios'], ['maxMensajesPropios', 'Mensajes propios'], ['maxServicios', 'Servicios (citas)'], ['maxCitasMes', 'Citas por mes']].forEach(function (k) { %>
+      <% [['convIncluidas', 'Conversaciones por mes'], ['maxProductos', 'Productos'], ['maxUsuarios', 'Usuarios'], ['maxAdmins', 'Administradores'], ['maxStaff', 'Colaboradores'], ['maxCajeros', 'Cajeros'], ['maxProfesionales', 'Profesionales'], ['maxMensajesPropios', 'Mensajes propios'], ['maxServicios', 'Servicios (citas)'], ['maxCitasMes', 'Citas por mes']].forEach(function (k) { %>
         <li><%= k[1] %>: <strong><%= topeTexto(v.limites[k[0]]) %></strong></li>
       <% }); %>
     </ul>
@@ -122,6 +122,11 @@
   <div class="field-row">
     <% [['convIncluidas', 'Conversaciones por mes'], ['maxProductos', 'Máx. productos'], ['maxUsuarios', 'Máx. usuarios']].forEach(function (k) { %>
       <div class="field"><label><%= k[1] %></label><input name="<%= k[0] %>" type="number" min="0" value="<%= v.limites[k[0]] === null ? '' : v.limites[k[0]] %>" placeholder="Sin límite" /></div>
+    <% }); %>
+  </div>
+  <div class="field-row">
+    <% [['maxAdmins', 'Administradores'], ['maxStaff', 'Colaboradores'], ['maxCajeros', 'Cajeros'], ['maxProfesionales', 'Profesionales']].forEach(function (k) { %>
+      <div class="field"><label><%= k[1] %></label><input name="<%= k[0] %>" type="number" min="0" value="<%= v.limites[k[0]] === null || v.limites[k[0]] === undefined ? '' : v.limites[k[0]] %>" placeholder="Sin límite" /></div>
     <% }); %>
   </div>
   <div class="field-row">

@@ -82,6 +82,9 @@
       <tr><td>Conversaciones incluidas</td><td><%= valores.limites.convIncluidas === null ? 'Ilimitadas' : valores.limites.convIncluidas.toLocaleString('es-BO') + ' por mes' %></td></tr>
       <tr><td>Productos permitidos</td><td><%= topeTexto(valores.limites.maxProductos) %></td></tr>
       <tr><td>Usuarios permitidos</td><td><%= topeTexto(valores.limites.maxUsuarios) %></td></tr>
+      <% [['maxAdmins', 'Administradores'], ['maxCajeros', 'Cajeros'], ['maxStaff', 'Colaboradores'], ['maxProfesionales', 'Profesionales']].forEach(function (r) { if (valores.limites[r[0]] !== null && valores.limites[r[0]] !== undefined) { %>
+        <tr><td>&nbsp;&nbsp;↳ <%= r[1] %></td><td><%= topeTexto(valores.limites[r[0]]) %></td></tr>
+      <% } }); %>
     </tbody>
   </table>
 </div>
