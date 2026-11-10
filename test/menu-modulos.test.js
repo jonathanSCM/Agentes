@@ -36,10 +36,12 @@ describe('menú lateral', () => {
     assert.ok(!c.includes('consumo') && !c.includes('equipo'));
   });
 
-  test('con citas desaparecen Pedidos y el catálogo, y aparece Mi negocio con el vocabulario', () => {
+  test('con citas desaparecen Pedidos, Categorías y Reportes; los productos y el inventario quedan para vender en las cuentas; aparece Mi negocio con el vocabulario', () => {
     const g = construirMenu({ esCitas: true, vocab: { profesionales: 'Barberos' } });
     const c = claves(g);
-    for (const x of ['pedidos', 'productos', 'categorias', 'inventario', 'reportes']) assert.ok(!c.includes(x), x);
+    for (const x of ['pedidos', 'categorias', 'reportes']) assert.ok(!c.includes(x), x);
+    for (const x of ['productos', 'inventario']) assert.ok(c.includes(x), x);
+    assert.ok(!claves(construirMenu({ esCitas: true, rol: 'STAFF' })).includes('productos'), 'el colaborador no administra productos');
     for (const x of ['servicios', 'atencion-equipo', 'horarios']) assert.ok(c.includes(x), x);
     assert.equal(items(g).find((i) => i.clave === 'atencion-equipo').etiqueta, 'Barberos');
   });
