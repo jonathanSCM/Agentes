@@ -1,0 +1,73 @@
+/* Calendario de citas (semana, mes y día). Usa la paleta del panel. */
+.cal-titulo { font-size: 1rem; }
+.cal-titulo::first-letter { text-transform: uppercase; }
+.cal-herramientas { display: flex; gap: .4rem; flex-wrap: wrap; align-items: center; }
+.cal-herramientas select { background: rgba(255, 255, 255, .06); color: var(--text); border: 1px solid var(--border); border-radius: 10px; padding: .45rem .6rem; font: inherit; font-size: .88rem; }
+.cal-vistas { display: inline-flex; background: rgba(255, 255, 255, .06); border-radius: 10px; padding: 3px; gap: 2px; }
+.cal-vistas a { padding: .35rem .8rem; border-radius: 8px; font-size: .82rem; font-weight: 600; color: var(--muted); }
+.cal-vistas a.activa { background: rgba(47, 227, 166, .16); color: var(--primary-2); }
+.cal-vacio { margin: 0 0 .8rem; }
+
+/* Semana y dia: grilla de horas */
+.cal-scroll { overflow-x: auto; border: 1px solid var(--border); border-radius: 14px; background: rgba(255, 255, 255, .03); }
+.cal-grilla { display: grid; grid-template-columns: 52px repeat(var(--cols), minmax(118px, 1fr)); min-width: calc(52px + var(--cols) * 118px); }
+.cal-esquina { border-bottom: 1px solid var(--border); background: rgba(0, 0, 0, .12); position: sticky; top: 0; z-index: 3; }
+.cal-cab-dia { display: grid; justify-items: center; gap: 0; padding: .45rem 0; text-align: center; border-bottom: 1px solid var(--border); border-left: 1px solid var(--border); background: rgba(0, 0, 0, .12); color: var(--muted); }
+.cal-cab-dia small { text-transform: uppercase; letter-spacing: .06em; font-size: .68rem; }
+.cal-cab-dia strong { font-size: 1.1rem; color: var(--text); }
+.cal-cab-dia.es-hoy strong { background: var(--primary-2); color: #06231a; border-radius: 999px; min-width: 30px; padding: 0 .35rem; }
+.cal-horas { position: relative; }
+.cal-horas span { position: absolute; right: 6px; transform: translateY(-50%); font-size: .68rem; color: var(--muted); font-variant-numeric: tabular-nums; }
+.cal-horas span:first-child { transform: none; }
+.cal-columna { position: relative; border-left: 1px solid var(--border); }
+.cal-columna.es-hoy { background: rgba(47, 227, 166, .04); }
+.cal-linea { position: absolute; left: 0; right: 0; border-top: 1px solid rgba(255, 255, 255, .07); pointer-events: none; }
+.cal-ahora { position: absolute; left: 0; right: 0; border-top: 2px solid #fb7185; z-index: 2; pointer-events: none; }
+.cal-ahora::before { content: ''; position: absolute; left: -4px; top: -5px; width: 8px; height: 8px; border-radius: 50%; background: #fb7185; }
+
+.cal-evento {
+  --evt: var(--primary); position: absolute; z-index: 1; overflow: hidden; text-align: left; cursor: pointer; padding: 3px 6px;
+  border: 0; border-left: 3px solid var(--evt); border-radius: 7px; background: color-mix(in srgb, var(--evt) 24%, #1e1230); color: var(--text); font: inherit; font-size: .74rem; line-height: 1.25;
+  display: flex; flex-direction: column; gap: 0;
+}
+.cal-evento:hover, .cal-evento:focus-visible { filter: brightness(1.25); outline: none; box-shadow: 0 0 0 2px color-mix(in srgb, var(--evt) 60%, transparent); }
+.cal-evento b { font-variant-numeric: tabular-nums; }
+.cal-evento span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
+.cal-evento small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); font-size: .68rem; }
+.cal-evento.estado-pendiente { --evt: #f59e0b; }
+.cal-evento.estado-completada { --evt: #2fe3a6; opacity: .75; }
+.cal-evento.estado-no_asistio { --evt: #fb7185; opacity: .75; text-decoration: line-through; }
+
+/* Mes */
+.cal-mes { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); border: 1px solid var(--border); border-radius: 14px; overflow: hidden; background: rgba(255, 255, 255, .03); }
+.cal-mes-cab { padding: .45rem; text-align: center; text-transform: uppercase; letter-spacing: .06em; font-size: .68rem; color: var(--muted); background: rgba(0, 0, 0, .12); border-bottom: 1px solid var(--border); }
+.cal-mes-dia { min-height: 96px; padding: .3rem .35rem; display: flex; flex-direction: column; gap: 2px; border-right: 1px solid var(--border); border-bottom: 1px solid var(--border); color: inherit; min-width: 0; }
+.cal-mes-dia:nth-child(7n + 14) { border-right: 0; }
+.cal-mes-dia:hover { background: rgba(139, 92, 246, .1); }
+.cal-mes-dia.fuera { opacity: .4; }
+.cal-mes-num { font-size: .8rem; font-weight: 700; color: var(--muted); }
+.cal-mes-dia.es-hoy .cal-mes-num { background: var(--primary-2); color: #06231a; border-radius: 999px; min-width: 22px; text-align: center; align-self: flex-start; padding: 0 .3rem; }
+.cal-chip { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding: 1px 5px; border-radius: 5px; font-size: .68rem; background: rgba(139, 92, 246, .22); }
+.cal-chip.estado-pendiente { background: rgba(245, 158, 11, .22); }
+.cal-chip.estado-completada { background: rgba(47, 227, 166, .18); }
+.cal-chip.estado-no_asistio { background: rgba(251, 113, 133, .2); text-decoration: line-through; }
+.cal-mas { font-size: .68rem; color: var(--muted); }
+
+/* Detalle */
+.cal-detalle-fondo { position: fixed; inset: 0; z-index: 90; display: flex; align-items: center; justify-content: center; padding: 1rem; background: rgba(8, 4, 16, .72); }
+.cal-detalle-fondo[hidden] { display: none; }
+.cal-detalle { position: relative; width: min(440px, 100%); background: #231536; border: 1px solid var(--border); border-radius: 16px; padding: 1.2rem 1.2rem 1.1rem; box-shadow: 0 20px 60px rgba(0, 0, 0, .5); }
+.cal-detalle h3 { margin: 0 2rem .8rem 0; font-size: 1.05rem; }
+.cal-detalle-cerrar { position: absolute; top: .7rem; right: .7rem; background: none; border: 0; color: var(--muted); font-size: 1.1rem; cursor: pointer; }
+.cal-detalle-datos { margin: 0 0 1rem; display: grid; gap: .4rem; }
+.cal-detalle-datos div { display: flex; justify-content: space-between; gap: 1rem; padding-bottom: .35rem; border-bottom: 1px dashed var(--border); font-size: .9rem; }
+.cal-detalle-datos dt { color: var(--muted); }
+.cal-detalle-datos dd { margin: 0; text-align: right; font-weight: 600; }
+.cal-detalle-datos a { color: var(--primary-2); }
+.cal-detalle-acciones { display: flex; gap: .5rem; flex-wrap: wrap; }
+
+@media (max-width: 700px) {
+  .cal-mes-dia { min-height: 70px; }
+  .cal-chip { display: none; }
+  .cal-mes-dia .cal-mas { display: none; }
+}

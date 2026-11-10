@@ -369,6 +369,8 @@ model Recurso {
 
   @@index([empresaId, activo])
   @@map("recursos")
+  usuarios     Usuario[]
+  invitaciones Invitacion[]
 }
 
 // Sin filas para un recurso = atiende todos los servicios.
@@ -526,6 +528,9 @@ model Usuario {
   passwordHash String
   nombre       String
   rol          Rol      @default(OWNER)
+  // PROFESIONAL: el recurso (profesional de la agenda) cuyas citas ve.
+  recursoId    Int?
+  recurso      Recurso? @relation(fields: [recursoId], references: [id], onDelete: SetNull)
   createdAt    DateTime @default(now())
 
   conversacionesTomadas Conversacion[]
@@ -552,6 +557,8 @@ model Invitacion {
   empresa   Empresa  @relation(fields: [empresaId], references: [id], onDelete: Cascade)
   email     String
   rol       Rol      @default(STAFF)
+  recursoId Int?
+  recurso   Recurso? @relation(fields: [recursoId], references: [id], onDelete: SetNull)
   token     String   @unique
   aceptada  Boolean  @default(false)
   expiraEn  DateTime
@@ -567,6 +574,7 @@ enum Rol {
   ADMIN         // administrador de la empresa
   STAFF         // colaborador
   CAJERO        // mostrador: solo punto de venta, caja y ventas
+  PROFESIONAL   // atiende citas: solo ve su agenda (calendario)
 }
 
 // ============================ SUSCRIPCION Y CONSUMO ============================

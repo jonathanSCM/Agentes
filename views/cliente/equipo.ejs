@@ -2,7 +2,8 @@
 
 <div class="page-head">
   <h2>Mi equipo</h2>
-  <p>Invita a otras personas de tu negocio para que usen el panel y atiendan conversaciones.</p>
+  <p>Invitá a las personas de tu negocio y elegí qué ve cada una: colaboradores, <strong>cajeros</strong> (solo el punto de venta)<% if (esCitas) { %> y <strong>profesionales</strong> (solo su calendario de citas)<% } %>.
+    <span class="muted">Usás <strong><%= cupo.usados %></strong> de <strong><%= cupo.topeTexto %></strong> usuarios de tu plan (cuentan las invitaciones pendientes).</span></p>
 </div>
 
 <% if (mensaje) { %><div class="alert-ok"><%= mensaje %></div><% } %>
@@ -27,9 +28,27 @@
         <option value="STAFF">Staff (atiende conversaciones y pedidos)</option>
         <option value="ADMIN">Admin (todo, menos equipo y facturación)</option>
         <option value="CAJERO">Cajero (solo punto de venta, caja y ventas)</option>
+        <% if (esCitas) { %><option value="PROFESIONAL">Profesional (solo ve su calendario de citas)</option><% } %>
       </select>
     </div>
   </div>
+  <% if (esCitas) { %>
+    <div class="field" id="campoRecurso" hidden>
+      <label for="recursoId">¿Cuál es su agenda? *</label>
+      <select id="recursoId" name="recursoId">
+        <option value="">Elegí el profesional…</option>
+        <% recursos.forEach(function (r) { %><option value="<%= r.id %>"><%= r.nombre %><%= r.especialidad ? ' · ' + r.especialidad : '' %></option><% }); %>
+      </select>
+      <p class="pf-ayuda">La persona verá en su calendario solo las citas de este profesional. Si todavía no está en la lista, cargalo en Mi negocio → Equipo de atención.</p>
+    </div>
+    <script>
+      (function () {
+        var rol = document.getElementById('rol'); var campo = document.getElementById('campoRecurso'); var sel = document.getElementById('recursoId');
+        function ajustar() { var si = rol.value === 'PROFESIONAL'; campo.hidden = !si; sel.required = si; }
+        rol.addEventListener('change', ajustar); ajustar();
+      })();
+    </script>
+  <% } %>
   <div class="form-actions">
     <button class="btn btn-primary" type="submit">Enviar invitación</button>
   </div>
@@ -44,7 +63,17 @@
         <tr>
           <td><strong><%= u.nombre %></strong><% if (u.id === usuarioActualId) { %> <span class="muted">(vos)</span><% } %></td>
           <td class="muted"><%= u.email %></td>
-          <td><span class="badge <%= u.rol === 'OWNER' ? 'badge-new' : 'badge-done' %>"><%= u.rol %></span></td>
+          <td><span class="badge <%= u.rol === 'OWNER' ? 'badge-new' : 'badge-done' %>"><%= etiquetaRol(u.rol) %></span>
+            <% if (u.rol === 'PROFESIONAL') { %>
+              <form method="POST" action="/panel/equipo/<%= u.id %>/recurso" class="inline-form" style="display:flex;gap:.3rem;margin-top:.4rem;flex-wrap:wrap">
+                <select name="recursoId" aria-label="Agenda de <%= u.nombre %>" style="max-width:190px">
+                  <option value="">Sin agenda asignada</option>
+                  <% recursos.forEach(function (r) { %><option value="<%= r.id %>" <%= u.recursoId === r.id ? 'selected' : '' %>><%= r.nombre %></option><% }); %>
+                </select>
+                <button class="btn btn-ghost" style="padding:.25rem .6rem;font-size:.78rem" type="submit">Guardar</button>
+              </form>
+            <% } %>
+          </td>
           <td class="nowrap muted"><%= new Date(u.createdAt).toLocaleDateString('es-BO') %></td>
           <td class="actions-cell">
             <% if (u.rol !== 'OWNER') { %>
@@ -71,7 +100,7 @@
         <% invitaciones.forEach(function (i) { %>
           <tr>
             <td><%= i.email %></td>
-            <td><span class="badge badge-done"><%= i.rol %></span></td>
+            <td><span class="badge badge-done"><%= etiquetaRol(i.rol) %></span></td>
             <td class="nowrap muted"><%= new Date(i.expiraEn).toLocaleDateString('es-BO') %></td>
             <td class="actions-cell">
               <form method="POST" action="/panel/equipo/invitaciones/<%= i.id %>/revocar" class="inline-form">

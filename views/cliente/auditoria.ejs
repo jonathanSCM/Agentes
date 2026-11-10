@@ -1,7 +1,7 @@
 <%- include('partials/inicio') %>
 <%
   var cuando = function (f) { return new Date(f).toLocaleString('es-BO', { timeZone: zona, dateStyle: 'short', timeStyle: 'short' }); };
-  var rolTxt = { OWNER: 'Dueño', ADMIN: 'Administrador', STAFF: 'Colaborador', CAJERO: 'Cajero', PROSHOP_ADMIN: 'Proshop' };
+  var rolTxt = { OWNER: 'Dueño', ADMIN: 'Administrador', STAFF: 'Colaborador', CAJERO: 'Cajero', PROFESIONAL: 'Profesional', PROSHOP_ADMIN: 'Proshop' };
   var qs = function (p) {
     var o = { grupo: filtros.grupo, usuario: filtros.usuario, desde: filtros.desde, hasta: filtros.hasta, pagina: p };
     return Object.keys(o).filter(function (k) { return o[k]; }).map(function (k) { return k + '=' + encodeURIComponent(o[k]); }).join('&');

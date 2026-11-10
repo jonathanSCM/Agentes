@@ -1,0 +1,69 @@
+{
+  "generado": "2026-11-03T15:44:39.786Z",
+  "totalProductos": 35,
+  "conVariantes": 33,
+  "porConvertir": 2,
+  "sinVariantesNiOpciones": 0,
+  "productos": [
+    {
+      "productoId": 169,
+      "empresaId": 2,
+      "empresa": "Tienda Demo",
+      "nombre": "ZAPATILLAS TEKKIRA CUP",
+      "categoria": "Zapatillas urbanas",
+      "activo": true,
+      "stockActual": 5,
+      "precio": 303,
+      "opciones": [
+        {
+          "nombre": "Talla",
+          "valores": [
+            "8",
+            "9",
+            "9.5",
+            "10",
+            "10.5"
+          ]
+        },
+        {
+          "nombre": "Color",
+          "valores": [
+            "Blanco nube"
+          ]
+        }
+      ],
+      "otrosDatos": {
+        "Genero": "Unisex"
+      },
+      "combinaciones": 5
+    },
+    {
+      "productoId": 170,
+      "empresaId": 2,
+      "empresa": "Tienda Demo",
+      "nombre": "Drop Step low 2.0",
+      "categoria": "Zapatillas urbanas",
+      "activo": true,
+      "stockActual": 16,
+      "precio": 309,
+      "opciones": [
+        {
+          "nombre": "Talla",
+          "valores": [
+            "10"
+          ]
+        },
+        {
+          "nombre": "Color",
+          "valores": [
+            "rojo"
+          ]
+        }
+      ],
+      "otrosDatos": {
+        "Genero": "Hombre"
+      },
+      "combinaciones": 1
+    }
+  ]
+}

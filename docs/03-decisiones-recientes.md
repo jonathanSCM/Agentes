@@ -1125,3 +1125,11 @@ Migración aditiva `20261114100000_pos_espera_y_cambios` (tabla `ventas_espera`,
 - **Arreglo visual**: en el punto de venta las filas de productos se achicaban a 96 px y los textos de las fichas se pisaban (`grid-auto-rows: max-content`).
 - Verificado: 13 pruebas nuevas (cambio con igual/mayor/menor valor, efectivo insuficiente, sin stock, reglas y roles, doble toque, Resumen; espera con precios de hoy, avisos, carrera, tope, aislamiento y vencimiento) y el flujo completo en el navegador con la copia de datos reales (dejar en espera, retomar, cambio con "Devolvele Bs 20.00 en efectivo", recibo y caja). Suite: 1113.
 - **Pendiente**: crédito a favor del cliente (vale) cuando lo nuevo vale menos y no quiere efectivo, y cambio sobre ventas de pedidos del bot.
+
+## 61. Rol Profesional y calendario de citas (nov 2026)
+
+- **Pedido:** usuarios cajeros (solo POS; ya existían, rol `CAJERO`) y usuarios que vean solo sus citas en un calendario.
+- **Rol `PROFESIONAL`** (solo negocios de citas): se invita desde Mi equipo eligiendo a qué profesional de la agenda corresponde (`Usuario.recursoId` / `Invitacion.recursoId`, validado contra la empresa). Queda confinado en servidor a `/panel/mi-agenda`, `/salir`, `/notificaciones`. El recurso se lee de la BD en cada pedido (no de la URL ni de la sesión).
+- **Calendario** (`lib/services/calendarioCitas.js`, `views/cliente/calendario.ejs`): vistas semana/mes/día, citas superpuestas lado a lado, línea de "ahora", detalle con WhatsApp. El profesional solo marca sus citas como completada / no vino; el negocio ve "Calendario" con filtro por profesional.
+- **Plan:** el tope `maxUsuarios` cuenta usuarios + invitaciones pendientes; Mi equipo muestra "N de M".
+- Migraciones aditivas: `20261115100000_rol_profesional`, `20261115110000_usuario_recurso`. Tests: `test/calendario-profesional.test.js`.

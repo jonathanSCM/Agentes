@@ -1,0 +1,29 @@
+{
+  "fecha": "2026-11-03T15:46:03.886Z",
+  "respaldo": [
+    {
+      "producto": {
+        "id": 169,
+        "nombre": "ZAPATILLAS TEKKIRA CUP",
+        "stock": 5,
+        "atributos": {
+          "Color": "Blanco nube",
+          "Talla": "8,9,9.5,10,10.5",
+          "Genero": "Unisex"
+        }
+      }
+    },
+    {
+      "producto": {
+        "id": 170,
+        "nombre": "Drop Step low 2.0",
+        "stock": 16,
+        "atributos": {
+          "Color": "rojo",
+          "Talla": "10",
+          "Genero": "Hombre"
+        }
+      }
+    }
+  ]
+}

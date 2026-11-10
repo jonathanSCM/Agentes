@@ -956,11 +956,15 @@ app.use('/panel', async (req, res, next) => {
 
 // El CAJERO solo ve el punto de venta, la caja y las ventas. Se aplica en el SERVIDOR (no solo en el menu).
 const RUTAS_DEL_CAJERO = ['/pos', '/caja', '/ventas', '/salir', '/notificaciones'];
+// El PROFESIONAL (citas) solo ve su agenda: su calendario y marcar sus propias citas.
+const RUTAS_DEL_PROFESIONAL = ['/mi-agenda', '/salir', '/notificaciones'];
+const ROLES_CONFINADOS = { CAJERO: { inicio: '/panel/pos', permitidas: RUTAS_DEL_CAJERO }, PROFESIONAL: { inicio: '/panel/mi-agenda', permitidas: RUTAS_DEL_PROFESIONAL } };
 app.use('/panel', (req, res, next) => {
-  if (!req.session || req.session.clienteRol !== 'CAJERO') return next();
-  if (req.path === '/') return res.redirect('/panel/pos');
-  if (RUTAS_DEL_CAJERO.some((r) => req.path === r || req.path.startsWith(`${r}/`))) return next();
-  if (req.method === 'GET') return res.redirect('/panel/pos');
+  const conf = req.session && ROLES_CONFINADOS[req.session.clienteRol];
+  if (!conf) return next();
+  if (req.path === '/') return res.redirect(conf.inicio);
+  if (conf.permitidas.some((r) => req.path === r || req.path.startsWith(`${r}/`))) return next();
+  if (req.method === 'GET') return res.redirect(conf.inicio);
   return res.status(403).render('403', { title: 'Sin permiso - Proshop' });
 });
 
@@ -2955,6 +2959,63 @@ const accionPlantilla = (fn, okTexto) => async (req, res, next) => {
 app.post('/panel/citas/recordatorios/plantilla', requireCliente, soloCitas, puedeEditarAtencion, accionPlantilla((e) => recordatoriosSrv.crearPlantillaEnMeta(e), 'Plantilla enviada a Meta. Suele aprobarse en minutos u horas: tocá "Actualizar estado" para ver cómo va.'));
 app.post('/panel/citas/recordatorios/plantilla/estado', requireCliente, soloCitas, puedeEditarAtencion, accionPlantilla((e) => recordatoriosSrv.actualizarEstadoPlantilla(e), 'Estado actualizado.'));
 
+// ---- Calendario (semana / mes / dia) ----
+const calendarioSrv = require('./lib/services/calendarioCitas');
+const accionesPermitidas = (e, soloCierre) => (soloCierre
+  ? (e.puedeCerrar ? ['COMPLETADA', 'NO_ASISTIO'] : [])
+  : (citasPanel.TRANSICIONES[e.estado] || []).filter((a) => !['COMPLETADA', 'NO_ASISTIO'].includes(a) || e.yaEmpezo));
+async function renderCalendario(req, res, { empresa, recursoId, propio, base, accionEstado, profesionales }) {
+  const vista = calendarioSrv.VISTAS.includes(String(req.query.vista || '')) ? String(req.query.vista) : 'semana';
+  const cal = await calendarioSrv.calendario(empresa, vista, String(req.query.fecha || ''), { recursoId });
+  for (const d of cal.dias) for (const e of d.eventos) e.acciones = accionesPermitidas(e, propio);
+  const vec = calendarioSrv.vecinas(cal.rango.vista, cal.rango.fecha, empresa.zonaHoraria);
+  const ahora = require('luxon').DateTime.now().setZone(empresa.zonaHoraria);
+  res.render('cliente/calendario', {
+    title: propio ? 'Mi agenda - Proshop' : 'Calendario - Proshop', tituloPagina: propio ? 'Mi agenda' : 'Calendario', activo: propio ? 'mi-agenda' : 'calendario',
+    cal, titulo: calendarioSrv.tituloDe(cal.rango, empresa.zonaHoraria), vec, propio, base, accionEstado, profesionales: profesionales || [], recursoId: recursoId || '',
+    ahoraMin: ahora.hour * 60 + ahora.minute, vocab: res.locals.vocab || require('./lib/services/rubros').vocabularioDe(empresa),
+    mensaje: req.query.ok || null, error: req.query.err || null,
+  });
+}
+app.get('/panel/citas/calendario', requireCliente, soloCitas, async (req, res, next) => {
+  try {
+    const empresa = await prisma.empresa.findUnique({ where: { id: req.session.empresaId } });
+    const profesionales = await prisma.recurso.findMany({ where: { empresaId: empresa.id, activo: true }, orderBy: { nombre: 'asc' }, select: { id: true, nombre: true } });
+    const recursoId = profesionales.some((p) => p.id === Number(req.query.profesional)) ? Number(req.query.profesional) : null;
+    await renderCalendario(req, res, { empresa, recursoId, propio: false, base: '/panel/citas/calendario', accionEstado: '/panel/citas', profesionales });
+  } catch (err) { next(err); }
+});
+// El PROFESIONAL: solo su agenda. El recurso sale de SU usuario (no de la URL): no puede ver la de otro.
+async function recursoDelProfesional(req) {
+  const u = await prisma.usuario.findUnique({ where: { id: req.session.clienteId }, select: { recursoId: true } });
+  return u && u.recursoId ? u.recursoId : null;
+}
+app.get('/panel/mi-agenda', requireCliente, requireRol('PROFESIONAL'), async (req, res, next) => {
+  try {
+    const empresa = await prisma.empresa.findUnique({ where: { id: req.session.empresaId } });
+    const recursoId = await recursoDelProfesional(req);
+    if (!recursoId) return res.render('cliente/calendario-sin-vinculo', { title: 'Mi agenda - Proshop', tituloPagina: 'Mi agenda', activo: 'mi-agenda' });
+    await renderCalendario(req, res, { empresa, recursoId, propio: true, base: '/panel/mi-agenda', accionEstado: '/panel/mi-agenda' });
+  } catch (err) { next(err); }
+});
+app.post('/panel/mi-agenda/:id(\\d+)/estado', requireCliente, requireRol('PROFESIONAL'), async (req, res, next) => {
+  const volver = `/panel/mi-agenda?vista=${calendarioSrv.VISTAS.includes(String(req.body.vista)) ? req.body.vista : 'semana'}${T.esFecha(String(req.body.fecha || '')) ? `&fecha=${req.body.fecha}` : ''}`;
+  try {
+    const empresa = await prisma.empresa.findUnique({ where: { id: req.session.empresaId } });
+    const recursoId = await recursoDelProfesional(req);
+    const cita = await prisma.cita.findFirst({ where: { id: Number(req.params.id), empresaId: empresa.id }, select: { id: true, recursoId: true } });
+    // Solo SUS citas, y solo marcar si vino o no vino (cancelar o mover es del negocio).
+    if (!cita || !recursoId || cita.recursoId !== recursoId || !['COMPLETADA', 'NO_ASISTIO'].includes(String(req.body.estado))) {
+      return res.redirect(volver + '&err=' + encodeURIComponent('No podés cambiar esa cita.'));
+    }
+    await citasPanel.cambiarEstado(empresa, cita.id, String(req.body.estado), { id: req.session.clienteId, rol: req.session.clienteRol });
+    res.redirect(volver + '&ok=' + encodeURIComponent('Listo, actualizado.'));
+  } catch (err) {
+    if (err.codigo === 'CITA') return res.redirect(volver + '&err=' + encodeURIComponent(err.message));
+    next(err);
+  }
+});
+
 app.post('/panel/citas/:id(\\d+)/estado', requireCliente, soloCitas, async (req, res, next) => {
   const fecha = T.esFecha(String(req.body.fecha || '')) ? `&fecha=${req.body.fecha}` : '';
   try {
@@ -2966,6 +3027,8 @@ app.post('/panel/citas/:id(\\d+)/estado', requireCliente, soloCitas, async (req,
       const aviso = await recordatoriosSrv.avisarCancelacion(empresa, cita).catch(() => ({ avisado: false }));
       mensaje += aviso.avisado ? ' Le avisamos al cliente por WhatsApp.' : ' No pudimos avisarle por WhatsApp (no escribió en las últimas 24 h): avisale vos.';
     }
+    // Si la accion vino del calendario, se vuelve al calendario (misma vista y fecha).
+    if (/^\/panel\/citas\/calendario\?[\w=&%.-]*$/.test(String(req.body.volver || ''))) return res.redirect(`${req.body.volver}&ok=${encodeURIComponent(mensaje)}`);
     res.redirect('/panel/citas?ok=' + encodeURIComponent(mensaje) + fecha);
   } catch (err) {
     if (err.codigo === 'CITA') return res.redirect('/panel/citas?err=' + encodeURIComponent(err.message) + fecha);
@@ -3473,34 +3536,62 @@ const { crearInvitacion, obtenerInvitacionPorToken, aceptarInvitacion } = requir
 
 app.get('/panel/equipo', requireCliente, requireRol('OWNER'), async (req, res, next) => {
   try {
-    const [usuarios, invitaciones] = await Promise.all([
+    const [usuarios, invitaciones, recursos, valores] = await Promise.all([
       prisma.usuario.findMany({ where: { empresaId: req.session.empresaId }, orderBy: { createdAt: 'asc' } }),
       prisma.invitacion.findMany({ where: { empresaId: req.session.empresaId, aceptada: false }, orderBy: { createdAt: 'desc' } }),
+      prisma.recurso.findMany({ where: { empresaId: req.session.empresaId, activo: true }, orderBy: { nombre: 'asc' }, select: { id: true, nombre: true, especialidad: true } }),
+      planesCliente.valoresDe(req.session.empresaId),
     ]);
     res.render('cliente/equipo', {
       title: 'Mi equipo - Proshop', tituloPagina: 'Mi equipo', activo: 'equipo',
-      usuarios, invitaciones, mensaje: req.query.ok || null, error: req.query.err || null,
+      usuarios, invitaciones, recursos, esCitas: res.locals.modeloNegocio === 'CITAS', etiquetaRol: menuPanel.etiquetaRol,
+      cupo: { usados: usuarios.length + invitaciones.length, tope: planesCliente.topeNumerico(valores.limites.maxUsuarios), topeTexto: planesCliente.topeTexto(valores.limites.maxUsuarios) },
+      mensaje: req.query.ok || null, error: req.query.err || null,
       linkInvitacion: req.query.link || null, usuarioActualId: req.session.clienteId,
     });
   } catch (err) { next(err); }
 });
 
 app.post('/panel/equipo/invitar', requireCliente, requireRol('OWNER'), async (req, res, next) => {
-  const { email, rol } = req.body || {};
+  const { email, rol, recursoId } = req.body || {};
   try {
     if (!email || !String(email).trim()) {
       return res.redirect('/panel/equipo?err=' + encodeURIComponent('Ingresa un correo.'));
     }
-    const invitacion = await crearInvitacion({ empresaId: req.session.empresaId, email, rol });
+    // Un profesional solo existe en negocios de citas.
+    if (rol === 'PROFESIONAL' && res.locals.modeloNegocio !== 'CITAS') {
+      return res.redirect('/panel/equipo?err=' + encodeURIComponent('El rol Profesional es para negocios que agendan citas.'));
+    }
+    // Tope de usuarios del plan (cuenta a los que ya estan y a las invitaciones pendientes).
+    const [cantidad, pendientes, valoresPlan] = await Promise.all([
+      prisma.usuario.count({ where: { empresaId: req.session.empresaId } }),
+      prisma.invitacion.count({ where: { empresaId: req.session.empresaId, aceptada: false, expiraEn: { gt: new Date() } } }),
+      planesCliente.valoresDe(req.session.empresaId),
+    ]);
+    const tope = planesCliente.topeNumerico(valoresPlan.limites.maxUsuarios);
+    if (cantidad + pendientes >= tope) {
+      return res.redirect('/panel/equipo?err=' + encodeURIComponent(`Tu plan permite ${planesCliente.topeTexto(valoresPlan.limites.maxUsuarios)} usuario${tope === 1 ? '' : 's'} (contando las invitaciones pendientes). Para sumar más personas, cambiá de plan o escribinos.`));
+    }
+    const invitacion = await crearInvitacion({ empresaId: req.session.empresaId, email, rol, recursoId });
     await auditoriaSrv.registrarSinRiesgo({ empresaId: req.session.empresaId, actor: { id: req.session.clienteId }, accion: 'EQUIPO_INVITADO', entidad: 'Invitacion', entidadId: invitacion.id, detalle: { email: String(email).trim().toLowerCase(), rol: invitacion.rol || rol } });
     const link = `${req.protocol}://${req.get('host')}/invitacion/${invitacion.token}`;
     res.redirect('/panel/equipo?ok=' + encodeURIComponent('Invitación creada. Compártele este link a la persona:') + '&link=' + encodeURIComponent(link));
   } catch (err) {
-    if (err.codigo === 'EMAIL_DUPLICADO') {
+    if (err.codigo === 'EMAIL_DUPLICADO' || err.codigo === 'RECURSO_INVALIDO') {
       return res.redirect('/panel/equipo?err=' + encodeURIComponent(err.message));
     }
     next(err);
   }
+});
+
+// Cambiar a qué profesional de la agenda corresponde un usuario PROFESIONAL.
+app.post('/panel/equipo/:id(\\d+)/recurso', requireCliente, requireRol('OWNER'), async (req, res, next) => {
+  try {
+    const recurso = await prisma.recurso.findFirst({ where: { id: Number(req.body.recursoId) || 0, empresaId: req.session.empresaId, activo: true }, select: { id: true } });
+    if (!recurso) return res.redirect('/panel/equipo?err=' + encodeURIComponent('Elegí un profesional de la agenda.'));
+    const r = await prisma.usuario.updateMany({ where: { id: Number(req.params.id), empresaId: req.session.empresaId, rol: 'PROFESIONAL' }, data: { recursoId: recurso.id } });
+    res.redirect('/panel/equipo?' + (r.count ? 'ok=' + encodeURIComponent('Listo: esa persona ahora ve la agenda de ese profesional.') : 'err=' + encodeURIComponent('Esa persona no es un profesional.')));
+  } catch (err) { next(err); }
 });
 
 app.post('/panel/equipo/invitaciones/:id/revocar', requireCliente, requireRol('OWNER'), async (req, res, next) => {

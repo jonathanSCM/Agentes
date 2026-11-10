@@ -1,0 +1,139 @@
+<%- include('partials/inicio') %>
+<link rel="stylesheet" href="/css/calendario.css" />
+<%
+  var vista = cal.rango.vista;
+  var HPX = 56; // alto de una hora en la grilla
+  var h0 = cal.ventana.desde, h1 = cal.ventana.hasta;
+  var horas = []; for (var h = h0; h < h1; h++) horas.push(h);
+  var altoGrilla = (h1 - h0) * HPX;
+  var ETQ = { PENDIENTE: 'Por confirmar', CONFIRMADA: 'Confirmada', COMPLETADA: 'Completada', NO_ASISTIO: 'No asistió' };
+  var ACCION = { CONFIRMADA: ['Confirmar', 'btn-primary'], COMPLETADA: ['Marcar como completada', 'btn-primary'], NO_ASISTIO: ['No vino', 'btn-ghost'], CANCELADA: ['Cancelar', 'btn-danger'] };
+  var qs = function (o) { return Object.keys(o).filter(function (k) { return o[k] !== '' && o[k] !== null && o[k] !== undefined; }).map(function (k) { return k + '=' + encodeURIComponent(o[k]); }).join('&'); };
+  var enlace = function (extra) { return base + '?' + qs(Object.assign({ vista: vista, fecha: cal.rango.fecha, profesional: propio ? '' : recursoId }, extra)); };
+  var hhmm = function (min) { return String(Math.floor(min / 60)).padStart(2, '0') + ':' + String(min % 60).padStart(2, '0'); };
+%>
+
+<div class="page-head page-head-row">
+  <div>
+    <h2><%= propio ? 'Mi agenda' : 'Calendario' %></h2>
+    <p class="cal-titulo"><%= titulo %></p>
+  </div>
+  <div class="cal-herramientas">
+    <a class="btn btn-ghost" href="<%= enlace({ fecha: vec.anterior }) %>" aria-label="Anterior">←</a>
+    <a class="btn btn-ghost" href="<%= enlace({ fecha: cal.hoy }) %>">Hoy</a>
+    <a class="btn btn-ghost" href="<%= enlace({ fecha: vec.siguiente }) %>" aria-label="Siguiente">→</a>
+    <span class="cal-vistas" role="tablist" aria-label="Vista">
+      <% [['semana', 'Semana'], ['mes', 'Mes'], ['dia', 'Día']].forEach(function (v) { %>
+        <a class="<%= vista === v[0] ? 'activa' : '' %>" href="<%= enlace({ vista: v[0] }) %>" role="tab"><%= v[1] %></a>
+      <% }); %>
+    </span>
+    <% if (!propio) { %>
+      <form method="GET" action="<%= base %>" class="inline-form">
+        <input type="hidden" name="vista" value="<%= vista %>" /><input type="hidden" name="fecha" value="<%= cal.rango.fecha %>" />
+        <select name="profesional" aria-label="Ver la agenda de" onchange="this.form.submit()">
+          <option value="">Todos los <%= vocab.profesionales.toLowerCase() %></option>
+          <% profesionales.forEach(function (p) { %><option value="<%= p.id %>" <%= Number(recursoId) === p.id ? 'selected' : '' %>><%= p.nombre %></option><% }); %>
+        </select>
+      </form>
+      <a class="btn btn-ghost" href="/panel/citas">Lista del día</a>
+    <% } %>
+  </div>
+</div>
+
+<% if (mensaje) { %><div class="alert-ok"><%= mensaje %></div><% } %>
+<% if (error) { %><div class="alert-err" role="alert"><%= error %></div><% } %>
+
+<% var cuenta = cal.dias.reduce(function (n, d) { return n + d.total; }, 0); %>
+<% if (!cuenta && vista !== 'mes') { %><p class="muted cal-vacio">No hay <%= vocab.citas %> en este período.</p><% } %>
+
+<% if (vista === 'mes') { %>
+  <div class="cal-mes" role="grid" aria-label="Mes">
+    <% ['lun', 'mar', 'mié', 'jue', 'vie', 'sáb', 'dom'].forEach(function (n) { %><div class="cal-mes-cab"><%= n %></div><% }); %>
+    <% cal.semanas.forEach(function (sem) { sem.forEach(function (d) { %>
+      <a class="cal-mes-dia <%= d.esHoy ? 'es-hoy' : '' %> <%= d.delMes ? '' : 'fuera' %>" href="<%= enlace({ vista: 'dia', fecha: d.fecha }) %>">
+        <span class="cal-mes-num"><%= d.numero %></span>
+        <% d.eventos.slice(0, 3).forEach(function (e) { %>
+          <span class="cal-chip estado-<%= e.estado.toLowerCase() %>"><b><%= e.hora %></b> <%= e.cliente %></span>
+        <% }); %>
+        <% if (d.total > 3) { %><span class="cal-mas">+<%= d.total - 3 %> más</span><% } %>
+      </a>
+    <% }); }); %>
+  </div>
+
+<% } else { %>
+  <div class="cal-scroll">
+    <div class="cal-grilla" style="--hpx: <%= HPX %>px; --cols: <%= cal.dias.length %>">
+      <div class="cal-esquina"></div>
+      <% cal.dias.forEach(function (d) { %>
+        <a class="cal-cab-dia <%= d.esHoy ? 'es-hoy' : '' %>" href="<%= enlace({ vista: 'dia', fecha: d.fecha }) %>"><small><%= d.etiqueta %></small><strong><%= d.numero %></strong></a>
+      <% }); %>
+      <div class="cal-horas" style="height: <%= altoGrilla %>px">
+        <% horas.forEach(function (h) { %><span style="top: <%= (h - h0) * HPX %>px"><%= String(h).padStart(2, '0') %>:00</span><% }); %>
+      </div>
+      <% cal.dias.forEach(function (d) { %>
+        <div class="cal-columna <%= d.esHoy ? 'es-hoy' : '' %>" style="height: <%= altoGrilla %>px">
+          <% horas.forEach(function (h) { %><i class="cal-linea" style="top: <%= (h - h0) * HPX %>px"></i><% }); %>
+          <% if (d.esHoy && ahoraMin >= h0 * 60 && ahoraMin <= h1 * 60) { %><i class="cal-ahora" style="top: <%= (ahoraMin - h0 * 60) / 60 * HPX %>px"></i><% } %>
+          <% d.eventos.forEach(function (e) {
+               var top = (e.inicioMin - h0 * 60) / 60 * HPX; var alto = Math.max(24, (e.finMin - e.inicioMin) / 60 * HPX - 2);
+               var datos = JSON.stringify({ id: e.id, hora: e.hora, horaFin: e.horaFin, cliente: e.cliente, telefono: e.telefono, servicio: e.servicio, recurso: e.recurso, estado: ETQ[e.estado] || e.estado, personas: e.personas, notas: e.notas, confirmo: e.confirmo, acciones: e.acciones, fecha: d.fecha });
+          %>
+            <button type="button" class="cal-evento estado-<%= e.estado.toLowerCase() %>" data-cita="<%- datos.replace(/&/g, '&amp;').replace(/"/g, '&quot;') %>"
+                    style="top: <%= top %>px; height: <%= alto %>px; left: calc(<%= e.col %> * 100% / <%= e.cols %> + 2px); width: calc(100% / <%= e.cols %> - 4px);<%= e.color ? ' --evt: ' + e.color + ';' : '' %>">
+              <b><%= e.hora %></b> <span><%= e.cliente %></span><% if (alto > 40) { %><small><%= e.servicio %><% if (!propio && e.recurso) { %> · <%= e.recurso %><% } %></small><% } %>
+            </button>
+          <% }); %>
+        </div>
+      <% }); %>
+    </div>
+  </div>
+<% } %>
+
+<%# ---------- Detalle de una cita ---------- %>
+<div class="cal-detalle-fondo" id="calDetalle" hidden>
+  <div class="cal-detalle" role="dialog" aria-modal="true" aria-labelledby="calDetalleTitulo">
+    <button type="button" class="cal-detalle-cerrar" id="calCerrar" aria-label="Cerrar">✕</button>
+    <h3 id="calDetalleTitulo"></h3>
+    <dl class="cal-detalle-datos" id="calDatos"></dl>
+    <div class="cal-detalle-acciones" id="calAcciones"></div>
+  </div>
+</div>
+
+<script>
+  (function () {
+    var ACCION = { CONFIRMADA: ['Confirmar', 'btn-primary'], COMPLETADA: ['Marcar como completada', 'btn-primary'], NO_ASISTIO: ['No vino', 'btn-ghost'], CANCELADA: ['Cancelar la cita', 'btn-danger'] };
+    var ACCION_ESTADO = <%- JSON.stringify(accionEstado) %>;
+    var PROPIO = <%- JSON.stringify(Boolean(propio)) %>;
+    var VOLVER = <%- JSON.stringify(propio ? '' : enlace({})) %>;
+    var VISTA = <%- JSON.stringify(vista) %>;
+    var FECHA = <%- JSON.stringify(cal.rango.fecha) %>;
+    var fondo = document.getElementById('calDetalle');
+    function fila(dt, dd) { var d = document.createElement('div'); var a = document.createElement('dt'); a.textContent = dt; var b = document.createElement('dd'); if (dd instanceof Node) b.appendChild(dd); else b.textContent = dd; d.appendChild(a); d.appendChild(b); return d; }
+    function abrir(c) {
+      document.getElementById('calDetalleTitulo').textContent = c.hora + ' – ' + c.horaFin + ' · ' + c.cliente;
+      var datos = document.getElementById('calDatos'); datos.innerHTML = '';
+      datos.appendChild(fila('Servicio', c.servicio));
+      if (c.recurso) datos.appendChild(fila('Profesional', c.recurso));
+      if (c.personas > 1) datos.appendChild(fila('Personas', String(c.personas)));
+      datos.appendChild(fila('Estado', c.estado + (c.confirmo ? ' · ✓ confirmó que va' : '')));
+      var a = document.createElement('a'); a.href = 'https://wa.me/' + String(c.telefono).replace(/\D/g, ''); a.target = '_blank'; a.rel = 'noopener noreferrer'; a.textContent = c.telefono;
+      datos.appendChild(fila('WhatsApp', a));
+      if (c.notas) datos.appendChild(fila('Notas', c.notas));
+      var acc = document.getElementById('calAcciones'); acc.innerHTML = '';
+      (c.acciones || []).forEach(function (estado) {
+        var f = document.createElement('form'); f.method = 'POST'; f.action = ACCION_ESTADO + '/' + c.id + '/estado'; f.className = 'inline-form';
+        if (estado === 'CANCELADA') f.addEventListener('submit', function (e) { if (!confirm('¿Cancelar esta cita? Se libera el horario.')) e.preventDefault(); });
+        [['estado', estado], ['fecha', FECHA], ['vista', VISTA], ['volver', VOLVER]].forEach(function (p) { var i = document.createElement('input'); i.type = 'hidden'; i.name = p[0]; i.value = p[1]; f.appendChild(i); });
+        var b = document.createElement('button'); b.type = 'submit'; b.className = 'btn ' + ACCION[estado][1]; b.textContent = ACCION[estado][0]; f.appendChild(b); acc.appendChild(f);
+      });
+      fondo.hidden = false;
+    }
+    function cerrar() { fondo.hidden = true; }
+    document.querySelectorAll('.cal-evento').forEach(function (el) { el.addEventListener('click', function () { abrir(JSON.parse(el.getAttribute('data-cita'))); }); });
+    document.getElementById('calCerrar').addEventListener('click', cerrar);
+    fondo.addEventListener('click', function (e) { if (e.target === fondo) cerrar(); });
+    document.addEventListener('keydown', function (e) { if (e.key === 'Escape') cerrar(); });
+  })();
+</script>
+
+<%- include('partials/fin') %>
