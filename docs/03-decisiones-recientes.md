@@ -1133,3 +1133,12 @@ Migración aditiva `20261114100000_pos_espera_y_cambios` (tabla `ventas_espera`,
 - **Calendario** (`lib/services/calendarioCitas.js`, `views/cliente/calendario.ejs`): vistas semana/mes/día, citas superpuestas lado a lado, línea de "ahora", detalle con WhatsApp. El profesional solo marca sus citas como completada / no vino; el negocio ve "Calendario" con filtro por profesional.
 - **Plan:** el tope `maxUsuarios` cuenta usuarios + invitaciones pendientes; Mi equipo muestra "N de M".
 - Migraciones aditivas: `20261115100000_rol_profesional`, `20261115110000_usuario_recurso`. Tests: `test/calendario-profesional.test.js`.
+
+## 62. Proveedores y compras de mercadería (nov 2026)
+
+- **Qué hace:** Proveedores (alta/edición/desactivar, con total comprado y deuda) y Compras de stock (`/panel/compras-proveedor`). Una compra suma el stock (movimiento `COMPRA` en el kardex), deja como costo del producto/opción el de esa compra y queda pagada (efectivo de la caja u otro medio) o **por pagar** (cuenta por pagar, que se marca pagada después).
+- **Reglas:** dinero en centavos y recalculado en el servidor; todo en una transacción con el candado por empresa (el mismo de ventas y caja); idempotencia por clave; pagar y anular se "reclaman" con UPDATE condicionado (dos clics no pagan dos veces). Pagar de la caja exige caja abierta y efectivo suficiente. **Anular** devuelve el stock con descuento atómico: si parte ya se vendió, se rechaza; si salió de la caja, vuelve el efectivo (pide caja abierta). Solo dueño/admin; el cajero queda confinado y no las ve.
+- **Rutas:** `/panel/compras-proveedor` (no `/panel/compras`, que son los paquetes de conversaciones). Menú dentro de "Punto de venta" (módulo POS).
+- **Migraciones aditivas:** `20261116100000_proveedores_y_compras`, `20261116110000_stock_anulacion_compra` (amplía el CHECK de tipos de movimiento de stock).
+- **Tests:** `test/compras.test.js` (19). Auditoría: `COMPRA_REGISTRADA`, `COMPRA_PAGADA`, `COMPRA_ANULADA`.
+- **No incluido (a propósito):** pagos parciales/abonos, órdenes de compra previas a la recepción, costo promedio ponderado (se usa el último costo).

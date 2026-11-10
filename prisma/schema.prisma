@@ -292,6 +292,8 @@ model Empresa {
   devoluciones     Devolucion[]
   solicitudesPlan  SolicitudPlan[]
   ventasEspera     VentaEspera[]
+  proveedores      Proveedor[]
+  compras          Compra[]
   usosIA         UsoIA[]
   mensajesAgente MensajeAgente[]
   datosNegocio   DatoNegocio[]
@@ -541,6 +543,7 @@ model Usuario {
   movimientosCaja       MovimientoCaja[]
   ventasCobradas        Venta[]           @relation("VentaCajero")
   ventasAnuladas        Venta[]           @relation("VentaAnuladaPor")
+  comprasRegistradas    Compra[]          @relation("CompraUsuario")
 
   @@index([empresaId])
   @@map("usuarios")
@@ -1449,4 +1452,78 @@ model VentaEspera {
 
   @@index([empresaId, createdAt])
   @@map("ventas_espera")
+}
+
+// ============================ PROVEEDORES Y COMPRAS ============================
+// A quien se le compra mercaderia. Se desactiva, no se borra: las compras viejas lo siguen nombrando.
+model Proveedor {
+  id        Int      @id @default(autoincrement())
+  empresaId Int
+  empresa   Empresa  @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  nombre    String
+  contacto  String?
+  telefono  String?
+  email     String?
+  notas     String?
+  activo    Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  compras Compra[]
+
+  @@index([empresaId])
+  @@map("proveedores")
+}
+
+// Una compra RECIBIDA ya sumo el stock (movimiento COMPRA). Puede quedar por pagar (cuenta por pagar) o pagada
+// (de la caja o por otro medio). Anular una compra devuelve el stock y, si salio de la caja, el efectivo.
+model Compra {
+  id                Int        @id @default(autoincrement())
+  empresaId         Int
+  empresa           Empresa    @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  // Correlativo por empresa (C-0001...).
+  numero            Int
+  proveedorId       Int?
+  proveedor         Proveedor? @relation(fields: [proveedorId], references: [id], onDelete: SetNull)
+  proveedorNombre   String?
+  // Numero de factura o remito del proveedor.
+  referencia        String?
+  // RECIBIDA | ANULADA
+  estado            String     @default("RECIBIDA")
+  total             Decimal    @db.Decimal(12, 2)
+  // PENDIENTE | PAGADA
+  pagoEstado        String     @default("PENDIENTE")
+  // EFECTIVO_CAJA | OTRO (transferencia, QR, etc.)
+  pagoMetodo        String?
+  pagadaAt          DateTime?
+  notas             String?
+  claveIdempotencia String?
+  usuarioId         Int?
+  usuario           Usuario?   @relation("CompraUsuario", fields: [usuarioId], references: [id], onDelete: SetNull)
+  anuladaAt         DateTime?
+  anuladaPorId      Int?
+  motivoAnulacion   String?
+  createdAt         DateTime   @default(now())
+
+  items CompraItem[]
+
+  @@unique([empresaId, numero])
+  @@unique([empresaId, claveIdempotencia])
+  @@index([empresaId, createdAt])
+  @@index([proveedorId])
+  @@map("compras")
+}
+
+model CompraItem {
+  id            Int     @id @default(autoincrement())
+  compraId      Int
+  compra        Compra  @relation(fields: [compraId], references: [id], onDelete: Cascade)
+  productoId    Int?
+  varianteId    Int?
+  nombre        String
+  cantidad      Int
+  costoUnitario Decimal @db.Decimal(10, 2)
+  total         Decimal @db.Decimal(12, 2)
+
+  @@index([compraId])
+  @@map("compra_items")
 }

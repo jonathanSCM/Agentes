@@ -1,0 +1,60 @@
+<%- include('partials/inicio') %>
+
+<div class="page-head page-head-row">
+  <div>
+    <h2>Compra <%= codigo %></h2>
+    <p><%= new Date(compra.createdAt).toLocaleString('es-BO', { dateStyle: 'long', timeStyle: 'short' }) %><% if (compra.usuario) { %> · registrada por <%= compra.usuario.nombre %><% } %></p>
+  </div>
+  <a class="btn btn-ghost" href="/panel/compras-proveedor">← Volver a las compras</a>
+</div>
+
+<% if (mensaje) { %><div class="alert-ok"><%= mensaje %></div><% } %>
+<% if (error) { %><div class="alert-err" role="alert"><%= error %></div><% } %>
+
+<div class="cmp-resumen">
+  <div><span class="muted">Proveedor</span><strong><%= compra.proveedorNombre || 'Sin proveedor' %></strong></div>
+  <div><span class="muted">Factura o remito</span><strong><%= compra.referencia || '—' %></strong></div>
+  <div><span class="muted">Estado</span>
+    <% if (compra.estado === 'ANULADA') { %><span class="badge badge-anulada">Anulada</span>
+    <% } else if (compra.pagoEstado === 'PENDIENTE') { %><span class="badge badge-pendiente">Por pagar</span>
+    <% } else { %><span class="badge badge-new">Pagada · <%= etiquetasPago[compra.pagoMetodo] || '' %></span><% } %>
+  </div>
+  <div><span class="muted">Total</span><strong class="cmp-total"><%= simboloCatalogo %> <%= Number(compra.total).toFixed(2) %></strong></div>
+</div>
+
+<% if (compra.notas) { %><p class="muted">Notas: <%= compra.notas %></p><% } %>
+<% if (compra.estado === 'ANULADA') { %><p class="alert-err">Anulada<% if (compra.anuladaAt) { %> el <%= new Date(compra.anuladaAt).toLocaleDateString('es-BO') %><% } %>. Motivo: <%= compra.motivoAnulacion || '—' %></p><% } %>
+
+<div class="table-wrap">
+  <table class="leads-table">
+    <thead><tr><th>Producto</th><th class="num">Cantidad</th><th class="num">Costo</th><th class="num">Subtotal</th></tr></thead>
+    <tbody>
+      <% compra.items.forEach(function (i) { %>
+        <tr><td><%= i.nombre %></td><td class="num"><%= i.cantidad %></td><td class="num"><%= simboloCatalogo %> <%= Number(i.costoUnitario).toFixed(2) %></td><td class="num"><%= simboloCatalogo %> <%= Number(i.total).toFixed(2) %></td></tr>
+      <% }); %>
+    </tbody>
+  </table>
+</div>
+
+<% if (compra.estado === 'RECIBIDA') { %>
+  <div class="cmp-bloques">
+    <% if (compra.pagoEstado === 'PENDIENTE') { %>
+      <form method="POST" action="/panel/compras-proveedor/<%= compra.id %>/pagar" class="card-form">
+        <h3 class="cmp-form-titulo">Marcar como pagada</h3>
+        <div class="field">
+          <label for="metodo">¿Cómo la pagaste?</label>
+          <select id="metodo" name="metodo"><option value="OTRO">Transferencia u otro medio</option><option value="EFECTIVO_CAJA">Efectivo de la caja</option></select>
+        </div>
+        <button class="btn btn-primary" type="submit">Registrar el pago</button>
+      </form>
+    <% } %>
+    <form method="POST" action="/panel/compras-proveedor/<%= compra.id %>/anular" class="card-form" onsubmit="return confirm('¿Anular esta compra? Se saca la mercadería del stock<%= compra.pagoMetodo === 'EFECTIVO_CAJA' ? ' y vuelve el efectivo a la caja' : '' %>.')">
+      <h3 class="cmp-form-titulo">Anular la compra</h3>
+      <p class="muted cmp-nota">Se saca del stock lo que entró. Si ya vendiste parte de esa mercadería, no se puede anular.</p>
+      <div class="field"><label for="motivo">Motivo *</label><input id="motivo" name="motivo" required minlength="3" maxlength="200" placeholder="Ej. Me equivoqué de proveedor" /></div>
+      <button class="btn btn-danger" type="submit">Anular compra</button>
+    </form>
+  </div>
+<% } %>
+
+<%- include('partials/fin') %>

@@ -1,0 +1,60 @@
+<%- include('partials/inicio') %>
+
+<div class="page-head page-head-row">
+  <div>
+    <h2>Proveedores</h2>
+    <p>A quién le comprás la mercadería. Con ellos registrás compras, que suman stock y te dicen cuánto debés.</p>
+  </div>
+  <a class="btn btn-primary" href="/panel/compras-proveedor/nueva">Nueva compra</a>
+</div>
+
+<% if (mensaje) { %><div class="alert-ok"><%= mensaje %></div><% } %>
+<% if (error) { %><div class="alert-err" role="alert"><%= error %></div><% } %>
+
+<form method="POST" action="<%= editar ? '/panel/proveedores/' + editar.id : '/panel/proveedores' %>" class="card-form cmp-form">
+  <h3 class="cmp-form-titulo"><%= editar ? 'Editar a ' + editar.nombre : 'Agregar un proveedor' %></h3>
+  <div class="field-row">
+    <div class="field"><label for="pNombre">Nombre *</label><input id="pNombre" name="nombre" required maxlength="80" value="<%= editar ? editar.nombre : '' %>" placeholder="Ej. Textil Sur" /></div>
+    <div class="field"><label for="pContacto">Persona de contacto</label><input id="pContacto" name="contacto" maxlength="80" value="<%= editar ? editar.contacto || '' : '' %>" /></div>
+  </div>
+  <div class="field-row">
+    <div class="field"><label for="pTel">Teléfono</label><input id="pTel" name="telefono" maxlength="30" inputmode="tel" value="<%= editar ? editar.telefono || '' : '' %>" /></div>
+    <div class="field"><label for="pMail">Correo</label><input id="pMail" name="email" type="email" maxlength="120" value="<%= editar ? editar.email || '' : '' %>" /></div>
+  </div>
+  <div class="field"><label for="pNotas">Notas</label><input id="pNotas" name="notas" maxlength="300" value="<%= editar ? editar.notas || '' : '' %>" placeholder="Días de entrega, condiciones de pago…" /></div>
+  <div class="form-actions">
+    <button class="btn btn-primary" type="submit"><%= editar ? 'Guardar cambios' : 'Agregar proveedor' %></button>
+    <% if (editar) { %><a class="btn btn-ghost" href="/panel/proveedores">Cancelar</a><% } %>
+  </div>
+</form>
+
+<% if (!proveedores.length) { %>
+  <div class="empty-state"><h3>Todavía no cargaste proveedores</h3><p>Agregá el primero arriba. También podés registrar compras sin proveedor.</p></div>
+<% } else { %>
+  <div class="table-wrap">
+    <table class="leads-table">
+      <thead><tr><th>Proveedor</th><th>Contacto</th><th class="num">Compras</th><th class="num">Comprado</th><th class="num">Le debés</th><th>Acciones</th></tr></thead>
+      <tbody>
+        <% proveedores.forEach(function (p) { %>
+          <tr class="<%= p.activo ? '' : 'is-done' %>">
+            <td><strong><%= p.nombre %></strong><% if (!p.activo) { %> <span class="badge badge-anulada">Desactivado</span><% } %><% if (p.notas) { %><br><span class="muted cmp-nota"><%= p.notas %></span><% } %></td>
+            <td><%= p.contacto || '—' %><% if (p.telefono) { %><br><a class="muted" href="https://wa.me/<%= String(p.telefono).replace(/\D/g, '') %>" target="_blank" rel="noopener noreferrer"><%= p.telefono %></a><% } %><% if (p.email) { %><br><span class="muted"><%= p.email %></span><% } %></td>
+            <td class="num"><a href="/panel/compras-proveedor?proveedor=<%= p.id %>"><%= p.compras %></a></td>
+            <td class="num"><%= simboloCatalogo %> <%= p.comprado.toFixed(2) %></td>
+            <td class="num"><% if (p.deuda > 0) { %><strong class="cmp-deuda"><%= simboloCatalogo %> <%= p.deuda.toFixed(2) %></strong><% } else { %><span class="muted">—</span><% } %></td>
+            <td class="cmp-acciones">
+              <% if (p.activo) { %><a class="btn btn-ghost" href="/panel/compras-proveedor/nueva?proveedor=<%= p.id %>">Comprar</a><% } %>
+              <a class="btn btn-ghost" href="/panel/proveedores?editar=<%= p.id %>">Editar</a>
+              <form method="POST" action="/panel/proveedores/<%= p.id %>/estado" class="inline-form">
+                <input type="hidden" name="activo" value="<%= p.activo ? '0' : '1' %>" />
+                <button class="btn btn-ghost" type="submit"><%= p.activo ? 'Desactivar' : 'Activar' %></button>
+              </form>
+            </td>
+          </tr>
+        <% }); %>
+      </tbody>
+    </table>
+  </div>
+<% } %>
+
+<%- include('partials/fin') %>

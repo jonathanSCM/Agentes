@@ -1,0 +1,28 @@
+/* Proveedores y compras: usa la paleta del panel y las tablas de ventas. */
+.cmp-form { margin-bottom: 1.4rem; }
+.cmp-form-titulo { margin: 0 0 .7rem; font-size: 1rem; }
+.cmp-nota { font-size: .8rem; }
+.cmp-deuda { color: #fbbf24; }
+.cmp-acciones { display: flex; gap: .4rem; flex-wrap: wrap; align-items: center; }
+.cmp-acciones .btn { padding: .3rem .7rem; font-size: .82rem; }
+.badge-pendiente { background: rgba(245, 158, 11, .2); color: #fbbf24; }
+
+.cmp-resumen { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: .8rem; margin-bottom: 1rem; }
+.cmp-resumen > div { display: grid; gap: .2rem; padding: .8rem 1rem; border: 1px solid var(--border); border-radius: 12px; background: rgba(255, 255, 255, .04); align-content: start; }
+.cmp-resumen .muted { font-size: .75rem; text-transform: uppercase; letter-spacing: .05em; }
+.cmp-total { font-size: 1.3rem; font-variant-numeric: tabular-nums; }
+.cmp-bloques { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1rem; margin-top: 1.2rem; }
+
+.cmp-nueva { display: grid; grid-template-columns: minmax(260px, 1fr) minmax(0, 2fr); gap: 1.2rem; align-items: start; }
+.cmp-buscar input[type="search"] { width: 100%; }
+.cmp-resultados { list-style: none; margin: .7rem 0 0; padding: 0; display: grid; gap: .3rem; max-height: 55vh; overflow-y: auto; }
+.cmp-resultado { width: 100%; display: grid; text-align: left; gap: 0; padding: .5rem .7rem; border: 1px solid var(--border); border-radius: 10px; background: rgba(255, 255, 255, .04); color: var(--text); font: inherit; cursor: pointer; }
+.cmp-resultado:hover, .cmp-resultado:focus-visible { border-color: var(--primary-2); background: rgba(47, 227, 166, .08); outline: none; }
+.cmp-resultado small { color: var(--muted); }
+.cmp-num { width: 5.5rem; text-align: right; font-variant-numeric: tabular-nums; }
+.cmp-total-linea { text-align: right; font-size: 1.15rem; margin: .6rem 0 1rem; font-variant-numeric: tabular-nums; }
+.cmp-pago { border: 1px solid var(--border); border-radius: 12px; padding: .7rem 1rem; margin: 0 0 1rem; display: grid; gap: .4rem; }
+.cmp-pago legend { padding: 0 .4rem; font-size: .85rem; color: var(--muted); }
+.cmp-pago label { display: flex; gap: .5rem; align-items: center; cursor: pointer; }
+
+@media (max-width: 860px) { .cmp-nueva { grid-template-columns: 1fr; } }

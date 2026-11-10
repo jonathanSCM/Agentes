@@ -3250,6 +3250,125 @@ app.post('/panel/ventas/:id(\\d+)/devolver', ...POS, async (req, res, next) => {
   }
 });
 
+// ===================== PROVEEDORES Y COMPRAS (POS P3) =====================
+// Solo dueño y administrador (el servicio lo vuelve a comprobar). Requiere el modulo POS del plan.
+const comprasSrv = require('./lib/services/compras');
+const COMPRAS = [...POS, requireRol('OWNER', 'ADMIN')];
+const esErrorDeCompra = (err) => err && ['COMPRA', 'STOCK', 'CAJA'].includes(err.codigo);
+
+app.get('/panel/proveedores', ...COMPRAS, async (req, res, next) => {
+  try {
+    const proveedores = await comprasSrv.listarProveedores(req.session.empresaId);
+    const editar = req.query.editar ? proveedores.find((p) => p.id === Number(req.query.editar)) || null : null;
+    res.render('cliente/proveedores', {
+      title: 'Proveedores - Proshop', tituloPagina: 'Proveedores', activo: 'proveedores', hojas: ['/css/pos.css', '/css/compras.css'],
+      proveedores, editar, mensaje: req.query.ok || null, error: req.query.err || null,
+    });
+  } catch (err) { next(err); }
+});
+app.post('/panel/proveedores', ...COMPRAS, async (req, res, next) => {
+  try {
+    await comprasSrv.crearProveedor(req.session.empresaId, usuarioPos(req), req.body || {});
+    res.redirect('/panel/proveedores?ok=' + encodeURIComponent('Proveedor agregado.'));
+  } catch (err) {
+    if (esErrorDeCompra(err)) return res.redirect('/panel/proveedores?err=' + encodeURIComponent(err.message));
+    next(err);
+  }
+});
+app.post('/panel/proveedores/:id(\\d+)', ...COMPRAS, async (req, res, next) => {
+  try {
+    await comprasSrv.actualizarProveedor(req.session.empresaId, usuarioPos(req), req.params.id, req.body || {});
+    res.redirect('/panel/proveedores?ok=' + encodeURIComponent('Proveedor actualizado.'));
+  } catch (err) {
+    if (esErrorDeCompra(err)) return res.redirect(`/panel/proveedores?editar=${req.params.id}&err=` + encodeURIComponent(err.message));
+    next(err);
+  }
+});
+app.post('/panel/proveedores/:id(\\d+)/estado', ...COMPRAS, async (req, res, next) => {
+  try {
+    const activo = req.body.activo === '1';
+    await comprasSrv.cambiarEstadoProveedor(req.session.empresaId, usuarioPos(req), req.params.id, activo);
+    res.redirect('/panel/proveedores?ok=' + encodeURIComponent(activo ? 'Proveedor activado.' : 'Proveedor desactivado: sus compras viejas se conservan.'));
+  } catch (err) {
+    if (esErrorDeCompra(err)) return res.redirect('/panel/proveedores?err=' + encodeURIComponent(err.message));
+    next(err);
+  }
+});
+
+app.get('/panel/compras-proveedor', ...COMPRAS, async (req, res, next) => {
+  try {
+    const empresaId = req.session.empresaId;
+    const filtro = String(req.query.f || '');
+    const opciones = filtro === 'porPagar' ? { pago: 'PENDIENTE' } : filtro === 'anuladas' ? { estado: 'ANULADA' } : {};
+    const proveedorId = Number(req.query.proveedor) || null;
+    const [compras, totales, proveedores] = await Promise.all([comprasSrv.listar(empresaId, { ...opciones, proveedorId }), comprasSrv.totales(empresaId), comprasSrv.listarProveedores(empresaId)]);
+    res.render('cliente/compras-proveedor', {
+      title: 'Compras a proveedores - Proshop', tituloPagina: 'Compras a proveedores', activo: 'compras-proveedor', hojas: ['/css/pos.css', '/css/compras.css'],
+      compras, totales, proveedores, filtro, proveedorId, codigoDe: comprasSrv.codigoDe, etiquetasPago: comprasSrv.ETIQUETAS_PAGO,
+      mensaje: req.query.ok || null, error: req.query.err || null,
+    });
+  } catch (err) { next(err); }
+});
+
+app.get('/panel/compras-proveedor/nueva', ...COMPRAS, async (req, res, next) => {
+  try {
+    const empresaId = req.session.empresaId;
+    const [proveedores, sesion] = await Promise.all([comprasSrv.listarProveedores(empresaId, { incluirInactivos: false }), caja.sesionAbierta(empresaId)]);
+    res.render('cliente/compra-nueva', {
+      title: 'Nueva compra - Proshop', tituloPagina: 'Nueva compra', activo: 'compras-proveedor', hojas: ['/css/pos.css', '/css/compras.css'],
+      proveedores, cajaAbierta: Boolean(sesion), proveedorId: Number(req.query.proveedor) || '', error: req.query.err || null,
+    });
+  } catch (err) { next(err); }
+});
+app.get('/panel/compras-proveedor/buscar', ...COMPRAS, async (req, res, next) => {
+  try { res.json({ productos: await comprasSrv.buscarMercaderia(req.session.empresaId, req.query.q) }); } catch (err) { next(err); }
+});
+app.post('/panel/compras-proveedor', ...COMPRAS, async (req, res) => {
+  try {
+    const b = req.body || {};
+    const items = (Array.isArray(b.items) ? b.items : []).map((i) => ({ productoId: i.productoId, varianteId: i.varianteId || null, cantidad: i.cantidad, costo: i.costo }));
+    const { compra, repetida } = await comprasSrv.crear(req.session.empresaId, usuarioPos(req), { proveedorId: b.proveedorId || null, referencia: b.referencia, notas: b.notas, pago: b.pago, items, claveIdempotencia: b.claveIdempotencia });
+    catalogoCache.invalidarEmpresa(req.session.empresaId);
+    res.json({ ok: true, repetida, id: compra.id, url: `/panel/compras-proveedor/${compra.id}` });
+  } catch (err) {
+    if (esErrorDeCompra(err)) return res.status(400).json({ ok: false, error: err.message });
+    console.error('[compras] error al registrar:', err);
+    res.status(500).json({ ok: false, error: 'No se pudo registrar por un problema técnico. Probá de nuevo: si ya se registró, no se duplica.' });
+  }
+});
+
+app.get('/panel/compras-proveedor/:id(\\d+)', ...COMPRAS, async (req, res, next) => {
+  try {
+    const compra = await comprasSrv.detalle(req.session.empresaId, req.params.id);
+    if (!compra) return res.redirect('/panel/compras-proveedor');
+    res.render('cliente/compra-detalle', {
+      title: `Compra ${comprasSrv.codigoDe(compra.numero)} - Proshop`, tituloPagina: 'Compra', activo: 'compras-proveedor', hojas: ['/css/pos.css', '/css/compras.css'],
+      compra, codigo: comprasSrv.codigoDe(compra.numero), etiquetasPago: comprasSrv.ETIQUETAS_PAGO, mensaje: req.query.ok || null, error: req.query.err || null,
+    });
+  } catch (err) { next(err); }
+});
+app.post('/panel/compras-proveedor/:id(\\d+)/pagar', ...COMPRAS, async (req, res, next) => {
+  const volver = `/panel/compras-proveedor/${req.params.id}`;
+  try {
+    await comprasSrv.pagar(req.session.empresaId, usuarioPos(req), req.params.id, req.body.metodo);
+    res.redirect(`${volver}?ok=` + encodeURIComponent('Compra marcada como pagada.'));
+  } catch (err) {
+    if (esErrorDeCompra(err)) return res.redirect(`${volver}?err=` + encodeURIComponent(err.message));
+    next(err);
+  }
+});
+app.post('/panel/compras-proveedor/:id(\\d+)/anular', ...COMPRAS, async (req, res, next) => {
+  const volver = `/panel/compras-proveedor/${req.params.id}`;
+  try {
+    await comprasSrv.anular(req.session.empresaId, usuarioPos(req), req.params.id, req.body.motivo);
+    catalogoCache.invalidarEmpresa(req.session.empresaId);
+    res.redirect(`${volver}?ok=` + encodeURIComponent('Compra anulada: se devolvió el stock.'));
+  } catch (err) {
+    if (esErrorDeCompra(err)) return res.redirect(`${volver}?err=` + encodeURIComponent(err.message));
+    next(err);
+  }
+});
+
 // ---- Clientes para la venta (busqueda por nombre o telefono, solo de esta empresa) ----
 app.get('/panel/pos/clientes', ...POS, async (req, res, next) => {
   try {

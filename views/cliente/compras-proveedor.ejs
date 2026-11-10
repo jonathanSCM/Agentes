@@ -1,0 +1,64 @@
+<%- include('partials/inicio') %>
+
+<div class="page-head page-head-row">
+  <div>
+    <h2>Compras a proveedores</h2>
+    <p>La mercadería que te llega. Cada compra suma al stock y actualiza el costo de los productos.</p>
+  </div>
+  <div class="cmp-acciones">
+    <a class="btn btn-ghost" href="/panel/proveedores">Proveedores</a>
+    <a class="btn btn-primary" href="/panel/compras-proveedor/nueva">Nueva compra</a>
+  </div>
+</div>
+
+<% if (mensaje) { %><div class="alert-ok"><%= mensaje %></div><% } %>
+<% if (error) { %><div class="alert-err" role="alert"><%= error %></div><% } %>
+
+<div class="admin-stats">
+  <div class="stat-card"><span class="stat-num"><%= totales.compras %></span><span class="stat-label">Compras registradas</span></div>
+  <div class="stat-card"><span class="stat-num"><%= simboloCatalogo %> <%= totales.comprado.toFixed(2) %></span><span class="stat-label">Total comprado</span></div>
+  <div class="stat-card <%= totales.deuda > 0 ? 'stat-new' : '' %>"><span class="stat-num"><%= simboloCatalogo %> <%= totales.deuda.toFixed(2) %></span><span class="stat-label">Por pagar (<%= totales.porPagar %>)</span></div>
+</div>
+
+<form method="GET" action="/panel/compras-proveedor" class="filtros-ventas">
+  <select name="f" aria-label="Estado">
+    <option value="">Todas</option>
+    <option value="porPagar" <%= filtro === 'porPagar' ? 'selected' : '' %>>Por pagar</option>
+    <option value="anuladas" <%= filtro === 'anuladas' ? 'selected' : '' %>>Anuladas</option>
+  </select>
+  <select name="proveedor" aria-label="Proveedor">
+    <option value="">Todos los proveedores</option>
+    <% proveedores.forEach(function (p) { %><option value="<%= p.id %>" <%= proveedorId === p.id ? 'selected' : '' %>><%= p.nombre %></option><% }); %>
+  </select>
+  <button class="btn btn-ghost" type="submit">Filtrar</button>
+  <% if (filtro || proveedorId) { %><a class="btn btn-ghost" href="/panel/compras-proveedor">Quitar filtros</a><% } %>
+</form>
+
+<% if (!compras.length) { %>
+  <div class="empty-state"><h3>No hay compras</h3><p>Cuando registres la mercadería que te llega, va a aparecer acá.</p></div>
+<% } else { %>
+  <div class="table-wrap">
+    <table class="leads-table">
+      <thead><tr><th>N°</th><th>Fecha</th><th>Proveedor</th><th>Factura</th><th class="num">Productos</th><th class="num">Total</th><th>Estado</th></tr></thead>
+      <tbody>
+        <% compras.forEach(function (c) { %>
+          <tr class="<%= c.estado === 'ANULADA' ? 'is-done' : '' %> row-link" onclick="window.location='/panel/compras-proveedor/<%= c.id %>'" style="cursor:pointer">
+            <td><a href="/panel/compras-proveedor/<%= c.id %>"><strong><%= codigoDe(c.numero) %></strong></a></td>
+            <td class="nowrap muted"><%= new Date(c.createdAt).toLocaleString('es-BO', { dateStyle: 'short', timeStyle: 'short' }) %></td>
+            <td><%= c.proveedorNombre || '—' %></td>
+            <td><%= c.referencia || '—' %></td>
+            <td class="num"><%= c._count.items %></td>
+            <td class="num"><strong><%= simboloCatalogo %> <%= Number(c.total).toFixed(2) %></strong></td>
+            <td>
+              <% if (c.estado === 'ANULADA') { %><span class="badge badge-anulada">Anulada</span>
+              <% } else if (c.pagoEstado === 'PENDIENTE') { %><span class="badge badge-pendiente">Por pagar</span>
+              <% } else { %><span class="badge badge-new">Pagada</span><% } %>
+            </td>
+          </tr>
+        <% }); %>
+      </tbody>
+    </table>
+  </div>
+<% } %>
+
+<%- include('partials/fin') %>

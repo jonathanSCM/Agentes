@@ -1,0 +1,59 @@
+<%- include('partials/inicio') %>
+
+<div class="page-head page-head-row">
+  <div>
+    <h2>Nueva compra</h2>
+    <p>Buscá los productos que te llegaron, poné cuántos y a qué costo. Al guardar, el stock sube solo.</p>
+  </div>
+  <a class="btn btn-ghost" href="/panel/compras-proveedor">← Volver</a>
+</div>
+
+<% if (error) { %><div class="alert-err" role="alert"><%= error %></div><% } %>
+<div class="alert-err" id="cmpError" role="alert" hidden></div>
+
+<div class="cmp-nueva">
+  <section class="cmp-buscar card-form">
+    <label for="cmpQ" class="cmp-form-titulo">Buscar producto</label>
+    <input id="cmpQ" type="search" autocomplete="off" placeholder="Nombre, código o código de barras…" />
+    <ul class="cmp-resultados" id="cmpResultados" aria-live="polite"></ul>
+  </section>
+
+  <section class="cmp-detalle card-form">
+    <h3 class="cmp-form-titulo">Lo que compraste</h3>
+    <div class="table-wrap">
+      <table class="leads-table" id="cmpTabla">
+        <thead><tr><th>Producto</th><th class="num">Cantidad</th><th class="num">Costo c/u</th><th class="num">Subtotal</th><th></th></tr></thead>
+        <tbody id="cmpLineas"></tbody>
+      </table>
+    </div>
+    <p class="muted" id="cmpVacio">Todavía no agregaste productos.</p>
+    <p class="cmp-total-linea">Total: <strong><%= simboloCatalogo %> <span id="cmpTotal">0.00</span></strong></p>
+
+    <div class="field-row">
+      <div class="field">
+        <label for="cmpProveedor">Proveedor</label>
+        <select id="cmpProveedor">
+          <option value="">Sin proveedor</option>
+          <% proveedores.forEach(function (p) { %><option value="<%= p.id %>" <%= String(proveedorId) === String(p.id) ? 'selected' : '' %>><%= p.nombre %></option><% }); %>
+        </select>
+        <% if (!proveedores.length) { %><p class="pf-ayuda"><a href="/panel/proveedores">Cargá un proveedor</a> para saber cuánto le comprás y le debés.</p><% } %>
+      </div>
+      <div class="field"><label for="cmpRef">Factura o remito</label><input id="cmpRef" maxlength="60" placeholder="Opcional" /></div>
+    </div>
+
+    <fieldset class="cmp-pago">
+      <legend>¿Ya la pagaste?</legend>
+      <label><input type="radio" name="pago" value="PENDIENTE" checked /> Todavía no (queda por pagar)</label>
+      <label><input type="radio" name="pago" value="OTRO" /> Sí, por transferencia u otro medio</label>
+      <label><input type="radio" name="pago" value="EFECTIVO_CAJA" <%= cajaAbierta ? '' : 'disabled' %> /> Sí, con efectivo de la caja<%= cajaAbierta ? '' : ' (abrí la caja primero)' %></label>
+    </fieldset>
+
+    <div class="field"><label for="cmpNotas">Notas</label><input id="cmpNotas" maxlength="300" placeholder="Opcional" /></div>
+    <div class="form-actions"><button class="btn btn-primary" type="button" id="cmpGuardar" disabled>Registrar la compra</button></div>
+  </section>
+</div>
+
+<script>window.COMPRA = { simbolo: <%- JSON.stringify(simboloCatalogo) %> };</script>
+<script src="/js/compra.js"></script>
+
+<%- include('partials/fin') %>
