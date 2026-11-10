@@ -1175,3 +1175,13 @@ Migración aditiva `20261114100000_pos_espera_y_cambios` (tabla `ventas_espera`,
 - **Pendiente de probar con WhatsApp real:** el envío de documento/video/audio/ubicación a Meta (en la copia el número está desconectado: se verificó la pantalla, la validación, el guardado y el chat en vivo, y los cuerpos exactos contra la API con pruebas).
 
 **Corrección (#66):** subir una foto que ya era JPG desde el chat fallaba con "Cannot use same file for input and output" (sharp 0.35 no deja convertir un archivo sobre sí mismo; mi prueba usó un PNG y no lo vio). Misma causa afectaba a toda subida de fotos .jpg (productos, categorías, QR, logo) porque comparten `convertirFotosAJpg`. Ahora vive en `lib/services/fotosJpg.js`: lee el archivo a memoria, convierte y recién escribe el resultado. Test `test/fotos-jpg.test.js` (5), incluido el caso JPG→JPG.
+
+## 67. Lavado de cara del panel (PAVP-1) (nov 2026)
+
+- **Pedir conversaciones:** los números de los paquetes salían negros (un `<button>` no hereda el color del texto). Ahora son blancos, gruesos y con degradado a verde, como Planes. Hoja nueva `public/css/pulido.css` (se carga después de admin.css y panel-shell.css en `partials/inicio.ejs`).
+- **Inventario** pasa de tabla a **tarjetas** (como el punto de venta): foto, estado (Disponible / Stock bajo / Agotado), precio, stock grande y ajuste en la misma tarjeta; con buscador, filtro por categoría y botones de estado.
+- **Productos:** misma barra de filtros (búsqueda, categoría, activos, desactivados, stock bajo, agotados, "el agente no los muestra") y el stock con color.
+- **Clientes:** tarjetas con avatar, estado en palabras claras (Nuevo, Conversando, Interesado, Compró, Pidió asesor…), pedidos, **cuánto compró** y **cuándo habló por última vez** (se quitaron datos que sobraban); ordenados por actividad; buscador y filtros (ya compraron, piden asesor, activos esta semana).
+- **Tablas del sistema** (todas las `.leads-table`): encabezado fijo, filas alternadas, resalte al pasar, columnas numéricas sin cortes y más etiquetas de estado.
+- **Menú:** se quitan **Proveedores** y **Compras de stock** (todo el stock y el inventario se maneja desde el catálogo). Solo se ocultan del menú; el código y las tablas quedan por si se retoman.
+- Los filtros son del navegador (`public/js/filtros-lista.js`, reutilizable con `data-item`/`data-texto`/`data-tags`).

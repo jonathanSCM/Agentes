@@ -1,9 +1,15 @@
 <%- include('partials/inicio') %>
+<%
+  var categorias = [];
+  productos.forEach(function (p) { var n = p.categoria ? p.categoria.nombre : ''; if (n && categorias.indexOf(n) === -1) categorias.push(n); });
+  categorias.sort();
+  var estadoDe = function (p) { return p.stockMostrado === 0 ? 'agotado' : (p.stockMostrado <= 5 ? 'bajo' : 'ok'); };
+%>
 
 <div class="page-head page-head-row">
   <div>
     <h2>Inventario</h2>
-    <p>Control de stock de tus productos. Ajusta las cantidades disponibles.</p>
+    <p>El stock de tu catálogo: lo que tenés, lo que se está acabando y lo que ya no queda. Ajustá las cantidades acá mismo.</p>
   </div>
   <div style="display:flex;gap:.5rem;flex-wrap:wrap">
     <a class="btn btn-ghost" href="/panel/inventario/movimientos">Historial de stock</a>
@@ -16,7 +22,7 @@
 <div class="admin-stats">
   <div class="stat-card"><span class="stat-num"><%= stats.total %></span><span class="stat-label">Productos</span></div>
   <div class="stat-card stat-done"><span class="stat-num"><%= stats.bajo %></span><span class="stat-label">Stock bajo (≤5)</span></div>
-  <div class="stat-card"><span class="stat-num"><%= stats.agotados %></span><span class="stat-label">Agotados</span></div>
+  <div class="stat-card <%= stats.agotados ? 'stat-alerta' : '' %>"><span class="stat-num"><%= stats.agotados %></span><span class="stat-label">Agotados</span></div>
 </div>
 
 <% if (productos.length === 0) { %>
@@ -25,36 +31,50 @@
     <p><a class="btn btn-primary" href="/panel/productos/nuevo">+ Agregar producto</a></p>
   </div>
 <% } else { %>
-  <div class="table-wrap">
-    <table class="leads-table">
-      <thead>
-        <tr><th>Producto</th><th class="num">Precio</th><th>Stock actual</th><th>Ajustar</th></tr>
-      </thead>
-      <tbody>
-        <% productos.forEach(function (p) { %>
-          <tr class="<%= p.stockMostrado === 0 ? 'is-done' : '' %>">
-            <td><strong><%= p.nombre %></strong><% if (p.tieneVariantes) { %> <span class="muted" style="font-size:.75rem">(por variante)</span><% } %></td>
-            <td class="num"><%= simboloCatalogo %> <%= Number(p.precio).toFixed(2) %></td>
-            <td>
-              <span class="badge <%= p.stockMostrado === 0 ? 'badge-off' : (p.stockMostrado <= 5 ? 'badge-star' : 'badge-new') %>">
-                <%= p.stockMostrado %> unidades
-              </span>
-            </td>
-            <td>
-              <% if (p.tieneVariantes) { %>
-                <a class="btn btn-ghost" href="/panel/productos/<%= p.id %>/editar" style="padding:.35rem .7rem;font-size:.82rem">Ajustar por variante</a>
-              <% } else { %>
-                <form method="POST" action="/panel/inventario/<%= p.id %>" class="sim-form">
-                  <input type="number" name="stock" value="<%= p.stock %>" min="0" class="sim-input" style="width:70px" />
-                  <button class="btn btn-ghost" type="submit" style="padding:.35rem .7rem;font-size:.82rem">Guardar</button>
-                </form>
-              <% } %>
-            </td>
-          </tr>
-        <% }); %>
-      </tbody>
-    </table>
+  <div class="filtros-barra" data-objetivo="#invGrid" data-vacio="#invVacio" data-etiqueta="productos">
+    <label class="f-buscar"><span class="sr-only" style="position:absolute;left:-9999px">Buscar producto</span><input type="search" data-filtro-q placeholder="Buscar por nombre…" autocomplete="off" /></label>
+    <% if (categorias.length) { %>
+      <select data-filtro-cat aria-label="Categoría">
+        <option value="">Todas las categorías</option>
+        <% categorias.forEach(function (c) { %><option value="<%= c %>"><%= c %></option><% }); %>
+      </select>
+    <% } %>
+    <div class="f-chips" role="group" aria-label="Estado del stock">
+      <button type="button" class="f-chip activo" data-filtro-chip="" aria-pressed="true">Todos</button>
+      <button type="button" class="f-chip" data-filtro-chip="bajo" aria-pressed="false">Stock bajo</button>
+      <button type="button" class="f-chip" data-filtro-chip="agotado" aria-pressed="false">Agotados</button>
+    </div>
+    <span class="f-cuenta" data-filtro-cuenta aria-live="polite"></span>
   </div>
+
+  <div class="cat-grid" id="invGrid">
+    <% productos.forEach(function (p) { var est = estadoDe(p); %>
+      <article class="cat-card s-<%= est %>" data-item data-texto="<%= p.nombre %> <%= p.sku || '' %> <%= p.categoria ? p.categoria.nombre : '' %>" data-categoria="<%= p.categoria ? p.categoria.nombre : '' %>" data-tags="<%= est %>">
+        <div class="cat-foto">
+          <% if (p.fotos && p.fotos.length) { %><img src="<%= p.fotos[0] %>" alt="" loading="lazy" /><% } else { %><span class="cat-inicial" aria-hidden="true"><%= p.nombre.charAt(0).toUpperCase() %></span><% } %>
+          <span class="cat-estado badge <%= est === 'agotado' ? 'badge-alerta' : (est === 'bajo' ? 'badge-star' : 'badge-new') %>"><%= est === 'agotado' ? 'Agotado' : (est === 'bajo' ? 'Stock bajo' : 'Disponible') %></span>
+        </div>
+        <div class="cat-cuerpo">
+          <h3><%= p.nombre %></h3>
+          <span class="cat-cat"><%= p.categoria ? p.categoria.nombre : 'Sin categoría' %><%= p.tieneVariantes ? ' · con opciones' : '' %></span>
+          <span class="cat-precio"><%= simboloCatalogo %> <%= Number(p.precio).toFixed(2) %></span>
+          <div class="cat-stock"><strong><%= p.stockMostrado %></strong><span>en stock</span></div>
+          <% if (p.tieneVariantes) { %>
+            <div class="cat-variantes"><a class="btn btn-ghost" href="/panel/productos/<%= p.id %>/editar">Ajustar por opción</a></div>
+          <% } else { %>
+            <div class="cat-ajuste">
+              <form method="POST" action="/panel/inventario/<%= p.id %>">
+                <input type="number" name="stock" value="<%= p.stock %>" min="0" aria-label="Stock de <%= p.nombre %>" />
+                <button class="btn btn-ghost" type="submit">Guardar</button>
+              </form>
+            </div>
+          <% } %>
+        </div>
+      </article>
+    <% }); %>
+  </div>
+  <div class="f-vacio" id="invVacio" hidden>No hay productos con esos filtros.</div>
+  <script src="/js/filtros-lista.js"></script>
 <% } %>
 
 <%- include('partials/fin') %>

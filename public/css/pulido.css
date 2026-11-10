@@ -1,0 +1,85 @@
+/* Pulido visual del panel: tablas, tarjetas, filtros y tarjetas de compra. Va DESPUES de admin.css y panel-shell.css. */
+
+/* ---------- Pedir conversaciones: el número en blanco, grueso y con color (como en Planes) ---------- */
+.buy-card { color: var(--text); font: inherit; border-radius: 18px; background: rgba(255, 255, 255, .05); }
+.buy-qty {
+  display: block; font-size: 2rem; line-height: 1.1; color: var(--text);
+  background: linear-gradient(120deg, #ffffff 25%, var(--primary-2) 100%); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
+}
+.buy-card:hover .buy-qty { background: linear-gradient(120deg, #ffffff 0%, #c4b5fd 100%); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; }
+.buy-unit { color: var(--primary-2); font-weight: 700; font-size: .85rem; }
+.buy-card:focus-visible { outline: 2px solid var(--primary-2); outline-offset: 2px; }
+
+/* ---------- Tablas ---------- */
+.table-wrap { border-radius: 16px; box-shadow: 0 6px 24px rgba(0, 0, 0, .18); }
+.leads-table { font-size: .9rem; }
+.leads-table th, .leads-table td { padding: .85rem 1.05rem; vertical-align: middle; }
+.leads-table thead th { background: rgba(0, 0, 0, .18); position: sticky; top: 0; z-index: 1; white-space: nowrap; }
+.leads-table tbody tr:nth-child(even) { background: rgba(255, 255, 255, .022); }
+.leads-table tbody tr:hover { background: rgba(139, 92, 246, .1); }
+.leads-table tbody td:first-child { font-weight: 600; }
+.leads-table td.num { font-variant-numeric: tabular-nums; white-space: nowrap; }
+.leads-table .muted { font-size: .84em; }
+.leads-table .badge { font-size: .68rem; letter-spacing: .02em; }
+.badge-anulada { background: rgba(251, 113, 133, .16); color: #fecdd3; border: 1px solid rgba(251, 113, 133, .4); }
+.badge-pendiente { background: rgba(245, 158, 11, .16); color: #fde68a; border: 1px solid rgba(245, 158, 11, .4); }
+
+/* ---------- Barra de filtros ---------- */
+.filtros-barra { display: flex; flex-wrap: wrap; gap: .6rem; align-items: center; margin: 0 0 1rem; }
+.filtros-barra .f-buscar { position: relative; flex: 1 1 240px; min-width: 200px; }
+.filtros-barra .f-buscar input { width: 100%; padding: .6rem .8rem .6rem 2.1rem; border-radius: 12px; border: 1px solid var(--border); background: rgba(255, 255, 255, .06); color: var(--text); font: inherit; }
+.filtros-barra .f-buscar::before { content: '🔍'; position: absolute; left: .7rem; top: 50%; transform: translateY(-50%); font-size: .8rem; opacity: .7; pointer-events: none; }
+.filtros-barra select { padding: .6rem .8rem; border-radius: 12px; border: 1px solid var(--border); background: rgba(255, 255, 255, .06); color: var(--text); font: inherit; max-width: 220px; }
+.filtros-barra input:focus-visible, .filtros-barra select:focus-visible { outline: 2px solid var(--primary-2); outline-offset: 1px; }
+.f-chips { display: inline-flex; gap: .35rem; flex-wrap: wrap; }
+.f-chip { padding: .42rem .85rem; border-radius: 999px; border: 1px solid var(--border); background: rgba(255, 255, 255, .05); color: var(--muted); font: inherit; font-size: .82rem; font-weight: 600; cursor: pointer; }
+.f-chip:hover { color: var(--text); border-color: rgba(139, 92, 246, .5); }
+.f-chip.activo { background: rgba(47, 227, 166, .16); border-color: rgba(47, 227, 166, .5); color: var(--primary-2); }
+.f-cuenta { margin-left: auto; font-size: .82rem; color: var(--muted); }
+.f-vacio { padding: 2.2rem 1rem; text-align: center; color: var(--muted); border: 1px dashed var(--border); border-radius: 16px; }
+[data-item][hidden] { display: none !important; }
+
+/* ---------- Tarjetas de producto (inventario), como en el punto de venta ---------- */
+.cat-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 1rem; }
+.cat-card { display: flex; flex-direction: column; border: 1px solid var(--border); border-radius: 18px; background: rgba(255, 255, 255, .05); overflow: hidden; transition: transform .15s, border-color .15s; }
+.cat-card:hover { transform: translateY(-3px); border-color: rgba(139, 92, 246, .55); }
+.cat-foto { position: relative; aspect-ratio: 4 / 3; background: rgba(255, 255, 255, .04); display: grid; place-items: center; overflow: hidden; }
+.cat-foto img { width: 100%; height: 100%; object-fit: cover; }
+.cat-foto .cat-inicial { font-size: 2.2rem; font-weight: 800; color: rgba(255, 255, 255, .25); }
+.cat-estado { position: absolute; top: .55rem; left: .55rem; }
+.cat-cuerpo { display: flex; flex-direction: column; gap: .35rem; padding: .85rem .9rem .95rem; flex: 1; }
+.cat-cuerpo h3 { margin: 0; font-size: .98rem; line-height: 1.25; overflow-wrap: anywhere; }
+.cat-cat { color: var(--muted); font-size: .76rem; }
+.cat-precio { color: var(--primary-2); font-weight: 800; font-size: 1.05rem; }
+.cat-stock { display: flex; align-items: baseline; gap: .4rem; margin-top: .2rem; }
+.cat-stock strong { font-size: 1.9rem; line-height: 1; font-weight: 800; }
+.cat-stock span { color: var(--muted); font-size: .76rem; }
+.cat-card.s-bajo .cat-stock strong { color: #fde68a; }
+.cat-card.s-agotado .cat-stock strong { color: #fda4af; }
+.cat-card.s-agotado .cat-foto img { filter: grayscale(.7); opacity: .6; }
+.cat-ajuste { display: flex; gap: .4rem; margin-top: auto; padding-top: .5rem; }
+.cat-ajuste form { display: flex; gap: .4rem; width: 100%; margin: 0; }
+.cat-ajuste input { width: 5rem; padding: .4rem .5rem; border-radius: 10px; border: 1px solid var(--border); background: rgba(255, 255, 255, .06); color: var(--text); font: inherit; text-align: center; }
+.cat-ajuste .btn { padding: .4rem .8rem; font-size: .8rem; flex: 1; }
+.cat-variantes { margin-top: auto; padding-top: .5rem; }
+.cat-variantes .btn { width: 100%; padding: .4rem .8rem; font-size: .8rem; }
+
+/* ---------- Clientes ---------- */
+.cli-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(290px, 1fr)); gap: 1rem; }
+.cli-card { display: flex; flex-direction: column; gap: .7rem; padding: 1rem 1.05rem; border: 1px solid var(--border); border-radius: 18px; background: rgba(255, 255, 255, .05); transition: border-color .15s, transform .15s; }
+.cli-card:hover { border-color: rgba(139, 92, 246, .55); transform: translateY(-2px); }
+.cli-cab { display: flex; gap: .75rem; align-items: center; min-width: 0; }
+.cli-av { flex: none; width: 44px; height: 44px; border-radius: 50%; display: grid; place-items: center; font-weight: 800; color: #fff; background: var(--av, #8b5cf6); }
+.cli-quien { min-width: 0; }
+.cli-quien strong { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cli-quien a { color: var(--muted); font-size: .8rem; }
+.cli-quien a:hover { color: var(--primary-2); }
+.cli-estado { margin-left: auto; flex: none; }
+.cli-datos { display: grid; grid-template-columns: repeat(3, 1fr); gap: .5rem; padding: .6rem 0; border-block: 1px solid var(--border); text-align: center; }
+.cli-datos div strong { display: block; font-size: 1.05rem; font-variant-numeric: tabular-nums; }
+.cli-datos div span { color: var(--muted); font-size: .7rem; text-transform: uppercase; letter-spacing: .04em; }
+.cli-pie { display: flex; justify-content: space-between; align-items: center; gap: .5rem; font-size: .8rem; color: var(--muted); }
+.cli-acciones { display: flex; gap: .4rem; }
+.cli-acciones .btn { padding: .35rem .75rem; font-size: .8rem; }
+.cli-interes { font-size: .82rem; color: var(--muted); overflow-wrap: anywhere; }
+@media (max-width: 600px) { .cli-grid { grid-template-columns: 1fr; } }

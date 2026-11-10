@@ -30,14 +30,43 @@
     <p style="margin-top:1rem"><a class="btn btn-primary" href="/panel/productos/nuevo">+ Agregar producto</a></p>
   </div>
 <% } else { %>
+  <%
+    var categoriasLista = [];
+    productos.forEach(function (p) { var n = p.categoria ? p.categoria.nombre : ''; if (n && categoriasLista.indexOf(n) === -1) categoriasLista.push(n); });
+    categoriasLista.sort();
+    var tagsDe = function (p) {
+      var t = [p.activo ? 'activo' : 'inactivo'];
+      if (p.stockMostrado <= 0) t.push('agotado'); else if (p.stockMostrado <= 5) t.push('bajo');
+      if (!porCitas && p.motivoOculto) t.push('oculto');
+      return t.join(' ');
+    };
+  %>
+  <div class="filtros-barra" data-objetivo="#prodTabla" data-vacio="#prodVacio" data-etiqueta="productos">
+    <label class="f-buscar"><span style="position:absolute;left:-9999px">Buscar producto</span><input type="search" data-filtro-q placeholder="Buscar por nombre, código o categoría…" autocomplete="off" /></label>
+    <% if (categoriasLista.length) { %>
+      <select data-filtro-cat aria-label="Categoría">
+        <option value="">Todas las categorías</option>
+        <% categoriasLista.forEach(function (c) { %><option value="<%= c %>"><%= c %></option><% }); %>
+      </select>
+    <% } %>
+    <div class="f-chips" role="group" aria-label="Estado">
+      <button type="button" class="f-chip activo" data-filtro-chip="" aria-pressed="true">Todos</button>
+      <button type="button" class="f-chip" data-filtro-chip="activo" aria-pressed="false">Activos</button>
+      <button type="button" class="f-chip" data-filtro-chip="inactivo" aria-pressed="false">Desactivados</button>
+      <button type="button" class="f-chip" data-filtro-chip="bajo" aria-pressed="false">Stock bajo</button>
+      <button type="button" class="f-chip" data-filtro-chip="agotado" aria-pressed="false">Agotados</button>
+      <% if (!porCitas) { %><button type="button" class="f-chip" data-filtro-chip="oculto" aria-pressed="false">El agente no los muestra</button><% } %>
+    </div>
+    <span class="f-cuenta" data-filtro-cuenta aria-live="polite"></span>
+  </div>
   <div class="table-wrap">
-    <table class="leads-table">
+    <table class="leads-table" id="prodTabla">
       <thead>
         <tr><th></th><th>Producto</th><th>Categoría</th><th class="num">Precio</th><th class="num">Stock</th><% if (!porCitas) { %><th>¿El agente lo muestra?</th><% } %><th>Acciones</th></tr>
       </thead>
       <tbody>
         <% productos.forEach(function (p) { %>
-          <tr class="<%= p.activo ? '' : 'is-done' %>">
+          <tr class="<%= p.activo ? '' : 'is-done' %>" data-item data-texto="<%= p.nombre %> <%= p.sku || '' %> <%= p.categoria ? p.categoria.nombre : '' %>" data-categoria="<%= p.categoria ? p.categoria.nombre : '' %>" data-tags="<%= tagsDe(p) %>">
             <td>
               <% if (p.fotos && p.fotos.length) { %>
                 <img src="<%= p.fotos[0] %>" alt="" class="prod-thumb" />
@@ -51,8 +80,8 @@
             </td>
             <td><%= p.categoria ? p.categoria.nombre : '-' %></td>
             <td class="num"><%= simboloCatalogo %> <%= Number(p.precio).toFixed(2) %></td>
-            <td class="num <%= p.stockMostrado <= 5 ? 'saldo-ok' : '' %>">
-              <%= p.stockMostrado %><% if (p.tieneVariantes) { %> <span class="muted" style="font-size:.75rem">(variantes)</span><% } %>
+            <td class="num">
+              <span class="badge <%= p.stockMostrado <= 0 ? 'badge-alerta' : (p.stockMostrado <= 5 ? 'badge-star' : 'badge-new') %>"><%= p.stockMostrado %></span><% if (p.tieneVariantes) { %><br><span class="muted" style="font-size:.72rem">con opciones</span><% } %>
             </td>
             <% if (!porCitas) { %><td>
               <% if (p.motivoOculto) { %>
@@ -74,6 +103,8 @@
       </tbody>
     </table>
   </div>
+  <div class="f-vacio" id="prodVacio" hidden>No hay productos con esos filtros.</div>
+  <script src="/js/filtros-lista.js"></script>
 <% } %>
 
 <details class="pf-mas cat-mas">

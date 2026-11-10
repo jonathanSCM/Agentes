@@ -1,13 +1,23 @@
 <%- include('partials/inicio') %>
+<%
+  var ETQ = { NUEVO: ['Nuevo', 'badge-new'], EN_CONVERSACION: ['Conversando', 'badge-done'], CALIFICADO: ['Interesado', 'badge-star'], PEDIDO_CREADO: ['Compró', 'badge-new'], DERIVADO_A_ASESOR: ['Pidió asesor', 'badge-alerta'], CERRADO: ['Cerrado', 'badge-off'], NO_INTERESADO: ['No interesado', 'badge-off'] };
+  var hace = function (f) {
+    var min = Math.max(0, Math.round((Date.now() - new Date(f).getTime()) / 60000));
+    if (min < 2) return 'ahora'; if (min < 60) return 'hace ' + min + ' min'; if (min < 1440) return 'hace ' + Math.round(min / 60) + ' h';
+    var d = Math.round(min / 1440); return d === 1 ? 'ayer' : (d < 30 ? 'hace ' + d + ' días' : new Date(f).toLocaleDateString('es-BO'));
+  };
+%>
 
 <div class="page-head">
   <h2>Clientes</h2>
-  <p>Personas que han escrito a tu agente. Tu base de contactos.</p>
+  <p>Las personas que escribieron a tu agente: cuánto te compraron y cuándo hablaron por última vez.</p>
 </div>
 
 <div class="admin-stats">
   <div class="stat-card"><span class="stat-num"><%= stats.total %></span><span class="stat-label">Clientes</span></div>
   <div class="stat-card stat-new"><span class="stat-num"><%= stats.nuevosHoy %></span><span class="stat-label">Nuevos hoy</span></div>
+  <div class="stat-card"><span class="stat-num"><%= stats.compradores %></span><span class="stat-label">Ya compraron</span></div>
+  <div class="stat-card stat-done"><span class="stat-num"><%= simboloCatalogo %> <%= Math.round(stats.comprado).toLocaleString('es-BO') %></span><span class="stat-label">Comprado en total</span></div>
 </div>
 
 <% if (clientes.length === 0) { %>
@@ -16,32 +26,54 @@
     <p>Cuando alguien escriba a tu agente, quedará guardado aquí con su nombre y teléfono.</p>
   </div>
 <% } else { %>
-  <div class="table-wrap">
-    <table class="leads-table">
-      <thead>
-        <tr><th>Nombre</th><th>Teléfono</th><th>Interés</th><th>Estado</th><th class="num">Pedidos</th><th>Desde</th></tr>
-      </thead>
-      <tbody>
-        <% clientes.forEach(function (c) { %>
-          <tr>
-            <td><strong><%= c.nombre || '(sin nombre)' %></strong></td>
-            <td>
-              <a href="https://wa.me/<%= c.telefono.replace(/\D/g,'') %>" target="_blank" rel="noopener"><%= c.telefono %></a>
-            </td>
-            <td class="muted">
-              <%= c.categoriaInteres || '-' %>
-              <% if (c.ubicacionLat && c.ubicacionLng) { %>
-                · <a href="https://www.google.com/maps?q=<%= c.ubicacionLat %>,<%= c.ubicacionLng %>" target="_blank" rel="noopener" style="color:var(--primary-2)">Ubicación</a>
-              <% } %>
-            </td>
-            <td><span class="badge badge-done"><%= c.estadoLead.replace(/_/g, ' ').toLowerCase() %></span></td>
-            <td class="num"><%= c._count.pedidos %></td>
-            <td class="nowrap muted"><%= new Date(c.createdAt).toLocaleDateString('es-BO') %></td>
-          </tr>
-        <% }); %>
-      </tbody>
-    </table>
+  <div class="filtros-barra" data-objetivo="#cliGrid" data-vacio="#cliVacio" data-etiqueta="clientes">
+    <label class="f-buscar"><span style="position:absolute;left:-9999px">Buscar cliente</span><input type="search" data-filtro-q placeholder="Buscar por nombre, teléfono o interés…" autocomplete="off" /></label>
+    <div class="f-chips" role="group" aria-label="Filtrar clientes">
+      <button type="button" class="f-chip activo" data-filtro-chip="" aria-pressed="true">Todos</button>
+      <button type="button" class="f-chip" data-filtro-chip="compro" aria-pressed="false">Ya compraron</button>
+      <button type="button" class="f-chip" data-filtro-chip="asesor" aria-pressed="false">Piden asesor</button>
+      <button type="button" class="f-chip" data-filtro-chip="activo" aria-pressed="false">Activos esta semana</button>
+    </div>
+    <span class="f-cuenta" data-filtro-cuenta aria-live="polite"></span>
   </div>
+
+  <div class="cli-grid" id="cliGrid">
+    <% clientes.forEach(function (c) {
+         var e = ETQ[c.estadoLead] || [c.estadoLead.replace(/_/g, ' ').toLowerCase(), 'badge-done'];
+         var tags = [];
+         if (c._count.pedidos > 0) tags.push('compro');
+         if (c.estadoLead === 'DERIVADO_A_ASESOR') tags.push('asesor');
+         if (Date.now() - new Date(c.ultimaActividad).getTime() < 7 * 86400000) tags.push('activo');
+    %>
+      <article class="cli-card" data-item data-texto="<%= c.titulo %> <%= c.telefono %> <%= c.categoriaInteres || '' %>" data-tags="<%= tags.join(' ') %>">
+        <div class="cli-cab">
+          <span class="cli-av" style="--av: <%= c.color %>" aria-hidden="true"><%= c.iniciales %></span>
+          <div class="cli-quien">
+            <strong><%= c.titulo %></strong>
+            <a href="https://wa.me/<%= c.telefono.replace(/\D/g,'') %>" target="_blank" rel="noopener"><%= c.telefono %></a>
+          </div>
+          <span class="badge cli-estado <%= e[1] %>"><%= e[0] %></span>
+        </div>
+        <div class="cli-datos">
+          <div><strong><%= c._count.pedidos %></strong><span>Pedidos</span></div>
+          <div><strong><%= c.comprado > 0 ? simboloCatalogo + ' ' + Math.round(c.comprado).toLocaleString('es-BO') : '—' %></strong><span>Comprado</span></div>
+          <div><strong><%= hace(c.ultimaActividad) %></strong><span>Última vez</span></div>
+        </div>
+        <% if (c.categoriaInteres || (c.ubicacionLat && c.ubicacionLng)) { %>
+          <div class="cli-interes">
+            <% if (c.categoriaInteres) { %>Le interesa: <strong><%= c.categoriaInteres %></strong><% } %>
+            <% if (c.ubicacionLat && c.ubicacionLng) { %><%= c.categoriaInteres ? ' · ' : '' %><a href="https://www.google.com/maps?q=<%= c.ubicacionLat %>,<%= c.ubicacionLng %>" target="_blank" rel="noopener" style="color:var(--primary-2)">📍 Ubicación</a><% } %>
+          </div>
+        <% } %>
+        <div class="cli-pie">
+          <span>Cliente desde <%= new Date(c.createdAt).toLocaleDateString('es-BO') %></span>
+          <div class="cli-acciones"><a class="btn btn-ghost" href="/panel/conversaciones/<%= encodeURIComponent(c.telefono) %>">Abrir chat</a></div>
+        </div>
+      </article>
+    <% }); %>
+  </div>
+  <div class="f-vacio" id="cliVacio" hidden>No hay clientes con esos filtros.</div>
+  <script src="/js/filtros-lista.js"></script>
 <% } %>
 
 <%- include('partials/fin') %>

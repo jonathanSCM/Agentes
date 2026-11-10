@@ -1707,14 +1707,25 @@ app.get('/panel/clientes', requireCliente, async (req, res, next) => {
   try {
     const empresaId = req.session.empresaId;
     const hoy = inicioDeHoy();
-    const [clientes, total, nuevosHoy] = await Promise.all([
-      prisma.clienteFinal.findMany({ where: { empresaId }, include: { _count: { select: { pedidos: true } } }, orderBy: { createdAt: 'desc' }, take: 200 }),
+    const agenteIds = await agenteIdsDe(empresaId);
+    const [clientes, total, nuevosHoy, comprado, actividad, conPedido] = await Promise.all([
+      prisma.clienteFinal.findMany({ where: { empresaId }, include: { _count: { select: { pedidos: true } } }, orderBy: { createdAt: 'desc' }, take: 300 }),
       prisma.clienteFinal.count({ where: { empresaId } }),
       prisma.clienteFinal.count({ where: { empresaId, createdAt: { gte: hoy } } }),
+      // Cuanto compro cada cliente (sin contar lo cancelado) y cuando hablo por ultima vez.
+      prisma.pedido.groupBy({ by: ['clienteId'], where: { empresaId, estado: { not: 'CANCELADO' }, clienteId: { not: null } }, _sum: { total: true } }),
+      prisma.conversacion.groupBy({ by: ['telefonoCliente'], where: { agenteId: { in: agenteIds } }, _max: { ultimoMensajeAt: true } }),
+      prisma.pedido.groupBy({ by: ['clienteId'], where: { empresaId, estado: { not: 'CANCELADO' }, clienteId: { not: null } }, _count: true }),
     ]);
+    const gastoDe = new Map(comprado.map((x) => [x.clienteId, Number(x._sum.total || 0)]));
+    const ultimaDe = new Map(actividad.map((x) => [x.telefonoCliente, x._max.ultimoMensajeAt]));
+    const filas = clientes.map((c) => ({
+      ...c, comprado: gastoDe.get(c.id) || 0, ultimaActividad: ultimaDe.get(c.telefono) || c.createdAt,
+      titulo: c.nombre || c.nombrePerfil || c.telefono, iniciales: bandeja.inicialesDe(c.nombre || c.nombrePerfil, c.telefono), color: bandeja.colorDe(c.telefono),
+    })).sort((a, b) => new Date(b.ultimaActividad) - new Date(a.ultimaActividad));
     res.render('cliente/clientes', {
       title: 'Clientes - Proshop', tituloPagina: 'Clientes', activo: 'clientes',
-      clientes, stats: { total, nuevosHoy },
+      clientes: filas, stats: { total, nuevosHoy, compradores: conPedido.length, comprado: [...gastoDe.values()].reduce((t, n) => t + n, 0) },
     });
   } catch (err) { next(err); }
 });
@@ -1725,7 +1736,7 @@ app.get('/panel/inventario', requireCliente, async (req, res, next) => {
     const empresaId = req.session.empresaId;
     const productosDb = await prisma.producto.findMany({
       where: { empresaId },
-      include: { variantes: { where: { activa: true }, select: { stock: true } } },
+      include: { variantes: { where: { activa: true }, select: { stock: true } }, categoria: { select: { nombre: true } } },
     });
     // Si el producto tiene variantes, el stock real es la suma de sus
     // variantes (el stock del producto en si queda en 0 a proposito) - ver

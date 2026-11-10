@@ -183,11 +183,19 @@ describe('consultas', () => {
   });
 });
 
-describe('menú de compras', () => {
+describe('menú: proveedores y compras ya no están (el stock se maneja desde el catálogo)', () => {
   const { construirMenu } = require('../lib/services/menuPanel');
   const claves = (g) => g.flatMap((x) => x.items.map((i) => i.clave));
-  test('dueño y admin las ven; el cajero y el staff no', () => {
-    for (const rol of ['OWNER', 'ADMIN']) assert.ok(claves(construirMenu({ rol, modulos: ['AGENTE', 'POS'] })).includes('compras-proveedor'));
-    for (const rol of ['CAJERO', 'STAFF']) assert.ok(!claves(construirMenu({ rol, modulos: ['AGENTE', 'POS'] })).includes('compras-proveedor'));
+  test('ningún rol las ve en el menú, ni en negocios de productos ni de citas', () => {
+    for (const rol of ['OWNER', 'ADMIN', 'STAFF', 'CAJERO']) {
+      for (const esCitas of [false, true]) {
+        const c = claves(construirMenu({ rol, esCitas, modulos: ['AGENTE', 'POS', 'PANEL'] }));
+        assert.ok(!c.includes('proveedores') && !c.includes('compras-proveedor'), `${rol} ${esCitas}`);
+      }
+    }
+  });
+  test('el catálogo sí trae productos e inventario para manejar el stock', () => {
+    const c = claves(construirMenu({ rol: 'OWNER', modulos: ['AGENTE', 'POS'] }));
+    assert.ok(c.includes('productos') && c.includes('inventario'));
   });
 });

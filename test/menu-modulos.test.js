@@ -125,7 +125,7 @@ describe('requireModulo (bloqueo en el servidor)', () => {
 describe('menú del punto de venta', () => {
   test('el dueño ve el grupo Punto de venta; bloqueado si el plan no trae POS', () => {
     const sin = items(construirMenu({ rol: 'OWNER', modulos: ['AGENTE'] })).filter((i) => i.modulo === 'POS');
-    assert.deepEqual(sin.map((i) => i.clave), ['pos', 'pos-pedidos', 'caja', 'ventas', 'proveedores', 'compras-proveedor']);
+    assert.deepEqual(sin.map((i) => i.clave), ['pos', 'pos-pedidos', 'caja', 'ventas']);
     assert.ok(sin.every((i) => i.bloqueado));
     const con = items(construirMenu({ rol: 'OWNER', modulos: ['AGENTE', 'POS'] })).filter((i) => i.modulo === 'POS');
     assert.ok(con.every((i) => !i.bloqueado));
