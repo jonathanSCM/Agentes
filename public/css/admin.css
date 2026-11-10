@@ -34,6 +34,20 @@ select option:hover {
   color: #fff;
 }
 
+/* ---------- Controles de formulario sueltos (filtros, fechas, selects, buscadores) ----------
+   Un <select> o <input> sin clase propia salía con el fondo BLANCO del navegador sobre el tema oscuro (ej. los filtros de Auditoría
+   y de varias pantallas del superadmin). Base oscura para todos; va con :where() (especificidad 0) para no pisar a los que ya
+   tienen su propio estilo (.field, .filtros-ventas, .pf-fila...). Los selectores de fecha/hora llevan color-scheme oscuro
+   para que su calendario y su ícono se vean. */
+:where(body.admin) :where(select, textarea, input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="range"]):not([type="color"]):not([type="submit"]):not([type="button"]):not([type="hidden"]):not([type="image"])) {
+  background-color: rgba(255, 255, 255, .06); color: var(--text); border: 1px solid var(--border); border-radius: 10px;
+  padding: .5rem .7rem; font: inherit; font-size: .9rem; max-width: 100%;
+}
+:where(body.admin) :where(input[type="date"], input[type="time"], input[type="datetime-local"], input[type="month"], input[type="number"], input[type="search"]) { color-scheme: dark; }
+:where(body.admin) :where(select, textarea, input):focus-visible { outline: 2px solid var(--primary-2); outline-offset: 1px; }
+:where(body.admin) :where(input, textarea)::placeholder { color: var(--muted); opacity: .8; }
+:where(body.admin) :where(select, input, textarea):disabled { opacity: .55; cursor: not-allowed; }
+
 /* ---------- Login ---------- */
 .admin-login { min-height: 100vh; display: grid; place-items: center; }
 .login-wrap { width: 100%; display: grid; place-items: center; padding: 2rem 1.25rem; }

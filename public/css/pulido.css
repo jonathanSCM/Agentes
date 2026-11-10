@@ -108,3 +108,6 @@
 .cat-acciones { display: flex; gap: .4rem; margin-top: auto; padding-top: .6rem; align-items: center; }
 .cat-acciones form { margin: 0; }
 .cat-agente { font-size: .72rem; color: var(--muted); }
+
+/* Barra de filtros de las pantallas que no cargan pos.css (Auditoría, etc.) */
+.filtros-ventas { display: flex; gap: .5rem; flex-wrap: wrap; align-items: center; margin: 0 0 1rem; }

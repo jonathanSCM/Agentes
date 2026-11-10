@@ -1203,3 +1203,5 @@ Migración aditiva `20261114100000_pos_espera_y_cambios` (tabla `ventas_espera`,
 - Migración aditiva `20261120100000_whatsapp_coexistence` (`modo`, `estadoSync`, `conectadoAt`). Tests: `test/meta-coexistence.test.js` (15). Auditoría: `WHATSAPP_CONECTADO`.
 
 **Corrección (#67):** Productos vuelve a ser el de las **tarjetas** (con filtros) e Inventario vuelve a ser **tabla** (con filtros), como se pidió; las listas largas se **agrupan en páginas** (tarjetas de a 24, tabla de a 20) con `data-pagina` en `filtros-lista.js`. En "Pedir conversaciones" se quita el degradado verde de los números (blanco sólido, sin recortes).
+
+**Corrección (#67):** los filtros de Auditoría (y de varias pantallas del superadmin) salían con fondo **blanco**: un `<select>`/`<input>` sin clase propia usa el estilo del navegador. Ahora `admin.css` trae una base oscura para todos los controles sueltos de `body.admin` (los dos paneles lo comparten), con `:where()` para no pisar a los que ya tienen estilo, y `color-scheme: dark` en fechas y horas. Se revisaron 27 pantallas (panel y superadmin) y ya no queda ningún control claro.
