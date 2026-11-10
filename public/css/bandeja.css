@@ -132,3 +132,39 @@ body.admin:has(.bandeja) .admin-body { min-height: 0; height: 100%; overflow: hi
   .bandeja .conv-body { padding: .8rem; }
   .chat-acciones .etiqueta { display: none; }
 }
+
+/* ---------- Adjuntos, ubicación y compositor del chat ---------- */
+.bandeja .conv-compositor { align-items: flex-end; }
+.bandeja .conv-compositor textarea {
+  flex: 1; min-width: 0; resize: none; max-height: 140px; padding: .6rem .8rem; border-radius: 12px; border: 1px solid var(--border);
+  background: var(--bg-2); color: var(--text); font: inherit; line-height: 1.4; overflow-y: hidden;
+}
+.bandeja .conv-compositor textarea:focus-visible { outline: 2px solid var(--primary-2); outline-offset: 1px; }
+.adj-wrap { position: relative; }
+.adj-btn { padding: .55rem .7rem; font-size: 1.05rem; }
+.adj-menu {
+  position: absolute; bottom: calc(100% + 8px); left: 0; z-index: 20; min-width: 220px; display: grid; gap: 2px; padding: .35rem;
+  background: var(--surface, #231536); border: 1px solid var(--border); border-radius: 12px; box-shadow: 0 12px 34px rgba(0, 0, 0, .45);
+}
+.adj-menu[hidden] { display: none; }
+.adj-menu button { text-align: left; padding: .55rem .7rem; border: 0; border-radius: 8px; background: none; color: var(--text); font: inherit; cursor: pointer; }
+.adj-menu button:hover, .adj-menu button:focus-visible { background: rgba(139, 92, 246, .22); outline: none; }
+
+.adj-previa { display: grid; justify-items: center; gap: .5rem; margin-bottom: .9rem; }
+.adj-previa img { max-width: 100%; max-height: 260px; border-radius: 10px; object-fit: contain; }
+.adj-icono { font-size: 3rem; line-height: 1; }
+.adj-nombre { font-size: .85rem; color: var(--muted); overflow-wrap: anywhere; text-align: center; }
+.adj-acciones { display: flex; gap: .5rem; justify-content: flex-end; align-items: center; margin-top: .9rem; }
+.adj-acciones .muted { margin-right: auto; font-size: .8rem; }
+.ubi-atajos { display: flex; gap: .5rem; flex-wrap: wrap; margin-bottom: .8rem; }
+#ubiOverlay .prod-card, #adjOverlay .prod-card { overflow-y: auto; }
+
+.chat-arrastrando { outline: 2px dashed var(--primary-2); outline-offset: -8px; background-image: linear-gradient(rgba(47, 227, 166, .08), rgba(47, 227, 166, .08)); }
+
+.conv-video { display: block; max-width: 100%; max-height: 300px; border-radius: 8px; }
+.conv-pie { margin-top: .4rem; font-size: .86rem; white-space: pre-line; overflow-wrap: anywhere; }
+.conv-doc, .conv-ubi { display: flex; align-items: center; gap: .7rem; padding: .5rem .6rem; border-radius: 10px; background: rgba(0, 0, 0, .22); color: inherit; text-decoration: none; min-width: 220px; }
+.conv-doc:hover, .conv-ubi:hover { background: rgba(0, 0, 0, .32); }
+.conv-doc strong, .conv-ubi strong, .conv-doc small, .conv-ubi small { display: block; overflow-wrap: anywhere; }
+.conv-doc small, .conv-ubi small { color: var(--muted); font-size: .74rem; }
+.conv-doc-ico, .conv-ubi-pin { font-size: 1.7rem; line-height: 1; }

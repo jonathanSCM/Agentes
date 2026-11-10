@@ -113,6 +113,29 @@
                 <audio controls src="<%= m.mediaUrl %>"></audio>
                 <% if (m.contenido) { %><div style="margin-top:.4rem;font-size:.82rem"><%= m.contenido %></div><% } %>
               </div>
+            <% } else if (m.mediaTipo === 'video' && m.mediaUrl) { %>
+              <div class="conv-msg <%= clase %>">
+                <% if (quien) { %><div class="conv-msg-quien"><%= quien %></div><% } %>
+                <video class="conv-video" controls preload="metadata" src="<%= m.mediaUrl %>"></video>
+                <% if (m.contenido) { %><div class="conv-pie"><%= m.contenido %></div><% } %>
+              </div>
+            <% } else if (m.mediaTipo === 'documento' && m.mediaUrl) { %>
+              <div class="conv-msg <%= clase %>">
+                <% if (quien) { %><div class="conv-msg-quien"><%= quien %></div><% } %>
+                <a class="conv-doc" href="<%= m.mediaUrl %>" target="_blank" rel="noopener" download>
+                  <span class="conv-doc-ico" aria-hidden="true">📄</span>
+                  <span><strong><%= (m.meta && m.meta.nombre) || 'Documento' %></strong><small><%= m.meta && m.meta.bytes ? (m.meta.bytes >= 1048576 ? (m.meta.bytes / 1048576).toFixed(1) + ' MB' : Math.max(1, Math.round(m.meta.bytes / 1024)) + ' KB') : '' %></small></span>
+                </a>
+                <% if (m.contenido) { %><div class="conv-pie"><%= m.contenido %></div><% } %>
+              </div>
+            <% } else if (m.mediaTipo === 'ubicacion' && m.mediaUrl) { %>
+              <div class="conv-msg <%= clase %>">
+                <% if (quien) { %><div class="conv-msg-quien"><%= quien %></div><% } %>
+                <a class="conv-ubi" href="<%= m.mediaUrl %>" target="_blank" rel="noopener">
+                  <span class="conv-ubi-pin" aria-hidden="true">📍</span>
+                  <span><strong><%= (m.meta && m.meta.nombre) || 'Ubicación' %></strong><small><%= (m.meta && m.meta.direccion) || (m.meta && m.meta.lat !== undefined ? Number(m.meta.lat).toFixed(5) + ', ' + Number(m.meta.lng).toFixed(5) : 'Abrir en Google Maps') %></small></span>
+                </a>
+              </div>
             <% } else { %>
               <div class="conv-msg <%= clase %>"><% if (quien) { %><div class="conv-msg-quien"><%= quien %></div><% } %><%= m.contenido %></div>
             <% } %>
@@ -122,11 +145,20 @@
       </div>
 
       <% if (ultimaConversacion.modo === 'HUMANO') { %>
-        <form method="POST" action="<%= hrefBase %>/mensaje" id="formMensajeHumano" class="conv-foot">
-          <input type="text" name="texto" autocomplete="off" placeholder="Escribí tu respuesta..." />
-          <button class="btn btn-ghost" type="button" id="btnAbrirProducto">📦 Producto</button>
+        <form method="POST" action="<%= hrefBase %>/mensaje" id="formMensajeHumano" class="conv-foot conv-compositor">
+          <div class="adj-wrap">
+            <button class="btn btn-ghost adj-btn" type="button" id="btnAdjuntar" aria-haspopup="true" aria-expanded="false" aria-label="Adjuntar" title="Adjuntar un archivo, una ubicación o un producto">📎</button>
+            <div class="adj-menu" id="adjMenu" role="menu" hidden>
+              <button type="button" role="menuitem" data-adj="documento">📄 Documento</button>
+              <button type="button" role="menuitem" data-adj="foto">🖼 Foto, video o audio</button>
+              <button type="button" role="menuitem" data-adj="ubicacion">📍 Ubicación</button>
+              <button type="button" role="menuitem" id="btnAbrirProducto">📦 Producto</button>
+            </div>
+          </div>
+          <textarea name="texto" id="chatTexto" rows="1" autocomplete="off" maxlength="4000" placeholder="Escribí tu respuesta…" title="Enter envía · Shift+Enter hace un salto de línea"></textarea>
           <button class="btn btn-primary" type="submit">Enviar</button>
         </form>
+        <input type="file" id="adjArchivo" accept="<%= aceptados %>" multiple hidden />
       <% } else { %>
         <p class="conv-foot-sin-control">Tomá el control del chat para poder escribirle directo al cliente.</p>
       <% } %>
@@ -202,6 +234,35 @@
     <div class="prod-lista" id="prodLista"></div>
   </div>
 </div>
+<div class="prod-overlay" id="adjOverlay" hidden>
+  <div class="prod-card" role="dialog" aria-modal="true" aria-labelledby="adjTitulo">
+    <button type="button" class="prod-cerrar" id="adjCerrar" aria-label="Cerrar">✕</button>
+    <h3 id="adjTitulo">Enviar archivo</h3>
+    <div class="adj-previa" id="adjPrevia"></div>
+    <div class="field" id="adjCampoCaption"><label for="adjCaption">Mensaje (opcional)</label><input id="adjCaption" type="text" maxlength="1024" autocomplete="off" placeholder="Escribí algo para acompañar el archivo…" /></div>
+    <p class="alert-err" id="adjError" role="alert" hidden></p>
+    <div class="adj-acciones"><span class="muted" id="adjCola"></span><button class="btn btn-ghost" type="button" id="adjCancelar">Cancelar</button><button class="btn btn-primary" type="button" id="adjEnviar">Enviar</button></div>
+  </div>
+</div>
+<div class="prod-overlay" id="ubiOverlay" hidden>
+  <div class="prod-card" role="dialog" aria-modal="true" aria-labelledby="ubiTitulo">
+    <button type="button" class="prod-cerrar" id="ubiCerrar" aria-label="Cerrar">✕</button>
+    <h3 id="ubiTitulo">Enviar ubicación</h3>
+    <div class="ubi-atajos">
+      <button class="btn btn-ghost" type="button" id="ubiMia">📍 Mi ubicación actual</button>
+      <button class="btn btn-ghost" type="button" id="ubiLocal" <%= tiendaConUbicacion ? '' : 'disabled title="Cargá la ubicación del local en Configuración"' %>>🏪 Ubicación del local</button>
+    </div>
+    <div class="field"><label for="ubiEnlace">Link de Google Maps</label><input id="ubiEnlace" type="text" autocomplete="off" placeholder="https://maps.app.goo.gl/…" /></div>
+    <div class="field-row">
+      <div class="field"><label for="ubiLat">Latitud</label><input id="ubiLat" type="text" inputmode="decimal" autocomplete="off" placeholder="-17.78" /></div>
+      <div class="field"><label for="ubiLng">Longitud</label><input id="ubiLng" type="text" inputmode="decimal" autocomplete="off" placeholder="-63.18" /></div>
+    </div>
+    <div class="field"><label for="ubiNombre">Nombre del lugar (opcional)</label><input id="ubiNombre" type="text" maxlength="100" autocomplete="off" /></div>
+    <div class="field"><label for="ubiDireccion">Dirección (opcional)</label><input id="ubiDireccion" type="text" maxlength="200" autocomplete="off" /></div>
+    <p class="alert-err" id="ubiError" role="alert" hidden></p>
+    <div class="adj-acciones"><button class="btn btn-ghost" type="button" id="ubiCancelar">Cancelar</button><button class="btn btn-primary" type="button" id="ubiEnviar">Enviar ubicación</button></div>
+  </div>
+</div>
 <form method="POST" action="<%= hrefBase %>/producto" id="formEnviarProducto" style="display:none">
   <input type="hidden" name="productoId" id="prodIdSeleccionado" />
 </form>
@@ -261,6 +322,27 @@
         conQuien(wrap);
         var audio = document.createElement('audio'); audio.controls = true; audio.src = m.mediaUrl; wrap.appendChild(audio);
         if (m.contenido) { var nota = document.createElement('div'); nota.style.cssText = 'margin-top:.4rem;font-size:.82rem'; nota.textContent = m.contenido; wrap.appendChild(nota); }
+      } else if (m.mediaTipo === 'video' && m.mediaUrl) {
+        conQuien(wrap);
+        var video = document.createElement('video'); video.className = 'conv-video'; video.controls = true; video.preload = 'metadata'; video.src = m.mediaUrl; wrap.appendChild(video);
+        if (m.contenido) { var pieV = document.createElement('div'); pieV.className = 'conv-pie'; pieV.textContent = m.contenido; wrap.appendChild(pieV); }
+      } else if (m.mediaTipo === 'documento' && m.mediaUrl) {
+        conQuien(wrap);
+        var meta = m.meta || {};
+        var enlaceD = document.createElement('a'); enlaceD.className = 'conv-doc'; enlaceD.href = m.mediaUrl; enlaceD.target = '_blank'; enlaceD.rel = 'noopener'; enlaceD.setAttribute('download', '');
+        var icoD = document.createElement('span'); icoD.className = 'conv-doc-ico'; icoD.textContent = '📄';
+        var txtD = document.createElement('span'); var nomD = document.createElement('strong'); nomD.textContent = meta.nombre || 'Documento'; var tamD = document.createElement('small');
+        tamD.textContent = meta.bytes ? (meta.bytes >= 1048576 ? (meta.bytes / 1048576).toFixed(1) + ' MB' : Math.max(1, Math.round(meta.bytes / 1024)) + ' KB') : '';
+        txtD.appendChild(nomD); txtD.appendChild(tamD); enlaceD.appendChild(icoD); enlaceD.appendChild(txtD); wrap.appendChild(enlaceD);
+        if (m.contenido) { var pieD = document.createElement('div'); pieD.className = 'conv-pie'; pieD.textContent = m.contenido; wrap.appendChild(pieD); }
+      } else if (m.mediaTipo === 'ubicacion' && m.mediaUrl) {
+        conQuien(wrap);
+        var mu = m.meta || {};
+        var enlaceU = document.createElement('a'); enlaceU.className = 'conv-ubi'; enlaceU.href = m.mediaUrl; enlaceU.target = '_blank'; enlaceU.rel = 'noopener';
+        var pin = document.createElement('span'); pin.className = 'conv-ubi-pin'; pin.textContent = '📍';
+        var txtU = document.createElement('span'); var nomU = document.createElement('strong'); nomU.textContent = mu.nombre || 'Ubicación'; var dirU = document.createElement('small');
+        dirU.textContent = mu.direccion || (mu.lat !== undefined ? Number(mu.lat).toFixed(5) + ', ' + Number(mu.lng).toFixed(5) : 'Abrir en Google Maps');
+        txtU.appendChild(nomU); txtU.appendChild(dirU); enlaceU.appendChild(pin); enlaceU.appendChild(txtU); wrap.appendChild(enlaceU);
       } else {
         conQuien(wrap);
         wrap.appendChild(document.createTextNode(m.contenido));
@@ -327,5 +409,7 @@
     buscar.addEventListener('input', function () { clearTimeout(debounce); var v = buscar.value; debounce = setTimeout(function () { cargar(v); }, 300); });
   })();
 </script>
+
+<script src="/js/chat-adjuntos.js"></script>
 
 <%- include('partials/fin') %>

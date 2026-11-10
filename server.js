@@ -1184,16 +1184,18 @@ app.get('/panel/conversaciones/:telefono', requireCliente, async (req, res, next
     const itemConversaciones = (res.locals.menu || []).flatMap((g) => g.items).find((i) => i.clave === 'conversaciones');
     if (itemConversaciones) itemConversaciones.badge = await bandeja.contarNoLeidos(agenteIds);
     const { filtro, q } = opcionesDeLista(req);
-    const [lista, ficha] = await Promise.all([
+    const [lista, ficha, configAgente] = await Promise.all([
       bandeja.listar(req.session.empresaId, agenteIds, { filtro, q }),
       bandeja.ficha(req.session.empresaId, ultimaConversacion.telefonoCliente),
+      prisma.agenteConfig.findUnique({ where: { agenteId: ultimaConversacion.agenteId }, select: { tiendaLat: true, tiendaLng: true } }),
     ]);
+    const tiendaConUbicacion = Boolean(configAgente && configAgente.tiendaLat !== null && configAgente.tiendaLng !== null);
     const filaAbierta = lista.find((f) => f.telefono === ultimaConversacion.telefonoCliente)
       || (await bandeja.listar(req.session.empresaId, agenteIds)).find((f) => f.telefono === ultimaConversacion.telefonoCliente) || null;
 
     res.render('cliente/bandeja', {
       title: 'Conversación - Proshop', tituloPagina: 'Conversaciones', activo: 'conversaciones', hojas: ['/css/bandeja.css'],
-      lista, filtro, q, abierta: ultimaConversacion.telefonoCliente, filaAbierta, ficha, stats: null,
+      lista, filtro, q, abierta: ultimaConversacion.telefonoCliente, filaAbierta, ficha, stats: null, tiendaConUbicacion, aceptados: require('./lib/services/chatHumano').ACEPTADOS,
       conversaciones, ultimaConversacion, itemsUnificados, totalMensajes, cliente, direccionLink,
       pendiente: ultimaConversacion.modo === 'HUMANO' ? null : await pendientes.pendienteDe(ultimaConversacion.id),
       mensaje: req.query.ok || null, error: req.query.err || null,
@@ -1382,6 +1384,103 @@ app.post('/panel/conversaciones/:telefono/mensaje', requireCliente, async (req, 
 
     res.redirect(`/panel/conversaciones/${req.params.telefono}`);
   } catch (err) { next(err); }
+});
+
+// ---- Archivos y ubicaciones desde el chat (como en WhatsApp) ----
+// Un humano con el control del chat puede mandar foto, video, audio, documento o una ubicación. Las reglas (qué se acepta,
+// tamaños, coordenadas) viven en lib/services/chatHumano.js. Lo mandado se guarda y se empuja al chat igual que el texto.
+const chatHumano = require('./lib/services/chatHumano');
+const uploadChat = multer({
+  storage: multer.diskStorage({
+    destination: (_req, _file, cb) => cb(null, UPLOADS_DIR),
+    filename: (_req, file, cb) => cb(null, `chat-${Date.now()}-${Math.round(Math.random() * 1e9)}${path.extname(file.originalname).toLowerCase().replace(/[^.a-z0-9]/g, '')}`),
+  }),
+  limits: { fileSize: chatHumano.MAX_BYTES, files: 1 },
+});
+
+/** La conversación abierta del cliente, solo si el usuario tiene el control (modo HUMANO). Si no, responde el error. */
+async function conversacionHumana(req, res) {
+  const conversaciones = await cargarConversacionesDelCliente(req);
+  if (!conversaciones.length) { res.status(404).json({ ok: false, error: 'Esa conversación no existe.' }); return null; }
+  const conversacion = conversaciones[conversaciones.length - 1];
+  if (conversacion.modo !== 'HUMANO') { res.status(400).json({ ok: false, error: 'Primero tenés que tomar el control de este chat.' }); return null; }
+  return conversacion;
+}
+
+/** Guarda lo que mandó el humano y lo empuja al chat en vivo. */
+async function registrarMensajeHumano(req, conversacion, { contenido, mediaUrl = null, mediaTipo = null, meta = null }) {
+  const [guardado] = await prisma.$transaction([
+    prisma.mensaje.create({ data: { conversacionId: conversacion.id, rol: 'AGENTE', contenido, mediaUrl, mediaTipo, meta: meta || undefined, usuarioId: req.session.clienteId } }),
+    prisma.conversacion.update({ where: { id: conversacion.id }, data: { ultimoMensajeAt: new Date() } }),
+  ]);
+  emitMensaje(req.session.empresaId, {
+    conversacionId: conversacion.id, rol: 'AGENTE', contenido, mediaUrl, mediaTipo, meta, createdAt: guardado.createdAt, usuarioNombre: req.session.clienteNombre,
+  });
+  return guardado;
+}
+
+const quitarArchivo = (nombre) => { try { fs.unlinkSync(path.join(UPLOADS_DIR, nombre)); } catch { /* ya no estaba */ } };
+
+app.post('/panel/conversaciones/:telefono/archivo', requireCliente, (req, res, next) => {
+  uploadChat.single('archivo')(req, res, (err) => {
+    if (!err) return next();
+    const pesado = err.code === 'LIMIT_FILE_SIZE';
+    res.status(400).json({ ok: false, error: pesado ? 'El archivo pesa más de 16 MB.' : 'No se pudo subir el archivo.' });
+  });
+}, async (req, res) => {
+  const subido = req.file;
+  try {
+    const conversacion = await conversacionHumana(req, res);
+    if (!conversacion) { if (subido) quitarArchivo(subido.filename); return; }
+    if (!subido) return res.status(400).json({ ok: false, error: 'Elegí un archivo.' });
+    let info;
+    try { info = chatHumano.clasificarArchivo({ nombre: subido.originalname, bytes: subido.size }); } catch (err) { quitarArchivo(subido.filename); return res.status(400).json({ ok: false, error: err.message }); }
+
+    // Las fotos se pasan a JPG (WhatsApp no acepta WebP) y se enderezan según la orientación de la cámara.
+    let nombreFinal = subido.filename;
+    if (info.tipo === 'imagen') [nombreFinal] = await convertirFotosAJpg([subido]);
+    const url = urlPublicaDeArchivo(req, nombreFinal);
+    const caption = info.tipo === 'audio' ? '' : String((req.body || {}).caption || '').trim().slice(0, 1024);
+
+    const conexion = conversacion.agente.conexion;
+    if (conexion && conexion.estado === 'CONECTADO') {
+      const envio = await wa.enviarMedia(conexion, conversacion.telefonoCliente, info.waTipo, { url, caption, filename: info.nombre });
+      if (!envio.ok) { quitarArchivo(nombreFinal); return res.status(400).json({ ok: false, error: chatHumano.mensajeDeError(envio.error, envio.codigo) }); }
+    }
+    await registrarMensajeHumano(req, conversacion, { contenido: caption, mediaUrl: url, mediaTipo: info.tipo, meta: { nombre: info.nombre, bytes: subido.size } });
+    res.json({ ok: true });
+  } catch (err) {
+    if (subido) quitarArchivo(subido.filename);
+    console.error('[chat] error al mandar archivo:', err);
+    res.status(500).json({ ok: false, error: 'No se pudo enviar por un problema técnico. Probá de nuevo.' });
+  }
+});
+
+app.post('/panel/conversaciones/:telefono/ubicacion', requireCliente, async (req, res) => {
+  try {
+    const conversacion = await conversacionHumana(req, res);
+    if (!conversacion) return;
+    const config = await prisma.agenteConfig.findUnique({ where: { agenteId: conversacion.agenteId }, select: { tiendaLat: true, tiendaLng: true, direccionTienda: true } });
+    const empresa = await prisma.empresa.findUnique({ where: { id: req.session.empresaId }, select: { nombre: true } });
+    let ubicacion;
+    try {
+      ubicacion = await chatHumano.normalizarUbicacion(req.body || {}, config ? { lat: config.tiendaLat, lng: config.tiendaLng, direccion: config.direccionTienda, nombre: empresa && empresa.nombre } : null);
+    } catch (err) {
+      if (err.codigo === 'CHAT') return res.status(400).json({ ok: false, error: err.message });
+      throw err;
+    }
+    const conexion = conversacion.agente.conexion;
+    if (conexion && conexion.estado === 'CONECTADO') {
+      const envio = await wa.enviarUbicacion(conexion, conversacion.telefonoCliente, ubicacion);
+      if (!envio.ok) return res.status(400).json({ ok: false, error: chatHumano.mensajeDeError(envio.error, envio.codigo) });
+    }
+    const resumen = ['📍 Ubicación', ubicacion.nombre, ubicacion.direccion].filter(Boolean).join(' · ');
+    await registrarMensajeHumano(req, conversacion, { contenido: resumen, mediaUrl: chatHumano.mapsUrl(ubicacion.lat, ubicacion.lng), mediaTipo: 'ubicacion', meta: ubicacion });
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('[chat] error al mandar ubicación:', err);
+    res.status(500).json({ ok: false, error: 'No se pudo enviar por un problema técnico. Probá de nuevo.' });
+  }
 });
 
 // Buscador de productos para mandar una tarjeta manual (solo devuelve lo

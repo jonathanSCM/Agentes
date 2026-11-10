@@ -36,7 +36,7 @@
         <span class="conv-fila">
           <span class="conv-texto">
             <% if (c.ultimoAutor === 'AGENTE') { %><span class="conv-autor"><%= c.humano ? 'Equipo: ' : 'Agente: ' %></span><% } %>
-            <% if (c.ultimoTipo === 'imagen') { %>📷 <% } else if (c.ultimoTipo === 'audio') { %>🎤 <% } %><%= c.ultimoTexto %>
+            <% if (c.ultimoTipo === 'imagen') { %>📷 <% } else if (c.ultimoTipo === 'audio') { %>🎤 <% } else if (c.ultimoTipo === 'video') { %>🎥 <% } else if (c.ultimoTipo === 'documento') { %>📄 <% } else if (c.ultimoTipo === 'ubicacion') { %>📍 <% } %><%= c.ultimoTexto %>
           </span>
           <% if (c.noLeidos) { %><span class="contador"><%= c.noLeidos %></span><% } %>
         </span>
