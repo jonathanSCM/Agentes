@@ -159,17 +159,8 @@ const upload = multer({
   limits: { fileSize: 8 * 1024 * 1024 },
 });
 
-async function convertirFotosAJpg(files) {
-  const nombres = [];
-  for (const file of files || []) {
-    const nombreJpg = `${path.parse(file.filename).name}.jpg`;
-    const rutaJpg = path.join(UPLOADS_DIR, nombreJpg);
-    await sharp(file.path).rotate().jpeg({ quality: 85 }).toFile(rutaJpg);
-    if (file.path !== rutaJpg) fs.unlinkSync(file.path);
-    nombres.push(nombreJpg);
-  }
-  return nombres;
-}
+const { convertirFotosAJpg: convertirAJpg } = require('./lib/services/fotosJpg');
+const convertirFotosAJpg = (files) => convertirAJpg(files, UPLOADS_DIR);
 
 // Mismo tratamiento que convertirFotosAJpg, pero partiendo de una URL en vez
 // de un archivo subido (para el import de catalogo desde Excel: el dueno
