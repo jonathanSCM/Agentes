@@ -93,3 +93,10 @@
 .eq-cupo.lleno { border-color: rgba(245, 158, 11, .5); background: rgba(245, 158, 11, .08); }
 .eq-cupo.lleno small { color: #fde68a; }
 .plan-rol { color: var(--muted); font-size: .84rem; }
+
+/* ---------- WhatsApp: conexión por coexistence ---------- */
+.wa-coex { display: flex; gap: 1.4rem; align-items: center; justify-content: space-between; flex-wrap: wrap; padding: 1.2rem 1.4rem; margin: 0 0 1.4rem; border-radius: 18px; border: 1px solid rgba(47, 227, 166, .35); background: linear-gradient(135deg, rgba(47, 227, 166, .09), rgba(139, 92, 246, .09)); }
+.wa-coex h3 { margin: 0 0 .4rem; font-size: 1.1rem; }
+.wa-coex p { margin: 0 0 .5rem; max-width: 62ch; font-size: .9rem; }
+.wa-coex-lista { margin: 0; padding-left: 1.1rem; color: var(--muted); font-size: .84rem; display: grid; gap: .2rem; }
+.wa-coex-accion { display: grid; gap: .5rem; justify-items: start; min-width: 220px; }

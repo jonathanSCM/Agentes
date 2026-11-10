@@ -774,6 +774,11 @@ model ConexionWhatsApp {
   tokenCifrado    String? // token de acceso, cifrado con APP_ENCRYPTION_KEY
   ultimoMensajeAt DateTime? // ultimo mensaje recibido
   verificado      Boolean   @default(false)
+  // MANUAL (credenciales a mano) | COEXISTENCE (Embedded Signup: el numero sigue tambien en la app del celular).
+  modo            String    @default("MANUAL")
+  // Sincronizacion de contactos e historial pedida a Meta: { contactos, historial, at, error }.
+  estadoSync      Json?
+  conectadoAt     DateTime?
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt @default(now())
 

@@ -1193,3 +1193,11 @@ Migración aditiva `20261114100000_pos_espera_y_cambios` (tabla `ventas_espera`,
 - **Superadmin:** campos nuevos en el formulario del plan y en los valores de cada cliente; la lista de planes muestra los topes por rol.
 - **Dueño:** Mi equipo muestra tarjetas "usados / tope" por rol (en ámbar al completarse), las opciones de rol llenas quedan bloqueadas con el motivo, y el servidor rechaza la invitación con un mensaje claro ("Tu plan permite 2 cajeros…" / "Tu plan no incluye cajeros"). Planes y Mi plan y consumo también muestran los topes por rol.
 - Tests: `test/limites-rol.test.js` (11).
+
+## 69. Conexión de WhatsApp por coexistence, preparada (PAVP-4) (nov 2026)
+
+- Todo el circuito para conectar un número por **Embedded Signup con coexistence** (el número sigue en la app WhatsApp Business del celular) está construido y probado con Meta simulada; **falta cargar `META_APP_ID`, `META_APP_SECRET` y `META_EMBEDDED_SIGNUP_CONFIG_ID` y probar con un número real**. Guía completa y lista de lo que hay que verificar en la primera conexión: `docs/12-coexistence.md`.
+- Piezas: `lib/services/metaCoexistence.js` (canje del código, suscripción de la app a la cuenta, elección del número, pedido de sincronización de contactos e historial, ecos), botón y JS en `/panel/whatsapp`, ruta `POST /panel/whatsapp/coexistence` (dueño/admin), webhook con eventos `smb_message_echoes` / `smb_app_state_sync` / `history`.
+- **Lo que el dueño escribe desde el celular** aparece en Conversaciones como mensaje del equipo ("App de WhatsApp") y el chat queda en manos de una persona (la IA no le contesta encima).
+- **Firma del webhook** (`X-Hub-Signature-256`): se exige en conexiones por coexistence; las manuales no cambian (usan la app de cada cliente).
+- Migración aditiva `20261120100000_whatsapp_coexistence` (`modo`, `estadoSync`, `conectadoAt`). Tests: `test/meta-coexistence.test.js` (15). Auditoría: `WHATSAPP_CONECTADO`.

@@ -201,7 +201,8 @@ app.use(compression());
 // js) conserva el nombre entre deploys y se sigue revalidando.
 app.use('/uploads', express.static(path.join(__dirname, 'public', 'uploads'), { maxAge: '30d', immutable: true }));
 app.use(express.static(path.join(__dirname, 'public')));
-app.use(express.json());
+// Se guarda el cuerpo CRUDO de los webhooks de Meta: la firma X-Hub-Signature-256 se calcula sobre esos bytes.
+app.use(express.json({ verify: (req, _res, buf) => { if (req.originalUrl && req.originalUrl.startsWith('/webhooks/')) req.rawBody = buf; } }));
 app.use(express.urlencoded({ extended: true }));
 
 // Sesiones guardadas en Postgres (tabla "session", se crea sola la primera
@@ -4026,6 +4027,7 @@ app.post('/invitacion/:token', async (req, res, next) => {
 
 // -------- Conectar WhatsApp (datos de Meta que registra el cliente) --------
 const cripto = require('./lib/crypto');
+const metaCoexistence = require('./lib/services/metaCoexistence');
 
 function datosWebhook(req) {
   const host = req.get('host');
@@ -4046,9 +4048,26 @@ app.get('/panel/whatsapp', requireCliente, async (req, res, next) => {
       conexion,
       tokenEnmascarado: conexion ? cripto.enmascarar(cripto.descifrar(conexion.tokenCifrado)) : '',
       callbackUrl: wh.callbackUrl, verifyToken: wh.verifyToken,
+      coexistence: { ...metaCoexistence.configuracion(), parametros: metaCoexistence.parametrosParaNavegador(), campos: metaCoexistence.CAMPOS_WEBHOOK },
+      puedeConectar: ['OWNER', 'ADMIN'].includes(req.session.clienteRol),
       mensaje: req.query.ok || null, error: req.query.err || null,
     });
   } catch (err) { next(err); }
+});
+
+// Conectar el numero por COEXISTENCE (Embedded Signup de Meta): el navegador manda el codigo de Meta y el id de la cuenta de WhatsApp Business.
+app.post('/panel/whatsapp/coexistence', requireCliente, requireRol('OWNER', 'ADMIN'), async (req, res) => {
+  try {
+    const b = req.body || {};
+    const agente = await obtenerAgente(req.session.empresaId);
+    const r = await metaCoexistence.conectar(agente.id, { code: b.code, wabaId: b.wabaId, phoneNumberId: b.phoneNumberId || null });
+    await auditoriaSrv.registrarSinRiesgo({ empresaId: req.session.empresaId, actor: { id: req.session.clienteId, rol: req.session.clienteRol }, accion: 'WHATSAPP_CONECTADO', entidad: 'ConexionWhatsApp', entidadId: r.conexion.id, detalle: { numero: r.numero.numero, modo: 'COEXISTENCE' } });
+    res.json({ ok: true, numero: r.numero.numero, sincronizacion: r.sincronizacion, pasos: r.pasos });
+  } catch (err) {
+    if (err.codigo === 'META') return res.status(400).json({ ok: false, error: err.message });
+    console.error('[whatsapp] error al conectar por coexistence:', err);
+    res.status(500).json({ ok: false, error: 'No se pudo conectar por un problema técnico. Probá de nuevo.' });
+  }
 });
 
 // Solicitar conexion (modelo manual: Proshop la completa despues)
@@ -4293,11 +4312,40 @@ async function interpretarMensajeEntrante(mensaje, conexion, telefonoCliente) {
   return null; // sticker, video, documento, etc.: no soportado por ahora
 }
 
+// Eventos de COEXISTENCE: lo que el dueño escribe desde la app del celular (ecos) y la sincronizacion de contactos/historial.
+// En conexiones por coexistence (nuestra app de Meta) se exige la firma del webhook; las conexiones manuales usan la app de cada
+// cliente (otro secreto) y siguen como siempre.
+async function manejarEventoCoexistence(cambio, req) {
+  const valor = cambio.value || {};
+  const phoneNumberId = valor.metadata && valor.metadata.phone_number_id;
+  if (!phoneNumberId) return;
+  const conexion = await prisma.conexionWhatsApp.findUnique({ where: { phoneNumberId }, include: { agente: true } });
+  if (!conexion || !conexion.agente) return;
+  const firma = metaCoexistence.verificarFirma(req.rawBody, req.get('x-hub-signature-256'), process.env.META_APP_SECRET);
+  if (conexion.modo === 'COEXISTENCE' && !firma.ok) { console.warn(`--- webhook: firma inválida en ${cambio.field}, se ignora`); return; }
+  if (cambio.field === 'smb_message_echoes') {
+    const guardados = await metaCoexistence.registrarEcos(conexion.agente, metaCoexistence.leerEcos(valor), {
+      yaVisto: (id) => yaProcesado(`eco:${id}`),
+      emitir: (conv, payload) => { emitMensaje(conexion.agente.empresaId, payload); emitConversacion(conexion.agente.empresaId, { conversacionId: conv.id }); },
+    });
+    if (guardados) console.log(`--- webhook: ${guardados} mensaje(s) enviados desde la app de WhatsApp registrados (agente ${conexion.agente.id})`);
+    return;
+  }
+  // smb_app_state_sync (contactos) e history (mensajes viejos): por ahora solo se deja constancia de que llegaron.
+  const n = (valor.state_sync || valor.history || []).length;
+  console.log(`--- webhook: ${cambio.field} recibido (${n} elementos) para el agente ${conexion.agente.id}`);
+}
+
 app.post('/webhooks/whatsapp', (req, res) => {
   res.sendStatus(200); // responder rapido a Meta, procesar despues
 
   (async () => {
     try {
+      for (const cambioCoex of (req.body.entry || []).flatMap((e) => e.changes || [])) {
+        if (['smb_message_echoes', 'smb_app_state_sync', 'history'].includes(cambioCoex.field)) {
+          await manejarEventoCoexistence(cambioCoex, req).catch((err) => console.error('Error en evento de coexistence:', err.message));
+        }
+      }
       const entry = req.body.entry?.[0];
       const cambio = entry?.changes?.[0]?.value;
       const mensaje = cambio?.messages?.[0];
@@ -4318,6 +4366,10 @@ app.post('/webhooks/whatsapp', (req, res) => {
       });
       if (!conexion || !conexion.agente) {
         console.log(`--- webhook: no hay ningun agente conectado al phone_number_id ${phoneNumberId}`);
+        return;
+      }
+      if (conexion.modo === 'COEXISTENCE' && !metaCoexistence.verificarFirma(req.rawBody, req.get('x-hub-signature-256'), process.env.META_APP_SECRET).ok) {
+        console.warn('--- webhook: firma inválida en un mensaje de una conexión por coexistence, se ignora');
         return;
       }
       if (conexion.agente.estado !== 'ACTIVO') return;

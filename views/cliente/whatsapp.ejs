@@ -20,6 +20,40 @@
   }
 %>
 
+<!-- ===== Conexión automática por coexistence (Embedded Signup de Meta) ===== -->
+<section class="wa-coex" id="waCoex" aria-labelledby="waCoexTitulo">
+  <div class="wa-coex-texto">
+    <h3 id="waCoexTitulo">Conectar tu WhatsApp Business <span class="badge badge-new">Recomendado</span></h3>
+    <p>Conectá tu número <strong>sin dejar de usar la app de WhatsApp Business en tu celular</strong>: el agente atiende por Proshop y vos podés seguir contestando desde el teléfono. Se hace en un par de minutos, sin pegar claves.</p>
+    <ul class="wa-coex-lista">
+      <li>Tus chats y contactos se sincronizan (se pide una sola vez, dentro de las 24 h de conectar).</li>
+      <li>Lo que escribas desde el celular aparece en Conversaciones, y el agente deja de contestar ese chat.</li>
+      <li>El número tiene que estar usándose en la app WhatsApp Business (no la común).</li>
+    </ul>
+  </div>
+  <div class="wa-coex-accion">
+    <% if (conexion && conexion.modo === 'COEXISTENCE' && conexion.estado === 'CONECTADO') { %>
+      <span class="badge badge-new">Conectado por coexistence</span>
+      <% if (conexion.estadoSync) { %><small class="muted">Sincronización: contactos <%= conexion.estadoSync.contactos || '—' %> · historial <%= conexion.estadoSync.historial || '—' %></small><% } %>
+    <% } %>
+    <% if (!coexistence.listo) { %>
+      <p class="muted" style="font-size:.84rem;margin:0">Esta opción todavía no está activada en el servidor<%= puedeConectar ? ' (faltan: ' + coexistence.faltan.join(', ') + ')' : '' %>. Mientras tanto podés conectar a mano más abajo.</p>
+    <% } else if (!puedeConectar) { %>
+      <p class="muted" style="font-size:.84rem;margin:0">Solo el dueño o un administrador puede conectar el número.</p>
+    <% } else { %>
+      <button type="button" class="btn btn-primary" id="waCoexBtn">Conectar con Meta</button>
+      <p class="alert-err" id="waCoexError" role="alert" hidden></p>
+      <p class="alert-ok" id="waCoexOk" role="status" hidden></p>
+    <% } %>
+  </div>
+</section>
+<% if (coexistence.listo && puedeConectar) { %>
+<script>
+  window.COEX = <%- JSON.stringify(coexistence.parametros) %>;
+</script>
+<script src="/js/whatsapp-coexistence.js"></script>
+<% } %>
+
 <!-- ===== Banner de estado ===== -->
 <% if (estado === 'CONECTADO') { %>
   <div class="wa-status wa-on">
