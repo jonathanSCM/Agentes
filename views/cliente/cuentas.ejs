@@ -1,0 +1,70 @@
+<%- include('partials/inicio') %>
+<%
+  var m = function (c) { return simboloCatalogo + ' ' + (c / 100).toFixed(2); };
+%>
+
+<div class="page-head page-head-row">
+  <div>
+    <h2>Cuentas</h2>
+    <p>Lo que consume cada cliente: el servicio de su <%= vocab ? vocab.cita : 'cita' %> y lo que se le suma en el local (otros servicios, productos). Se cobra todo junto.</p>
+  </div>
+  <a class="btn btn-ghost" href="/panel/caja">Caja</a>
+</div>
+
+<% if (mensaje) { %><div class="alert-ok"><%= mensaje %></div><% } %>
+<% if (error) { %><div class="alert-err" role="alert"><%= error %></div><% } %>
+<% if (!sesion) { %><div class="alert-err">La caja está cerrada. Abrila en <a href="/panel/caja">Caja</a> para poder cobrar. Igual podés ir armando las cuentas.</div><% } %>
+
+<h3 class="cmp-form-titulo" style="margin-top:1.2rem">Cuentas abiertas</h3>
+<% if (!abiertas.length) { %>
+  <div class="empty-state"><h3>No hay cuentas abiertas</h3><p>Abrí la cuenta de una <%= vocab ? vocab.cita : 'cita' %> de hoy o la de alguien que llegó sin <%= vocab ? vocab.cita : 'cita' %>.</p></div>
+<% } else { %>
+  <div class="table-wrap">
+    <table class="leads-table">
+      <thead><tr><th>Cuenta</th><th>Cliente</th><th>Detalle</th><th class="num">Total</th><th></th></tr></thead>
+      <tbody>
+        <% abiertas.forEach(function (c) { %>
+          <tr class="row-link" onclick="window.location='/panel/cuentas/<%= c.id %>'" style="cursor:pointer">
+            <td><strong><%= c.codigo %></strong><br><span class="muted" style="font-size:.78rem"><%= c.citaId ? 'De una ' + (vocab ? vocab.cita : 'cita') : 'Sin ' + (vocab ? vocab.cita : 'cita') %></span></td>
+            <td><%= c.clienteNombre || '—' %></td>
+            <td><%= c.items.length ? c.items.map(function (i) { return i.cantidad + ' × ' + i.nombre; }).join(', ') : 'Todavía vacía' %></td>
+            <td class="num"><strong><%= m(c.totalCentavos) %></strong></td>
+            <td><a class="btn btn-primary btn-chico" href="/panel/cuentas/<%= c.id %>">Abrir</a></td>
+          </tr>
+        <% }); %>
+      </tbody>
+    </table>
+  </div>
+<% } %>
+
+<h3 class="cmp-form-titulo" style="margin-top:1.6rem"><%= vocab ? vocab.citas.charAt(0).toUpperCase() + vocab.citas.slice(1) : 'Citas' %> de hoy sin cuenta</h3>
+<% if (!citas.length) { %>
+  <p class="muted">No hay <%= vocab ? vocab.citas : 'citas' %> de hoy para abrir.</p>
+<% } else { %>
+  <div class="table-wrap">
+    <table class="leads-table">
+      <thead><tr><th>Hora</th><th>Cliente</th><th>Servicio</th><th class="num">Precio</th><th></th></tr></thead>
+      <tbody>
+        <% citas.forEach(function (c) { %>
+          <tr>
+            <td class="nowrap"><strong><%= c.hora %></strong></td>
+            <td><%= c.cliente %></td>
+            <td><%= c.servicio %><% if (c.recurso) { %> <span class="muted">· <%= c.recurso %></span><% } %></td>
+            <td class="num"><%= c.precio === null ? '—' : simboloCatalogo + ' ' + c.precio.toFixed(2) %></td>
+            <td><form method="POST" action="/panel/cuentas/cita/<%= c.id %>" class="inline-form"><button class="btn btn-primary btn-chico" type="submit">Abrir cuenta</button></form></td>
+          </tr>
+        <% }); %>
+      </tbody>
+    </table>
+  </div>
+<% } %>
+
+<form method="POST" action="/panel/cuentas/nueva" class="card-form cmp-form" style="margin-top:1.6rem">
+  <h3 class="cmp-form-titulo">Cuenta de alguien que llegó sin <%= vocab ? vocab.cita : 'cita' %></h3>
+  <div class="field-row">
+    <div class="field"><label for="cNombre">Nombre *</label><input id="cNombre" name="clienteNombre" required maxlength="80" placeholder="Ej. Marta" /></div>
+    <div class="field" style="align-self:end"><button class="btn btn-primary" type="submit">Abrir cuenta</button></div>
+  </div>
+</form>
+
+<%- include('partials/fin') %>

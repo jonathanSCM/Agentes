@@ -89,6 +89,15 @@
                   <button class="btn <%= b[1] %>" style="padding:.3rem .65rem;font-size:.78rem" type="submit"><%= b[0] %></button>
                 </form>
               <% }); %>
+              <% if (typeof modulos !== 'undefined' && modulos.indexOf('POS') !== -1) { %>
+                <% if (c.cuenta && c.cuenta.estado === 'ABIERTA') { %>
+                  <a class="btn btn-primary" style="padding:.3rem .65rem;font-size:.78rem" href="/panel/cuentas/<%= c.cuenta.id %>">Ver cuenta</a>
+                <% } else if (c.cuenta) { %>
+                  <a class="btn btn-ghost" style="padding:.3rem .65rem;font-size:.78rem" href="/panel/ventas/<%= c.cuenta.ventaId %>">Cobrada ✓</a>
+                <% } else if (['PENDIENTE', 'CONFIRMADA', 'COMPLETADA'].indexOf(c.estado) !== -1) { %>
+                  <form method="POST" action="/panel/cuentas/cita/<%= c.id %>" class="inline-form"><button class="btn btn-ghost" style="padding:.3rem .65rem;font-size:.78rem" type="submit">Cobrar</button></form>
+                <% } %>
+              <% } %>
             </td>
           </tr>
         <% }); %>

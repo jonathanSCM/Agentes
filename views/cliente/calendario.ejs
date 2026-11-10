@@ -104,6 +104,7 @@
     var ACCION = { CONFIRMADA: ['Confirmar', 'btn-primary'], COMPLETADA: ['Marcar como completada', 'btn-primary'], NO_ASISTIO: ['No vino', 'btn-ghost'], CANCELADA: ['Cancelar la cita', 'btn-danger'] };
     var ACCION_ESTADO = <%- JSON.stringify(accionEstado) %>;
     var PROPIO = <%- JSON.stringify(Boolean(propio)) %>;
+    var PUEDE_COBRAR = <%- JSON.stringify(typeof modulos !== 'undefined' && modulos.indexOf('POS') !== -1) %>;
     var VOLVER = <%- JSON.stringify(propio ? '' : enlace({})) %>;
     var VISTA = <%- JSON.stringify(vista) %>;
     var FECHA = <%- JSON.stringify(cal.rango.fecha) %>;
@@ -126,6 +127,10 @@
         [['estado', estado], ['fecha', FECHA], ['vista', VISTA], ['volver', VOLVER]].forEach(function (p) { var i = document.createElement('input'); i.type = 'hidden'; i.name = p[0]; i.value = p[1]; f.appendChild(i); });
         var b = document.createElement('button'); b.type = 'submit'; b.className = 'btn ' + ACCION[estado][1]; b.textContent = ACCION[estado][0]; f.appendChild(b); acc.appendChild(f);
       });
+      if (!PROPIO && PUEDE_COBRAR) {
+        var fc = document.createElement('form'); fc.method = 'POST'; fc.action = '/panel/cuentas/cita/' + c.id; fc.className = 'inline-form';
+        var bc = document.createElement('button'); bc.type = 'submit'; bc.className = 'btn btn-ghost'; bc.textContent = 'Cobrar / ver cuenta'; fc.appendChild(bc); acc.appendChild(fc);
+      }
       fondo.hidden = false;
     }
     function cerrar() { fondo.hidden = true; }

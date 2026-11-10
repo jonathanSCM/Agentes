@@ -955,16 +955,18 @@ app.use('/panel', async (req, res, next) => {
 });
 
 // El CAJERO solo ve el punto de venta, la caja y las ventas. Se aplica en el SERVIDOR (no solo en el menu).
-const RUTAS_DEL_CAJERO = ['/pos', '/caja', '/ventas', '/salir', '/notificaciones'];
+const RUTAS_DEL_CAJERO = ['/pos', '/caja', '/ventas', '/cuentas', '/salir', '/notificaciones'];
 // El PROFESIONAL (citas) solo ve su agenda: su calendario y marcar sus propias citas.
 const RUTAS_DEL_PROFESIONAL = ['/mi-agenda', '/salir', '/notificaciones'];
 const ROLES_CONFINADOS = { CAJERO: { inicio: '/panel/pos', permitidas: RUTAS_DEL_CAJERO }, PROFESIONAL: { inicio: '/panel/mi-agenda', permitidas: RUTAS_DEL_PROFESIONAL } };
 app.use('/panel', (req, res, next) => {
   const conf = req.session && ROLES_CONFINADOS[req.session.clienteRol];
   if (!conf) return next();
-  if (req.path === '/') return res.redirect(conf.inicio);
+  // El cajero de un negocio de citas empieza en las cuentas (no hay mostrador de productos).
+  const inicio = req.session.clienteRol === 'CAJERO' && res.locals.modeloNegocio === 'CITAS' ? '/panel/cuentas' : conf.inicio;
+  if (req.path === '/') return res.redirect(inicio);
   if (conf.permitidas.some((r) => req.path === r || req.path.startsWith(`${r}/`))) return next();
-  if (req.method === 'GET') return res.redirect(conf.inicio);
+  if (req.method === 'GET') return res.redirect(inicio);
   return res.status(403).render('403', { title: 'Sin permiso - Proshop' });
 });
 
@@ -3475,6 +3477,97 @@ app.post('/panel/pos/pedidos/:id(\\d+)/editar', ...POS, async (req, res) => {
     if (esErrorDePedido(err)) return res.status(400).json({ ok: false, error: err.message });
     console.error('[pos] error al editar pedido:', err);
     res.status(500).json({ ok: false, error: 'No se pudo guardar por un problema técnico. Probá de nuevo.' });
+  }
+});
+
+// ===================== CUENTAS: cita + extras en una sola cuenta =====================
+// El servicio de la cita y lo que se suma en el local (otros servicios, productos) se cobran juntos. Requiere el modulo POS.
+const cuentasSrv = require('./lib/services/cuentas');
+const esErrorDeCuenta = (err) => err && ['CUENTA', 'VENTA', 'CAJA', 'STOCK'].includes(err.codigo);
+const jsonCuenta = (fn) => async (req, res) => {
+  try { res.json({ ok: true, ...(await fn(req)) }); } catch (err) {
+    if (esErrorDeCuenta(err)) return res.status(400).json({ ok: false, error: err.message });
+    console.error('[cuentas] error:', err);
+    res.status(500).json({ ok: false, error: 'No se pudo por un problema técnico. Probá de nuevo.' });
+  }
+};
+
+app.get('/panel/cuentas', ...POS, async (req, res, next) => {
+  try {
+    const empresa = await prisma.empresa.findUnique({ where: { id: req.session.empresaId } });
+    const [abiertas, citas, sesion] = await Promise.all([cuentasSrv.listarAbiertas(empresa.id), cuentasSrv.citasDeHoySinCuenta(empresa), caja.sesionAbierta(empresa.id)]);
+    res.render('cliente/cuentas', {
+      title: 'Cuentas - Proshop', tituloPagina: 'Cuentas', activo: 'cuentas', hojas: ['/css/pos.css', '/css/compras.css'],
+      abiertas, citas, sesion, vocab: res.locals.vocab, mensaje: req.query.ok || null, error: req.query.err || null,
+    });
+  } catch (err) { next(err); }
+});
+app.post('/panel/cuentas/cita/:citaId(\\d+)', ...POS, async (req, res, next) => {
+  try {
+    const c = await cuentasSrv.abrirDeCita(req.session.empresaId, usuarioPos(req), req.params.citaId);
+    res.redirect(`/panel/cuentas/${c.id}`);
+  } catch (err) {
+    if (esErrorDeCuenta(err)) return res.redirect('/panel/cuentas?err=' + encodeURIComponent(err.message));
+    next(err);
+  }
+});
+app.post('/panel/cuentas/nueva', ...POS, async (req, res, next) => {
+  try {
+    const c = await cuentasSrv.abrirLibre(req.session.empresaId, usuarioPos(req), { clienteNombre: req.body.clienteNombre, clienteId: req.body.clienteId || null });
+    res.redirect(`/panel/cuentas/${c.id}`);
+  } catch (err) {
+    if (esErrorDeCuenta(err)) return res.redirect('/panel/cuentas?err=' + encodeURIComponent(err.message));
+    next(err);
+  }
+});
+app.get('/panel/cuentas/:id(\\d+)', ...POS, async (req, res, next) => {
+  try {
+    const empresaId = req.session.empresaId;
+    const cuenta = await cuentasSrv.detalle(empresaId, req.params.id);
+    if (!cuenta) return res.redirect('/panel/cuentas');
+    const [catalogo, sesion] = await Promise.all([cuentasSrv.catalogoParaCuenta(empresaId), caja.sesionAbierta(empresaId)]);
+    res.render('cliente/cuenta', {
+      title: `Cuenta ${cuenta.codigo} - Proshop`, tituloPagina: 'Cuenta', activo: 'cuentas', hojas: ['/css/pos.css', '/css/compras.css'],
+      cuenta, catalogo, sesion, metodos: ventaCalculo.METODOS.map((m) => ({ clave: m, etiqueta: ventaCalculo.ETIQUETAS_METODO[m] })),
+      mensaje: req.query.ok || null, error: req.query.err || null,
+    });
+  } catch (err) { next(err); }
+});
+app.post('/panel/cuentas/:id(\\d+)/servicio', ...POS, jsonCuenta(async (req) => {
+  await cuentasSrv.agregarServicio(req.session.empresaId, usuarioPos(req), req.params.id, { servicioId: req.body.servicioId, cantidad: req.body.cantidad || 1, recursoId: req.body.recursoId || null });
+  return {};
+}));
+app.post('/panel/cuentas/:id(\\d+)/producto', ...POS, jsonCuenta(async (req) => {
+  await cuentasSrv.agregarProducto(req.session.empresaId, usuarioPos(req), req.params.id, { productoId: req.body.productoId, varianteId: req.body.varianteId || null, cantidad: req.body.cantidad || 1 });
+  return {};
+}));
+app.post('/panel/cuentas/:id(\\d+)/linea/:itemId(\\d+)', ...POS, jsonCuenta(async (req) => {
+  const b = req.body || {};
+  if (b.precio !== undefined) await cuentasSrv.ponerPrecio(req.session.empresaId, usuarioPos(req), req.params.id, req.params.itemId, b.precio);
+  else await cuentasSrv.cambiarCantidad(req.session.empresaId, usuarioPos(req), req.params.id, req.params.itemId, b.cantidad);
+  return {};
+}));
+app.post('/panel/cuentas/:id(\\d+)/cancelar', ...POS, async (req, res, next) => {
+  try {
+    await cuentasSrv.cancelar(req.session.empresaId, usuarioPos(req), req.params.id, req.body.motivo);
+    res.redirect('/panel/cuentas?ok=' + encodeURIComponent('Cuenta cancelada: no se cobró nada.'));
+  } catch (err) {
+    if (esErrorDeCuenta(err)) return res.redirect(`/panel/cuentas/${req.params.id}?err=` + encodeURIComponent(err.message));
+    next(err);
+  }
+});
+app.post('/panel/cuentas/:id(\\d+)/cobrar', ...POS, async (req, res) => {
+  try {
+    const b = req.body || {};
+    const pagos = (Array.isArray(b.pagos) ? b.pagos : []).map((p) => ({ metodo: p.metodo, monto: p.monto, recibido: p.recibido, referencia: p.referencia }));
+    const { venta, repetida } = await cuentasSrv.cobrar(req.session.empresaId, usuarioPos(req), req.params.id, { pagos, claveIdempotencia: b.claveIdempotencia });
+    catalogoCache.invalidarEmpresa(req.session.empresaId);
+    const vuelto = venta.pagos.reduce((t, p) => t + Number(p.vuelto || 0), 0);
+    res.json({ ok: true, repetida, venta: { id: venta.id, numero: venta.numero, total: Number(venta.total), vuelto, token: venta.tokenRecibo, reciboUrl: `/recibo/${venta.tokenRecibo}` } });
+  } catch (err) {
+    if (esErrorDeCuenta(err)) return res.status(400).json({ ok: false, error: err.message });
+    console.error('[cuentas] error al cobrar:', err);
+    res.status(500).json({ ok: false, error: 'No se pudo cobrar por un problema técnico. Probá de nuevo: si ya se cobró, no se cobra dos veces.' });
   }
 });
 

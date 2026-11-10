@@ -1,0 +1,105 @@
+<%- include('partials/inicio') %>
+<%
+  var abierta = cuenta.estado === 'ABIERTA';
+  var cita = cuenta.cita;
+%>
+
+<div class="page-head page-head-row">
+  <div>
+    <h2>Cuenta <%= cuenta.codigo %></h2>
+    <p><strong><%= cuenta.clienteNombre || 'Sin nombre' %></strong>
+      <% if (cita) { %> · <%= cita.servicio ? cita.servicio.nombre : 'Servicio' %><%= cita.recurso ? ' con ' + cita.recurso.nombre : '' %>, <%= new Date(cita.inicio).toLocaleString('es-BO', { dateStyle: 'short', timeStyle: 'short' }) %><% } %></p>
+  </div>
+  <a class="btn btn-ghost" href="/panel/cuentas">← Cuentas</a>
+</div>
+
+<% if (mensaje) { %><div class="alert-ok"><%= mensaje %></div><% } %>
+<% if (error) { %><div class="alert-err" role="alert"><%= error %></div><% } %>
+<div class="alert-err" id="cuError" role="alert" hidden></div>
+<% if (!abierta) { %>
+  <div class="alert-err">Esta cuenta ya está <%= cuenta.estado === 'COBRADA' ? 'cobrada' : 'cancelada' %>.<% if (cuenta.ventaId) { %> <a href="/panel/ventas/<%= cuenta.ventaId %>">Ver la venta</a><% } %></div>
+<% } %>
+
+<div class="cmp-nueva">
+  <% if (abierta) { %>
+  <section class="cmp-buscar card-form">
+    <h3 class="cmp-form-titulo">Sumar un servicio</h3>
+    <div class="field"><label for="cuServicio">Servicio</label>
+      <select id="cuServicio">
+        <% catalogo.servicios.forEach(function (s) { %><option value="<%= s.id %>"><%= s.nombre %><%= s.precio === null ? ' (sin precio)' : ' · ' + simboloCatalogo + ' ' + s.precio.toFixed(2) %></option><% }); %>
+      </select></div>
+    <% if (catalogo.profesionales.length) { %>
+      <div class="field"><label for="cuRecurso">Lo hizo</label>
+        <select id="cuRecurso"><option value="">—</option><% catalogo.profesionales.forEach(function (p) { %><option value="<%= p.id %>"><%= p.nombre %></option><% }); %></select></div>
+    <% } %>
+    <button class="btn btn-ghost" type="button" id="cuSumarServicio" <%= catalogo.servicios.length ? '' : 'disabled' %>>Sumar servicio</button>
+
+    <h3 class="cmp-form-titulo" style="margin-top:1.4rem">Sumar un producto</h3>
+    <input id="cuQ" type="search" autocomplete="off" placeholder="Nombre, código o código de barras…" />
+    <ul class="cmp-resultados" id="cuResultados" aria-live="polite"></ul>
+  </section>
+  <% } %>
+
+  <section class="cmp-detalle card-form" style="<%= abierta ? '' : 'grid-column:1/-1' %>">
+    <h3 class="cmp-form-titulo">Lo que consumió</h3>
+    <div class="table-wrap">
+      <table class="leads-table">
+        <thead><tr><th>Detalle</th><th class="num">Precio</th><th class="num">Cant.</th><th class="num">Subtotal</th><th></th></tr></thead>
+        <tbody id="cuLineas">
+          <% cuenta.items.forEach(function (i) { %>
+            <tr data-id="<%= i.id %>" data-libre="<%= i.precioLibre ? '1' : '0' %>" data-precio="<%= Number(i.precioUnitario) %>" data-cant="<%= i.cantidad %>" data-nombre="<%= i.nombre %>">
+              <td><strong><%= i.nombre %></strong><br><span class="muted cmp-nota"><%= i.tipo === 'SERVICIO' ? 'Servicio' : 'Producto' %></span></td>
+              <td class="num" data-celda="precio"><%= simboloCatalogo %> <%= Number(i.precioUnitario).toFixed(2) %></td>
+              <td class="num" data-celda="cant"><%= i.cantidad %></td>
+              <td class="num"><%= simboloCatalogo %> <%= (Number(i.precioUnitario) * i.cantidad).toFixed(2) %></td>
+              <td></td>
+            </tr>
+          <% }); %>
+        </tbody>
+      </table>
+    </div>
+    <p class="muted" id="cuVacia" <%= cuenta.items.length ? 'hidden' : '' %>>Todavía no hay nada en la cuenta.</p>
+    <p class="cmp-total-linea">Total: <strong><%= simboloCatalogo %> <span id="cuTotal"><%= (cuenta.totalCentavos / 100).toFixed(2) %></span></strong></p>
+
+    <% if (abierta) { %>
+      <% if (!sesion) { %>
+        <div class="alert-err">La caja está cerrada. Abrila en <a href="/panel/caja">Caja</a> para poder cobrar.</div>
+      <% } else { %>
+        <form id="cuCobro" class="form-card" novalidate>
+          <h3>Cómo paga el cliente</h3>
+          <div id="cuPagos"></div>
+          <button type="button" class="btn btn-ghost btn-chico" id="cuDividir">+ Dividir el pago</button>
+          <p class="pos-cobro-estado" id="cuEstado" role="status"></p>
+          <p class="alert-err" id="cuErrorCobro" role="alert" hidden></p>
+          <div class="form-actions"><button class="btn btn-primary" type="submit" id="cuConfirmar">Cobrar la cuenta</button></div>
+        </form>
+      <% } %>
+      <div id="cuListo" class="form-card" hidden>
+        <h3>Cuenta cobrada ✓</h3>
+        <p id="cuResumen"></p>
+        <div style="display:flex;gap:.5rem;flex-wrap:wrap">
+          <a class="btn btn-primary" id="cuRecibo" target="_blank" rel="noopener">🖨 Imprimir recibo</a>
+          <a class="btn btn-ghost" href="/panel/cuentas">Más cuentas</a>
+        </div>
+      </div>
+      <form method="POST" action="/panel/cuentas/<%= cuenta.id %>/cancelar" class="cmp-form" style="margin-top:1.2rem" onsubmit="return confirm('¿Cancelar esta cuenta? No se cobra nada.')">
+        <div class="field-row">
+          <div class="field"><label for="cuMotivo">Si la cuenta no se cobra</label><input id="cuMotivo" name="motivo" maxlength="120" placeholder="Motivo (opcional)" /></div>
+          <div class="field" style="align-self:end"><button class="btn btn-ghost" type="submit">Cancelar la cuenta</button></div>
+        </div>
+      </form>
+    <% } %>
+  </section>
+</div>
+
+<% if (abierta) { %>
+  <script>
+    window.CUENTA = {
+      id: <%= cuenta.id %>, simbolo: <%- JSON.stringify(simboloCatalogo) %>, totalCentavos: <%= cuenta.totalCentavos %>,
+      metodos: <%- JSON.stringify(metodos) %>, hayCaja: <%= sesion ? 'true' : 'false' %>
+    };
+  </script>
+  <script src="/js/cuenta.js"></script>
+<% } %>
+
+<%- include('partials/fin') %>

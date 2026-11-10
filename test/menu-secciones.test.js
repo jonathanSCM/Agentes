@@ -36,7 +36,17 @@ test('el dueño de una tienda ve sus módulos como secciones separadas y ninguna
 
 test('un negocio de citas tiene su sección "Mi negocio" en vez de Catálogo y Panel comercial', () => {
   const menu = construirMenu({ esCitas: true });
-  assert.deepEqual(menu.filter((g) => g.titulo).map((g) => g.clave), ['agente', 'negocio', 'cuenta']);
+  assert.deepEqual(menu.filter((g) => g.titulo).map((g) => g.clave), ['agente', 'negocio', 'cobros', 'cuenta']);
+});
+
+test('en un negocio de citas, cobros trae las cuentas, la caja y las ventas (módulo POS); el cajero y el profesional ven lo suyo', () => {
+  const claves = (m) => m.flatMap((g) => g.items.map((i) => i.clave));
+  const cobros = construirMenu({ esCitas: true, modulos: ['AGENTE', 'POS'] }).find((g) => g.clave === 'cobros');
+  assert.deepEqual(cobros.items.map((i) => i.clave), ['cuentas', 'caja', 'ventas']);
+  assert.ok(cobros.items.every((i) => !i.bloqueado && i.modulo === 'POS'));
+  assert.ok(construirMenu({ esCitas: true, modulos: ['AGENTE'] }).find((g) => g.clave === 'cobros').items.every((i) => i.bloqueado), 'sin POS en el plan: con candado');
+  assert.deepEqual(claves(construirMenu({ esCitas: true, rol: 'CAJERO', modulos: ['AGENTE', 'POS'] })), ['cuentas', 'caja', 'ventas']);
+  assert.deepEqual(claves(construirMenu({ esCitas: true, rol: 'PROFESIONAL' })), ['mi-agenda']);
 });
 
 test('la pantalla arma las secciones desplegables y abre solo la del módulo actual', () => {

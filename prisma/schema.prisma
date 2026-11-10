@@ -293,6 +293,7 @@ model Empresa {
   solicitudesPlan  SolicitudPlan[]
   ventasEspera     VentaEspera[]
   proveedores      Proveedor[]
+  cuentas          Cuenta[]
   compras          Compra[]
   usosIA         UsoIA[]
   mensajesAgente MensajeAgente[]
@@ -1103,6 +1104,8 @@ model VentaItem {
   total          Decimal   @db.Decimal(12, 2)
   // Costo al momento de vender: asi el margen no cambia si despues cambia el costo.
   costoUnitario  Decimal?  @db.Decimal(12, 2)
+  // Servicio cobrado (cuentas de citas); null si es un producto.
+  servicioId     Int?
   devolucionItems DevolucionItem[]
 
   @@index([ventaId])
@@ -1531,4 +1534,48 @@ model CompraItem {
 
   @@index([compraId])
   @@map("compra_items")
+}
+
+// ============================ CUENTAS (citas + extras) ============================
+// Lo que consume un cliente: el servicio de su cita y lo que se le agrega en el local (otros servicios, productos).
+// No toca stock ni caja hasta cobrarla: ahi se crea una venta con todo junto y la cita queda completada.
+// (El indice unico "una cuenta viva por cita" esta en la migracion: Prisma no expresa indices parciales.)
+model Cuenta {
+  id                Int       @id @default(autoincrement())
+  empresaId         Int
+  empresa           Empresa   @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  citaId            Int?
+  clienteId         Int?
+  clienteNombre     String?
+  // ABIERTA | COBRADA | CANCELADA
+  estado            String    @default("ABIERTA")
+  ventaId           Int?
+  usuarioId         Int?
+  motivoCancelacion String?
+  createdAt         DateTime  @default(now())
+  cobradaAt         DateTime?
+
+  items CuentaItem[]
+
+  @@index([empresaId, estado])
+  @@map("cuentas")
+}
+
+model CuentaItem {
+  id             Int     @id @default(autoincrement())
+  cuentaId       Int
+  cuenta         Cuenta  @relation(fields: [cuentaId], references: [id], onDelete: Cascade)
+  // SERVICIO | PRODUCTO
+  tipo           String
+  servicioId     Int?
+  productoId     Int?
+  varianteId     Int?
+  recursoId      Int?
+  nombre         String
+  cantidad       Int
+  precioUnitario Decimal @db.Decimal(10, 2)
+  precioLibre    Boolean @default(false)
+
+  @@index([cuentaId])
+  @@map("cuenta_items")
 }
