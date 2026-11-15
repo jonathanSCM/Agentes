@@ -184,7 +184,7 @@ describe('cobrar un pedido de WhatsApp en el mostrador', () => {
     const p = await producto(A, 'Chompa', 150, 8, { costo: 90 });
     const pedido = await pedidoDe(A, [{ productoId: p.id, nombre: 'Chompa', precio: 150, cantidad: 2 }]);
     await Caja.abrir(A.empresaId, A.dueno.id, 0);
-    const { venta } = await Ventas.cobrarPedido(A.empresaId, A.cajero, pedido.id, { pagos: [{ metodo: 'QR', monto: 300 }], claveIdempotencia: clave() });
+    const { venta } = await Ventas.cobrarPedido(A.empresaId, A.cajero, pedido.id, { pagos: [{ metodo: 'QR', monto: 300 }], claveIdempotencia: clave(), entregar: true });
     assert.equal(venta.pedidoId, pedido.id);
     assert.equal(Number(venta.total), 300);
     assert.equal(Number(venta.items[0].costoUnitario), 90);

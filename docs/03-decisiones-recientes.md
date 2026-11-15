@@ -1205,3 +1205,10 @@ Migración aditiva `20261114100000_pos_espera_y_cambios` (tabla `ventas_espera`,
 **Corrección (#67):** Productos vuelve a ser el de las **tarjetas** (con filtros) e Inventario vuelve a ser **tabla** (con filtros), como se pidió; las listas largas se **agrupan en páginas** (tarjetas de a 24, tabla de a 20) con `data-pagina` en `filtros-lista.js`. En "Pedir conversaciones" se quita el degradado verde de los números (blanco sólido, sin recortes).
 
 **Corrección (#67):** los filtros de Auditoría (y de varias pantallas del superadmin) salían con fondo **blanco**: un `<select>`/`<input>` sin clase propia usa el estilo del navegador. Ahora `admin.css` trae una base oscura para todos los controles sueltos de `body.admin` (los dos paneles lo comparten), con `:where()` para no pisar a los que ya tienen estilo, y `color-scheme: dark` en fechas y horas. Se revisaron 27 pantallas (panel y superadmin) y ya no queda ningún control claro.
+
+## 70. Cobrar no es entregar (nov 2026)
+
+- **Bug:** cobrar un pedido en el POS lo marcaba como ENTREGADO y le mandaba al cliente el mensaje de "¡Tu pedido fue entregado!". Pagado y entregado son estados distintos.
+- **Ahora** (`ventas.cobrarPedido`, parámetro `entregar`): **Cobrar** registra la venta y el pago (`pagadoMonto`/`pagoMetodo`), el pedido sigue abierto y **no se avisa nada**. **Cobrar y entregar** (o "Marcar como entregado" después, o "Entregar pedido" en uno pagado por QR) lo pasa a ENTREGADO y **solo ahí** sale el aviso. Entregar un pedido ya cobrado no crea otra venta ni necesita la caja abierta.
+- Un pedido ya cobrado en el mostrador no se puede editar, ni quitarle el pago, ni cancelar: primero se anula la venta (anular la venta ahora cancela el pedido aunque no se hubiera entregado). Confirmar el pago por QR tampoco entrega ni crea la venta.
+- Pantalla del POS: dos botones (Cobrar / Cobrar y entregar), estado "Cobrado ✓ · todavía no se le entregó" y "falta entregar" en la lista. Tests nuevos en `test/pedidos-pago-edicion.test.js` ("cobrar NO es entregar").

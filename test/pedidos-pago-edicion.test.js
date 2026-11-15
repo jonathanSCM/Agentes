@@ -48,7 +48,7 @@ describe('pago previo', () => {
     assert.equal(estado.saldoCentavos, 0);
     const e0 = await efectivo();
     await rechaza(ventas.cobrarPedido(A.id, U(), p.id, { pagos: [{ metodo: 'EFECTIVO', monto: 200, recibido: 200 }] }), /ya está pagado/);
-    const { venta } = await ventas.cobrarPedido(A.id, U(), p.id, { pagos: [], claveIdempotencia: 'ent-1' });
+    const { venta } = await ventas.cobrarPedido(A.id, U(), p.id, { pagos: [], claveIdempotencia: 'ent-1', entregar: true });
     assert.equal(Number(venta.total), 200);
     assert.deepEqual(venta.pagos.map((x) => [x.metodo, Number(x.monto)]), [['QR', 200]]);
     assert.equal(await efectivo(), e0, 'el QR no entra a la caja de efectivo');
@@ -171,5 +171,55 @@ describe('editar un pedido', () => {
     await rechaza(PP.editar(A.id, U(), p.id, { items: [{ itemId: p.items[0].id, cantidad: 1 }, { itemId: it.id, cantidad: 3 }] }), /solo se puede quitar/);
     await PP.editar(A.id, U(), p.id, { items: [{ itemId: p.items[0].id, cantidad: 1 }, { itemId: it.id, cantidad: 0 }] });
     assert.equal(Number((await prisma.pedido.findUnique({ where: { id: p.id } })).total), 100);
+  });
+});
+
+describe('cobrar NO es entregar', () => {
+  const estadoDe = async (id) => (await prisma.pedido.findUnique({ where: { id } }));
+
+  test('cobrar en efectivo registra la venta y el pago, pero el pedido sigue abierto y sin entregar', async () => {
+    const p = await pedido([{ producto: remera, precio: 100, cantidad: 1 }], { formaPago: 'EFECTIVO' });
+    const r = await ventas.cobrarPedido(A.id, U(), p.id, { pagos: [{ metodo: 'EFECTIVO', monto: 100, recibido: 100 }], claveIdempotencia: 'solo-cobrar-1' });
+    assert.equal(r.entregado, false);
+    const x = await estadoDe(p.id);
+    assert.equal(x.estado, 'NUEVO', 'el pedido NO pasa a entregado');
+    assert.equal(Number(x.pagadoMonto), 100);
+    assert.equal(x.pagoMetodo, 'EFECTIVO');
+    assert.equal(await prisma.venta.count({ where: { pedidoId: p.id } }), 1);
+  });
+  test('después se entrega: pasa a entregado SIN crear otra venta ni mover la caja, y sin pedir la caja abierta', async () => {
+    const p = await pedido([{ producto: remera, precio: 100, cantidad: 1 }], { formaPago: 'EFECTIVO' });
+    await ventas.cobrarPedido(A.id, U(), p.id, { pagos: [{ metodo: 'EFECTIVO', monto: 100, recibido: 100 }] });
+    const e0 = await efectivo();
+    await rechaza(ventas.cobrarPedido(A.id, U(), p.id, { pagos: [{ metodo: 'EFECTIVO', monto: 100, recibido: 100 }], entregar: true }), /ya está cobrado: no se cobra de nuevo/);
+    await rechaza(ventas.cobrarPedido(A.id, U(), p.id, { pagos: [] }), /ya está cobrado/);
+    const r = await ventas.cobrarPedido(A.id, U(), p.id, { pagos: [], entregar: true });
+    assert.equal(r.entregado, true);
+    assert.equal((await estadoDe(p.id)).estado, 'ENTREGADO');
+    assert.equal(await prisma.venta.count({ where: { pedidoId: p.id } }), 1, 'no se duplica la venta');
+    assert.equal(await efectivo(), e0, 'la caja no se mueve otra vez');
+  });
+  test('cobrar y entregar de una vez sigue funcionando', async () => {
+    const p = await pedido([{ producto: remera, precio: 100, cantidad: 1 }], { formaPago: 'EFECTIVO' });
+    const r = await ventas.cobrarPedido(A.id, U(), p.id, { pagos: [{ metodo: 'EFECTIVO', monto: 100, recibido: 100 }], entregar: true });
+    assert.equal(r.entregado, true);
+    assert.equal((await estadoDe(p.id)).estado, 'ENTREGADO');
+  });
+  test('un pedido ya cobrado no se puede editar, ni quitarle el pago, ni cancelar su venta se ignora: primero se anula la venta', async () => {
+    const p = await pedido([{ producto: remera, precio: 100, cantidad: 1 }], { formaPago: 'EFECTIVO' });
+    const { venta } = await ventas.cobrarPedido(A.id, U(), p.id, { pagos: [{ metodo: 'EFECTIVO', monto: 100, recibido: 100 }] });
+    await rechaza(PP.editar(A.id, U(), p.id, { items: [{ itemId: p.items[0].id, cantidad: 2 }] }), /ya se cobró en el mostrador/);
+    await rechaza(PP.quitarPago(A.id, U(), p.id), /ya se cobró en el mostrador/);
+    // Anular la venta cancela el pedido (aunque todavía no se hubiera entregado) y devuelve el stock una vez.
+    const r0 = await stockDe(remera.id);
+    await ventas.anular(A.id, U(), venta.id, 'se arrepintió');
+    assert.equal((await estadoDe(p.id)).estado, 'CANCELADO');
+    assert.equal(await stockDe(remera.id), r0 + 1);
+  });
+  test('un pedido pagado por QR sigue necesitando entregarse para quedar como venta', async () => {
+    const p = await pedido([{ producto: remera, precio: 100, cantidad: 1 }]);
+    await PP.confirmarPago(A.id, U(), p.id, 'QR');
+    assert.equal(await prisma.venta.count({ where: { pedidoId: p.id } }), 0, 'confirmar el pago no crea la venta');
+    assert.equal((await estadoDe(p.id)).estado, 'NUEVO', 'ni lo entrega');
   });
 });

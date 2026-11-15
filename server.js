@@ -1631,6 +1631,9 @@ app.post('/panel/pedidos/:id/estado', requireCliente, async (req, res, next) => 
     if (!pedido) return res.redirect('/panel/pedidos');
 
     const estadoNuevo = String(req.body.estado || '').toUpperCase();
+    if (estadoNuevo === 'CANCELADO' && await prisma.venta.findFirst({ where: { empresaId, pedidoId: pedido.id, estado: 'COMPLETADA' }, select: { id: true } })) {
+      return res.redirect(`${volverA}?err=` + encodeURIComponent('Ese pedido ya se cobró en el mostrador: para cancelarlo, anulá primero la venta desde Ventas.'));
+    }
     if (!transicionValida(pedido.estado, estadoNuevo)) {
       return res.redirect(`${volverA}?err=` + encodeURIComponent('Ese cambio de estado no es válido.'));
     }
@@ -3512,6 +3515,7 @@ app.get('/panel/pos/pedidos/:id(\\d+)', ...POS, async (req, res, next) => {
     res.render('cliente/pos-pedido', {
       title: `Cobrar pedido #${pedido.id} - Proshop`, tituloPagina: 'Cobrar pedido', activo: 'pos-pedidos', hojas: ['/css/pos.css'],
       pedido, sesion: await caja.sesionAbierta(empresaId), pago: pedidosPagoSrv.estadoDePago(pedido), etiquetasPago: pedidosPagoSrv.ETIQUETAS,
+      ventaDelPedido: await prisma.venta.findFirst({ where: { empresaId, pedidoId: pedido.id, estado: 'COMPLETADA' }, select: { id: true, numero: true, tokenRecibo: true } }),
       metodos: ventaCalculo.METODOS.map((m) => ({ clave: m, etiqueta: ventaCalculo.ETIQUETAS_METODO[m] })),
       mensaje: req.query.ok || null, error: req.query.err || null,
     });
@@ -3522,14 +3526,15 @@ app.post('/panel/pos/pedidos/:id(\\d+)/cobrar', ...POS, async (req, res) => {
   try {
     const b = req.body || {};
     const pagos = (Array.isArray(b.pagos) ? b.pagos : []).map((p) => ({ metodo: p.metodo, monto: p.monto, recibido: p.recibido, referencia: p.referencia }));
-    const { venta, repetida } = await ventasSrv.cobrarPedido(req.session.empresaId, usuarioPos(req), req.params.id, { pagos, claveIdempotencia: b.claveIdempotencia, clienteNombre: b.clienteNombre });
-    // Se avisa al cliente por WhatsApp que su pedido quedo entregado (igual que al marcarlo entregado en Pedidos).
-    if (!repetida) {
+    const entregar = b.entregar === true;
+    const { venta, repetida } = await ventasSrv.cobrarPedido(req.session.empresaId, usuarioPos(req), req.params.id, { pagos, claveIdempotencia: b.claveIdempotencia, clienteNombre: b.clienteNombre, entregar });
+    // Cobrar NO es entregar: el aviso de "entregado" solo sale si se entrego de verdad (igual que al marcarlo entregado en Pedidos).
+    if (!repetida && entregar) {
       const pedido = await prisma.pedido.findFirst({ where: { id: venta.pedidoId, empresaId: req.session.empresaId } });
       if (pedido) notificarCambioDeEstadoPedido(req.session.empresaId, pedido, 'ENTREGADO').catch(() => {});
     }
     const vuelto = venta.pagos.reduce((t, p) => t + Number(p.vuelto || 0), 0);
-    res.json({ ok: true, repetida, venta: { id: venta.id, numero: venta.numero, total: Number(venta.total), vuelto, token: venta.tokenRecibo, reciboUrl: `/recibo/${venta.tokenRecibo}` } });
+    res.json({ ok: true, repetida, entregado: entregar, venta: { id: venta.id, numero: venta.numero, total: Number(venta.total), vuelto, token: venta.tokenRecibo, reciboUrl: `/recibo/${venta.tokenRecibo}` } });
   } catch (err) {
     if (esErrorDeNegocio(err)) return res.status(400).json({ ok: false, error: err.message });
     console.error('[pos] error al cobrar pedido:', err);
