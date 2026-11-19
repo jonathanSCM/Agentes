@@ -1,0 +1,56 @@
+<%- include('partials/inicio') %>
+<%
+  var ETQ_RES = { OK: 'Bien', DERIVADO: 'Derivado', SIN_RESPUESTA: 'Sin respuesta', ERROR: 'Error', EN_CURSO: 'En curso' };
+  var ETQ_RUTA = { FLUJO: 'Flujo guiado', IA: 'Con IA', SIN_IA: 'Modo sin IA', CITAS: 'Citas', GUARDIA: 'Guardia' };
+  var qs = function (extra) {
+    var p = { dias: filtros.dias, resultado: filtros.resultado, ruta: filtros.ruta, empresaId: filtros.empresaId, problemas: filtros.soloProblemas ? '1' : '' };
+    Object.keys(extra).forEach(function (k) { p[k] = extra[k]; });
+    return Object.keys(p).filter(function (k) { return p[k] !== '' && p[k] !== undefined && p[k] !== null; }).map(function (k) { return k + '=' + encodeURIComponent(p[k]); }).join('&');
+  };
+%>
+
+<div class="page-head">
+  <h2>Fallas e historial</h2>
+  <p>Un turno por cada mensaje de un cliente. Los teléfonos están enmascarados y no se guardan los textos de la conversación.</p>
+</div>
+
+<form method="GET" class="filtros-ventas" style="margin-bottom:1rem">
+  <select name="dias" aria-label="Período"><% [[1, '24 horas'], [7, '7 días'], [30, '30 días'], [120, '120 días']].forEach(function (p) { %><option value="<%= p[0] %>" <%= filtros.dias === p[0] ? 'selected' : '' %>><%= p[1] %></option><% }); %></select>
+  <select name="resultado" aria-label="Resultado"><option value="">Todos los resultados</option><% RESULTADOS.forEach(function (x) { %><option value="<%= x %>" <%= filtros.resultado === x ? 'selected' : '' %>><%= ETQ_RES[x] %></option><% }); %></select>
+  <select name="ruta" aria-label="Camino"><option value="">Todos los caminos</option><% RUTAS.forEach(function (x) { %><option value="<%= x %>" <%= filtros.ruta === x ? 'selected' : '' %>><%= ETQ_RUTA[x] %></option><% }); %></select>
+  <select name="empresaId" aria-label="Empresa"><option value="">Todas las empresas</option><% empresas.forEach(function (e) { %><option value="<%= e.id %>" <%= String(filtros.empresaId) === String(e.id) ? 'selected' : '' %>><%= e.nombre %></option><% }); %></select>
+  <label style="display:flex;gap:.4rem;align-items:center"><input type="checkbox" name="problemas" value="1" <%= filtros.soloProblemas ? 'checked' : '' %> /> Solo problemas</label>
+  <button class="btn btn-primary" type="submit">Filtrar</button>
+</form>
+
+<% if (!lista.filas.length) { %>
+  <div class="empty-state"><h3>No hay turnos con estos filtros</h3><p>Probá con un período más largo o quitá algún filtro.</p></div>
+<% } else { %>
+<p class="muted"><%= lista.total %> turno(s) · página <%= lista.pagina %> de <%= lista.paginas %></p>
+<div class="table-wrap">
+  <table class="leads-table">
+    <thead><tr><th>Fecha</th><th>Empresa</th><th>Cliente</th><th>Camino</th><th>Resultado</th><th class="num">IA</th><th class="num">Tiempo</th><th class="num">Eventos</th><th></th></tr></thead>
+    <tbody>
+      <% lista.filas.forEach(function (t) { %>
+        <tr class="<%= t.resultado === 'ERROR' ? 'is-alert' : '' %>">
+          <td class="nowrap"><%= t.createdAt.toLocaleString('es-BO') %></td>
+          <td><%= t.empresa.nombre %></td>
+          <td><%= t.telefonoMasc || '—' %></td>
+          <td><%= ETQ_RUTA[t.ruta] || t.ruta %></td>
+          <td><%= ETQ_RES[t.resultado] || t.resultado %></td>
+          <td class="num"><%= t.llamadasIA %><%= t.fallidasIA ? ' (+' + t.fallidasIA + ' fallidas)' : '' %></td>
+          <td class="num"><%= t.latenciaMs === null ? '—' : (t.latenciaMs / 1000).toFixed(1) + ' s' %></td>
+          <td class="num"><%= t._count.eventos %></td>
+          <td><a href="/admin/ia/turnos/<%= t.id %>">Ver</a></td>
+        </tr>
+      <% }); %>
+    </tbody>
+  </table>
+</div>
+<div class="form-actions" style="display:flex;gap:.6rem;margin-top:1rem">
+  <% if (lista.pagina > 1) { %><a class="btn btn-ghost" href="/admin/ia/turnos?<%= qs({ pagina: lista.pagina - 1 }) %>">← Anterior</a><% } %>
+  <% if (lista.pagina < lista.paginas) { %><a class="btn btn-ghost" href="/admin/ia/turnos?<%= qs({ pagina: lista.pagina + 1 }) %>">Siguiente →</a><% } %>
+</div>
+<% } %>
+
+<%- include('partials/fin') %>

@@ -4636,6 +4636,30 @@ app.get('/admin/costo-ia', requireAuth, async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
+// ---- Centro de IA: resumen de salud, fallas e historial de turnos (solo lectura) ----
+const centroIA = require('./lib/services/centroIA');
+const periodoIA = (v) => ([1, 7, 30, 120].includes(Number(v)) ? Number(v) : 7);
+app.get('/admin/ia', requireAuth, async (req, res, next) => {
+  try {
+    const r = await centroIA.resumen({ dias: periodoIA(req.query.dias) });
+    res.render('admin/ia', { title: 'Panel Proshop - Centro de IA', tituloPagina: 'Centro de IA', activo: 'ia', r, retencion: require('./lib/services/trazaIA').RETENCION_DIAS });
+  } catch (err) { next(err); }
+});
+app.get('/admin/ia/turnos', requireAuth, async (req, res, next) => {
+  try {
+    const filtros = { dias: periodoIA(req.query.dias), resultado: req.query.resultado || '', ruta: req.query.ruta || '', empresaId: req.query.empresaId || '', soloProblemas: req.query.problemas === '1', pagina: req.query.pagina };
+    const [lista, empresas] = await Promise.all([centroIA.listarTurnos(filtros), prisma.empresa.findMany({ select: { id: true, nombre: true }, orderBy: { nombre: 'asc' } })]);
+    res.render('admin/ia-turnos', { title: 'Panel Proshop - Fallas e historial de IA', tituloPagina: 'Fallas e historial', activo: 'ia-turnos', lista, filtros, empresas, RESULTADOS: centroIA.RESULTADOS, RUTAS: centroIA.RUTAS });
+  } catch (err) { next(err); }
+});
+app.get('/admin/ia/turnos/:id(\\d+)', requireAuth, async (req, res, next) => {
+  try {
+    const d = await centroIA.detalleTurno(req.params.id);
+    if (!d) return res.status(404).send('Turno no encontrado (puede haberse borrado por la retención de 120 días).');
+    res.render('admin/ia-turno', { title: 'Panel Proshop - Turno de IA', tituloPagina: `Turno #${d.turno.id}`, activo: 'ia-turnos', ...d });
+  } catch (err) { next(err); }
+});
+
 // Tipo de cambio: actualizar ahora (BCB, con respaldo) o poner un valor a mano.
 app.post('/admin/costo-ia/tipo-cambio/actualizar', requireAuth, async (req, res, next) => {
   try {
@@ -5635,4 +5659,5 @@ httpServer.listen(PORT, '0.0.0.0', () => {
   iniciarJobFacturacion();
   iniciarJobRecordatorios();
   tipoCambioSrv.iniciarJob();
+  require('./lib/services/trazaIA').iniciarJob();
 });

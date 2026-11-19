@@ -1,0 +1,74 @@
+<%- include('partials/inicio') %>
+<%
+  var ETQ_RUTA = { FLUJO: 'Flujo guiado (sin IA)', IA: 'Con IA', SIN_IA: 'Modo sin IA', CITAS: 'Bot de citas', GUARDIA: 'Bloqueado por la guardia' };
+  var ETQ_EVENTO = { herramienta: 'Herramienta con fallo', envio_fallido: 'Envío fallido', derivacion: 'Derivación a una persona', guardia_entrada: 'Guardia de entrada', revisor_salida: 'Revisor de salida', modo_sin_ia: 'Modo sin IA', error_aviso_sin_ia: 'Error al avisar en modo sin IA', media_no_soportada: 'Audio/imagen no soportado', pedido_creado: 'Pedido creado' };
+  var maxDia = Math.max.apply(null, r.porDia.map(function (d) { return d.turnos; }).concat([1]));
+%>
+
+<div class="page-head">
+  <h2>Centro de IA</h2>
+  <p>Cómo le está yendo al agente en todas las empresas. Cada mensaje de un cliente es un <strong>turno</strong>; el detalle se guarda <%= retencion %> días y después queda solo el resumen diario.</p>
+</div>
+
+<form method="GET" class="filtros-ventas" style="margin-bottom:1rem">
+  <select name="dias" aria-label="Período" onchange="this.form.submit()">
+    <% [[1, 'Últimas 24 horas'], [7, 'Últimos 7 días'], [30, 'Últimos 30 días'], [120, 'Últimos 120 días']].forEach(function (p) { %><option value="<%= p[0] %>" <%= r.dias === p[0] ? 'selected' : '' %>><%= p[1] %></option><% }); %>
+  </select>
+  <noscript><button class="btn btn-ghost" type="submit">Aplicar</button></noscript>
+</form>
+
+<div class="admin-stats">
+  <div class="stat-card"><span class="stat-num"><%= r.total %></span><span class="stat-label">Turnos atendidos</span></div>
+  <div class="stat-card <%= r.errores ? 'stat-alerta' : '' %>"><span class="stat-num"><%= r.errores %></span><span class="stat-label">Con error</span></div>
+  <div class="stat-card <%= r.sinRespuesta ? 'stat-alerta' : '' %>"><span class="stat-num"><%= r.sinRespuesta %></span><span class="stat-label">Sin respuesta</span></div>
+  <div class="stat-card <%= r.pctProblemas > 5 ? 'stat-alerta' : '' %>"><span class="stat-num"><%= r.pctProblemas %>%</span><span class="stat-label">Turnos con problema</span></div>
+  <div class="stat-card"><span class="stat-num"><%= r.derivados %></span><span class="stat-label">Derivados a una persona</span></div>
+  <div class="stat-card"><span class="stat-num"><%= r.llamadas %></span><span class="stat-label">Llamadas a la IA · <%= r.fallidas %> fallidas</span></div>
+  <div class="stat-card"><span class="stat-num"><%= (r.latenciaMs / 1000).toFixed(1) %> s</span><span class="stat-label">Tiempo medio por turno</span></div>
+</div>
+
+<div class="dash-grid">
+  <div class="dash-card">
+    <div class="dash-card-head"><h3>Turnos por día</h3></div>
+    <% if (!r.porDia.length) { %>
+      <p class="dash-empty">Todavía no hay turnos en este período.</p>
+    <% } else { %>
+      <div class="mini-chart">
+        <% r.porDia.forEach(function (d) { %>
+          <div class="mini-bar-wrap">
+            <div class="mini-bar" style="height:<%= Math.max(4, Math.round((d.turnos / maxDia) * 100)) %>%" title="<%= d.dia %>: <%= d.turnos %> turnos, <%= d.errores %> con error"></div>
+            <span class="mini-lbl"><%= d.dia.slice(5) %></span>
+          </div>
+        <% }); %>
+      </div>
+    <% } %>
+  </div>
+  <div class="dash-card">
+    <div class="dash-card-head"><h3>Por qué camino se atendió</h3></div>
+    <div class="table-wrap"><table class="leads-table"><tbody>
+      <% r.porRuta.forEach(function (x) { %><tr><td><%= ETQ_RUTA[x.ruta] %></td><td class="num"><%= x.n %></td></tr><% }); %>
+    </tbody></table></div>
+  </div>
+</div>
+
+<div class="page-head"><h2 style="font-size:1.2rem">Avisos y errores registrados</h2></div>
+<% if (!r.eventos.length) { %>
+  <p class="muted">Sin avisos ni errores en este período.</p>
+<% } else { %>
+<div class="table-wrap"><table class="leads-table"><thead><tr><th>Evento</th><th>Gravedad</th><th class="num">Veces</th></tr></thead><tbody>
+  <% r.eventos.forEach(function (e) { %><tr><td><%= ETQ_EVENTO[e.tipo] || e.tipo %></td><td><%= e.gravedad === 'ERROR' ? 'Error' : 'Aviso' %></td><td class="num"><%= e.n %></td></tr><% }); %>
+</tbody></table></div>
+<% } %>
+
+<div class="page-head"><h2 style="font-size:1.2rem">Empresas con más problemas</h2></div>
+<% if (!r.empresasProblema.length) { %>
+  <p class="muted">Ninguna empresa tuvo turnos con error o sin respuesta.</p>
+<% } else { %>
+<div class="table-wrap"><table class="leads-table"><thead><tr><th>Empresa</th><th class="num">Turnos con problema</th><th></th></tr></thead><tbody>
+  <% r.empresasProblema.forEach(function (e) { %><tr><td><%= e.nombre %></td><td class="num"><%= e.n %></td><td><a href="/admin/ia/turnos?problemas=1&empresaId=<%= e.empresaId %>&dias=<%= r.dias %>">Ver turnos</a></td></tr><% }); %>
+</tbody></table></div>
+<% } %>
+
+<p class="muted" style="margin-top:1rem">Más detalle: <a href="/admin/ia/turnos?problemas=1&dias=<%= r.dias %>">fallas e historial</a> · <a href="/admin/estado-ia">estado de la IA</a> · <a href="/admin/costo-ia">costo de IA</a></p>
+
+<%- include('partials/fin') %>

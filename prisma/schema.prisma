@@ -299,6 +299,9 @@ model Empresa {
   ventasEspera     VentaEspera[]
   proveedores      Proveedor[]
   cuentas          Cuenta[]
+  turnosIA         TurnoIA[]
+  eventosIA        EventoIA[]
+  resumenesIA      ResumenIADiario[]
   compras          Compra[]
   usosIA         UsoIA[]
   mensajesAgente MensajeAgente[]
@@ -538,10 +541,13 @@ model UsoIA {
   tarifaId    Int?
   // CALCULADO (al momento de la llamada) | RECALCULADO (filas viejas, con la tarifa de su epoca)
   costoFuente String   @default("CALCULADO")
+  // Turno del agente que causo la solicitud (historial de actividad).
+  turnoId     Int?
 
   @@index([empresaId, createdAt])
   @@index([estado, createdAt])
   @@index([servicio, createdAt])
+  @@index([turnoId])
   @@map("usos_ia")
 }
 
@@ -1640,4 +1646,78 @@ model TipoCambio {
 
   @@unique([fecha, fuente])
   @@map("tipos_cambio")
+}
+
+// ============================ HISTORIAL DE ACTIVIDAD DEL AGENTE ============================
+// Un turno = un mensaje de un cliente atendido. Detalle con retencion de 120 dias; los resumenes diarios y usos_ia se conservan.
+model TurnoIA {
+  id             Int      @id @default(autoincrement())
+  empresaId      Int
+  empresa        Empresa  @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  agenteId       Int?
+  conversacionId Int?
+  telefonoMasc   String?
+  // TEXTO | BOTON | PRUEBA
+  entrada        String   @default("TEXTO")
+  // FLUJO | IA | SIN_IA | CITAS | GUARDIA
+  ruta           String   @default("FLUJO")
+  modelo         String?
+  llamadasIA     Int      @default(0)
+  fallidasIA     Int      @default(0)
+  tokensEntrada  Int      @default(0)
+  tokensSalida   Int      @default(0)
+  costoUsd       Decimal? @db.Decimal(12, 6)
+  latenciaMs     Int?
+  // EN_CURSO | OK | DERIVADO | SIN_RESPUESTA | ERROR
+  resultado      String   @default("EN_CURSO")
+  error          String?
+  prueba         Boolean  @default(false)
+  createdAt      DateTime @default(now())
+
+  eventos EventoIA[]
+
+  @@index([empresaId, createdAt])
+  @@index([resultado, createdAt])
+  @@index([ruta, createdAt])
+  @@index([createdAt])
+  @@map("ia_turnos")
+}
+
+model EventoIA {
+  id        Int      @id @default(autoincrement())
+  turnoId   Int?
+  turno     TurnoIA? @relation(fields: [turnoId], references: [id], onDelete: Cascade)
+  empresaId Int
+  empresa   Empresa  @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  agenteId  Int?
+  tipo      String
+  // INFO | AVISO | ERROR
+  gravedad  String   @default("INFO")
+  detalle   Json     @default("{}")
+  createdAt DateTime @default(now())
+
+  @@index([turnoId])
+  @@index([tipo, createdAt])
+  @@index([empresaId, createdAt])
+  @@map("ia_eventos")
+}
+
+model ResumenIADiario {
+  id              Int      @id @default(autoincrement())
+  fecha           DateTime @db.Date
+  empresaId       Int
+  empresa         Empresa  @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  turnos          Int      @default(0)
+  porRuta         Json     @default("{}")
+  errores         Int      @default(0)
+  derivados       Int      @default(0)
+  llamadasIA      Int      @default(0)
+  fallidasIA      Int      @default(0)
+  tokens          Int      @default(0)
+  costoUsd        Decimal  @default(0) @db.Decimal(12, 6)
+  latenciaMediaMs Int?
+  createdAt       DateTime @default(now())
+
+  @@unique([fecha, empresaId])
+  @@map("ia_resumen_diario")
 }

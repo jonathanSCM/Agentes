@@ -1,0 +1,49 @@
+<%- include('partials/inicio') %>
+<%
+  var ETQ_RES = { OK: 'Bien', DERIVADO: 'Derivado a una persona', SIN_RESPUESTA: 'Sin respuesta', ERROR: 'Error', EN_CURSO: 'En curso' };
+  var ETQ_RUTA = { FLUJO: 'Flujo guiado (sin IA)', IA: 'Con IA', SIN_IA: 'Modo sin IA', CITAS: 'Bot de citas', GUARDIA: 'Bloqueado por la guardia' };
+  var GRAV = { INFO: 'Info', AVISO: 'Aviso', ERROR: 'Error' };
+%>
+
+<div class="page-head">
+  <h2>Turno #<%= turno.id %></h2>
+  <p><a href="/admin/ia/turnos">← Volver a fallas e historial</a></p>
+</div>
+
+<div class="table-wrap"><table class="leads-table"><tbody>
+  <tr><th>Fecha</th><td><%= turno.createdAt.toLocaleString('es-BO') %></td></tr>
+  <tr><th>Empresa</th><td><%= turno.empresa.nombre %></td></tr>
+  <tr><th>Cliente</th><td><%= turno.telefonoMasc || '—' %></td></tr>
+  <tr><th>Entrada</th><td><%= turno.entrada === 'BOTON' ? 'Toque de botón' : (turno.entrada === 'PRUEBA' ? 'Chat de prueba' : 'Texto') %></td></tr>
+  <tr><th>Camino</th><td><%= ETQ_RUTA[turno.ruta] || turno.ruta %></td></tr>
+  <tr><th>Resultado</th><td><%= ETQ_RES[turno.resultado] || turno.resultado %></td></tr>
+  <% if (turno.error) { %><tr><th>Error</th><td><%= turno.error %></td></tr><% } %>
+  <tr><th>Modelo</th><td><%= turno.modelo || '—' %></td></tr>
+  <tr><th>Llamadas a la IA</th><td><%= turno.llamadasIA %> completadas, <%= turno.fallidasIA %> fallidas · <%= turno.tokensEntrada %> tokens de entrada, <%= turno.tokensSalida %> de salida</td></tr>
+  <tr><th>Costo estimado</th><td><%= turno.costoUsd === null ? '—' : 'US$ ' + Number(turno.costoUsd).toFixed(4) %></td></tr>
+  <tr><th>Tiempo total</th><td><%= turno.latenciaMs === null ? '—' : (turno.latenciaMs / 1000).toFixed(1) + ' s' %></td></tr>
+</tbody></table></div>
+
+<div class="page-head"><h2 style="font-size:1.2rem">Qué pasó dentro del turno</h2></div>
+<% if (!turno.eventos.length) { %>
+  <p class="muted">No se registraron eventos en este turno.</p>
+<% } else { %>
+<div class="table-wrap"><table class="leads-table"><thead><tr><th>Hora</th><th>Evento</th><th>Gravedad</th><th>Detalle</th></tr></thead><tbody>
+  <% turno.eventos.forEach(function (e) { %>
+    <tr><td class="nowrap"><%= e.createdAt.toLocaleTimeString('es-BO') %></td><td><%= e.tipo %></td><td><%= GRAV[e.gravedad] || e.gravedad %></td><td><code><%= JSON.stringify(e.detalle) %></code></td></tr>
+  <% }); %>
+</tbody></table></div>
+<% } %>
+
+<div class="page-head"><h2 style="font-size:1.2rem">Solicitudes a la IA</h2></div>
+<% if (!usos.length) { %>
+  <p class="muted">Este turno no llamó a la IA.</p>
+<% } else { %>
+<div class="table-wrap"><table class="leads-table"><thead><tr><th>#</th><th>Modelo</th><th>Propósito</th><th>Estado</th><th class="num">Tokens (entrada / salida)</th><th class="num">Tiempo</th><th class="num">Costo</th></tr></thead><tbody>
+  <% usos.forEach(function (u, i) { %>
+    <tr><td><%= i + 1 %></td><td><%= u.proveedor %> · <%= u.modelo %></td><td><%= u.proposito %></td><td><%= u.estado === 'FALLIDA' ? 'Fallida' + (u.error ? ' (' + u.error + ')' : '') : 'Completada' %></td><td class="num"><%= u.promptTokens %> / <%= u.completionTokens %></td><td class="num"><%= u.latenciaMs === null ? '—' : (u.latenciaMs / 1000).toFixed(1) + ' s' %></td><td class="num"><%= u.costoUsd === null ? '—' : 'US$ ' + Number(u.costoUsd).toFixed(6) %></td></tr>
+  <% }); %>
+</tbody></table></div>
+<% } %>
+
+<%- include('partials/fin') %>
