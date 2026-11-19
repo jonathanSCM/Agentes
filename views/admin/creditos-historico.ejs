@@ -1,0 +1,60 @@
+<%- include('partials/inicio') %>
+<%
+  var nf = function (n) { return Number(n).toLocaleString('es-BO'); };
+  var bs = function (n) { return 'Bs ' + Number(n).toLocaleString('es-BO', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); };
+  var usd = function (n) { return 'US$ ' + Number(n).toFixed(4); };
+  var t = r.totales;
+%>
+
+<div class="page-head">
+  <h2>Créditos: lo que habría pasado</h2>
+  <p>Con los datos que ya existen: cuántos créditos habría gastado cada empresa (conversaciones nuevas × <%= r.precios.conversacion %> + respuestas con IA × <%= r.precios.turno %>) y cuánto nos costó atenderla. Es un cálculo de lectura: <strong>no se cobró ni se escribió nada</strong>. <a href="/admin/creditos">← Volver a créditos</a></p>
+</div>
+
+<form method="GET" class="filtros-ventas" style="margin-bottom:1rem">
+  <select name="meses" aria-label="Período" onchange="this.form.submit()">
+    <% [[1, 'Este mes'], [3, 'Últimos 3 meses'], [6, 'Últimos 6 meses'], [12, 'Últimos 12 meses'], [24, 'Últimos 24 meses']].forEach(function (p) { %><option value="<%= p[0] %>" <%= r.meses === p[0] ? 'selected' : '' %>><%= p[1] %></option><% }); %>
+  </select>
+  <noscript><button class="btn btn-ghost" type="submit">Aplicar</button></noscript>
+</form>
+
+<% if (!r.cobertura.desde) { %>
+  <div class="alert-err" role="alert">Todavía no hay llamadas a la IA registradas: solo se pueden contar conversaciones, no respuestas con IA ni costos.</div>
+<% } else if (r.cobertura.mesesSinIA.length) { %>
+  <div class="alert-err" role="alert">El registro de llamadas a la IA empieza el <strong><%= r.cobertura.desde.toLocaleDateString('es-BO') %></strong>. En <%= r.cobertura.mesesSinIA.join(', ') %> hay conversaciones pero no sabemos cuántas respuestas con IA hubo ni cuánto costaron: esos meses subestiman créditos y costo.</div>
+<% } %>
+<% if (r.cambioAproximado) { %><div class="alert-err" role="alert">US$ <%= r.cambioAproximado.usd.toFixed(4) %> de costo son de días anteriores al primer tipo de cambio guardado (<%= r.cambioAproximado.desde %>): se convirtieron con ese primer valor (Bs <%= r.cambioAproximado.bobPorUsd.toFixed(2) %>), así que su costo en Bs es <strong>aproximado</strong>.</div><% } %>
+<% if (t.costoSinConvertirUsd > 0) { %><div class="alert-err" role="alert">US$ <%= t.costoSinConvertirUsd.toFixed(4) %> de costo son de días sin tipo de cambio guardado: no están sumados al costo en Bs.</div><% } %>
+
+<div class="admin-stats">
+  <div class="stat-card"><span class="stat-num"><%= nf(t.creditos) %></span><span class="stat-label">Créditos que se habrían gastado</span></div>
+  <div class="stat-card"><span class="stat-num"><%= nf(t.conversaciones) %></span><span class="stat-label">Conversaciones nuevas</span></div>
+  <div class="stat-card"><span class="stat-num"><%= nf(t.turnos) %></span><span class="stat-label">Respuestas con IA</span></div>
+  <div class="stat-card"><span class="stat-num"><%= usd(t.costoUsd) %></span><span class="stat-label">Costo de IA · <%= bs(t.costoBs) %></span></div>
+  <div class="stat-card"><span class="stat-num"><%= bs(t.ingresosBs) %></span><span class="stat-label">Pagos confirmados</span></div>
+  <div class="stat-card <%= t.margenBs < 0 ? 'stat-alerta' : '' %>"><span class="stat-num"><%= bs(t.margenBs) %></span><span class="stat-label">Margen sobre el costo de IA</span></div>
+  <div class="stat-card"><span class="stat-num"><%= t.costoBsPorCredito === null ? '—' : 'Bs ' + t.costoBsPorCredito.toFixed(4) %></span><span class="stat-label">Costo de IA por crédito</span></div>
+</div>
+
+<% if (!r.filas.length) { %>
+  <div class="empty-state"><h3>No hay datos en este período</h3><p>Probá con un período más largo.</p></div>
+<% } else { %>
+<div class="page-head"><h2 style="font-size:1.2rem">Por mes</h2></div>
+<div class="table-wrap"><table class="leads-table"><thead><tr><th>Mes</th><th class="num">Conversaciones</th><th class="num">Resp. con IA</th><th class="num">Créditos</th><th class="num">Costo de IA</th><th class="num">Costo Bs</th><th class="num">Pagos Bs</th><th class="num">Margen Bs</th></tr></thead><tbody>
+  <% r.porMes.forEach(function (m) { %><tr><td><%= m.mes %></td><td class="num"><%= nf(m.conversaciones) %></td><td class="num"><%= nf(m.turnos) %></td><td class="num"><%= nf(m.creditos) %></td><td class="num"><%= usd(m.costoUsd) %></td><td class="num"><%= bs(m.costoBs) %></td><td class="num"><%= bs(m.ingresosBs) %></td><td class="num"><%= bs(m.margenBs) %></td></tr><% }); %>
+</tbody></table></div>
+
+<div class="page-head"><h2 style="font-size:1.2rem">Por empresa (todo el período)</h2></div>
+<div class="table-wrap"><table class="leads-table"><thead><tr><th>Empresa</th><th class="num">Conversaciones</th><th class="num">Resp. con IA</th><th class="num">Créditos</th><th class="num">Costo de IA</th><th class="num">Costo Bs</th><th class="num">Pagos Bs</th><th class="num">Margen Bs</th><th class="num">Bs por crédito</th></tr></thead><tbody>
+  <% r.porEmpresa.forEach(function (e) { %><tr class="<%= e.margenBs < 0 ? 'is-alert' : '' %>"><td><%= e.nombre %></td><td class="num"><%= nf(e.conversaciones) %></td><td class="num"><%= nf(e.turnos) %></td><td class="num"><%= nf(e.creditos) %></td><td class="num"><%= usd(e.costoUsd) %></td><td class="num"><%= bs(e.costoBs) %></td><td class="num"><%= bs(e.ingresosBs) %></td><td class="num"><%= bs(e.margenBs) %></td><td class="num"><%= e.costoBsPorCredito === null ? '—' : e.costoBsPorCredito.toFixed(4) %></td></tr><% }); %>
+</tbody></table></div>
+
+<div class="page-head"><h2 style="font-size:1.2rem">Detalle por mes y empresa</h2></div>
+<div class="table-wrap"><table class="leads-table"><thead><tr><th>Mes</th><th>Empresa</th><th class="num">Conversaciones</th><th class="num">Resp. con IA</th><th class="num">Créditos</th><th class="num">Costo Bs</th><th class="num">Pagos Bs</th></tr></thead><tbody>
+  <% r.filas.forEach(function (f) { %><tr><td><%= f.mes %></td><td><%= f.nombre %></td><td class="num"><%= nf(f.conversaciones) %></td><td class="num"><%= nf(f.turnos) %></td><td class="num"><%= nf(f.creditos) %></td><td class="num"><%= bs(f.costoBs) %></td><td class="num"><%= bs(f.ingresosBs) %></td></tr><% }); %>
+</tbody></table></div>
+<% } %>
+
+<p class="muted" style="font-size:.8rem;margin-top:.8rem">Respuestas con IA = primera llamada de cada turno (los reintentos del sistema y la búsqueda semántica suman costo, pero no créditos). Las plantillas salientes no tienen historial y no entran. Costo estimado con la tarifa de cada época.</p>
+
+<%- include('partials/fin') %>

@@ -4694,6 +4694,12 @@ app.get('/admin/creditos', requireAuth, async (req, res, next) => {
     });
   } catch (err) { next(err); }
 });
+app.get('/admin/creditos/historico', requireAuth, async (req, res, next) => {
+  try {
+    const r = await require('./lib/services/creditosHistorico').informe({ meses: Number(req.query.meses) || 6 });
+    res.render('admin/creditos-historico', { title: 'Panel Proshop - Créditos: lo que habría pasado', tituloPagina: 'Créditos: histórico', activo: 'creditos', r });
+  } catch (err) { next(err); }
+});
 app.post('/admin/creditos/tarifario', requireAuth, async (req, res, next) => {
   try {
     await creditosSrv.cambiarPrecio({ accion: req.body.accion, creditos: req.body.creditos, nota: req.body.nota });

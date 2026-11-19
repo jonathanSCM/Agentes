@@ -14,6 +14,8 @@
 <% if (mensaje) { %><div class="alert-ok"><%= mensaje %></div><% } %>
 <% if (error) { %><div class="alert-err" role="alert"><%= error %></div><% } %>
 
+<p><a class="btn btn-primary" href="/admin/creditos/historico">Ver lo que habría pasado con los datos históricos</a></p>
+
 <div class="page-head"><h2 style="font-size:1.2rem">Tarifario (créditos por acción)</h2><p>Cambiar un precio cierra el vigente y abre uno nuevo: lo ya cobrado no se mueve.</p></div>
 <div class="table-wrap"><table class="leads-table"><thead><tr><th>Acción</th><th class="num">Créditos</th><th>Vigente</th><th>Nota</th></tr></thead><tbody>
   <% tarifario.forEach(function (t) { %>
