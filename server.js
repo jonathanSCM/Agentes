@@ -4033,6 +4033,7 @@ app.post('/invitacion/:token', async (req, res, next) => {
 // -------- Conectar WhatsApp (datos de Meta que registra el cliente) --------
 const cripto = require('./lib/crypto');
 const metaCoexistence = require('./lib/services/metaCoexistence');
+const mediaEntrante = require('./lib/services/mediaEntrante');
 
 function datosWebhook(req) {
   const host = req.get('host');
@@ -4385,6 +4386,17 @@ app.post('/webhooks/whatsapp', (req, res) => {
       wa.marcarLeidoYEscribiendo(conexion, mensaje.id).catch(() => {});
 
       const telefonoCliente = mensaje.from;
+
+      // SOLO TEXTO: audios, fotos, videos, documentos y stickers no se descargan ni se envian a ningun modelo (costo cero); se le pide
+      // al cliente que escriba. Sin conversacion abierta no se abre una (no se cobra). Reactivable con MEDIA_ENTRANTE_ACTIVA=1.
+      const tipoMedia = mediaEntrante.tipoNoSoportado(mensaje);
+      if (tipoMedia && !mediaEntrante.mediaActiva()) {
+        const aviso = await mediaEntrante.responder({ conexion, telefono: telefonoCliente, tipo: tipoMedia });
+        if (aviso.respondido && aviso.conversacionId) {
+          emitMensaje(conexion.agente.empresaId, { conversacionId: aviso.conversacionId, rol: 'AGENTE', contenido: aviso.texto, createdAt: new Date() });
+        }
+        return;
+      }
       // ID tecnico del boton/lista que toco el cliente (null si escribio texto).
       // (los botones de una plantilla llegan como mensaje tipo "button" con su payload)
       const idBoton = mensaje.interactive?.list_reply?.id || mensaje.interactive?.button_reply?.id || (mensaje.type === 'button' ? mensaje.button?.payload : null) || null;
@@ -4560,83 +4572,95 @@ app.post('/admin/estado-ia/probar-alerta', requireAuth, async (req, res) => {
   res.redirect('/admin/estado-ia?' + (r.enviada ? 'ok=' + encodeURIComponent('Alerta de prueba enviada por: ' + r.canales.join(', ')) : 'err=' + encodeURIComponent('No se pudo enviar la alerta de prueba (revisá los logs).')));
 });
 
+// Informe de costo REAL de IA (fase 2 del planning): usa el costo guardado en cada solicitud (tarifa vigente en su fecha), con fallidas, servicios,
+// modelos, costo por conversacion y por mensaje, y el total en Bs con el tipo de cambio de cada dia.
+const tarifasSrv = require('./lib/services/tarifasIA');
+const tipoCambioSrv = require('./lib/services/tipoCambio');
 app.get('/admin/costo-ia', requireAuth, async (req, res, next) => {
   try {
     const hace7 = new Date(); hace7.setHours(0, 0, 0, 0); hace7.setDate(hace7.getDate() - 6);
     const hace30 = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
-
-    const [filas30, filasPorEmpresa, filas7, mensajesClientePeriodo] = await Promise.all([
-      prisma.usoIA.findMany({ where: { createdAt: { gte: hace30 } } }),
-      prisma.usoIA.groupBy({
-        by: ['empresaId'],
-        where: { createdAt: { gte: hace30 } },
-        _sum: { promptTokens: true, cachedTokens: true, completionTokens: true },
-        _count: true,
-      }),
-      prisma.usoIA.findMany({ where: { createdAt: { gte: hace7 } }, select: { createdAt: true, promptTokens: true, cachedTokens: true, completionTokens: true, modelo: true } }),
+    const completadas = { createdAt: { gte: hace30 }, estado: 'COMPLETADA' };
+    const [total, sinTarifa, fallidas, porEmpresa, porEmpresaFallidas, porModelo, filas7, mensajesCliente, convDistintas, reintentos, porDia, tc, tarifas] = await Promise.all([
+      prisma.usoIA.aggregate({ where: completadas, _sum: { costoUsd: true, promptTokens: true, completionTokens: true }, _count: true, _avg: { latenciaMs: true } }),
+      prisma.usoIA.count({ where: { ...completadas, costoUsd: null } }),
+      prisma.usoIA.groupBy({ by: ['error'], where: { createdAt: { gte: hace30 }, estado: 'FALLIDA' }, _count: true }),
+      prisma.usoIA.groupBy({ by: ['empresaId'], where: completadas, _sum: { costoUsd: true, promptTokens: true, cachedTokens: true, completionTokens: true }, _count: true }),
+      prisma.usoIA.groupBy({ by: ['empresaId'], where: { createdAt: { gte: hace30 }, estado: 'FALLIDA' }, _count: true }),
+      prisma.usoIA.groupBy({ by: ['proveedor', 'modelo', 'servicio'], where: completadas, _sum: { costoUsd: true, promptTokens: true, completionTokens: true }, _count: true }),
+      prisma.usoIA.findMany({ where: { createdAt: { gte: hace7 }, estado: 'COMPLETADA' }, select: { createdAt: true, costoUsd: true } }),
       prisma.mensaje.count({ where: { rol: 'CLIENTE', createdAt: { gte: hace30 } } }),
+      prisma.$queryRaw`SELECT COUNT(DISTINCT "conversacionId")::int AS n FROM "usos_ia" WHERE "createdAt" >= ${hace30} AND "estado" = 'COMPLETADA' AND "servicio" = 'chat' AND "conversacionId" IS NOT NULL`,
+      prisma.usoIA.aggregate({ where: { ...completadas, proposito: 'reintento_forzado' }, _sum: { costoUsd: true } }),
+      prisma.$queryRaw`SELECT (("createdAt" AT TIME ZONE 'America/La_Paz')::date)::text AS dia, COALESCE(SUM("costoUsd"), 0)::float AS usd FROM "usos_ia" WHERE "createdAt" >= ${hace30} AND "estado" = 'COMPLETADA' GROUP BY 1 ORDER BY 1`,
+      tipoCambioSrv.delDia(),
+      tarifasSrv.listar(),
     ]);
 
-    const empresas = await prisma.empresa.findMany({
-      where: { id: { in: filasPorEmpresa.map((f) => f.empresaId) } },
-      select: { id: true, nombre: true },
-    });
-    const nombreEmpresa = new Map(empresas.map((e) => [e.id, e.nombre]));
-
-    // Costo por fila (agrupado tambien por modelo, cada uno tiene precio distinto)
-    let costoTotal = 0;
-    let promptReintentos = 0;
-    let promptTotal = 0;
-    for (const f of filas30) {
-      const c = costoUSD(f.modelo, f);
-      if (c != null) costoTotal += c;
-      promptTotal += f.promptTokens;
-      if (f.proposito === 'reintento_forzado') promptReintentos += f.promptTokens;
+    const costoTotal = Number(total._sum.costoUsd || 0);
+    // Total en Bs: cada dia con SU tipo de cambio (no con el de hoy).
+    let totalBs = 0; let diasSinCambio = 0;
+    for (const d of porDia) {
+      const bs = await tipoCambioSrv.usdABs(d.usd, d.dia);
+      if (bs === null) diasSinCambio += 1; else totalBs += bs;
     }
+    const empresas = await prisma.empresa.findMany({ where: { id: { in: porEmpresa.map((f) => f.empresaId) } }, select: { id: true, nombre: true } });
+    const nombreEmpresa = new Map(empresas.map((e) => [e.id, e.nombre]));
+    const fallidasPorEmpresa = new Map(porEmpresaFallidas.map((f) => [f.empresaId, f._count]));
+    const filasEmpresa = porEmpresa.map((f) => ({
+      empresaId: f.empresaId, nombre: nombreEmpresa.get(f.empresaId) || `Empresa #${f.empresaId}`, llamadas: f._count, fallidas: fallidasPorEmpresa.get(f.empresaId) || 0,
+      promptTokens: f._sum.promptTokens || 0, cachedTokens: f._sum.cachedTokens || 0, completionTokens: f._sum.completionTokens || 0, costo: Number(f._sum.costoUsd || 0),
+    })).sort((a, b) => b.costo - a.costo);
+    const filasModelo = porModelo.map((m) => ({ proveedor: m.proveedor, modelo: m.modelo, servicio: m.servicio, llamadas: m._count, tokens: (m._sum.promptTokens || 0) + (m._sum.completionTokens || 0), costo: Number(m._sum.costoUsd || 0) })).sort((a, b) => b.costo - a.costo);
 
-    // Costo por empresa (para la tabla)
-    const filasEmpresaConCosto = filasPorEmpresa.map((f) => {
-      const propias = filas30.filter((x) => x.empresaId === f.empresaId);
-      const costo = propias.reduce((s, x) => s + (costoUSD(x.modelo, x) || 0), 0);
-      return {
-        empresaId: f.empresaId,
-        nombre: nombreEmpresa.get(f.empresaId) || `Empresa #${f.empresaId}`,
-        llamadas: f._count,
-        promptTokens: f._sum.promptTokens || 0,
-        cachedTokens: f._sum.cachedTokens || 0,
-        completionTokens: f._sum.completionTokens || 0,
-        costo,
-      };
-    }).sort((a, b) => b.costo - a.costo);
-
-    // Serie diaria de costo (ultimos 7 dias)
     const dias = ['dom', 'lun', 'mar', 'mié', 'jue', 'vie', 'sáb'];
     const serie = [];
     for (let i = 6; i >= 0; i--) {
       const d = new Date(); d.setHours(0, 0, 0, 0); d.setDate(d.getDate() - i);
       const fin = new Date(d); fin.setDate(fin.getDate() + 1);
-      const delDia = filas7.filter((x) => x.createdAt >= d && x.createdAt < fin);
-      const total = delDia.reduce((s, x) => s + (costoUSD(x.modelo, x) || 0), 0);
-      serie.push({ etiqueta: dias[d.getDay()], total });
+      serie.push({ etiqueta: dias[d.getDay()], total: filas7.filter((x) => x.createdAt >= d && x.createdAt < fin).reduce((acc, x) => acc + Number(x.costoUsd || 0), 0) });
     }
-
-    const totalLlamadas = filas30.length;
-    const llamadasPorMensaje = mensajesClientePeriodo > 0 ? totalLlamadas / mensajesClientePeriodo : 0;
-
+    const nConversaciones = (convDistintas[0] && convDistintas[0].n) || 0;
+    const totalFallidas = fallidas.reduce((acc, f) => acc + f._count, 0);
     res.render('admin/costo-ia', {
-      title: 'Panel Proshop - Costo de IA',
-      tituloPagina: 'Costo de IA',
-      activo: 'costo-ia',
+      title: 'Panel Proshop - Costo de IA', tituloPagina: 'Costo de IA', activo: 'costo-ia',
       stats: {
-        costoTotal,
-        pctReintentos: promptTotal > 0 ? Math.round((promptReintentos / promptTotal) * 100) : 0,
-        llamadasPorMensaje,
-        totalLlamadas,
+        costoTotal, totalBs, diasSinCambio, totalLlamadas: total._count, totalFallidas, sinTarifa, latenciaMs: Math.round(total._avg.latenciaMs || 0),
+        llamadasPorMensaje: mensajesCliente > 0 ? total._count / mensajesCliente : 0,
+        costoPorMensaje: mensajesCliente > 0 ? costoTotal / mensajesCliente : null, costoPorConversacion: nConversaciones > 0 ? costoTotal / nConversaciones : null, conversaciones: nConversaciones,
+        pctReintentos: costoTotal > 0 ? Math.round((Number(reintentos._sum.costoUsd || 0) / costoTotal) * 100) : 0,
       },
-      serie,
-      empresas: filasEmpresaConCosto,
+      serie, empresas: filasEmpresa, modelos: filasModelo, fallidasPorTipo: fallidas.map((f) => ({ tipo: f.error || 'ERROR', n: f._count })).sort((a, b) => b.n - a.n),
+      tipoCambio: tc, tarifas, mensaje: req.query.ok || null, error: req.query.err || null,
     });
   } catch (err) { next(err); }
+});
+
+// Tipo de cambio: actualizar ahora (BCB, con respaldo) o poner un valor a mano.
+app.post('/admin/costo-ia/tipo-cambio/actualizar', requireAuth, async (req, res, next) => {
+  try {
+    const r = await tipoCambioSrv.actualizar();
+    res.redirect('/admin/costo-ia?' + (r.ok ? 'ok=' + encodeURIComponent(`Tipo de cambio actualizado: Bs ${r.valor.toFixed(2)} (${r.fuente}, ${r.fecha}).`) : 'err=' + encodeURIComponent('No se pudo actualizar: ' + r.errores.join(' | '))));
+  } catch (err) { next(err); }
+});
+app.post('/admin/costo-ia/tipo-cambio/manual', requireAuth, async (req, res, next) => {
+  try {
+    const f = await tipoCambioSrv.ponerManual({ valor: req.body.valor, fecha: req.body.fecha || null, nota: req.body.nota || null });
+    res.redirect('/admin/costo-ia?ok=' + encodeURIComponent(`Tipo de cambio manual guardado: Bs ${Number(f.bobPorUsd).toFixed(2)}.`));
+  } catch (err) {
+    if (err.codigo === 'CAMBIO') return res.redirect('/admin/costo-ia?err=' + encodeURIComponent(err.message));
+    next(err);
+  }
+});
+// Tarifas de IA versionadas: cambiar un precio cierra la tarifa vigente y abre la nueva (lo ya registrado no se mueve).
+app.post('/admin/costo-ia/tarifas', requireAuth, async (req, res, next) => {
+  try {
+    await tarifasSrv.cambiar({ proveedor: req.body.proveedor, modelo: req.body.modelo, servicio: req.body.servicio, entradaUsdPorM: req.body.entradaUsdPorM, cacheUsdPorM: req.body.cacheUsdPorM, salidaUsdPorM: req.body.salidaUsdPorM, desde: req.body.desde || null, nota: req.body.nota });
+    res.redirect('/admin/costo-ia?ok=' + encodeURIComponent('Tarifa guardada: desde ahora se usa para las solicitudes nuevas.') + '#tarifas');
+  } catch (err) {
+    if (err.codigo === 'TARIFA') return res.redirect('/admin/costo-ia?err=' + encodeURIComponent(err.message) + '#tarifas');
+    next(err);
+  }
 });
 
 // ---------- Utilidades ----------
@@ -5610,4 +5634,5 @@ httpServer.listen(PORT, '0.0.0.0', () => {
   console.log(`  [DIAGNOSTICO] ANTHROPIC_API_KEY presente: ${Boolean(process.env.ANTHROPIC_API_KEY)}\n`);
   iniciarJobFacturacion();
   iniciarJobRecordatorios();
+  tipoCambioSrv.iniciarJob();
 });
