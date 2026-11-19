@@ -1230,3 +1230,9 @@ Migración aditiva `20261114100000_pos_espera_y_cambios` (tabla `ventas_espera`,
 - **Retención de 120 días** (`IA_RETENCION_DIAS`): un trabajo diario resume por día y empresa en `ia_resumen_diario` (se conserva siempre) y **después** borra turnos y eventos viejos (corte al inicio del día, hora de Bolivia; las pruebas del panel no se resumen). `usos_ia` y la auditoría no se borran. Se puede apagar con `IA_PURGA_JOB=0`.
 - **Centro de IA (superadmin):** sección propia en el menú con `/admin/ia` (resumen: turnos, errores, sin respuesta, % con problema, derivados, llamadas, tiempo medio, turnos por día, caminos, avisos/errores, empresas con más problemas), `/admin/ia/turnos` (fallas e historial filtrable por período, resultado, camino, empresa, solo problemas, con paginación de 25) y `/admin/ia/turnos/:id` (eventos y solicitudes a la IA del turno). Estado de la IA y Costo de IA siguen donde estaban.
 - Migración aditiva `20261122100000_historial_actividad_ia`. Tests: `test/historial-ia.test.js` (8), `test/centro-ia.test.js` (5). Suite: 1266.
+
+## 73. Rentabilidad por empresa (fase 9 del planning) (nov 2026)
+
+- **`/admin/rentabilidad`** (`lib/services/rentabilidad.js`), en el menú Costos: por empresa y período (30/60/90 días/año), ingresos (pagos **confirmados**; los de USD se pasan a Bs con el cambio de la fecha del pago), costo de IA (cada día con **su** tipo de cambio), margen en Bs y %, conversaciones y costo por conversación. Estados: Rentable, En pérdida, Sin pagos en el período. Ordenado de menor a mayor margen.
+- Es margen **sobre el costo de IA solamente** (sin servidores ni comisiones). Los costos de días sin tipo de cambio no se convierten ni se inventan: se avisan aparte.
+- Sin migración. Tests: `test/rentabilidad.test.js` (5).

@@ -1,0 +1,58 @@
+<%- include('partials/inicio') %>
+<%
+  var bs = function (n) { return 'Bs ' + Number(n).toLocaleString('es-BO', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); };
+  var pct = function (n) { return n === null ? '—' : n + '%'; };
+  var ETQ = { OK: 'Rentable', PERDIDA: 'En pérdida', SIN_INGRESOS: 'Sin pagos en el período' };
+  var t = r.totales;
+%>
+
+<div class="page-head">
+  <h2>Rentabilidad</h2>
+  <p>Lo que cada empresa le pagó a Proshop frente a lo que costó atenderla con IA, en bolivianos. Es el margen <strong>sobre el costo de IA</strong>: no incluye servidores, comisiones ni sueldos.</p>
+</div>
+
+<form method="GET" class="filtros-ventas" style="margin-bottom:1rem">
+  <select name="dias" aria-label="Período" onchange="this.form.submit()">
+    <% [[30, 'Últimos 30 días'], [60, 'Últimos 60 días'], [90, 'Últimos 90 días'], [365, 'Último año']].forEach(function (p) { %><option value="<%= p[0] %>" <%= r.dias === p[0] ? 'selected' : '' %>><%= p[1] %></option><% }); %>
+  </select>
+  <noscript><button class="btn btn-ghost" type="submit">Aplicar</button></noscript>
+</form>
+
+<% if (!tipoCambio) { %><div class="alert-err" role="alert">No hay tipo de cambio guardado: los costos en dólares no se pueden pasar a bolivianos. Cargalo en <a href="/admin/costo-ia">Costo de IA</a>.</div><% } %>
+<% if (t.costoSinConvertirUsd > 0) { %><div class="alert-err" role="alert">US$ <%= t.costoSinConvertirUsd.toFixed(4) %> de costo son de días sin tipo de cambio: no están sumados al costo en Bs (no se inventa una conversión).</div><% } %>
+<% if (t.ingresosSinConvertir > 0) { %><div class="alert-err" role="alert">US$ <%= t.ingresosSinConvertir.toFixed(2) %> de pagos en dólares no se pudieron pasar a Bs por falta de tipo de cambio.</div><% } %>
+
+<div class="admin-stats">
+  <div class="stat-card"><span class="stat-num"><%= bs(t.ingresosBs) %></span><span class="stat-label">Ingresos (pagos confirmados)</span></div>
+  <div class="stat-card"><span class="stat-num"><%= bs(t.costoBs) %></span><span class="stat-label">Costo de IA</span></div>
+  <div class="stat-card <%= t.margenBs < 0 ? 'stat-alerta' : '' %>"><span class="stat-num"><%= bs(t.margenBs) %></span><span class="stat-label">Margen · <%= pct(t.margenPct) %></span></div>
+  <div class="stat-card <%= t.empresasEnPerdida ? 'stat-alerta' : '' %>"><span class="stat-num"><%= t.empresasEnPerdida %></span><span class="stat-label">Empresas en pérdida</span></div>
+  <div class="stat-card <%= t.empresasSinIngresos ? 'stat-new' : '' %>"><span class="stat-num"><%= t.empresasSinIngresos %></span><span class="stat-label">Usan IA sin pagos en el período</span></div>
+</div>
+
+<% if (!r.filas.length) { %>
+  <div class="empty-state"><h3>Todavía no hay pagos ni uso de IA en este período</h3><p>Cuando una empresa pague o use el agente, aparece acá.</p></div>
+<% } else { %>
+<div class="table-wrap">
+  <table class="leads-table">
+    <thead><tr><th>Empresa</th><th>Estado</th><th class="num">Ingresos</th><th class="num">Costo de IA</th><th class="num">Margen</th><th class="num">Margen %</th><th class="num">Conversaciones</th><th class="num">Costo por conversación</th></tr></thead>
+    <tbody>
+      <% r.filas.forEach(function (f) { %>
+        <tr class="<%= f.estado === 'PERDIDA' ? 'is-alert' : '' %>">
+          <td><%= f.nombre %></td>
+          <td><%= ETQ[f.estado] %></td>
+          <td class="num"><%= bs(f.ingresosBs) %></td>
+          <td class="num"><%= bs(f.costoBs) %></td>
+          <td class="num"><%= bs(f.margenBs) %></td>
+          <td class="num"><%= pct(f.margenPct) %></td>
+          <td class="num"><%= f.conversaciones %></td>
+          <td class="num"><%= f.costoPorConversacionBs === null ? '—' : bs(f.costoPorConversacionBs) %></td>
+        </tr>
+      <% }); %>
+    </tbody>
+  </table>
+</div>
+<p class="muted" style="font-size:.8rem;margin-top:.8rem">Los pagos se cuentan en el período en que se confirmaron: una mensualidad cubre 30 días, así que en períodos cortos un mes sin cobro puede mostrar a una empresa "sin pagos". Ordenado de menor a mayor margen.</p>
+<% } %>
+
+<%- include('partials/fin') %>

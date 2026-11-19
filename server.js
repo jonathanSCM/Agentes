@@ -4660,6 +4660,15 @@ app.get('/admin/ia/turnos/:id(\\d+)', requireAuth, async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
+// ---- Rentabilidad por empresa: pagos confirmados (Bs) frente al costo de IA convertido a Bs ----
+app.get('/admin/rentabilidad', requireAuth, async (req, res, next) => {
+  try {
+    const dias = [30, 60, 90, 365].includes(Number(req.query.dias)) ? Number(req.query.dias) : 30;
+    const r = await require('./lib/services/rentabilidad').porEmpresa({ dias });
+    res.render('admin/rentabilidad', { title: 'Panel Proshop - Rentabilidad', tituloPagina: 'Rentabilidad', activo: 'rentabilidad', r, tipoCambio: await tipoCambioSrv.delDia() });
+  } catch (err) { next(err); }
+});
+
 // Tipo de cambio: actualizar ahora (BCB, con respaldo) o poner un valor a mano.
 app.post('/admin/costo-ia/tipo-cambio/actualizar', requireAuth, async (req, res, next) => {
   try {
