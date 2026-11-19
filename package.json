@@ -12,6 +12,7 @@
     "seed:el-y-ella": "node scripts/seed-el-y-ella.js",
     "seed:catalogo": "node scripts/seed-catalogo-demo.js",
     "prueba": "node scripts/prueba-consumo.js",
+    "creditos:convertir": "node scripts/convertir-a-creditos.js",
     "embeddings": "node scripts/generar-embeddings.js",
     "simular": "node scripts/simular.js",
     "eval": "node scripts/eval/correr.js",

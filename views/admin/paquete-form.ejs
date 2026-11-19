@@ -13,6 +13,9 @@
     <label for="cantidad">Cantidad de conversaciones *</label>
     <input id="cantidad" name="cantidad" type="number" min="1" required class="calc-costo"
            value="<%= paquete ? paquete.cantidad : '' %>" placeholder="Ej: 1000" />
+    <label for="creditos" style="margin-top:.6rem">Créditos del paquete (opcional)</label>
+    <input id="creditos" name="creditos" type="number" min="0" placeholder="vacío = conversaciones x 5"
+           value="<%= paquete && paquete.creditos ? paquete.creditos : '' %>" />
   </div>
 
   <h3 class="form-section-title">Precio internacional por default (US$)</h3>

@@ -1,8 +1,9 @@
 <%- include('partials/inicio') %>
 
 <div class="page-head">
-  <h2>Pedir más conversaciones</h2>
-  <p>Sumá conversaciones a tu cuenta. Se usan cuando agotás las incluidas en tu plan. Hacés el pedido, nuestro equipo lo confirma y se cargan a tu saldo.</p>
+  <% var U = enCreditos ? 'créditos' : 'conversaciones'; %>
+  <h2><%= enCreditos ? 'Pedir más créditos' : 'Pedir más conversaciones' %></h2>
+  <p><% if (enCreditos) { %>Sumá créditos a tu cuenta. Se usan para las conversaciones nuevas, las respuestas con IA y las plantillas. Hacés el pedido, nuestro equipo lo confirma y se cargan a tu saldo.<% } else { %>Sumá conversaciones a tu cuenta. Se usan cuando agotás las incluidas en tu plan. Hacés el pedido, nuestro equipo lo confirma y se cargan a tu saldo.<% } %></p>
 </div>
 
 <% if (mensaje) { %><div class="alert-ok"><%= mensaje %></div><% } %>
@@ -11,8 +12,8 @@
 <div class="gauge">
   <div class="gauge-top">
     <div>
-      <span class="gauge-num"><%= consumo.ilimitado ? 'Ilimitadas' : consumo.totalDisponible.toLocaleString('es-BO') %></span>
-      <span class="gauge-sub">conversaciones disponibles ahora</span>
+      <span class="gauge-num"><%= enCreditos ? saldoCreditos.toLocaleString('es-BO') : (consumo.ilimitado ? 'Ilimitadas' : consumo.totalDisponible.toLocaleString('es-BO')) %></span>
+      <span class="gauge-sub"><%= U %> disponibles ahora</span>
     </div>
   </div>
 </div>
@@ -25,9 +26,9 @@
       <label>Elegí una cantidad o escribí la tuya</label>
       <div class="buy-grid" style="grid-template-columns:repeat(auto-fill,minmax(150px,1fr))">
         <% paquetes.forEach(function (p) { %>
-          <button type="button" class="buy-card" data-cantidad="<%= p.cantidad %>" style="text-align:left;cursor:pointer">
-            <span class="buy-qty"><%= p.cantidad.toLocaleString('es-BO') %></span>
-            <span class="buy-lbl">conversaciones</span>
+          <button type="button" class="buy-card" data-cantidad="<%= p.unidades %>" style="text-align:left;cursor:pointer">
+            <span class="buy-qty"><%= p.unidades.toLocaleString('es-BO') %></span>
+            <span class="buy-lbl"><%= U %></span>
             <span class="buy-unit">≈ <%= simboloMoneda(p.precio.moneda) %> <%= p.precio.precio.toFixed(2) %></span>
           </button>
         <% }); %>
@@ -37,13 +38,13 @@
   <% } %>
 
   <div class="field">
-    <label for="cantidad">Cantidad de conversaciones *</label>
+    <label for="cantidad">Cantidad de <%= U %> *</label>
     <input id="cantidad" name="cantidad" type="number" required min="<%= minimo %>" max="1000000" step="1" value="<%= (datos && datos.cantidad) || '' %>" placeholder="Ej: 1000" />
   </div>
   <div class="field">
     <label for="nota">Nota para nuestro equipo *</label>
     <textarea id="nota" name="nota" rows="3" required minlength="5" maxlength="500" placeholder="Ej: Voy a pagar por transferencia hoy a las 15:00. Te mando el comprobante por WhatsApp."><%= (datos && datos.nota) || '' %></textarea>
-    <p class="muted" style="font-size:.8rem;margin:.3rem 0 0">Contanos cómo vas a pagar. Las conversaciones se cargan apenas confirmemos tu pago.</p>
+    <p class="muted" style="font-size:.8rem;margin:.3rem 0 0">Contanos cómo vas a pagar. Los <%= U %> se cargan apenas confirmemos tu pago.</p>
   </div>
   <div class="form-actions"><button class="btn btn-primary" type="submit">Enviar pedido</button></div>
 </form>
@@ -70,7 +71,7 @@
 <% } %>
 
 <p class="muted" style="margin-top:1.4rem;font-size:.88rem">
-  Las conversaciones extra se consumen solo después de agotar las incluidas en tu plan.
+  <% if (enCreditos) { %>Los créditos del plan se usan primero (vencen al cerrar el período); los comprados duran 12 meses.<% } else { %>Las conversaciones extra se consumen solo después de agotar las incluidas en tu plan.<% } %>
 </p>
 
 <script>

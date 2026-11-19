@@ -80,6 +80,10 @@
       <label for="convIncluidas">Conversaciones incluidas / mes</label>
       <input id="convIncluidas" name="convIncluidas" type="number" min="0"
              value="<%= plan ? plan.convIncluidas : 100 %>" />
+      <label for="creditosMes" style="margin-top:.6rem">Créditos incluidos / mes</label>
+      <input id="creditosMes" name="creditosMes" type="number" min="0" placeholder="vacío = conversaciones x 5"
+             value="<%= plan && plan.creditosMes !== null && plan.creditosMes !== undefined ? plan.creditosMes : '' %>" />
+      <small class="muted">Se usan cuando los créditos están activos (CREDITOS_MODO=ACTIVO). Sin valor, se calculan como conversaciones x 5.</small>
     </div>
     <div class="field">
       <label for="maxProductos">Máximo de productos</label>

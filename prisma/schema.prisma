@@ -51,6 +51,8 @@ model Plan {
   implementacionUsd Decimal? @db.Decimal(10, 2)
   primerPagoUsd     Decimal? @db.Decimal(10, 2)
   convIncluidas    Int // conversaciones incluidas por periodo
+  // Creditos por mes (reemplazan a las conversaciones cuando CREDITOS_MODO=ACTIVO).
+  creditosMes      Int?
   maxProductos     Int
   maxUsuarios      Int
   // Limites por ROL dentro de ese total (null = sin limite por rol).
@@ -143,6 +145,8 @@ model PlanPrecioPais {
 model Paquete {
   id               Int     @id @default(autoincrement())
   cantidad         Int // 1000, 2500, 3500, 5000, 8000, 10000, 15000
+  // Creditos del paquete (null = cantidad x equivalencia).
+  creditos         Int?
   precioUsd        Decimal @db.Decimal(10, 2)
   costoUnitarioUsd Decimal @db.Decimal(10, 4)
   activo           Boolean @default(true)
@@ -300,6 +304,8 @@ model Empresa {
   proveedores      Proveedor[]
   cuentas          Cuenta[]
   turnosIA         TurnoIA[]
+  creditosLotes    CreditoLote[]
+  creditosMovs     CreditoMovimiento[]
   eventosIA        EventoIA[]
   resumenesIA      ResumenIADiario[]
   compras          Compra[]
@@ -635,6 +641,7 @@ model Suscripcion {
   maxMensajesPropios Int?
   maxServicios       Int?
   maxCitasMes        Int?
+  creditosMes        Int?
   modeloIa           String?
   marcaBlanca        Boolean  @default(false)
   ilimitado          Boolean  @default(false)
@@ -1720,4 +1727,61 @@ model ResumenIADiario {
 
   @@unique([fecha, empresaId])
   @@map("ia_resumen_diario")
+}
+
+// ============================ CREDITOS ============================
+model AccionCredito {
+  id           Int       @id @default(autoincrement())
+  accion       String
+  creditos     Int
+  activa       Boolean   @default(true)
+  vigenteDesde DateTime  @default(now())
+  vigenteHasta DateTime?
+  nota         String?
+
+  @@index([accion, vigenteDesde])
+  @@map("acciones_credito")
+}
+
+model CreditoLote {
+  id              Int       @id @default(autoincrement())
+  empresaId       Int
+  empresa         Empresa   @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  // PLAN | COMPRA | AJUSTE | MIGRACION
+  origen          String
+  cantidadInicial Int
+  restante        Int
+  vence           DateTime?
+  referencia      String?
+  createdAt       DateTime  @default(now())
+
+  movimientos CreditoMovimiento[]
+
+  @@index([empresaId, restante, vence])
+  @@map("creditos_lotes")
+}
+
+model CreditoMovimiento {
+  id                Int          @id @default(autoincrement())
+  empresaId         Int
+  empresa           Empresa      @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  loteId            Int?
+  lote              CreditoLote? @relation(fields: [loteId], references: [id], onDelete: Cascade)
+  // ASIGNACION | COMPRA | MIGRACION | CONSUMO | DEVOLUCION | AJUSTE | VENCIMIENTO | SOMBRA
+  tipo              String
+  cantidad          Int
+  saldoDespues      Int?
+  accion            String?
+  precioAplicado    Int?
+  referencia        String?
+  claveIdempotencia String?
+  nota              String?
+  quien             String?
+  createdAt         DateTime     @default(now())
+
+  @@unique([claveIdempotencia, tipo, loteId])
+  @@index([empresaId, createdAt])
+  @@index([claveIdempotencia])
+  @@index([loteId])
+  @@map("creditos_movimientos")
 }

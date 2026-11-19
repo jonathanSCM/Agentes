@@ -1,0 +1,48 @@
+<%- include('partials/inicio') %>
+<%
+  var nf = function (n) { return Number(n).toLocaleString('es-BO'); };
+  var ORIGEN = { PLAN: 'Plan', COMPRA: 'Compra', AJUSTE: 'Ajuste', MIGRACION: 'Conversión' };
+%>
+
+<div class="page-head">
+  <h2>Créditos · <%= empresa.nombre %></h2>
+  <p><a href="/admin/creditos">← Volver a créditos</a><% if (modo !== 'ACTIVO') { %> · <span class="muted">Los créditos no están activos (modo <%= modo %>): lo que ves acá es la preparación, no lo que se cobra.</span><% } %></p>
+</div>
+
+<% if (mensaje) { %><div class="alert-ok"><%= mensaje %></div><% } %>
+<% if (error) { %><div class="alert-err" role="alert"><%= error %></div><% } %>
+<% if (!cuadre.ok) { %><div class="alert-err" role="alert">El libro no cuadra con el saldo de <%= cuadre.descuadres.length %> lote(s): <%= cuadre.descuadres.map(function (d) { return '#' + d.loteId + ' (saldo ' + d.restante + ', libro ' + d.libro + ')'; }).join(', ') %>. Avisá a desarrollo.</div><% } %>
+
+<div class="admin-stats">
+  <div class="stat-card"><span class="stat-num"><%= nf(saldo.total) %></span><span class="stat-label">Saldo vigente (créditos)</span></div>
+  <% Object.keys(saldo.porOrigen).forEach(function (o) { %><div class="stat-card"><span class="stat-num"><%= nf(saldo.porOrigen[o]) %></span><span class="stat-label"><%= ORIGEN[o] || o %></span></div><% }); %>
+  <div class="stat-card <%= cuadre.ok ? 'stat-done' : 'stat-alerta' %>"><span class="stat-num"><%= cuadre.ok ? 'Cuadra' : 'No cuadra' %></span><span class="stat-label">Saldo frente al libro</span></div>
+</div>
+
+<form method="POST" action="/admin/creditos/empresa/<%= empresa.id %>/ajustar" class="card-form">
+  <h3 style="margin:0 0 .6rem;font-size:1rem">Asignar o ajustar créditos</h3>
+  <div class="field-row">
+    <div class="field"><label for="aCant">Cantidad (negativa para restar)</label><input id="aCant" name="cantidad" type="number" step="1" required placeholder="ej. 500 o -50" /></div>
+    <div class="field"><label for="aMot">Motivo (obligatorio)</label><input id="aMot" name="motivo" required minlength="3" maxlength="200" placeholder="ej. compensación por una caída" /></div>
+  </div>
+  <div class="form-actions"><button class="btn btn-primary" type="submit">Registrar ajuste</button></div>
+  <p class="muted" style="font-size:.8rem;margin:.4rem 0 0">Queda en el libro y en la auditoría de la empresa. Un ajuste positivo crea un lote que no vence.</p>
+</form>
+
+<div class="page-head"><h2 style="font-size:1.2rem">Lotes</h2></div>
+<div class="table-wrap"><table class="leads-table"><thead><tr><th>#</th><th>Origen</th><th class="num">Inicial</th><th class="num">Restante</th><th>Vence</th><th>Referencia</th></tr></thead><tbody>
+  <% lotes.forEach(function (l) { %><tr class="<%= l.restante === 0 ? 'is-done' : '' %>"><td><%= l.id %></td><td><%= ORIGEN[l.origen] || l.origen %></td><td class="num"><%= nf(l.cantidadInicial) %></td><td class="num"><%= nf(l.restante) %></td><td><%= l.vence ? l.vence.toLocaleDateString('es-BO') : 'No vence' %></td><td class="muted"><%= l.referencia || '' %></td></tr><% }); %>
+</tbody></table></div>
+
+<div class="page-head"><h2 style="font-size:1.2rem">Libro (<%= nf(total) %> movimientos)</h2></div>
+<% if (!movimientos.length) { %><p class="muted">Sin movimientos.</p><% } else { %>
+<div class="table-wrap"><table class="leads-table"><thead><tr><th>Fecha</th><th>Tipo</th><th class="num">Créditos</th><th class="num">Saldo después</th><th>Acción</th><th>Referencia</th><th>Quién</th><th>Nota</th></tr></thead><tbody>
+  <% movimientos.forEach(function (m) { %><tr><td class="nowrap muted"><%= m.createdAt.toLocaleString('es-BO') %></td><td><%= etqTipo[m.tipo] || m.tipo %></td><td class="num"><%= (m.cantidad > 0 ? '+' : '') + nf(m.cantidad) %></td><td class="num"><%= m.saldoDespues === null ? '—' : nf(m.saldoDespues) %></td><td><%= m.accion || '' %></td><td class="muted"><%= m.referencia || '' %></td><td><%= m.quien || '' %></td><td class="muted"><%= m.nota || '' %></td></tr><% }); %>
+</tbody></table></div>
+<div class="form-actions" style="display:flex;gap:.6rem;margin-top:1rem">
+  <% if (pagina > 1) { %><a class="btn btn-ghost" href="?pagina=<%= pagina - 1 %>">← Anterior</a><% } %>
+  <% if (pagina < paginas) { %><a class="btn btn-ghost" href="?pagina=<%= pagina + 1 %>">Siguiente →</a><% } %>
+</div>
+<% } %>
+
+<%- include('partials/fin') %>

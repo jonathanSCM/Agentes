@@ -1033,7 +1033,10 @@ app.get('/panel', requireCliente, async (req, res, next) => {
       .slice(0, 5);
 
     const resueltasIA = convTotal > 0 ? Math.round((convConIA / convTotal) * 100) : 0;
-    const avisoSaldo = resumen.consumo.totalDisponible === 0
+    const credPanel = await require('./lib/services/creditosPanel').resumenCliente(empresaId);
+    const avisoSaldo = credPanel
+      ? (credPanel.total <= 0 ? 'Te quedaste sin créditos: tu agente sigue atendiendo con menús, pero sin IA.' : (credPanel.diasAlcanza !== null && credPanel.diasAlcanza <= 3 ? 'Tus créditos alcanzan para unos ' + credPanel.diasAlcanza + ' días al ritmo actual.' : null))
+      : resumen.consumo.totalDisponible === 0
       ? 'Te quedaste sin conversaciones: tu agente dejó de atender.'
       : (resumen.consumo.porcentajeUsado >= 80 && resumen.consumo.extraDisponible === 0
         ? 'Ya usaste el ' + resumen.consumo.porcentajeUsado + '% de tu plan.' : null);
@@ -1083,6 +1086,7 @@ app.get('/panel/consumo', requireCliente, requireRol('OWNER'), async (req, res, 
       title: 'Mi consumo - Proshop', tituloPagina: 'Mi consumo', activo: 'consumo',
       plan: resumen.plan, suscripcion: resumen.suscripcion, consumo: resumen.consumo,
       valores: resumen.valores, nombresModulo: planesCliente.NOMBRES_MODULO, topeTexto: planesCliente.topeTexto,
+      creditos: await require('./lib/services/creditosPanel').resumenCliente(req.session.empresaId),
       mensaje: req.query.ok || null,
     });
   } catch (err) { next(err); }
@@ -2007,10 +2011,14 @@ async function renderPaquetes(req, res, { error = null, datos = null, status = 2
   // Sin plan (estado base) no hay conversaciones que ampliar: primero se elige un plan.
   if (!resumen) return res.redirect('/panel/plan?err=' + encodeURIComponent('Para pedir más conversaciones primero elegí un plan.'));
   const pais = detectarPais(req.ip);
-  const paquetes = paquetesDb.map((p) => ({ ...p, precio: precioPaqueteParaPais(p, pais, p.preciosPais) }));
+  const cred = require('./lib/services/creditos');
+  const enCreditos = cred.modo() === 'ACTIVO' && !resumen.consumo.ilimitado;
+  const paquetes = paquetesDb.map((p) => ({ ...p, unidades: enCreditos ? (p.creditos || p.cantidad * cred.EQUIVALENCIA) : p.cantidad, precio: precioPaqueteParaPais(p, pais, p.preciosPais) }));
+  const saldoCreditos = enCreditos ? (await cred.saldo(req.session.empresaId)).total : null;
   res.status(status).render('cliente/paquetes', {
-    title: 'Pedir conversaciones - Proshop', tituloPagina: 'Pedir conversaciones', activo: 'paquetes',
-    paquetes, consumo: resumen.consumo, simboloMoneda, solicitudes, minimo: solicitudesConv.MIN_CANTIDAD,
+    title: enCreditos ? 'Pedir créditos - Proshop' : 'Pedir conversaciones - Proshop', tituloPagina: enCreditos ? 'Pedir créditos' : 'Pedir conversaciones', activo: 'paquetes',
+    enCreditos, saldoCreditos,
+    paquetes, consumo: resumen.consumo, simboloMoneda, solicitudes, minimo: solicitudesConv.MIN_CANTIDAD * (enCreditos ? cred.EQUIVALENCIA : 1),
     mensaje: req.query.ok || null, error: error || req.query.err || null, datos,
   });
 }
@@ -4669,6 +4677,52 @@ app.get('/admin/rentabilidad', requireAuth, async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
+// ---- Creditos (superadmin): tarifario, comparacion en modo sombra, saldo/libro por empresa y ajustes con motivo ----
+const creditosSrv = require('./lib/services/creditos');
+const creditosPanelSrv = require('./lib/services/creditosPanel');
+app.get('/admin/creditos', requireAuth, async (req, res, next) => {
+  try {
+    const [tarifario, sombra, empresas, costoReal] = await Promise.all([
+      creditosSrv.tarifario(), creditosSrv.informeSombra({ dias: periodoIA(req.query.dias) }),
+      prisma.empresa.findMany({ select: { id: true, nombre: true }, orderBy: { nombre: 'asc' } }),
+      prisma.$queryRaw`SELECT COALESCE(SUM("costoUsd"),0)::float AS usd, COUNT(*)::int AS n FROM "usos_ia" WHERE "estado" = 'COMPLETADA' AND "servicio" = 'chat' AND "createdAt" >= ${new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)}`,
+    ]);
+    res.render('admin/creditos', {
+      title: 'Panel Proshop - Créditos', tituloPagina: 'Créditos', activo: 'creditos', modo: creditosSrv.modo(), equivalencia: creditosSrv.EQUIVALENCIA,
+      tarifario, sombra, empresas, costoRealTurno: costoReal[0] && costoReal[0].n ? costoReal[0].usd / costoReal[0].n : null,
+      mensaje: req.query.ok || null, error: req.query.err || null,
+    });
+  } catch (err) { next(err); }
+});
+app.post('/admin/creditos/tarifario', requireAuth, async (req, res, next) => {
+  try {
+    await creditosSrv.cambiarPrecio({ accion: req.body.accion, creditos: req.body.creditos, nota: req.body.nota });
+    res.redirect('/admin/creditos?ok=' + encodeURIComponent('Precio guardado: rige desde ahora; lo ya cobrado no cambia.'));
+  } catch (err) {
+    if (err.codigo) return res.redirect('/admin/creditos?err=' + encodeURIComponent(err.message));
+    next(err);
+  }
+});
+app.get('/admin/creditos/empresa/:id(\\d+)', requireAuth, async (req, res, next) => {
+  try {
+    const d = await creditosPanelSrv.detalleEmpresa(Number(req.params.id), { pagina: req.query.pagina });
+    if (!d.empresa) return res.redirect('/admin/creditos');
+    res.render('admin/creditos-empresa', { title: 'Panel Proshop - Créditos de empresa', tituloPagina: `Créditos · ${d.empresa.nombre}`, activo: 'creditos', modo: creditosSrv.modo(), etqTipo: creditosPanelSrv.ETQ_TIPO, ...d, mensaje: req.query.ok || null, error: req.query.err || null });
+  } catch (err) { next(err); }
+});
+app.post('/admin/creditos/empresa/:id(\\d+)/ajustar', requireAuth, async (req, res, next) => {
+  const id = Number(req.params.id);
+  try {
+    const r = await creditosSrv.ajustar({ empresaId: id, cantidad: req.body.cantidad, motivo: req.body.motivo, quien: 'Proshop (administración)' });
+    await auditoriaSrv.registrarSinRiesgo({ empresaId: id, actor: { nombre: 'Proshop (administración)', rol: 'PROSHOP_ADMIN' }, accion: 'CREDITOS_AJUSTADOS', entidad: 'Creditos', detalle: { cantidad: Number(req.body.cantidad), motivo: String(req.body.motivo).slice(0, 200) } });
+    if (Number(req.body.cantidad) > 0) await require('./lib/services/creditosConsumo').reiniciarAvisos(id);
+    res.redirect(`/admin/creditos/empresa/${id}?ok=` + encodeURIComponent('Ajuste registrado en el libro.'));
+  } catch (err) {
+    if (err.codigo) return res.redirect(`/admin/creditos/empresa/${id}?err=` + encodeURIComponent(err.message));
+    next(err);
+  }
+});
+
 // Tipo de cambio: actualizar ahora (BCB, con respaldo) o poner un valor a mano.
 app.post('/admin/costo-ia/tipo-cambio/actualizar', requireAuth, async (req, res, next) => {
   try {
@@ -5234,6 +5288,7 @@ function datosPlanDesdeForm(body) {
     implementacionUsd: usdOpcional(body.implementacionUsd),
     primerPagoUsd: usdOpcional(body.primerPagoUsd),
     convIncluidas: parseInt(body.convIncluidas, 10) || 0,
+    creditosMes: body.creditosMes === undefined || String(body.creditosMes).trim() === '' ? null : Math.max(0, parseInt(body.creditosMes, 10) || 0),
     maxProductos: parseInt(body.maxProductos, 10) || 0,
     maxUsuarios: parseInt(body.maxUsuarios, 10) || 1,
     maxAdmins: limitesRol.leerTope(body.maxAdmins, 'Administradores'),
@@ -5453,6 +5508,7 @@ function datosPaqueteDesdeForm(body) {
     cantidad: parseInt(body.cantidad, 10) || 0,
     precioUsd: Number(body.precioUsd) || 0,
     costoUnitarioUsd: Number(body.costoUnitarioUsd) || 0,
+    creditos: body.creditos === undefined || String(body.creditos).trim() === '' ? null : Math.max(0, parseInt(body.creditos, 10) || 0) || null,
   };
 }
 
@@ -5601,6 +5657,7 @@ app.post('/admin/pagos/:id/confirmar', requireAuth, async (req, res, next) => {
       });
     } else if (pago.tipo === 'PAQUETE' && pago.compraPaqueteId) {
       await prisma.compraPaquete.update({ where: { id: pago.compraPaqueteId }, data: { estado: 'ACTIVA' } });
+      await require('./lib/services/creditosConsumo').acreditarCompra(pago.compraPaqueteId);
       await notif.crear(pago.empresaId, {
         titulo: 'Tu paquete ya está disponible',
         mensaje: 'Confirmamos tu pago: las conversaciones del paquete ya se sumaron a tu saldo.',
@@ -5669,4 +5726,5 @@ httpServer.listen(PORT, '0.0.0.0', () => {
   iniciarJobRecordatorios();
   tipoCambioSrv.iniciarJob();
   require('./lib/services/trazaIA').iniciarJob();
+  require('./lib/services/creditosConsumo').iniciarJob();
 });

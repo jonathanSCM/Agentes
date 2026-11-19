@@ -35,6 +35,7 @@
   </div>
 <% } %>
 
+<% if (!creditos) { %>
 <!-- Medidor principal -->
 <div class="gauge">
   <div class="gauge-top">
@@ -72,6 +73,41 @@
   <div class="stat-card"><span class="stat-num"><%= valores.planFin ? new Date(valores.planFin).toLocaleDateString('es-BO') : 'Sin fecha' %></span><span class="stat-label">Vence el</span></div>
 </div>
 
+<% } else { %>
+<%
+  var nf = function (n) { return Number(n).toLocaleString('es-BO'); };
+%>
+<div class="gauge">
+  <div class="gauge-top">
+    <div>
+      <span class="gauge-num"><%= nf(creditos.total) %></span>
+      <span class="gauge-sub">créditos disponibles · equivale a unas <%= nf(creditos.equivaleConversaciones) %> conversaciones</span>
+    </div>
+    <span class="gauge-sub">Del plan: <strong><%= nf(creditos.delPlan) %></strong> · Comprados y otros: <strong><%= nf(creditos.comprados) %></strong></span>
+  </div>
+</div>
+<% if (creditos.total <= 0) { %>
+  <div class="alert-err"><strong>Te quedaste sin créditos.</strong> Tu agente sigue atendiendo con menús, catálogo y carrito, pero sin IA. <a href="/panel/paquetes" style="color:var(--primary-2)">Pedí créditos</a> para volver a la atención completa.</div>
+<% } %>
+<div class="admin-stats">
+  <div class="stat-card"><span class="stat-num"><%= nf(creditos.gastoPorDia) %></span><span class="stat-label">Créditos por día (últimos 7 días)</span></div>
+  <div class="stat-card"><span class="stat-num"><%= creditos.diasAlcanza === null ? '—' : creditos.diasAlcanza + ' días' %></span><span class="stat-label">Te alcanzan al ritmo actual</span></div>
+  <div class="stat-card"><span class="stat-num"><%= creditos.proximoVence ? new Date(creditos.proximoVence.fecha).toLocaleDateString('es-BO') : '—' %></span><span class="stat-label">Próximo vencimiento<%= creditos.proximoVence ? ' (' + nf(creditos.proximoVence.restante) + ' créditos)' : '' %></span></div>
+</div>
+<div class="page-head"><h2 style="font-size:1.2rem">En qué se usaron (últimos 30 días)</h2></div>
+<% if (!creditos.consumoMes.length) { %><p class="muted">Todavía no hubo consumo.</p><% } else { %>
+<div class="table-wrap"><table class="leads-table"><thead><tr><th>Acción</th><th class="num">Veces</th><th class="num">Créditos</th></tr></thead><tbody>
+  <% creditos.consumoMes.forEach(function (a) { %><tr><td><%= a.accion %></td><td class="num"><%= nf(a.veces) %></td><td class="num"><%= nf(a.creditos) %></td></tr><% }); %>
+</tbody></table></div>
+<% } %>
+<div class="page-head"><h2 style="font-size:1.2rem">Últimos movimientos</h2></div>
+<% if (!creditos.ultimos.length) { %><p class="muted">Todavía no hay movimientos.</p><% } else { %>
+<div class="table-wrap"><table class="leads-table"><thead><tr><th>Fecha</th><th>Movimiento</th><th>Detalle</th><th class="num">Créditos</th><th class="num">Saldo</th></tr></thead><tbody>
+  <% creditos.ultimos.forEach(function (m) { %><tr><td class="nowrap muted"><%= new Date(m.fecha).toLocaleString('es-BO') %></td><td><%= m.tipo %></td><td class="muted"><%= m.detalle %></td><td class="num"><%= (m.cantidad > 0 ? '+' : '') + nf(m.cantidad) %></td><td class="num"><%= m.saldoDespues === null ? '—' : nf(m.saldoDespues) %></td></tr><% }); %>
+</tbody></table></div>
+<% } %>
+<% } %>
+
 <div class="page-head"><h2 style="font-size:1.2rem">Mi plan</h2></div>
 <div class="table-wrap">
   <table class="leads-table">
@@ -79,7 +115,7 @@
       <tr><td>Plan</td><td><strong><%= valores.planNombre %></strong></td></tr>
       <tr><td>Módulos</td><td><%= valores.modulos.map(function (m) { return nombresModulo[m] || m; }).join(' + ') %></td></tr>
       <tr><td>Vigencia</td><td><%= valores.planInicio ? new Date(valores.planInicio).toLocaleDateString('es-BO') : '—' %> → <%= valores.planFin ? new Date(valores.planFin).toLocaleDateString('es-BO') : 'sin vencimiento' %></td></tr>
-      <tr><td>Conversaciones incluidas</td><td><%= valores.limites.convIncluidas === null ? 'Ilimitadas' : valores.limites.convIncluidas.toLocaleString('es-BO') + ' por mes' %></td></tr>
+      <tr><td><%= creditos ? 'Créditos incluidos' : 'Conversaciones incluidas' %></td><td><%= valores.limites.convIncluidas === null ? 'Ilimitados' : (creditos ? (suscripcion.creditosMes !== null && suscripcion.creditosMes !== undefined ? suscripcion.creditosMes : (plan.creditosMes !== null && plan.creditosMes !== undefined ? plan.creditosMes : valores.limites.convIncluidas * 5)).toLocaleString('es-BO') : valores.limites.convIncluidas.toLocaleString('es-BO')) + ' por mes' %></td></tr>
       <tr><td>Productos permitidos</td><td><%= topeTexto(valores.limites.maxProductos) %></td></tr>
       <tr><td>Usuarios permitidos</td><td><%= topeTexto(valores.limites.maxUsuarios) %></td></tr>
       <% [['maxAdmins', 'Administradores'], ['maxCajeros', 'Cajeros'], ['maxStaff', 'Colaboradores'], ['maxProfesionales', 'Profesionales']].forEach(function (r) { if (valores.limites[r[0]] !== null && valores.limites[r[0]] !== undefined) { %>
@@ -89,6 +125,6 @@
   </table>
 </div>
 
-<p style="margin-top:1.2rem;display:flex;gap:.6rem;flex-wrap:wrap"><a class="btn btn-primary" href="/panel/plan">Cambiar de plan</a> <a class="btn btn-ghost" href="/panel/paquetes">Pedir más conversaciones</a></p>
+<p style="margin-top:1.2rem;display:flex;gap:.6rem;flex-wrap:wrap"><a class="btn btn-primary" href="/panel/plan">Cambiar de plan</a> <a class="btn btn-ghost" href="/panel/paquetes"><%= creditos ? 'Pedir más créditos' : 'Pedir más conversaciones' %></a></p>
 
 <%- include('partials/fin') %>
