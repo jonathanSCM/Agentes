@@ -52,9 +52,8 @@
   </div>
 </div>
 
-<div class="page-head">
-  <h2 style="font-size:1.2rem">Cómo recibir los avisos</h2>
-</div>
+<details style="margin-top:1rem"<%= salud.canalesDeAlerta.length ? '' : ' open' %>>
+<summary style="cursor:pointer;font-weight:600">Cómo recibir los avisos<%= salud.canalesDeAlerta.length ? ' (ya tenés un canal configurado)' : ' (todavía no hay ningún canal)' %></summary>
 <p>Configurá una de estas variables en Coolify (y reiniciá):</p>
 <ul>
   <li><code>ALERTA_NTFY_TOPIC</code> — el nombre de un tema en ntfy.sh (gratis, app para el celular).</li>
@@ -62,3 +61,4 @@
   <li><code>ALERTA_WEBHOOK_URL</code> — un webhook de Slack o Discord.</li>
 </ul>
 <p>Se manda un aviso cada 30 minutos como máximo por cada tipo de problema (sin saldo, clave inválida, caída), y otro cuando la IA vuelve.</p>
+</details>

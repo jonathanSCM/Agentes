@@ -11,7 +11,7 @@
 
 <% if (mensaje) { %><div class="alert-ok"><%= mensaje %></div><% } %>
 <% if (error) { %><div class="alert-err" role="alert"><%= error %></div><% } %>
-<% if (stats.sinTarifa > 0) { %><div class="alert-err" role="alert"><%= stats.sinTarifa %> llamada(s) usaron un modelo <strong>sin tarifa cargada</strong>: no tienen costo (no se inventa). Cargá su tarifa abajo.</div><% } %>
+<% if (stats.sinTarifa > 0) { %><div class="alert-err" role="alert"><%= stats.sinTarifa %> llamada(s) usaron un modelo <strong>sin tarifa cargada</strong>: no tienen costo (no se inventa). Cargá su tarifa en <a href="/admin/costo-ia/ajustes#tarifas">Ajustes de costos</a>.</div><% } %>
 
 <div class="admin-stats">
   <div class="stat-card"><span class="stat-num"><%= usd(stats.costoTotal) %></span><span class="stat-label">Costo total estimado<%= tipoCambio ? ' · Bs ' + stats.totalBs.toFixed(2) : '' %></span></div>
@@ -41,23 +41,6 @@
     <% } %>
   </div>
 
-  <div class="dash-card">
-    <div class="dash-card-head"><h3>Tipo de cambio (Bs por dólar)</h3></div>
-    <% if (tipoCambio) { %>
-      <p style="font-size:1.6rem;font-weight:800;margin:.2rem 0">Bs <%= tipoCambio.bobPorUsd.toFixed(2) %></p>
-      <p class="muted" style="margin:0">Fuente: <strong><%= tipoCambio.fuente === 'BCB' ? 'Banco Central de Bolivia (oficial)' : (tipoCambio.fuente === 'API' ? 'API gratuita (referencia)' : 'Valor manual') %></strong> · vigente el <%= tipoCambio.fecha %><%= tipoCambio.diasAntiguedad > 2 ? ' · ⚠ tiene ' + tipoCambio.diasAntiguedad + ' días' : '' %></p>
-      <% if (stats.diasSinCambio) { %><p class="muted" style="font-size:.8rem">Hay <%= stats.diasSinCambio %> día(s) con gasto anteriores al primer tipo de cambio guardado: no se convierten a Bs.</p><% } %>
-    <% } else { %>
-      <p class="dash-empty">Todavía no hay un tipo de cambio guardado.</p>
-    <% } %>
-    <form method="POST" action="/admin/costo-ia/tipo-cambio/actualizar" style="margin:.6rem 0"><button class="btn btn-primary" type="submit">Actualizar ahora desde el BCB</button></form>
-    <form method="POST" action="/admin/costo-ia/tipo-cambio/manual" class="filtros-ventas" style="margin:0">
-      <input name="valor" inputmode="decimal" placeholder="Valor manual (ej. 11,68)" required aria-label="Valor manual" />
-      <input name="fecha" type="date" aria-label="Fecha (opcional)" />
-      <button class="btn btn-ghost" type="submit">Guardar a mano</button>
-    </form>
-    <p class="muted" style="font-size:.78rem;margin:.4rem 0 0">Se actualiza solo cada día. Si el BCB no se puede leer, usa una API gratuita como respaldo. Un valor manual tiene prioridad ese día.</p>
-  </div>
 </div>
 
 <% if (fallidasPorTipo.length) { %>
@@ -83,7 +66,7 @@
 </div>
 <% } %>
 
-<div class="page-head"><h2 style="font-size:1.2rem">Costo por empresa (30 días)</h2></div>
+<div class="page-head"><h2 style="font-size:1.2rem">Costo por empresa (30 días)</h2><p>Entrá a "Ver detalle" para saber en qué se fue el costo de cada una: tipo de token, para qué se usó, herramientas y los turnos más caros.</p></div>
 <% if (empresas.length === 0) { %>
   <div class="empty-state">
     <h3>Todavía no hay datos de uso de IA</h3>
@@ -93,12 +76,13 @@
 <div class="table-wrap">
   <table class="leads-table">
     <thead>
-      <tr><th>Empresa</th><th class="num">Llamadas</th><th class="num">Fallidas</th><th class="num">Tokens prompt</th><th class="num">Cacheados</th><th class="num">Tokens completion</th><th class="num">Costo estimado</th></tr>
+      <tr><th>Empresa</th><th></th><th class="num">Llamadas</th><th class="num">Fallidas</th><th class="num">Tokens prompt</th><th class="num">Cacheados</th><th class="num">Tokens completion</th><th class="num">Costo estimado</th></tr>
     </thead>
     <tbody>
       <% empresas.forEach(function (e) { %>
         <tr>
           <td><%= e.nombre %></td>
+          <td><a href="/admin/costo-ia/empresa/<%= e.empresaId %>">Ver detalle</a></td>
           <td class="num"><%= e.llamadas %></td>
           <td class="num"><%= e.fallidas || '—' %></td>
           <td class="num"><%= e.promptTokens.toLocaleString('es') %></td>
@@ -112,38 +96,6 @@
 </div>
 <% } %>
 
-<div class="page-head" id="tarifas"><h2 style="font-size:1.2rem">Tarifas de IA (USD por millón de tokens)</h2><p>Cambiar un precio cierra la tarifa vigente y abre una nueva: el costo de lo ya registrado no se mueve.</p></div>
-<div class="table-wrap">
-  <table class="leads-table">
-    <thead><tr><th>Proveedor</th><th>Modelo</th><th>Servicio</th><th class="num">Entrada</th><th class="num">Entrada cacheada</th><th class="num">Salida</th><th>Vigente</th></tr></thead>
-    <tbody>
-      <% tarifas.forEach(function (t) { %>
-        <tr class="<%= t.vigenteHasta ? 'is-done' : '' %>">
-          <td><%= t.proveedor %></td><td><%= t.modelo %></td><td><%= t.servicio %></td>
-          <td class="num"><%= Number(t.entradaUsdPorM).toFixed(4) %></td><td class="num"><%= Number(t.cacheUsdPorM).toFixed(4) %></td><td class="num"><%= Number(t.salidaUsdPorM).toFixed(4) %></td>
-          <td class="nowrap"><%= t.vigenteDesde.getFullYear() <= 2000 ? 'desde siempre' : 'desde ' + t.vigenteDesde.toLocaleDateString('es-BO') %><%= t.vigenteHasta ? ' hasta ' + t.vigenteHasta.toLocaleDateString('es-BO') : ' · vigente' %></td>
-        </tr>
-      <% }); %>
-    </tbody>
-  </table>
-</div>
-<form method="POST" action="/admin/costo-ia/tarifas" class="card-form" style="margin-top:1rem">
-  <h3 style="margin:0 0 .6rem;font-size:1rem">Cambiar o agregar una tarifa</h3>
-  <div class="field-row">
-    <div class="field"><label for="tProv">Proveedor</label><input id="tProv" name="proveedor" required placeholder="openai o anthropic" /></div>
-    <div class="field"><label for="tMod">Modelo</label><input id="tMod" name="modelo" required placeholder="ej. gpt-4o-mini" /></div>
-    <div class="field"><label for="tServ">Servicio</label><select id="tServ" name="servicio"><option value="chat">Respuestas del agente (chat)</option><option value="embedding">Búsqueda semántica (embedding)</option></select></div>
-  </div>
-  <div class="field-row">
-    <div class="field"><label for="tIn">Entrada</label><input id="tIn" name="entradaUsdPorM" inputmode="decimal" required placeholder="0.15" /></div>
-    <div class="field"><label for="tCa">Entrada cacheada</label><input id="tCa" name="cacheUsdPorM" inputmode="decimal" placeholder="igual a la entrada" /></div>
-    <div class="field"><label for="tOut">Salida</label><input id="tOut" name="salidaUsdPorM" inputmode="decimal" required placeholder="0.60" /></div>
-  </div>
-  <div class="field-row">
-    <div class="field"><label for="tDesde">Vigente desde (opcional, por defecto ahora)</label><input id="tDesde" name="desde" type="datetime-local" /></div>
-    <div class="field"><label for="tNota">Nota</label><input id="tNota" name="nota" maxlength="200" placeholder="ej. nuevo precio del proveedor" /></div>
-  </div>
-  <div class="form-actions"><button class="btn btn-primary" type="submit">Guardar tarifa</button></div>
-</form>
+<p class="muted" style="margin-top:1.4rem;font-size:.85rem">Las tarifas de IA y el tipo de cambio se cambian muy de vez en cuando: están en <a href="/admin/costo-ia/ajustes">Ajustes de costos</a>.</p>
 
 <%- include('partials/fin') %>

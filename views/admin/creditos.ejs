@@ -17,15 +17,20 @@
 <p><a class="btn btn-primary" href="/admin/creditos/historico">Ver lo que habría pasado con los datos históricos</a></p>
 
 <div class="page-head"><h2 style="font-size:1.2rem">Tarifario (créditos por acción)</h2><p>Cambiar un precio cierra el vigente y abre uno nuevo: lo ya cobrado no se mueve.</p></div>
-<div class="table-wrap"><table class="leads-table"><thead><tr><th>Acción</th><th class="num">Créditos</th><th>Vigente</th><th>Nota</th></tr></thead><tbody>
-  <% tarifario.forEach(function (t) { %>
-    <tr class="<%= t.vigenteHasta ? 'is-done' : '' %>"><td><%= ETQ[t.accion] || t.accion %></td><td class="num"><%= t.creditos %></td>
-      <td class="nowrap"><%= t.vigenteDesde.getFullYear() <= 2000 ? 'desde siempre' : 'desde ' + t.vigenteDesde.toLocaleDateString('es-BO') %><%= t.vigenteHasta ? ' hasta ' + t.vigenteHasta.toLocaleDateString('es-BO') : ' · vigente' %></td><td class="muted"><%= t.nota || '' %></td></tr>
+<div class="table-wrap"><table class="leads-table"><thead><tr><th>Acción</th><th class="num">Créditos</th><th>Desde</th></tr></thead><tbody>
+  <% vigentes.forEach(function (t) { %>
+    <tr><td><%= ETQ[t.accion] || t.accion %></td><td class="num"><%= t.creditos %></td><td class="nowrap muted"><%= t.vigenteDesde.getFullYear() <= 2000 ? 'desde siempre' : t.vigenteDesde.toLocaleDateString('es-BO') %></td></tr>
   <% }); %>
 </tbody></table></div>
+<% if (tarifario.length > vigentes.length) { %>
+<details style="margin:.6rem 0"><summary style="cursor:pointer">Ver precios anteriores</summary>
+<div class="table-wrap"><table class="leads-table"><tbody>
+  <% tarifario.filter(function (t) { return t.vigenteHasta; }).forEach(function (t) { %><tr class="is-done"><td><%= ETQ[t.accion] || t.accion %></td><td class="num"><%= t.creditos %></td><td class="nowrap"><%= t.vigenteDesde.getFullYear() <= 2000 ? 'desde siempre' : 'desde ' + t.vigenteDesde.toLocaleDateString('es-BO') %> hasta <%= t.vigenteHasta.toLocaleDateString('es-BO') %></td><td class="muted"><%= t.nota || '' %></td></tr><% }); %>
+</tbody></table></div></details>
+<% } %>
 <% if (costoRealTurno !== null) { %><p class="muted">Costo real medido: <strong><%= usd(costoRealTurno) %></strong> por llamada de chat (últimos 30 días). Con 1 crédito = US$ 0,01, un turno de IA cuesta 1 crédito (US$ 0,01) frente a ese costo. Revisá el margen en <a href="/admin/rentabilidad">Rentabilidad</a>.</p><% } %>
-<form method="POST" action="/admin/creditos/tarifario" class="card-form" style="margin-top:.8rem">
-  <h3 style="margin:0 0 .6rem;font-size:1rem">Cambiar un precio</h3>
+<details style="margin-top:.8rem"><summary style="cursor:pointer;font-weight:600">Cambiar un precio</summary>
+<form method="POST" action="/admin/creditos/tarifario" class="card-form" style="margin-top:.6rem">
   <div class="field-row">
     <div class="field"><label for="tAcc">Acción</label><select id="tAcc" name="accion"><% Object.keys(ETQ).forEach(function (k) { %><option value="<%= k %>"><%= ETQ[k] %></option><% }); %></select></div>
     <div class="field"><label for="tCre">Créditos</label><input id="tCre" name="creditos" type="number" min="0" required /></div>
@@ -33,6 +38,7 @@
   </div>
   <div class="form-actions"><button class="btn btn-primary" type="submit">Guardar precio</button></div>
 </form>
+</details>
 
 <div class="page-head"><h2 style="font-size:1.2rem">Modo sombra: lo que se habría cobrado</h2><p>Últimos <%= sombra.dias %> días. Sirve para comparar con las conversaciones reales y calibrar el tarifario antes de activar.</p></div>
 <% if (!sombra.filas.length) { %><p class="muted">Todavía no hay consumo anotado en modo sombra (se anota con <code>CREDITOS_MODO=SOMBRA</code>).</p><% } else { %>

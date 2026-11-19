@@ -4730,18 +4730,33 @@ app.post('/admin/creditos/empresa/:id(\\d+)/ajustar', requireAuth, async (req, r
 });
 
 // Tipo de cambio: actualizar ahora (BCB, con respaldo) o poner un valor a mano.
+// Ajustes (se usan poco, por eso no estan en la pantalla principal): tarifas de IA y tipo de cambio.
+app.get('/admin/costo-ia/ajustes', requireAuth, async (req, res, next) => {
+  try {
+    const [tarifas, tc] = await Promise.all([tarifasSrv.listar(), tipoCambioSrv.delDia()]);
+    res.render('admin/costo-ia-ajustes', { title: 'Panel Proshop - Ajustes de costos', tituloPagina: 'Ajustes de costos de IA', activo: 'costo-ia', tarifas, tipoCambio: tc, mensaje: req.query.ok || null, error: req.query.err || null });
+  } catch (err) { next(err); }
+});
+// Detalle de una empresa: en que se fue su costo (tipo de token, para que se uso, herramientas, modelos, dias, turnos mas caros).
+app.get('/admin/costo-ia/empresa/:id(\\d+)', requireAuth, async (req, res, next) => {
+  try {
+    const d = await require('./lib/services/costoIAEmpresa').detalle(Number(req.params.id), { dias: req.query.dias });
+    if (!d) return res.redirect('/admin/costo-ia');
+    res.render('admin/costo-ia-empresa', { title: 'Panel Proshop - Costo de IA de una empresa', tituloPagina: `Costo de IA · ${d.empresa.nombre}`, activo: 'costo-ia', d });
+  } catch (err) { next(err); }
+});
 app.post('/admin/costo-ia/tipo-cambio/actualizar', requireAuth, async (req, res, next) => {
   try {
     const r = await tipoCambioSrv.actualizar();
-    res.redirect('/admin/costo-ia?' + (r.ok ? 'ok=' + encodeURIComponent(`Tipo de cambio actualizado: Bs ${r.valor.toFixed(2)} (${r.fuente}, ${r.fecha}).`) : 'err=' + encodeURIComponent('No se pudo actualizar: ' + r.errores.join(' | '))));
+    res.redirect('/admin/costo-ia/ajustes?' + (r.ok ? 'ok=' + encodeURIComponent(`Tipo de cambio actualizado: Bs ${r.valor.toFixed(2)} (${r.fuente}, ${r.fecha}).`) : 'err=' + encodeURIComponent('No se pudo actualizar: ' + r.errores.join(' | '))));
   } catch (err) { next(err); }
 });
 app.post('/admin/costo-ia/tipo-cambio/manual', requireAuth, async (req, res, next) => {
   try {
     const f = await tipoCambioSrv.ponerManual({ valor: req.body.valor, fecha: req.body.fecha || null, nota: req.body.nota || null });
-    res.redirect('/admin/costo-ia?ok=' + encodeURIComponent(`Tipo de cambio manual guardado: Bs ${Number(f.bobPorUsd).toFixed(2)}.`));
+    res.redirect('/admin/costo-ia/ajustes?ok=' + encodeURIComponent(`Tipo de cambio manual guardado: Bs ${Number(f.bobPorUsd).toFixed(2)}.`));
   } catch (err) {
-    if (err.codigo === 'CAMBIO') return res.redirect('/admin/costo-ia?err=' + encodeURIComponent(err.message));
+    if (err.codigo === 'CAMBIO') return res.redirect('/admin/costo-ia/ajustes?err=' + encodeURIComponent(err.message));
     next(err);
   }
 });
@@ -4749,9 +4764,9 @@ app.post('/admin/costo-ia/tipo-cambio/manual', requireAuth, async (req, res, nex
 app.post('/admin/costo-ia/tarifas', requireAuth, async (req, res, next) => {
   try {
     await tarifasSrv.cambiar({ proveedor: req.body.proveedor, modelo: req.body.modelo, servicio: req.body.servicio, entradaUsdPorM: req.body.entradaUsdPorM, cacheUsdPorM: req.body.cacheUsdPorM, salidaUsdPorM: req.body.salidaUsdPorM, desde: req.body.desde || null, nota: req.body.nota });
-    res.redirect('/admin/costo-ia?ok=' + encodeURIComponent('Tarifa guardada: desde ahora se usa para las solicitudes nuevas.') + '#tarifas');
+    res.redirect('/admin/costo-ia/ajustes?ok=' + encodeURIComponent('Tarifa guardada: desde ahora se usa para las solicitudes nuevas.') + '#tarifas');
   } catch (err) {
-    if (err.codigo === 'TARIFA') return res.redirect('/admin/costo-ia?err=' + encodeURIComponent(err.message) + '#tarifas');
+    if (err.codigo === 'TARIFA') return res.redirect('/admin/costo-ia/ajustes?err=' + encodeURIComponent(err.message) + '#tarifas');
     next(err);
   }
 });
