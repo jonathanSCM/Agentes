@@ -1586,6 +1586,8 @@ const TEXTOS_CAMBIO_DE_ESTADO = {
   CANCELADO: 'Tu pedido fue cancelado. Si tenes alguna duda o queres volver a hacerlo, escribinos por acá.',
 };
 async function notificarCambioDeEstadoPedido(empresaId, pedido, estadoNuevo) {
+  // Pedir un comentario (si el negocio lo activó) no depende de que el aviso de "entregado" haya salido.
+  if (estadoNuevo === 'ENTREGADO') opinionesSrv.programar({ empresaId, clienteId: pedido.clienteId, tipo: 'PEDIDO', refId: pedido.id }).catch(() => {});
   try {
     const texto = TEXTOS_CAMBIO_DE_ESTADO[estadoNuevo];
     if (!texto) return false; // estado sin mensaje definido, no hay nada que avisar
@@ -1943,6 +1945,7 @@ app.get('/panel/reportes', requireCliente, requireModulo('PANEL'), async (req, r
 // ===== Inteligencia de negocio (módulo PANEL) =====
 // Datos reales y reglas en código (lib/services/inteligencia.js): cero IA. Solo dueño/admin.
 const inteligenciaSrv = require('./lib/services/inteligencia');
+const opinionesSrv = require('./lib/services/opiniones');
 app.get('/panel/inteligencia', requireCliente, requireModulo('PANEL'), requireRol('OWNER', 'ADMIN'), async (req, res, next) => {
   try {
     const empresaId = req.session.empresaId;
@@ -1964,8 +1967,19 @@ app.get('/panel/inteligencia/comentarios', requireCliente, requireModulo('PANEL'
     const { palabras, resultados } = q ? await inteligenciaSrv.buscarComentarios(req.session.empresaId, q) : { palabras: [], resultados: [] };
     res.render('cliente/inteligencia-comentarios', {
       title: 'Buscador de comentarios - Proshop', tituloPagina: 'Buscador de comentarios', activo: 'inteligencia', subvista: 'comentarios',
-      q, palabras, resultados,
+      q, palabras, resultados, opiniones: await opinionesSrv.resumen(req.session.empresaId),
+      pedirOpiniones: Boolean((await prisma.empresa.findUnique({ where: { id: req.session.empresaId }, select: { pedirOpiniones: true } })).pedirOpiniones),
+      mensaje: req.query.ok || null,
     });
+  } catch (err) { next(err); }
+});
+
+// Activar o apagar el pedido automatico de comentarios (mensajes salientes a los clientes del negocio).
+app.post('/panel/inteligencia/comentarios/pedir', requireCliente, requireModulo('PANEL'), requireRol('OWNER', 'ADMIN'), async (req, res, next) => {
+  try {
+    const activo = String(req.body.activo) === '1';
+    await opinionesSrv.activar(req.session.empresaId, activo);
+    res.redirect('/panel/inteligencia/comentarios?ok=' + encodeURIComponent(activo ? 'Listo: a partir de ahora se pide un comentario después de cada pedido entregado o cita completada.' : 'Listo: se dejó de pedir comentarios.'));
   } catch (err) { next(err); }
 });
 

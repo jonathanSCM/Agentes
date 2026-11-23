@@ -13,6 +13,42 @@
   <a href="/panel/inteligencia/comentarios" class="<%= subvista === 'comentarios' ? 'is-active' : '' %>">Buscador de comentarios</a>
 </nav>
 
+<% if (mensaje) { %><div class="alert-ok"><%= mensaje %></div><% } %>
+
+<section class="form-card" style="max-width:860px;margin-bottom:1.6rem">
+  <h3 style="margin:0 0 .3rem">Pedir comentarios a tus clientes</h3>
+  <p class="muted" style="margin:0 0 .8rem;font-size:.92rem">
+    Cuando un pedido se marca como entregado o una cita como completada, el agente le escribe al cliente una hora después para pedirle su opinión.
+    Lo hace en su 1.ª, 2.ª y 3.ª vez, nunca más de una vez por semana y nunca de noche. Solo puede enviarse si el cliente escribió en las últimas 24 h (límite de WhatsApp).
+    Lo que responda queda en el buscador de abajo.
+  </p>
+  <form method="POST" action="/panel/inteligencia/comentarios/pedir" style="display:flex;align-items:center;gap:.8rem;flex-wrap:wrap">
+    <span class="badge <%= pedirOpiniones ? 'badge-done' : 'badge-off' %>"><%= pedirOpiniones ? 'Activado' : 'Apagado' %></span>
+    <% if (pedirOpiniones) { %>
+      <input type="hidden" name="activo" value="0" /><button class="btn btn-ghost" type="submit">Dejar de pedir comentarios</button>
+    <% } else { %>
+      <input type="hidden" name="activo" value="1" /><button class="btn btn-primary" type="submit">Activar pedido de comentarios</button>
+    <% } %>
+  </form>
+  <% if (opiniones.total) { %>
+    <p style="margin:1rem 0 0;font-size:.92rem">
+      Últimos <%= opiniones.dias %> días: <strong><%= opiniones.enviadas %></strong> pedido<%= opiniones.enviadas === 1 ? '' : 's' %> enviado<%= opiniones.enviadas === 1 ? '' : 's' %>,
+      <strong><%= opiniones.respondieron %></strong> con respuesta<% if (opiniones.programadas) { %>, <%= opiniones.programadas %> programado<%= opiniones.programadas === 1 ? '' : 's' %><% } %><% if (opiniones.omitidas + opiniones.fallos) { %>, <%= opiniones.omitidas + opiniones.fallos %> sin poder enviarse<% } %>.
+    </p>
+    <% if (opiniones.omitidasEjemplos.length) { %>
+      <p class="muted" style="margin:.3rem 0 0;font-size:.82rem">No se pudo enviar porque: <%= opiniones.omitidasEjemplos.map(function (o) { return o.motivo; }).filter(function (m, i, a) { return a.indexOf(m) === i; }).join('; ') %>.</p>
+    <% } %>
+  <% } %>
+  <% if (opiniones.respuestas.length) { %>
+    <div class="table-wrap" style="margin-top:1rem"><table class="leads-table">
+      <thead><tr><th>Cliente</th><th>Después de</th><th>Lo que respondió</th></tr></thead>
+      <tbody><% opiniones.respuestas.slice(0, 8).forEach(function (r) { %>
+        <tr><td><strong><%= r.nombre %></strong></td><td class="muted nowrap"><%= r.tipo === 'CITA' ? 'una cita' : 'un pedido' %> · <%= r.numeroServicio %>.ª vez</td><td class="msg-cell"><%= r.contenido %></td></tr>
+      <% }); %></tbody>
+    </table></div>
+  <% } %>
+</section>
+
 <form method="GET" action="/panel/inteligencia/comentarios" class="form-card" style="max-width:640px;margin-bottom:1.4rem">
   <div class="field">
     <label for="q">¿Qué querés buscar?</label>

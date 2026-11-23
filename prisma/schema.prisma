@@ -279,6 +279,9 @@ model Empresa {
   vocabulario Json     @default("{}")
   // Reglas de la agenda: intervaloMin, anticipacionMin, diasMaximos, permiteElegirRecurso, cerrarFeriados, feriadosAbiertos.
   configAgenda Json    @default("{}")
+  // Pedir comentarios a los clientes despues de un servicio (apagado por defecto: son mensajes salientes).
+  pedirOpiniones Boolean @default(false)
+  solicitudesOpinion SolicitudOpinion[]
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -1174,6 +1177,7 @@ model VentaPago {
 
 model ClienteFinal {
   citas Cita[]
+  solicitudesOpinion SolicitudOpinion[]
 
   id        Int      @id @default(autoincrement())
   empresaId Int
@@ -1784,4 +1788,28 @@ model CreditoMovimiento {
   @@index([claveIdempotencia])
   @@index([loteId])
   @@map("creditos_movimientos")
+}
+
+
+// Pedido de comentario enviado (o programado) a un cliente tras un pedido entregado o una cita completada.
+model SolicitudOpinion {
+  id             Int          @id @default(autoincrement())
+  empresaId      Int
+  empresa        Empresa      @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  clienteId      Int
+  cliente        ClienteFinal @relation(fields: [clienteId], references: [id], onDelete: Cascade)
+  tipo           String // PEDIDO | CITA
+  refId          Int
+  numeroServicio Int          @default(1)
+  estado         String       @default("PROGRAMADA") // PROGRAMADA | ENVIANDO | ENVIADA | OMITIDA | FALLO
+  motivo         String?
+  programadaPara DateTime
+  enviadaAt      DateTime?
+  createdAt      DateTime     @default(now())
+
+  @@unique([tipo, refId])
+  @@index([empresaId, estado])
+  @@index([estado, programadaPara])
+  @@index([clienteId])
+  @@map("solicitudes_opinion")
 }
