@@ -136,7 +136,7 @@ select option:hover {
   border-bottom: 1px solid var(--border);
 }
 .topbar-title { font-size: 1.15rem; font-family: var(--display); }
-.topbar-user { margin-left: auto; color: var(--muted); font-size: .9rem; }
+.topbar-user { margin-left: .5rem; color: var(--muted); font-size: .9rem; }
 .sidebar-toggle { display: none; flex-direction: column; gap: 5px; background: none; border: 0; cursor: pointer; padding: 4px; }
 .sidebar-toggle span { width: 22px; height: 2px; background: var(--text); border-radius: 2px; }
 
@@ -407,6 +407,7 @@ select option:hover {
 
 /* ---------- Campanita de notificaciones (panel cliente) ---------- */
 .notif { position: relative; margin-left: auto; }
+.notif + .theme-toggle { margin-left: 0; }
 .notif-bell {
   position: relative; background: none; border: 0; cursor: pointer;
   font-size: 1.3rem; padding: .3rem; line-height: 1;
