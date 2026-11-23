@@ -370,3 +370,28 @@ describe('integración con el flujo de mensajes', () => {
     assert.match(toque.respuesta, /Qué servicio/);
   });
 });
+
+describe('saludos: un mensaje que es solo un saludo abre el menú (no "no entendí")', () => {
+  test('saludos compuestos y con cortesía se reconocen', () => {
+    for (const t of ['Hola, buen día', 'hola buenas tardes', 'Buenos días, ¿cómo están?', 'Hola 👋', 'Buenas noches a todos', 'Hola qué tal', 'saludos', 'Hey, hola', 'buen dia']) {
+      assert.equal(Bot.intencionDe(t), 'menu', t);
+    }
+  });
+  test('un saludo junto a un pedido NO es solo saludo: gana la intención real', () => {
+    assert.equal(Bot.intencionDe('Hola, quiero un turno'), 'agendar');
+    assert.equal(Bot.intencionDe('Buenas, a qué hora abren?'), 'info');
+    assert.equal(Bot.intencionDe('Hola, quiero cancelar mi turno'), 'cancelar');
+    assert.equal(Bot.intencionDe('Hola, quiero hablar con una persona'), 'asesor');
+  });
+  test('un texto que no es saludo ni nada conocido sigue sin intención', () => {
+    assert.equal(Bot.intencionDe('cuánto cuesta el viaje a Oruro'), null);
+    assert.equal(Bot.intencionDe('hola, tienen estacionamiento'), null);
+  });
+  test('en el chat, "Hola, buen día" devuelve el menú con las opciones, no "no llegué a entender"', async () => {
+    const tel = `5917555${String(++seq).padStart(4, '0')}`;
+    const conv = await prisma.conversacion.create({ data: { agenteId: A.agenteId, telefonoCliente: tel, ultimoMensajeAt: new Date() } });
+    const s = await generarYRegistrarRespuesta(A.agenteId, tel, conv.id, 'Hola, buen día', 'http://localhost', false, {});
+    assert.doesNotMatch(s.respuesta, /No llegué a entender/);
+    assert.ok(opciones(s).length >= 2, 'muestra las opciones del menú');
+  });
+});
