@@ -1,11 +1,11 @@
 /* Resumen comercial (módulo Panel). Usa las variables de la paleta del panel. */
 .rc-periodos { display: flex; gap: .4rem; flex-wrap: wrap; margin: 0 0 1.1rem; }
-.rc-periodos a { padding: .4rem .85rem; border-radius: 999px; border: 1px solid var(--border); color: var(--muted); font-size: .85rem; background: rgba(255, 255, 255, .04); }
+.rc-periodos a { padding: .4rem .85rem; border-radius: 999px; border: 1px solid var(--border); color: var(--muted); font-size: .85rem; background: color-mix(in srgb, var(--ink) 4%, transparent); }
 .rc-periodos a:hover { color: var(--text); }
-.rc-periodos a.on { background: rgba(47, 227, 166, .14); color: var(--primary-2); border-color: rgba(47, 227, 166, .4); }
+.rc-periodos a.on { background: color-mix(in srgb, var(--rust) 14%, transparent); color: var(--primary-2); border-color: color-mix(in srgb, var(--rust) 40%, transparent); }
 .rc-var { font-size: .76rem; margin-top: .2rem; display: block; color: var(--muted); }
 .rc-var.sube { color: var(--primary-2); }
-.rc-var.baja { color: #ff8a8a; }
+.rc-var.baja { color: var(--danger); }
 .rc-aviso { font-size: .82rem; color: var(--muted); margin: .2rem 0 1rem; }
 .rc-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 1.1rem; margin-bottom: 1.1rem; }
 .rc-barras { display: flex; align-items: flex-end; gap: 3px; height: 150px; padding-top: .5rem; overflow-x: auto; }
@@ -20,10 +20,10 @@
 .rc-canal { display: flex; flex-direction: column; gap: .8rem; }
 .rc-canal-fila { display: grid; gap: .3rem; }
 .rc-canal-fila .cab { display: flex; justify-content: space-between; font-size: .9rem; }
-.rc-canal-fila .riel { height: 8px; border-radius: 999px; background: rgba(255, 255, 255, .08); overflow: hidden; }
+.rc-canal-fila .riel { height: 8px; border-radius: 999px; background: color-mix(in srgb, var(--ink) 8%, transparent); overflow: hidden; }
 .rc-canal-fila .riel i { display: block; height: 100%; border-radius: 999px; }
 .rc-embudo { display: flex; flex-direction: column; gap: .5rem; }
-.rc-embudo div { display: flex; justify-content: space-between; padding: .55rem .8rem; border-radius: 10px; background: rgba(255, 255, 255, .05); border: 1px solid var(--border); font-size: .9rem; }
+.rc-embudo div { display: flex; justify-content: space-between; padding: .55rem .8rem; border-radius: 10px; background: color-mix(in srgb, var(--ink) 5%, transparent); border: 1px solid var(--border); font-size: .9rem; }
 .rc-lista { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: .45rem; }
 .rc-lista li { display: flex; justify-content: space-between; gap: .8rem; font-size: .88rem; }
 .rc-lista .sub { color: var(--muted); font-size: .78rem; }

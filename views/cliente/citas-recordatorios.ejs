@@ -39,7 +39,7 @@
   <p><strong>Quien no te escribió en las últimas 24 h</strong>: WhatsApp solo deja mandarle un mensaje con una <strong>plantilla aprobada por Meta</strong>. Sin plantilla, a esas personas <em>no</em> se les manda nada (no se rompe la regla de WhatsApp).</p>
   <h4 style="margin:1rem 0 .4rem">Plantilla de recordatorio <span class="badge <%= est[1] %>"><%= est[0] %></span></h4>
   <p class="muted" style="margin:0 0 .6rem"><%= est[2] %><% if (plantilla && plantilla.motivo) { %> Motivo: <%= plantilla.motivo %>.<% } %></p>
-  <blockquote style="margin:.4rem 0 1rem;padding:.7rem .9rem;border-left:3px solid var(--primary-2);background:rgba(255,255,255,.05);border-radius:0 10px 10px 0;font-size:.9rem">
+  <blockquote style="margin:.4rem 0 1rem;padding:.7rem .9rem;border-left:3px solid var(--primary-2);background:color-mix(in srgb, var(--ink) 5%, transparent);border-radius:0 10px 10px 0;font-size:.9rem">
     <%= def.cuerpo.replace('{{1}}', 'Ana').replace('{{2}}', vocab.cita).replace('{{3}}', 'Corte de pelo').replace('{{4}}', 'jueves 12 de noviembre, 10:30') %>
     <div class="muted" style="margin-top:.4rem;font-size:.8rem">Botones: <%= def.botones.join(' · ') %></div>
   </blockquote>

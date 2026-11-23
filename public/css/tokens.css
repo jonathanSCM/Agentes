@@ -1,0 +1,118 @@
+/* =========================================================
+   Proshop - tokens de diseño (UNICA fuente de colores, tipografía y forma)
+   Fondo blanco, tinta oscura, morado de marca para acciones y menta como segundo acento puntual.
+   Tema claro por defecto; el oscuro sigue la preferencia del sistema o <html data-theme="dark">.
+   Las variables viejas (--bg, --surface, --text, --primary...) quedan como equivalencias al final.
+   ========================================================= */
+
+:root {
+  color-scheme: light;
+
+  /* superficies */
+  --paper: #ffffff;
+  --paper-deep: #f5f6fa;
+  --paper-raised: #ffffff;
+  --paper-raised-2: #f7f6fb;
+  /* texto */
+  --ink: #1b1730;
+  --ink-soft: #4a4663;
+  --ink-faint: #6f6a88;
+  /* bordes */
+  --line: #e4e2ee;
+  --line-strong: #cdc9dc;
+  /* marca y acentos */
+  --rust: #6d28d9;
+  --rust-dark: #5b21b6;
+  --accent: #8b5cf6;
+  --moss: #14b88a;
+  --moss-dark: #0f9d75;
+  --moss-ink: #0a7a5a;
+  --blue: #2563eb;
+  --danger: #dc2626;
+  --danger-bg: #fef2f2;
+  --warn: #b45309;
+  --ring: rgba(109, 40, 217, .22);
+  /* texto sobre relleno (la menta lleva texto oscuro tambien en claro: contraste 8,9:1) */
+  --on-fill: #ffffff;
+  --on-moss: #0b2e22;
+  --on-danger: #ffffff;
+  /* chat y chips */
+  --chat-bg: #ece8f6;
+  --bubble-mine: #dcd2fa;
+  --chip-tint: #ede9fe;
+  /* semanticos de estados */
+  --st-epic: #7c3aed; --st-done: #059669; --st-task: #2563eb; --st-bug: #dc2626; --st-todo: #6f6a88; --st-review: #b45309;
+  /* forma y sombra */
+  --radius: 10px;
+  --radius-sm: 6px;
+  --shadow-sm: 0 1px 2px rgb(27 23 48 / .06);
+  --shadow-md: 0 4px 14px rgb(27 23 48 / .08);
+  --shadow-lg: 0 12px 32px rgb(27 23 48 / .14);
+  /* tipografia */
+  --font-display: 'Archivo Variable', 'Archivo', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-body: 'Inter Variable', 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --font-mono: 'JetBrains Mono Variable', 'JetBrains Mono', ui-monospace, 'Cascadia Mono', Consolas, monospace;
+  --max: 1160px;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) { color-scheme: dark;
+    --paper: #0f0e17; --paper-deep: #151421; --paper-raised: #1a1927; --paper-raised-2: #232137;
+    --ink: #edebf8; --ink-soft: #bdb8d4; --ink-faint: #8f8aa9; --line: #2c2a40; --line-strong: #403d5c;
+    --rust: #8b5cf6; --rust-dark: #7c3aed; --accent: #a78bfa; --moss: #2fe3a6; --moss-dark: #5eecbb; --moss-ink: #34d399;
+    --blue: #60a5fa; --danger: #f87171; --danger-bg: rgba(248, 113, 113, .12); --warn: #fbbf24; --ring: rgba(139, 92, 246, .4);
+    --on-fill: #0f0e17; --on-moss: #0b2e22; --on-danger: #0f0e17;
+    --chat-bg: #12111c; --bubble-mine: #3a2f6e; --chip-tint: #2a2347;
+    --st-epic: #a78bfa; --st-done: #34d399; --st-task: #60a5fa; --st-bug: #f87171; --st-todo: #9490b0; --st-review: #fbbf24;
+    --shadow-sm: 0 1px 2px rgb(0 0 0 / .3); --shadow-md: 0 4px 14px rgb(0 0 0 / .35); --shadow-lg: 0 12px 32px rgb(0 0 0 / .5);
+  }
+}
+:root[data-theme="dark"] { color-scheme: dark;
+  --paper: #0f0e17; --paper-deep: #151421; --paper-raised: #1a1927; --paper-raised-2: #232137;
+  --ink: #edebf8; --ink-soft: #bdb8d4; --ink-faint: #8f8aa9; --line: #2c2a40; --line-strong: #403d5c;
+  --rust: #8b5cf6; --rust-dark: #7c3aed; --accent: #a78bfa; --moss: #2fe3a6; --moss-dark: #5eecbb; --moss-ink: #34d399;
+  --blue: #60a5fa; --danger: #f87171; --danger-bg: rgba(248, 113, 113, .12); --warn: #fbbf24; --ring: rgba(139, 92, 246, .4);
+  --on-fill: #0f0e17; --on-moss: #0b2e22; --on-danger: #0f0e17;
+  --chat-bg: #12111c; --bubble-mine: #3a2f6e; --chip-tint: #2a2347;
+  --st-epic: #a78bfa; --st-done: #34d399; --st-task: #60a5fa; --st-bug: #f87171; --st-todo: #9490b0; --st-review: #fbbf24;
+  --shadow-sm: 0 1px 2px rgb(0 0 0 / .3); --shadow-md: 0 4px 14px rgb(0 0 0 / .35); --shadow-lg: 0 12px 32px rgb(0 0 0 / .5);
+}
+
+/* ---------- Equivalencias con las variables de antes (se migra pantalla por pantalla) ---------- */
+:root {
+  --bg: var(--paper-deep);
+  --bg-2: var(--paper-deep);
+  --surface: var(--paper-raised);
+  --surface-2: var(--paper-raised-2);
+  --border: var(--line);
+  --text: var(--ink);
+  --muted: var(--ink-soft);
+  --primary: var(--rust);
+  --primary-2: var(--rust);       /* antes menta: la menta ya no es decoracion, es --moss y solo en lo positivo */
+  --shadow: var(--shadow-md);
+  --font: var(--font-body);
+  --display: var(--font-display);
+}
+
+/* ---------- Base ---------- */
+::selection { background: color-mix(in srgb, var(--rust) 25%, transparent); }
+:focus-visible { outline: 2px solid var(--rust); outline-offset: 2px; }
+* { scrollbar-color: var(--line-strong) transparent; }
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-thumb { background: var(--line-strong); border-radius: 999px; border: 2px solid transparent; background-clip: padding-box; }
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; scroll-behavior: auto !important; } }
+
+/* ---------- Selector de tema ---------- */
+.theme-toggle { display: inline-flex; align-items: center; justify-content: center; width: 34px; height: 34px; border-radius: var(--radius-sm); border: 1px solid var(--line-strong); background: var(--paper); color: var(--ink); cursor: pointer; }
+.theme-toggle:hover { background: var(--paper-raised-2); }
+.theme-toggle svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.theme-toggle .ico-sol { display: none; }
+:root[data-theme="dark"] .theme-toggle .ico-luna { display: none; }
+:root[data-theme="dark"] .theme-toggle .ico-sol { display: block; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .theme-toggle .ico-luna { display: none; } :root:not([data-theme="light"]) .theme-toggle .ico-sol { display: block; } }
+
+/* ---------- Logos pensados para fondo oscuro: en tema claro se invierten (blanco -> tinta, la menta conserva su tono) ---------- */
+:root[data-theme="light"] .brand-logo, :root[data-theme="light"] .sidebar-brand img, :root[data-theme="light"] .login-brand img, :root[data-theme="light"] .footer-logo { filter: invert(1) hue-rotate(180deg); }
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme="dark"]) .brand-logo, :root:not([data-theme="dark"]) .sidebar-brand img, :root:not([data-theme="dark"]) .login-brand img, :root:not([data-theme="dark"]) .footer-logo { filter: invert(1) hue-rotate(180deg); }
+}

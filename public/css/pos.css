@@ -15,27 +15,27 @@
 .pos-buscar { display: flex; gap: .5rem; }
 .pos-buscar input {
   flex: 1; padding: .85rem 1rem; font-size: 1.05rem; border-radius: 12px; border: 1px solid var(--border);
-  background: rgba(255, 255, 255, .07); color: var(--text); font-family: inherit;
+  background: color-mix(in srgb, var(--ink) 7%, transparent); color: var(--text); font-family: inherit;
 }
-.pos-buscar input:focus { outline: 2px solid rgba(47, 227, 166, .55); outline-offset: 1px; }
+.pos-buscar input:focus { outline: 2px solid color-mix(in srgb, var(--moss) 55%, transparent); outline-offset: 1px; }
 .pos-buscar .btn { font-size: 1.2rem; }
-.pos-aviso { padding: .55rem .9rem; border-radius: 10px; font-size: .9rem; background: rgba(255, 255, 255, .08); border: 1px solid var(--border); }
-.pos-aviso.es-ok { background: rgba(47, 227, 166, .14); border-color: rgba(47, 227, 166, .4); }
-.pos-aviso.es-error { background: rgba(251, 113, 133, .14); border-color: rgba(251, 113, 133, .45); }
+.pos-aviso { padding: .55rem .9rem; border-radius: 10px; font-size: .9rem; background: color-mix(in srgb, var(--ink) 8%, transparent); border: 1px solid var(--border); }
+.pos-aviso.es-ok { background: color-mix(in srgb, var(--moss) 14%, transparent); border-color: color-mix(in srgb, var(--moss) 40%, transparent); }
+.pos-aviso.es-error { background: color-mix(in srgb, var(--danger) 14%, transparent); border-color: color-mix(in srgb, var(--danger) 45%, transparent); }
 .pos-grilla {
   flex: 1; min-height: 0; overflow-y: auto; display: grid; gap: .6rem; align-content: start;
   /* Cada fila mide lo que mide su contenido (sin esto las filas se achicaban a 96px y los textos de las fichas se pisaban). */
   grid-auto-rows: max-content;
   grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); padding-right: .2rem;
-  scrollbar-width: thin; scrollbar-color: rgba(255, 255, 255, .2) transparent;
+  scrollbar-width: thin; scrollbar-color: color-mix(in srgb, var(--ink) 20%, transparent) transparent;
 }
 .pos-sin { color: var(--muted); padding: 1rem; grid-column: 1 / -1; }
 .pos-tile {
   display: flex; flex-direction: column; align-items: flex-start; gap: .15rem; text-align: left; cursor: pointer;
-  padding: .7rem .75rem; border-radius: 12px; border: 1px solid var(--border); background: rgba(255, 255, 255, .06);
+  padding: .7rem .75rem; border-radius: 12px; border: 1px solid var(--border); background: color-mix(in srgb, var(--ink) 6%, transparent);
   color: var(--text); font: inherit; min-height: 96px;
 }
-.pos-tile:hover { background: rgba(139, 92, 246, .16); border-color: rgba(139, 92, 246, .5); }
+.pos-tile:hover { background: color-mix(in srgb, var(--rust) 16%, transparent); border-color: color-mix(in srgb, var(--rust) 50%, transparent); }
 .pos-tile img { width: 100%; height: 70px; object-fit: cover; border-radius: 8px; margin-bottom: .3rem; }
 .pos-tile strong { font-size: .88rem; line-height: 1.25; }
 .pos-tile span { color: var(--primary-2); font-weight: 700; }
@@ -45,7 +45,7 @@
 /* ---------------- Carrito ---------------- */
 .pos-carrito {
   display: flex; flex-direction: column; min-height: 0; border: 1px solid var(--border); border-radius: 14px;
-  background: rgba(0, 0, 0, .18); padding: .9rem; gap: .6rem;
+  background: color-mix(in srgb, var(--ink) 10.8%, transparent); padding: .9rem; gap: .6rem;
 }
 .pos-carrito-cab { display: flex; justify-content: space-between; align-items: center; }
 .pos-carrito-cab h3 { margin: 0; font-size: 1rem; }
@@ -53,16 +53,16 @@
 .pos-vacio { color: var(--muted); font-size: .88rem; text-align: center; padding: 1.5rem .5rem; }
 .pos-linea {
   display: grid; grid-template-columns: 1fr auto; gap: .2rem .6rem; padding: .55rem .6rem; border-radius: 10px;
-  background: rgba(255, 255, 255, .06); align-items: center;
+  background: color-mix(in srgb, var(--ink) 6%, transparent); align-items: center;
 }
 .pos-linea-info strong { display: block; font-size: .86rem; line-height: 1.25; }
 .pos-linea-info small { color: var(--muted); font-size: .72rem; }
 .pos-linea-ctl { display: inline-flex; align-items: center; gap: .3rem; }
 .pos-linea-ctl button, .pos-quitar {
-  width: 32px; height: 32px; border-radius: 9px; border: 1px solid var(--border); background: rgba(255, 255, 255, .08);
+  width: 32px; height: 32px; border-radius: 9px; border: 1px solid var(--border); background: color-mix(in srgb, var(--ink) 8%, transparent);
   color: var(--text); font-size: 1.05rem; cursor: pointer; line-height: 1;
 }
-.pos-linea-ctl button:hover, .pos-quitar:hover { background: rgba(255, 255, 255, .16); }
+.pos-linea-ctl button:hover, .pos-quitar:hover { background: color-mix(in srgb, var(--ink) 16%, transparent); }
 .pos-cant { min-width: 26px; text-align: center; font-weight: 700; }
 .pos-linea-total { justify-self: end; font-size: .92rem; }
 .pos-quitar { color: var(--muted); font-size: .8rem; width: 28px; height: 28px; }
@@ -72,7 +72,7 @@
 
 .pos-totales { display: grid; gap: .35rem; padding-top: .5rem; border-top: 1px solid var(--border); }
 .pos-fila { display: flex; justify-content: space-between; align-items: center; font-size: .9rem; }
-.pos-fila-desc input { width: 110px; text-align: right; padding: .35rem .5rem; border-radius: 8px; border: 1px solid var(--border); background: rgba(255, 255, 255, .07); color: var(--text); font: inherit; }
+.pos-fila-desc input { width: 110px; text-align: right; padding: .35rem .5rem; border-radius: 8px; border: 1px solid var(--border); background: color-mix(in srgb, var(--ink) 7%, transparent); color: var(--text); font: inherit; }
 .pos-total { font-size: 1.35rem; font-weight: 800; padding-top: .2rem; }
 .pos-total strong { color: var(--primary-2); }
 .pos-cobrar { padding: 1rem; font-size: 1.15rem; border-radius: 12px; }
@@ -80,21 +80,21 @@
 .pos-auto { display: flex; align-items: center; gap: .45rem; font-size: .8rem; color: var(--muted); }
 
 /* ---------------- Modales ---------------- */
-.pos-modal { position: fixed; inset: 0; z-index: 90; background: rgba(8, 4, 16, .72); display: flex; align-items: center; justify-content: center; padding: 1rem; }
+.pos-modal { position: fixed; inset: 0; z-index: 90; background: rgba(15, 14, 23, .55); display: flex; align-items: center; justify-content: center; padding: 1rem; }
 .pos-modal[hidden] { display: none; }
 .pos-modal-caja {
-  position: relative; width: 100%; max-width: 480px; max-height: 92vh; overflow-y: auto; background: #241634;
+  position: relative; width: 100%; max-width: 480px; max-height: 92vh; overflow-y: auto; background: var(--paper-raised);
   border: 1px solid var(--border); border-radius: 16px; padding: 1.3rem 1.3rem 1.2rem; box-shadow: var(--shadow);
 }
 .pos-modal-caja h3 { margin: 0 0 .7rem; }
 .pos-cerrar { position: absolute; top: .6rem; right: .6rem; background: none; border: 0; color: var(--muted); font-size: 1.1rem; cursor: pointer; padding: .3rem .5rem; border-radius: 8px; }
-.pos-cerrar:hover { background: rgba(255, 255, 255, .1); color: var(--text); }
+.pos-cerrar:hover { background: color-mix(in srgb, var(--ink) 10%, transparent); color: var(--text); }
 .pos-opciones { display: grid; grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: .5rem; }
 .pos-opcion {
   display: flex; flex-direction: column; gap: .1rem; align-items: flex-start; padding: .65rem .7rem; border-radius: 10px; cursor: pointer;
-  border: 1px solid var(--border); background: rgba(255, 255, 255, .07); color: var(--text); font: inherit; text-align: left;
+  border: 1px solid var(--border); background: color-mix(in srgb, var(--ink) 7%, transparent); color: var(--text); font: inherit; text-align: left;
 }
-.pos-opcion:hover { background: rgba(139, 92, 246, .2); }
+.pos-opcion:hover { background: color-mix(in srgb, var(--rust) 20%, transparent); }
 .pos-opcion span { color: var(--primary-2); font-weight: 700; font-size: .85rem; }
 .pos-opcion small { color: var(--muted); font-size: .72rem; }
 .pos-opcion.agotado { opacity: .4; }
@@ -102,18 +102,18 @@
 .pos-cobro-total { margin: 0 0 .8rem; color: var(--muted); }
 .pos-cobro-total strong { display: block; font-size: 2rem; color: var(--primary-2); }
 .pos-pago { display: grid; grid-template-columns: 1.2fr 1fr auto; gap: .4rem; margin-bottom: .5rem; align-items: center; }
-.pos-pago select, .pos-pago input { padding: .6rem .6rem; border-radius: 9px; border: 1px solid var(--border); background: rgba(255, 255, 255, .08); color: var(--text); font: inherit; width: 100%; }
+.pos-pago select, .pos-pago input { padding: .6rem .6rem; border-radius: 9px; border: 1px solid var(--border); background: color-mix(in srgb, var(--ink) 8%, transparent); color: var(--text); font: inherit; width: 100%; }
 .pos-pago .pos-recibido { grid-column: 1 / 3; }
 .pos-pago .pos-vuelto { grid-column: 1 / -1; font-size: .82rem; color: var(--primary-2); font-weight: 600; }
 .pos-pago .pos-quitar { grid-column: 3; grid-row: 1; }
 .pos-cobro-estado { margin: .6rem 0 .2rem; font-size: .88rem; font-weight: 600; }
 .pos-cobro-estado.ok { color: var(--primary-2); }
-.pos-cobro-estado.falta { color: #fda4af; }
-.pos-error { margin: .3rem 0; padding: .5rem .7rem; border-radius: 9px; background: rgba(251, 113, 133, .15); border: 1px solid rgba(251, 113, 133, .45); font-size: .85rem; }
+.pos-cobro-estado.falta { color: var(--danger); }
+.pos-error { margin: .3rem 0; padding: .5rem .7rem; border-radius: 9px; background: color-mix(in srgb, var(--danger) 15%, transparent); border: 1px solid color-mix(in srgb, var(--danger) 45%, transparent); font-size: .85rem; }
 .pos-confirmar { padding: .95rem; font-size: 1.05rem; border-radius: 12px; margin-top: .5rem; }
 
 .pos-exito { text-align: center; }
-.pos-exito-icono { display: inline-flex; width: 64px; height: 64px; border-radius: 50%; align-items: center; justify-content: center; background: rgba(47, 227, 166, .18); color: var(--primary-2); font-size: 2rem; margin-bottom: .4rem; }
+.pos-exito-icono { display: inline-flex; width: 64px; height: 64px; border-radius: 50%; align-items: center; justify-content: center; background: color-mix(in srgb, var(--rust) 18%, transparent); color: var(--primary-2); font-size: 2rem; margin-bottom: .4rem; }
 .pos-exito-numero { color: var(--muted); margin: 0 0 .3rem; }
 .pos-exito-vuelto { font-size: 1.6rem; font-weight: 800; color: var(--primary-2); margin: .3rem 0 .8rem; }
 .pos-exito-acciones { display: flex; gap: .5rem; flex-wrap: wrap; justify-content: center; margin-top: .6rem; }
@@ -122,43 +122,43 @@
 /* ---------------- Abrir caja / Caja / Ventas ---------------- */
 .pos-abrir { max-width: 480px; }
 .caja-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: .8rem; margin-bottom: 1.2rem; }
-.caja-dato { padding: .9rem 1rem; border-radius: 14px; border: 1px solid var(--border); background: rgba(255, 255, 255, .06); }
+.caja-dato { padding: .9rem 1rem; border-radius: 14px; border: 1px solid var(--border); background: color-mix(in srgb, var(--ink) 6%, transparent); }
 .caja-dato small { display: block; color: var(--muted); font-size: .74rem; text-transform: uppercase; letter-spacing: .06em; }
 .caja-dato strong { font-size: 1.4rem; }
 .caja-dato.destacado strong { color: var(--primary-2); }
 .caja-forms { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 1rem; margin-bottom: 1.2rem; }
-.dif-ok { color: var(--primary-2); } .dif-mal { color: #fda4af; }
+.dif-ok { color: var(--primary-2); } .dif-mal { color: var(--danger); }
 .filtros-ventas { display: flex; gap: .5rem; flex-wrap: wrap; align-items: center; margin: 0 0 1rem; }
-.filtros-ventas select, .filtros-ventas input { background: rgba(255, 255, 255, .06); color: var(--text); border: 1px solid var(--border); border-radius: 10px; padding: .5rem .7rem; font: inherit; font-size: .88rem; }
-.badge-anulada { background: rgba(251, 113, 133, .18); color: #fda4af; }
+.filtros-ventas select, .filtros-ventas input { background: color-mix(in srgb, var(--ink) 6%, transparent); color: var(--text); border: 1px solid var(--border); border-radius: 10px; padding: .5rem .7rem; font: inherit; font-size: .88rem; }
+.badge-anulada { background: color-mix(in srgb, var(--danger) 18%, transparent); color: var(--danger); }
 
 /* ---------------- Celular / tablet ---------------- */
 @media (max-width: 980px) {
   .pos { grid-template-columns: 1fr; height: auto; }
   .pos-grilla { max-height: 46vh; }
-  .pos-carrito { position: sticky; bottom: 0; max-height: 60vh; z-index: 5; background: #1d1129; }
+  .pos-carrito { position: sticky; bottom: 0; max-height: 60vh; z-index: 5; background: var(--paper-raised); }
 }
 
 /* Ventas en espera y cambio de producto */
 .pos-carrito-botones { display: flex; gap: .4rem; align-items: center; }
-.pos-contador { display: inline-flex; align-items: center; justify-content: center; min-width: 18px; height: 18px; padding: 0 5px; margin-left: 2px; border-radius: 999px; background: var(--primary-2); color: #06231a; font-size: .68rem; font-weight: 800; }
+.pos-contador { display: inline-flex; align-items: center; justify-content: center; min-width: 18px; height: 18px; padding: 0 5px; margin-left: 2px; border-radius: 999px; background: var(--primary-2); color: var(--on-moss); font-size: .68rem; font-weight: 800; }
 .pos-espera-guardar { margin: 0 0 1rem; padding-bottom: 1rem; border-bottom: 1px solid var(--border); }
 .pos-espera-guardar p { margin: 0 0 .6rem; font-size: .85rem; }
 .pos-espera-fila { display: flex; gap: .5rem; flex-wrap: wrap; }
-.pos-espera-fila input { flex: 1; min-width: 160px; background: rgba(255, 255, 255, .06); color: var(--text); border: 1px solid var(--border); border-radius: 10px; padding: .5rem .7rem; font: inherit; }
+.pos-espera-fila input { flex: 1; min-width: 160px; background: color-mix(in srgb, var(--ink) 6%, transparent); color: var(--text); border: 1px solid var(--border); border-radius: 10px; padding: .5rem .7rem; font: inherit; }
 .pos-espera-lista { list-style: none; margin: 0; padding: 0; display: grid; gap: .5rem; max-height: 46vh; overflow-y: auto; }
-.pos-espera-item { display: flex; align-items: center; gap: .7rem; padding: .6rem .75rem; border: 1px solid var(--border); border-radius: 12px; background: rgba(255, 255, 255, .04); }
+.pos-espera-item { display: flex; align-items: center; gap: .7rem; padding: .6rem .75rem; border: 1px solid var(--border); border-radius: 12px; background: color-mix(in srgb, var(--ink) 4%, transparent); }
 .pos-espera-item > div { flex: 1; min-width: 0; }
 .pos-espera-item strong, .pos-espera-item small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .pos-espera-item small { color: var(--muted); font-size: .76rem; }
-.pos-cambio { margin: 0 0 .8rem; padding: .8rem .85rem; border: 1px solid rgba(139, 92, 246, .5); border-radius: 12px; background: rgba(139, 92, 246, .1); display: grid; gap: .55rem; }
+.pos-cambio { margin: 0 0 .8rem; padding: .8rem .85rem; border: 1px solid color-mix(in srgb, var(--rust) 50%, transparent); border-radius: 12px; background: color-mix(in srgb, var(--rust) 10%, transparent); display: grid; gap: .55rem; }
 .pos-cambio h4 { margin: 0; font-size: .95rem; }
 .pos-cambio p { margin: 0; font-size: .8rem; }
 .pos-cambio-fila { display: flex; align-items: center; justify-content: space-between; gap: .6rem; font-size: .88rem; }
 .pos-cambio-fila small { display: block; color: var(--muted); font-size: .74rem; }
-.pos-cambio-fila input { width: 4.2rem; background: rgba(255, 255, 255, .08); color: var(--text); border: 1px solid var(--border); border-radius: 8px; padding: .35rem .45rem; font: inherit; text-align: center; }
+.pos-cambio-fila input { width: 4.2rem; background: color-mix(in srgb, var(--ink) 8%, transparent); color: var(--text); border: 1px solid var(--border); border-radius: 8px; padding: .35rem .45rem; font: inherit; text-align: center; }
 .pos-cambio-check { display: flex; gap: .45rem; align-items: center; font-size: .82rem; }
 .pos-cambio-motivo { display: grid; gap: .25rem; font-size: .82rem; font-weight: 600; }
-.pos-cambio-motivo input { background: rgba(255, 255, 255, .08); color: var(--text); border: 1px solid var(--border); border-radius: 8px; padding: .45rem .6rem; font: inherit; font-weight: 400; }
+.pos-cambio-motivo input { background: color-mix(in srgb, var(--ink) 8%, transparent); color: var(--text); border: 1px solid var(--border); border-radius: 8px; padding: .45rem .6rem; font: inherit; font-weight: 400; }
 .pos-cambio-salir { font-size: .8rem; color: var(--muted); }
 .pos-cobro-cambio { margin: 0 0 .7rem; font-size: .85rem; color: var(--muted); }

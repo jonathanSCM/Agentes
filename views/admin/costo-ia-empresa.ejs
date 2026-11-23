@@ -2,7 +2,7 @@
 <%
   var usd = function (n, dec) { return 'US$ ' + Number(n).toFixed(dec === undefined ? 4 : dec); };
   var nf = function (n) { return Math.round(Number(n)).toLocaleString('es-BO'); };
-  var barra = function (p) { return '<span style="display:block;height:6px;border-radius:3px;background:var(--primary-2,#6c5ce7);width:' + Math.max(2, Math.min(100, p)) + '%"></span>'; };
+  var barra = function (p) { return '<span style="display:block;height:6px;border-radius:3px;background:var(--primary-2,var(--rust));width:' + Math.max(2, Math.min(100, p)) + '%"></span>'; };
 %>
 
 <div class="page-head">

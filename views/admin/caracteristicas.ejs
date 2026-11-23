@@ -16,7 +16,7 @@
         <% caracteristicas.forEach(function (c) { %>
           <%
             var formId = 'editar-caracteristica-' + c.id;
-            var inputStyle = 'background:transparent;border:1px solid rgba(255,255,255,.15);border-radius:8px;padding:.4rem .6rem;color:inherit;font:inherit';
+            var inputStyle = 'background:transparent;border:1px solid color-mix(in srgb, var(--ink) 15%, transparent);border-radius:8px;padding:.4rem .6rem;color:inherit;font:inherit';
           %>
           <tr>
             <td><input form="<%= formId %>" name="orden" type="number" value="<%= c.orden %>" style="width:60px;<%= inputStyle %>" /></td>

@@ -38,7 +38,7 @@
             <td class="nowrap muted"><%= new Date(m.createdAt).toLocaleString('es-BO', { dateStyle: 'short', timeStyle: 'short' }) %></td>
             <td><strong><%= m.nombre %></strong></td>
             <td><span class="badge <%= m.cantidad < 0 ? 'badge-done' : 'badge-new' %>"><%= etiquetas[m.tipo] || m.tipo %></span></td>
-            <td class="num"><strong style="color:<%= m.cantidad < 0 ? '#fda4af' : 'var(--primary-2)' %>"><%= m.cantidad > 0 ? '+' : '' %><%= m.cantidad %></strong></td>
+            <td class="num"><strong style="color:<%= m.cantidad < 0 ? 'var(--danger)' : 'var(--primary-2)' %>"><%= m.cantidad > 0 ? '+' : '' %><%= m.cantidad %></strong></td>
             <td class="num muted"><%= m.stockAntes %></td>
             <td class="num"><%= m.stockDespues %></td>
             <td class="muted">

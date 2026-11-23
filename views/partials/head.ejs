@@ -2,6 +2,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <meta name="description" content="Proshop desarrolla software a medida: web apps, aplicaciones moviles y paneles administrativos para tu empresa." />
 <meta name="theme-color" content="#6d28d9" />
+<meta name="color-scheme" content="light dark" />
 <title><%= title %></title>
 
 <!-- Open Graph -->
@@ -10,7 +11,13 @@
 <meta property="og:type" content="website" />
 
 <link rel="icon" type="image/png" href="/img/logo-icon.png" />
-<link rel="preconnect" href="https://fonts.googleapis.com" />
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Sora:wght@600;700;800&display=swap" rel="stylesheet" />
+<link rel="preload" href="/fonts/inter-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin />
+<link rel="preload" href="/fonts/archivo-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin />
+<link rel="stylesheet" href="/css/fonts.css" />
+<link rel="stylesheet" href="/css/tokens.css" />
+<script>
+  /* Tema sin parpadeo: se aplica antes de pintar. 'claro' | 'oscuro' | (sin elegir = el del sistema). */
+  (function () { try { var t = localStorage.getItem('proshop-tema'); if (t === 'claro') document.documentElement.setAttribute('data-theme', 'light'); else if (t === 'oscuro') document.documentElement.setAttribute('data-theme', 'dark'); } catch (e) {} })();
+</script>
 <link rel="stylesheet" href="/css/styles.css" />
+<script src="/js/tema.js" defer></script>
