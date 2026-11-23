@@ -111,11 +111,7 @@
 :root[data-theme="dark"] .theme-toggle .ico-sol { display: block; }
 @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .theme-toggle .ico-luna { display: none; } :root:not([data-theme="light"]) .theme-toggle .ico-sol { display: block; } }
 
-/* ---------- Logos pensados para fondo oscuro: en tema claro se invierten (blanco -> tinta, la menta conserva su tono) ---------- */
-:root[data-theme="light"] .brand-logo, :root[data-theme="light"] .sidebar-brand img:not(.brand-mark-icon), :root[data-theme="light"] .login-brand img, :root[data-theme="light"] .footer-logo { filter: invert(1) hue-rotate(180deg); }
-@media (prefers-color-scheme: light) {
-  :root:not([data-theme="dark"]) .brand-logo, :root:not([data-theme="dark"]) .sidebar-brand img:not(.brand-mark-icon), :root:not([data-theme="dark"]) .login-brand img, :root:not([data-theme="dark"]) .footer-logo { filter: invert(1) hue-rotate(180deg); }
-}
+/* Los logos no cambian de color con el tema: son la marca (menta) y se usan tal cual. */
 
 /* En la barra superior el selector de tema va a la derecha (junto a notificaciones o al usuario) */
 .admin-topbar .theme-toggle { margin-left: auto; }

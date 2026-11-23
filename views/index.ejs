@@ -2,142 +2,262 @@
 <html lang="es">
 <head>
   <%- include('partials/head') %>
+  <link rel="stylesheet" href="/css/landing.css" />
 </head>
 <body>
   <%- include('partials/header') %>
 
   <main>
     <!-- ================= HERO ================= -->
-    <section class="hero">
-      <div class="hero-glow" aria-hidden="true"></div>
-      <div class="container hero-inner">
-        <div class="hero-copy reveal">
-          <span class="pill"><span class="dot"></span> Agente de ventas con Inteligencia Artificial</span>
-          <h1>Convierte WhatsApp en <span class="grad">un vendedor que nunca deja de atender</span></h1>
-          <p class="lead">
-            Entrenamos un vendedor digital con la información de tu empresa para
-            responder, recomendar productos, vender y
-            <strong>registrar pedidos</strong> automáticamente.
-          </p>
-          <div class="hero-cta">
-            <a class="btn btn-primary btn-lg" href="#planes">Ver planes</a>
-            <a class="btn btn-ghost btn-lg" href="<%= site.whatsappUrl %>" target="_blank" rel="noopener">Solicitar demo</a>
+    <section class="lp-hero">
+      <div class="container lp-hero-grid">
+        <div class="reveal">
+          <span class="lp-pill"><i></i> Vende y agenda por WhatsApp con IA</span>
+          <h1>Tu negocio atendido <em>las 24 horas</em>, sin perder una sola venta</h1>
+          <p class="lp-lead">Un agente entrenado con tu catálogo y tus horarios responde por WhatsApp, arma pedidos, agenda citas y cobra en tu punto de venta. Tú ves todo en un solo panel.</p>
+          <div class="lp-cta">
+            <a class="btn btn-primary btn-lg" href="/registro">Crear mi cuenta</a>
+            <a class="btn btn-ghost btn-lg" href="<%= site.whatsappUrl %>" target="_blank" rel="noopener">Pedir una demo</a>
           </div>
-          <div class="hero-stats">
-            <div><strong>24/7</strong><span>atención sin descanso</span></div>
-            <div><strong>Segundos</strong><span>tiempo de respuesta</span></div>
-            <div><strong>Bs 0</strong><span>para empezar a probar</span></div>
-          </div>
+          <div class="lp-conf"><span>Conservas tu número</span><span>Sin contratos largos</span><span>Atiende aunque la IA falle</span></div>
         </div>
 
-        <div class="hero-visual reveal">
-          <!-- Simulacion de chat de WhatsApp -->
-          <div class="chat-window">
-            <div class="chat-head">
-              <span class="chat-avatar">🤖</span>
-              <div>
-                <strong>Agente de ventas</strong>
-                <span class="chat-status">en línea</span>
-              </div>
+        <div class="lp-stage reveal" data-d="1">
+          <div class="lp-panel">
+            <div class="lp-panel-bar"><i></i><i></i><i></i><span>panel · hoy</span></div>
+            <div class="lp-kpis">
+              <div class="lp-kpi"><b data-count="38">0</b><span>Clientes atendidos</span></div>
+              <div class="lp-kpi"><b data-count="12">0</b><span>Pedidos y citas</span></div>
+              <div class="lp-kpi"><b data-count="2840" data-pref="Bs ">0</b><span>Vendido hoy</span></div>
             </div>
-            <div class="chat-body">
-              <div class="msg in">Hola, ¿tienen zapatillas deportivas?</div>
-              <div class="msg out">¡Hola! 👋 Sí, tenemos varios modelos. ¿Buscas para correr o para uso diario?</div>
-              <div class="msg in">Para correr, talla 42</div>
-              <div class="msg out">Perfecto. Tengo estas disponibles:<br />• Runner Pro — Bs 450<br />• AirLite — Bs 380<br />¿Te muestro fotos?</div>
-              <div class="msg in">La AirLite, sí</div>
-              <div class="msg out typing"><span></span><span></span><span></span></div>
+            <div class="lp-chat" id="lpChat" aria-label="Ejemplo de conversación con el agente">
+              <div class="lp-msg in">Hola, ¿tienen zapatillas para correr talla 42?</div>
+              <div class="lp-msg out">¡Hola! 👋 Sí. Tengo estas disponibles:<br>• Runner Pro — Bs 450<br>• AirLite — Bs 380</div>
+              <div class="lp-msg in">La AirLite. ¿Hacen envíos?</div>
+              <div class="lp-msg out">Claro. Agregué la AirLite a tu pedido. ¿Lo confirmo con envío a domicilio?</div>
+              <span class="lp-typing" aria-hidden="true"><i></i><i></i><i></i></span>
             </div>
           </div>
-          <div class="floaty floaty-1">Pedido registrado ✓</div>
-          <div class="floaty floaty-2">+24% ventas</div>
+          <div class="lp-toast lp-toast-1"><span class="ic ok"><svg viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></svg></span><div><b>Pedido registrado</b><small>AirLite · Bs 380</small></div></div>
+          <div class="lp-toast lp-toast-2"><span class="ic"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M8 3v4M16 3v4M3 11h18"/></svg></span><div><b>Cita agendada</b><small>Mañana 10:30 · Corte</small></div></div>
         </div>
       </div>
 
-      <div class="marquee" aria-hidden="true">
-        <div class="marquee-track">
-          <span>Atiende 24/7</span><span>Catálogo digital</span><span>Carrito conversacional</span>
-          <span>Registro de pedidos</span><span>Panel administrativo</span><span>Reportes de ventas</span>
-          <span>Atiende 24/7</span><span>Catálogo digital</span><span>Carrito conversacional</span>
-          <span>Registro de pedidos</span><span>Panel administrativo</span><span>Reportes de ventas</span>
+      <div class="lp-marquee" aria-hidden="true">
+        <div class="lp-marquee-track">
+          <% var tira = ['Agente de IA en WhatsApp', 'Catálogo digital', 'Carrito conversacional', 'Agenda de citas', 'Punto de venta', 'Recibos e impresora térmica', 'Recordatorios automáticos', 'Reportes de ventas', 'Inteligencia de negocio', 'Catálogo web con tu marca', 'Derivación a una persona', 'Funciona aunque la IA falle']; %>
+          <% tira.concat(tira).forEach(function (t) { %><span><%= t %></span><% }); %>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================= CIFRAS ================= -->
+    <section class="lp-section">
+      <div class="container">
+        <div class="lp-nums reveal">
+          <div class="lp-num"><b data-count="24" data-suf="/7">0</b><span>atención sin descanso</span></div>
+          <div class="lp-num"><b>Segundos</b><span>para responder un mensaje</span></div>
+          <div class="lp-num"><b data-count="1">0</b><span>panel para vender, agendar y cobrar</span></div>
+          <div class="lp-num"><b data-count="0" data-pref="Bs ">0</b><span>para empezar a probar</span></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================= MODULOS ================= -->
+    <section id="modulos" class="lp-section alt">
+      <div class="container">
+        <header class="section-head reveal">
+          <span class="eyebrow">Todo en uno</span>
+          <h2>Lo que Proshop hace por tu negocio</h2>
+          <p>Elige lo que necesitas. Cada módulo funciona solo y mejora cuando se combinan.</p>
+        </header>
+
+        <div class="lp-tabs reveal" role="tablist" aria-label="Módulos">
+          <button class="lp-tab" role="tab" id="t-ventas" aria-controls="p-ventas" aria-selected="true">Ventas por WhatsApp</button>
+          <button class="lp-tab" role="tab" id="t-citas" aria-controls="p-citas" aria-selected="false" tabindex="-1">Agenda de citas</button>
+          <button class="lp-tab" role="tab" id="t-pos" aria-controls="p-pos" aria-selected="false" tabindex="-1">Punto de venta</button>
+          <button class="lp-tab" role="tab" id="t-bi" aria-controls="p-bi" aria-selected="false" tabindex="-1">Inteligencia de negocio</button>
+          <button class="lp-tab" role="tab" id="t-web" aria-controls="p-web" aria-selected="false" tabindex="-1">Catálogo web</button>
+        </div>
+
+        <div class="reveal" data-d="1">
+          <!-- Ventas -->
+          <div class="lp-pane on" id="p-ventas" role="tabpanel" aria-labelledby="t-ventas">
+            <div>
+              <h3>Un vendedor que conoce tu catálogo</h3>
+              <p>El agente responde con tus productos, precios y stock reales. No inventa: lo que no sabe, lo deriva a tu equipo.</p>
+              <ul class="lp-list">
+                <li>Catálogo con categorías, variantes, fotos y disponibilidad</li>
+                <li>Carrito dentro del chat y pedido registrado automáticamente</li>
+                <li>Cobro con QR y comprobante de pago</li>
+                <li>Avisos de pedido confirmado y entregado</li>
+                <li>Pasa la conversación a una persona cuando hace falta</li>
+              </ul>
+              <a class="btn btn-primary" href="/registro">Probar el agente</a>
+            </div>
+            <div class="lp-shot">
+              <div class="lp-shot-h">Pedidos de hoy <small>3 nuevos</small></div>
+              <div class="lp-row"><div><b>Ana Rojas</b><small>AirLite 42 · envío a domicilio</small></div><span class="lp-tag">Nuevo</span></div>
+              <div class="lp-row"><div><b>Luis Mamani</b><small>Runner Pro 41 · recojo en tienda</small></div><span class="lp-tag warn">Por cobrar</span></div>
+              <div class="lp-row"><div><b>Carla Vega</b><small>Mochila urbana · QR pagado</small></div><span class="lp-tag ok">Pagado</span></div>
+              <div class="lp-row"><div><b>Pedro Salas</b><small>AirLite 40 · entregado</small></div><span class="lp-tag ok">Entregado</span></div>
+            </div>
+          </div>
+
+          <!-- Citas -->
+          <div class="lp-pane" id="p-citas" role="tabpanel" aria-labelledby="t-citas">
+            <div>
+              <h3>Agenda que se llena sola</h3>
+              <p>Para salones, consultorios, talleres y cualquier negocio con turnos. El cliente elige servicio, profesional y horario por WhatsApp o desde tu página.</p>
+              <ul class="lp-list">
+                <li>Servicios, profesionales y horarios por persona</li>
+                <li>Sin dobles reservas: nadie se pisa con otro</li>
+                <li>Recordatorios un día y dos horas antes, con botones para confirmar o cambiar</li>
+                <li>Página pública de reservas con tu marca</li>
+                <li>Cada profesional ve y marca su propia agenda</li>
+              </ul>
+              <a class="btn btn-primary" href="/registro">Armar mi agenda</a>
+            </div>
+            <div class="lp-shot">
+              <div class="lp-shot-h">Corte de pelo · jueves 12 <small>con Marta</small></div>
+              <div class="lp-slots">
+                <div class="lp-slot off">09:00</div><div class="lp-slot">09:30</div><div class="lp-slot off">10:00</div><div class="lp-slot sel">10:30</div>
+                <div class="lp-slot">11:00</div><div class="lp-slot">11:30</div><div class="lp-slot off">12:00</div><div class="lp-slot">15:00</div>
+              </div>
+              <div class="lp-row" style="margin-top:1rem"><div><b>Recordatorio enviado</b><small>"Mañana tienes turno a las 10:30"</small></div><span class="lp-tag ok">Confirmó</span></div>
+              <div class="lp-row"><div><b>Nadie más puede tomar ese horario</b><small>Marta ya está ocupada de 10:30 a 11:15</small></div><span class="lp-tag">Protegido</span></div>
+            </div>
+          </div>
+
+          <!-- POS -->
+          <div class="lp-pane" id="p-pos" role="tabpanel" aria-labelledby="t-pos">
+            <div>
+              <h3>Caja y mostrador en el mismo sistema</h3>
+              <p>Cobra lo que vendes en el local y lo que llega por WhatsApp, con el mismo stock y los mismos clientes.</p>
+              <ul class="lp-list">
+                <li>Ventas con varios métodos de pago y vuelto</li>
+                <li>Apertura y cierre de caja</li>
+                <li>Lector de códigos de barras e impresora térmica</li>
+                <li>Recibos para el cliente y cobro de pedidos del chat</li>
+                <li>Stock que se descuenta solo</li>
+              </ul>
+              <a class="btn btn-primary" href="/registro">Abrir mi caja</a>
+            </div>
+            <div class="lp-shot lp-ticket">
+              <div class="lp-shot-h">Venta #0142 <small>Efectivo</small></div>
+              <div class="lp-row"><span>2 × Polera básica</span><b>Bs 120</b></div>
+              <div class="lp-row"><span>1 × Gorra negra</span><b>Bs 60</b></div>
+              <div class="lp-row"><span>1 × AirLite 42</span><b>Bs 380</b></div>
+              <div class="lp-total"><span>Total</span><span>Bs 560</span></div>
+              <div class="lp-row" style="margin-top:.8rem"><span>Recibido Bs 600</span><span class="lp-tag ok">Vuelto Bs 40</span></div>
+            </div>
+          </div>
+
+          <!-- BI -->
+          <div class="lp-pane" id="p-bi" role="tabpanel" aria-labelledby="t-bi">
+            <div>
+              <h3>Entiende a tus clientes y decide con datos</h3>
+              <p>Proshop te dice quién dejó de comprar, qué se vende más y qué opinan tus clientes, con lo que ya está pasando en tu negocio.</p>
+              <ul class="lp-list">
+                <li>Clientes en riesgo con un mensaje sugerido para recuperarlos</li>
+                <li>Pide comentarios solo después de cada servicio o entrega</li>
+                <li>Buscador de comentarios: encuentra qué dicen de "talla", "demora" o "precio"</li>
+                <li>Ventas, ticket promedio y productos más vendidos</li>
+              </ul>
+              <a class="btn btn-primary" href="/registro">Ver mis datos</a>
+            </div>
+            <div class="lp-shot">
+              <div class="lp-shot-h">Ventas de los últimos 8 meses <small>Bs</small></div>
+              <div class="lp-bars" aria-hidden="true"><i style="--h:35%"></i><i style="--h:48%"></i><i style="--h:42%"></i><i style="--h:60%"></i><i style="--h:55%"></i><i style="--h:72%"></i><i style="--h:80%"></i><i style="--h:94%"></i></div>
+              <div class="lp-row" style="margin-top:.9rem"><div><b>Lucía Paz</b><small>No compra hace 45 días</small></div><span class="lp-tag bad">En riesgo</span></div>
+              <div class="lp-row"><div><b>"Llegó rápido y quedó perfecto"</b><small>Respuesta a tu pedido de comentario</small></div><span class="lp-tag ok">Comentario</span></div>
+            </div>
+          </div>
+
+          <!-- Web -->
+          <div class="lp-pane" id="p-web" role="tabpanel" aria-labelledby="t-web">
+            <div>
+              <h3>Tu catálogo también en la web</h3>
+              <p>Un enlace con tu marca para compartir en redes, con carrito y pedido directo a tu WhatsApp.</p>
+              <ul class="lp-list">
+                <li>4 diseños para elegir</li>
+                <li>Carrito web que se continúa en el chat</li>
+                <li>Marca blanca: tu nombre y tus colores</li>
+                <li>Aviso automático si el cliente deja el carrito a medias</li>
+              </ul>
+              <a class="btn btn-primary" href="/registro">Publicar mi catálogo</a>
+            </div>
+            <div class="lp-shot">
+              <div class="lp-shot-h">tutienda.proshop.lat <small>Catálogo</small></div>
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:.6rem">
+                <% [['AirLite', 'Bs 380'], ['Runner Pro', 'Bs 450'], ['Mochila urbana', 'Bs 210'], ['Gorra negra', 'Bs 60']].forEach(function (p, i) { %>
+                  <div class="lp-row" style="flex-direction:column;align-items:flex-start;margin:0"><div style="width:100%;height:70px;border-radius:6px;background:var(--chip-tint)"></div><b><%= p[0] %></b><span class="lp-tag <%= i === 1 ? 'ok' : '' %>"><%= p[1] %></span></div>
+                <% }); %>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================= Y ADEMAS ================= -->
+    <section id="beneficios" class="lp-section">
+      <div class="container">
+        <header class="section-head reveal">
+          <span class="eyebrow">Y además</span>
+          <h2>Detalles que hacen la diferencia</h2>
+          <p>Pensado para negocios reales, con clientes reales y días ocupados.</p>
+        </header>
+        <div class="lp-grid">
+          <% var feats = [
+            ['Sigue atendiendo si la IA falla', 'Menús y respuestas por código: tus clientes nunca se quedan sin respuesta.', 'M4 12h4l3-8 4 16 3-8h4'],
+            ['Conversaciones en vivo', 'Mira los chats, responde tú cuando quieras y vuelve a dejar al agente a cargo.', 'M4 4h16v11H8l-4 4V4Z'],
+            ['Todo tu equipo, con roles', 'Dueño, administrador, cajero y profesional: cada uno ve solo lo suyo.', 'M9 8a3 3 0 1 0 0 .01M2.5 19c.6-3.4 3.2-5.5 6.5-5.5s5.9 2.1 6.5 5.5'],
+            ['Notificaciones', 'Te avisamos cuando entra un pedido, se acaba el stock o un cliente pide una persona.', 'M6 10a6 6 0 1 1 12 0c0 4 1.5 5.5 1.5 5.5H4.5S6 14 6 10ZM10 19a2 2 0 0 0 4 0'],
+            ['Multi-moneda', 'Precios en tu moneda y conversiones claras para cobrar sin errores.', 'M12 3v18M16 7.5c0-1.4-1.8-2.5-4-2.5s-4 1.1-4 2.5 1.8 2.5 4 2.5 4 1.1 4 2.5-1.8 2.5-4 2.5-4-1.1-4-2.5'],
+            ['Marca blanca', 'Tu nombre y tu identidad en el catálogo, la reserva y los mensajes.', 'M12 3l2.6 5.4 5.9.9-4.3 4.1 1 5.9L12 16.5 6.8 19.3l1-5.9L3.5 9.3l5.9-.9L12 3Z'],
+            ['Créditos y paquetes', 'Paga por lo que usas y amplía cuando crezcas. Mientras más grande el paquete, menos cuesta cada conversación.', 'M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18ZM12 8v8M9 12h6'],
+            ['Mensajes editables', 'Cambia los textos que ve el cliente desde el panel, a tu manera de hablar.', 'M4 20h4L19 9l-4-4L4 16v4ZM13 7l4 4'],
+            ['Tus datos, bajo tu control', 'Información separada por negocio y un historial de los cambios importantes.', 'M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6l8-3Z']
+          ]; %>
+          <% feats.forEach(function (f, i) { %>
+            <article class="lp-feat reveal" data-d="<%= (i % 3) + 1 %>">
+              <div class="ic"><svg viewBox="0 0 24 24"><path d="<%= f[2] %>"/></svg></div>
+              <h3><%= f[0] %></h3>
+              <p><%= f[1] %></p>
+            </article>
+          <% }); %>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================= RUBROS ================= -->
+    <section class="lp-section alt">
+      <div class="container">
+        <header class="section-head reveal">
+          <span class="eyebrow">Para quién es</span>
+          <h2>Se adapta a tu tipo de negocio</h2>
+          <p>Vende productos, agenda servicios o las dos cosas. El agente habla con las palabras de tu rubro.</p>
+        </header>
+        <div class="lp-rubros reveal">
+          <% ['Tiendas de ropa y calzado', 'Salones y barberías', 'Consultorios y clínicas', 'Restaurantes y delivery', 'Ferreterías', 'Talleres mecánicos', 'Spas y centros de estética', 'Distribuidoras', 'Farmacias', 'Tiendas de tecnología', 'Estudios y gimnasios', 'Emprendedores'].forEach(function (r) { %><span class="lp-rubro"><%= r %></span><% }); %>
         </div>
       </div>
     </section>
 
     <!-- ================= COMO FUNCIONA ================= -->
-    <section id="como-funciona" class="section">
+    <section id="como-funciona" class="lp-section">
       <div class="container">
         <header class="section-head reveal">
-          <span class="eyebrow">Así trabajamos</span>
-          <h2>Tu solución comercial en 4 pasos</h2>
-          <p>Entendemos tu negocio, lo implementamos y tú recibes los pedidos.</p>
+          <span class="eyebrow">Así empezamos</span>
+          <h2>Funcionando en cuatro pasos</h2>
+          <p>Nos encargamos de la parte técnica para que tú te dediques a vender.</p>
         </header>
-
-        <ol class="steps">
-          <li class="step reveal">
-            <span class="step-num">01</span>
-            <h3>Conectamos tu canal de ventas</h3>
-            <p>Integramos tu WhatsApp Business con el agente, conservando tu número actual.</p>
-          </li>
-          <li class="step reveal">
-            <span class="step-num">02</span>
-            <h3>Entrenamos al agente</h3>
-            <p>Cargamos productos, precios, fotos y stock para que el agente conozca tu negocio.</p>
-          </li>
-          <li class="step reveal">
-            <span class="step-num">03</span>
-            <h3>El agente entiende y vende</h3>
-            <p>Responde consultas, recomienda opciones, arma pedidos y registra cada venta.</p>
-          </li>
-          <li class="step reveal">
-            <span class="step-num">04</span>
-            <h3>Tú decides y haces crecer</h3>
-            <p>Controlas pedidos, clientes y resultados. Derivas a tu equipo cuando sea necesario.</p>
-          </li>
-        </ol>
-      </div>
-    </section>
-
-    <!-- ================= BENEFICIOS ================= -->
-    <section id="beneficios" class="section section-alt">
-      <div class="container">
-        <header class="section-head reveal">
-          <span class="eyebrow">Beneficios</span>
-          <h2>Todo lo que hace por tu negocio</h2>
-          <p>Mucho más que un chatbot: un vendedor que trabaja todo el día.</p>
-        </header>
-
-        <div class="cards">
-          <article class="card reveal">
-            <div class="card-icon">💬</div>
-            <h3>Atiende sin hacer esperar</h3>
-            <p>Responde al instante a cada cliente, a cualquier hora, incluso fines de semana.</p>
-          </article>
-          <article class="card reveal">
-            <div class="card-icon">🛒</div>
-            <h3>Carrito conversacional</h3>
-            <p>El cliente arma su pedido dentro del chat y queda registrado automáticamente.</p>
-          </article>
-          <article class="card reveal">
-            <div class="card-icon">📦</div>
-            <h3>Catálogo e inventario</h3>
-            <p>Muestra productos, precios y disponibilidad. Te avisa cuando baja el stock.</p>
-          </article>
-          <article class="card reveal">
-            <div class="card-icon">👥</div>
-            <h3>Gestión de clientes</h3>
-            <p>Guarda nombre, teléfono e historial de compras. Identifica a tus clientes frecuentes.</p>
-          </article>
-          <article class="card reveal">
-            <div class="card-icon">📊</div>
-            <h3>Reportes de ventas</h3>
-            <p>Productos más vendidos, ticket promedio y seguimiento de oportunidades.</p>
-          </article>
-          <article class="card reveal">
-            <div class="card-icon">🤝</div>
-            <h3>Derivación a humano</h3>
-            <p>Cuando el caso lo amerita, pasa la conversación a una persona de tu equipo.</p>
-          </article>
+        <div class="lp-steps">
+          <div class="lp-step reveal"><h3>Conectamos tu WhatsApp</h3><p>Usas tu número actual, sin cambiar cómo te escriben.</p></div>
+          <div class="lp-step reveal" data-d="1"><h3>Cargamos tu negocio</h3><p>Productos, precios, servicios, horarios y profesionales.</p></div>
+          <div class="lp-step reveal" data-d="2"><h3>El agente atiende</h3><p>Responde, vende, agenda y registra todo por ti.</p></div>
+          <div class="lp-step reveal" data-d="3"><h3>Tú decides</h3><p>Controlas pedidos, citas y resultados desde un solo panel.</p></div>
         </div>
       </div>
     </section>
@@ -392,6 +512,39 @@
       })();
     </script>
 
+
+    <!-- ================= PREGUNTAS ================= -->
+    <section id="preguntas" class="lp-section alt">
+      <div class="container">
+        <header class="section-head reveal">
+          <span class="eyebrow">Preguntas frecuentes</span>
+          <h2>Lo que más nos preguntan</h2>
+        </header>
+        <div class="lp-faq reveal">
+          <details><summary>¿Tengo que cambiar mi número de WhatsApp?</summary><p>No. Conectamos el número que ya usas con WhatsApp Business y tus clientes te siguen escribiendo igual.</p></details>
+          <details><summary>¿Qué pasa si la inteligencia artificial falla?</summary><p>Tus clientes siguen atendidos: el sistema responde con menús y reglas de tu negocio, sin depender de la IA.</p></details>
+          <details><summary>¿El agente puede inventar precios o stock?</summary><p>No. Precios, stock, horarios y disponibilidad salen de tu información cargada, no de lo que "recuerda" la IA. Lo que no sabe, lo pasa a tu equipo.</p></details>
+          <details><summary>¿Puedo vender productos y agendar citas a la vez?</summary><p>Sí. Elige el modo de tu negocio y puedes sumar el punto de venta, el catálogo web y los reportes según tu plan.</p></details>
+          <details><summary>¿Cuánto cuesta empezar?</summary><p>Puedes empezar a probar sin costo. Los planes y los paquetes de conversaciones están más arriba, con una calculadora para ver cuántas ventas necesitas para pagarlos.</p></details>
+          <details><summary>¿Mis clientes reciben mensajes que yo no autoricé?</summary><p>No. Los recordatorios y los pedidos de comentarios los activas tú, por negocio, y respetan horarios de descanso.</p></details>
+        </div>
+      </div>
+    </section>
+
+    <section class="lp-section">
+      <div class="container">
+        <div class="lp-final reveal">
+          <h2>Tu próximo cliente puede estar escribiéndote ahora</h2>
+          <p>Crea tu cuenta, carga tu negocio y deja que el agente empiece a atender.</p>
+          <div class="lp-cta" style="justify-content:center;margin:0">
+            <a class="btn btn-primary btn-lg" href="/registro">Crear mi cuenta</a>
+            <a class="btn btn-ghost btn-lg" href="<%= site.whatsappUrl %>" target="_blank" rel="noopener">Hablar por WhatsApp</a>
+          </div>
+        </div>
+      </div>
+    </section>
+
+
     <!-- ================= CONTACTO ================= -->
     <section id="contacto" class="section section-alt">
       <div class="container contact-grid">
@@ -446,5 +599,6 @@
 
   <%- include('partials/footer') %>
   <script src="/js/main.js"></script>
+  <script src="/js/landing.js" defer></script>
 </body>
 </html>
