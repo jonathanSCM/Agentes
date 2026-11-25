@@ -395,3 +395,29 @@ describe('saludos: un mensaje que es solo un saludo abre el menú (no "no entend
     assert.ok(opciones(s).length >= 2, 'muestra las opciones del menú');
   });
 });
+
+describe('pedir horarios libres para agendar (no es el horario de atención)', () => {
+  const info = (s) => /horario de atenci[oó]n/i.test(s.respuesta);
+  test('las intenciones distinguen agendar de preguntar el horario', () => {
+    assert.equal(Bot.intencionDe('uiero agendar un corte con ana, para mañana, que horarios tiene libre?'), 'agendar');
+    assert.equal(Bot.intencionDe('qué horarios hay disponibles'), 'agendar');
+    assert.equal(Bot.intencionDe('cuál es su horario de atención'), 'info');
+    assert.equal(Bot.intencionDe('a qué hora abren mañana'), 'info');
+    assert.equal(Bot.intencionDe('dónde queda el lugar'), 'info');
+  });
+  test('con servicio, profesional y día muestra los horarios libres de esa persona', async () => {
+    const c = cliente(A, unTel());
+    const s = await c.di('uiero agendar un corte con ana, para mañana, que horarios tiene libre?');
+    assert.ok(!info(s), s.respuesta);
+    assert.match(s.respuesta, /Horarios libres/);
+    assert.ok(opciones(s).every((o) => o.id.startsWith(`ct:hr:${corte.id}:${ana.id}:`) || o.id.startsWith('ct:hmas:')), opciones(s)[0].id);
+  });
+  test('"qué horarios tiene Beto mañana" sin servicio: pide el servicio y recuerda con quién y cuándo', async () => {
+    const c = cliente(A, unTel());
+    let s = await c.di('que horarios tiene beto mañana?');
+    assert.ok(!info(s), s.respuesta);
+    s = await c.elige(s, 'Corte');
+    assert.match(s.respuesta, /Horarios libres/);
+    assert.ok(opciones(s)[0].id.includes(`:${corte.id}:${beto.id}:`), opciones(s)[0].id);
+  });
+});
